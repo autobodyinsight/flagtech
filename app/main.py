@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from app.routes.estimate import router as estimate_router
-from app.routes.ui import router as ui_router   # <-- add this
+from app.routes.ui import router as ui_router  # <-- this line adds the UI
 
 app = FastAPI(title="FlagTech Estimate Parser")
 
