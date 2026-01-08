@@ -33,13 +33,13 @@ async def parse_ui(file: UploadFile = File(...)):
         rows += f"""
         <tr>
             <td>{item.line}</td>
-            <td>{item.operation}</td>
-            <td>{item.description}</td>
-            <td>{item.part_number}</td>
-            <td>{item.quantity}</td>
-            <td>{item.price}</td>
-            <td>{item.labor}</td>
-            <td>{item.paint}</td>
+            <td>{item.operation or ''}</td>
+            <td>{item.description or ''}</td>
+            <td>{item.part_number or ''}</td>
+            <td>{item.quantity if item.quantity is not None else ''}</td>
+            <td>{item.price if item.price is not None else ''}</td>
+            <td>{item.labor if item.labor is not None else ''}</td>
+            <td>{item.paint if item.paint is not None else ''}</td>
         </tr>
         """
 
