@@ -38,9 +38,10 @@ def _parse_space_delimited_line(stripped: str):
             idx += 1
 
     # Find numeric tokens and classify currency-like tokens so we don't
-    # confuse extended price with labor/paint hours.
+    # confuse extended price with labor/paint hours. Scan left-to-right so
+    # we can assign small-number candidates in reading order.
     numeric_tokens = []  # (i, raw_token, float_value)
-    for i in range(len(tokens) - 1, idx - 1, -1):
+    for i in range(idx, len(tokens)):
         raw = tokens[i]
         raw_clean = raw.replace(",", "").replace("$", "")
         if re.match(r"^-?\d+(?:\.\d+)?$", raw_clean):
@@ -63,8 +64,8 @@ def _parse_space_delimited_line(stripped: str):
 
     # collect small-number candidates (likely hours), skipping qty before currency
     small_candidates = []  # (i,val)
-    for i, raw, val in numeric_tokens:
-        next_idx = i + 1
+    for idx_num, raw, val in numeric_tokens:
+        next_idx = idx_num + 1
         next_is_currency = False
         if next_idx < len(tokens):
             nxt = tokens[next_idx].replace(",", "").replace("$", "")
@@ -82,19 +83,29 @@ def _parse_space_delimited_line(stripped: str):
             # probably a Qty value (e.g., '1' before extended price) -> skip
             continue
         if abs(val) <= 24:
-            small_candidates.append((i, val))
+            small_candidates.append((idx_num, val))
 
     labor = None
     paint = None
     if small_candidates:
-        # last small is paint, second-last small is labor
-        paint = helpers.clean_float(str(small_candidates[0][1]))
+        # assign left-to-right: first small -> labor, second -> paint
+        labor = helpers.clean_float(str(small_candidates[0][1]))
         if len(small_candidates) >= 2:
-            labor = helpers.clean_float(str(small_candidates[1][1]))
+            paint = helpers.clean_float(str(small_candidates[1][1]))
 
     numeric_indices = [i for i, _, _ in numeric_tokens]
-    end_idx = min(numeric_indices) if numeric_indices else len(tokens)
-    description = " ".join(tokens[idx:end_idx]).strip()
+    end_idx = numeric_indices[0] if numeric_indices else len(tokens)
+
+    # Build description but strip part-number tokens (alphanumeric IDs)
+    desc_tokens = []
+    part_re = re.compile(r"(?=.*[A-Za-z])(?=.*\d)[A-Za-z0-9\-_/]{4,}")
+    for t in tokens[idx:end_idx]:
+        if part_re.search(t):
+            continue
+        if t.lower() in ("incl.", "incl", "m"):
+            continue
+        desc_tokens.append(t)
+    description = " ".join(desc_tokens).strip()
 
     return (line_no, operation, description, labor, paint)
 
@@ -143,9 +154,6 @@ def parse_estimate_text(text: str):
                 line=line_no,
                 operation=operation,
                 description=description,
-                part_number=None,
-                quantity=None,
-                price=None,
                 labor=labor,
                 paint=paint,
             ))
@@ -161,9 +169,6 @@ def parse_estimate_text(text: str):
             line=line_no,
             operation=operation,
             description=description or "",
-            part_number=None,
-            quantity=None,
-            price=None,
             labor=labor,
             paint=paint,
         ))

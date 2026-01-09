@@ -44,9 +44,6 @@ async def parse_ui(file: UploadFile = File(...)):
             <td>{item.line}</td>
             <td>{item.operation or ''}</td>
             <td>{item.description or ''}</td>
-            <td>{item.part_number or ''}</td>
-            <td>{item.quantity if item.quantity is not None else ''}</td>
-            <td>{item.price if item.price is not None else ''}</td>
             <td>{item.labor if item.labor is not None else ''}</td>
             <td>{item.paint if item.paint is not None else ''}</td>
         </tr>
@@ -64,9 +61,6 @@ async def parse_ui(file: UploadFile = File(...)):
             <th>Line</th>
             <th>Op</th>
             <th>Description</th>
-            <th>Part #</th>
-            <th>Qty</th>
-            <th>Price</th>
             <th>Labor</th>
             <th>Paint</th>
         </tr>
