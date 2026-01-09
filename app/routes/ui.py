@@ -26,7 +26,16 @@ async def upload_form():
 @router.post("/parse", response_class=HTMLResponse)
 async def parse_ui(file: UploadFile = File(...)):
     text = extract_text_from_pdf(file)
+    # Debug logging: show a truncated preview of extracted text
+    try:
+        print("===EXTRACTED TEXT PREVIEW (truncated)===")
+        print(text[:4000])
+        print("===END PREVIEW===")
+    except Exception:
+        print("[extractor] could not print text preview")
+
     items = parse_estimate_text(text)
+    print(f"[parser] parsed {len(items)} items")
 
     rows = ""
     for item in items:
