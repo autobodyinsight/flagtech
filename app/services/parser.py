@@ -62,6 +62,9 @@ def _parse_space_delimited_line(stripped: str):
             return True
         return False
 
+    # Precompute currency-like tokens for use in heuristics
+    currency_tokens = [(i, raw, val) for (i, raw, val) in numeric_tokens if is_currency_like(raw, val)]
+
     # collect small-number candidates (likely hours), skipping qty before currency
     small_candidates = []  # (i,val)
     for idx_num, raw, val in numeric_tokens:
@@ -87,11 +90,28 @@ def _parse_space_delimited_line(stripped: str):
 
     labor = None
     paint = None
+    # Decide mapping of small numeric candidates to labor/paint
     if small_candidates:
-        # assign left-to-right: first small -> labor, second -> paint
-        labor = helpers.clean_float(str(small_candidates[0][1]))
+        # If two or more small numbers, assume penultimate->labor and last->paint
         if len(small_candidates) >= 2:
-            paint = helpers.clean_float(str(small_candidates[1][1]))
+            labor = helpers.clean_float(str(small_candidates[-2][1]))
+            paint = helpers.clean_float(str(small_candidates[-1][1]))
+        else:
+            # Single small candidate: decide by presence of 'Incl' or currency before it
+            idx_single, val_single = small_candidates[0]
+            tokens_after_desc = tokens[idx:idx_single]
+            incl_present = any(t.lower().strip(".,") in ("incl", "incl.", "m") for t in tokens_after_desc)
+            currency_before = any(i < idx_single for (i, _, _) in currency_tokens)
+
+            if incl_present:
+                # labor is 'Incl.' -> treat single small as paint
+                paint = helpers.clean_float(str(val_single))
+            elif currency_before:
+                # presence of currency earlier suggests this small number is paint
+                paint = helpers.clean_float(str(val_single))
+            else:
+                # default: single small number is labor
+                labor = helpers.clean_float(str(val_single))
 
     numeric_indices = [i for i, _, _ in numeric_tokens]
     end_idx = numeric_indices[0] if numeric_indices else len(tokens)
