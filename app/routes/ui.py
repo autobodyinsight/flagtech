@@ -59,14 +59,23 @@ async def upload_form():
 <html>
 <head>
     <title>FlagTech Estimate Parser</title>
-    <style>body{font-family:Arial; padding:40px;}</style>
 </head>
-<body>
+<body style="font-family: Arial; padding: 40px;">
     <h2>Upload an Estimate PDF</h2>
-    <form action="/ui/grid" method="post" enctype="multipart/form-data">
+    <form action="/ui/parse" method="post" enctype="multipart/form-data">
         <input type="file" name="file" accept="application/pdf" />
         <br><br>
-        <button type="submit">View Estimate</button>
+        <button type="submit">Parse Estimate</button>
+    </form>
+    <br>
+    <h3>Visual Layout / Aligned Table</h3>
+    <form action="/ui/grid" method="post" enctype="multipart/form-data" style="display:inline-block; margin-right:12px;">
+        <input type="file" name="file" accept="application/pdf" />
+        <button type="submit">Show Visual Grid</button>
+    </form>
+    <form action="/ui/aligned" method="post" enctype="multipart/form-data" style="display:inline-block;">
+        <input type="file" name="file" accept="application/pdf" />
+        <button type="submit">Show Aligned Table</button>
     </form>
 </body>
 </html>
@@ -129,14 +138,15 @@ async def grid_ui(file: UploadFile = File(...)):
     if not pages:
         return "<html><body><p>No words found in PDF.</p><a href='/ui'>Back</a></body></html>"
 
+    display_w = 800
     # Prepare xmid/ymid and page index on words
-    all_words = []
     for pi, page in enumerate(pages, start=1):
         for w in page.get("words", []):
             w["page_index"] = pi
-            w["xmid"] = (w["x0"] + w["x1"]) / 2.0
-            w["ymid"] = (w["y0"] + w["y1"]) / 2.0
-            all_words.append(w)
+            if "xmid" not in w:
+                w["xmid"] = (w["x0"] + w["x1"]) / 2.0
+            if "ymid" not in w:
+                w["ymid"] = (w["y0"] + w["y1"]) / 2.0
 
     # detect first line-item row (anchor)
     anchor_page = None
@@ -144,6 +154,7 @@ async def grid_ui(file: UploadFile = File(...)):
     for pi, page in enumerate(pages, start=1):
         rows = _group_rows(page.get("words", []), y_thresh=6.0)
         for r in rows:
+            # left-most word in row
             left = min(r["words"], key=lambda w: w["xmid"]) if r["words"] else None
             if not left:
                 continue
@@ -154,164 +165,37 @@ async def grid_ui(file: UploadFile = File(...)):
         if anchor_page:
             break
 
-    # compute column centers
-    if anchor_page:
-        xvals = [w["xmid"] for w in all_words if (w["page_index"] > anchor_page) or (w["page_index"] == anchor_page and w["ymid"] >= (anchor_ymid - 3.0))]
-    else:
-        xvals = [w["xmid"] for w in all_words]
-
-    centers = _kmeans_1d(xvals, 5, iters=40) if xvals else []
-    centers_sorted = sorted(centers) if centers else []
-
-    # Build table rows with editable fields
-    table_rows = ""
-    labor_total = 0.0
-    paint_total = 0.0
-    row_index = 0
-    
-    def esc(s):
-        return (s or "").replace("<", "&lt;").replace(">", "&gt;")
-    
-    def parse_num(s):
-        if not s:
-            return 0.0
-        s = str(s).replace("$", "").replace(",", "").strip()
-        try:
-            return float(s)
-        except ValueError:
-            return 0.0
-
+    pages_html = ""
     for pi, page in enumerate(pages, start=1):
+        # skip pages before anchor
         if anchor_page and pi < anchor_page:
             continue
-        rows = _group_rows(page.get("words", []), y_thresh=6.0)
-        for r in rows:
-            if anchor_page and pi == anchor_page and anchor_ymid is not None and r["ymid"] < (anchor_ymid - 3.0):
-                continue
-            wlist = sorted(r["words"], key=lambda ww: ww.get("xmid", 0))
-            cols = {i: [] for i in range(len(centers_sorted) or 5)}
-            for ww in wlist:
-                if centers_sorted:
-                    best = min(range(len(centers_sorted)), key=lambda c: abs(ww.get("xmid", 0) - centers_sorted[c]))
-                else:
-                    best = 2
-                cols.setdefault(best, []).append(ww)
+        w = page.get("width", 1)
+        h = page.get("height", 1)
+        scale = display_w / w if w else 1.0
 
-            vals = []
-            for i in range(5):
-                part = " ".join(w.get("text", "") for w in sorted(cols.get(i, []), key=lambda z: z.get("xmid", 0)))
-                vals.append(part)
-
-            # filter likely header rows
-            left_col = vals[0].strip() if vals else ""
-            combined_text = " ".join(vals).lower()
-            if not re.search(r"\b\d+\b", left_col):
-                if any(k in combined_text for k in ("customer", "address", "vin", "page", "estimate", "phone", "fax")):
+        boxes_html = ""
+        for wd in page.get("words", []):
+            # if this is the anchor page, skip words above the anchor_ymid
+            if anchor_page and pi == anchor_page and anchor_ymid is not None:
+                if wd.get("ymid", 0) < (anchor_ymid - 3.0):
                     continue
-                if left_col.lower() in ("line", "line#", "no", "qty"):
-                    continue
+            x = wd["x0"] * scale
+            y = wd["y0"] * scale
+            ww = (wd["x1"] - wd["x0"]) * scale
+            hh = (wd["y1"] - wd["y0"]) * scale
+            txt = wd["text"].replace("<", "&lt;").replace(">", "&gt;")
+            boxes_html += f"<div style='position:absolute; left:{x}px; top:{y}px; width:{ww}px; height:{hh}px; border:1px solid rgba(0,120,215,0.6); font-size:10px; overflow:hidden;'>{txt}</div>"
 
-            labor_text = vals[3] if len(vals) > 3 else ""
-            paint_text = vals[4] if len(vals) > 4 else ""
-            
-            labor_val = parse_num(labor_text)
-            paint_val = parse_num(paint_text)
-            labor_total += labor_val
-            paint_total += paint_val
-
-            table_rows += f"""
-        <tr id="row-{row_index}">
-            <td>{esc(vals[0])}</td>
-            <td>{esc(vals[1])}</td>
-            <td>{esc(vals[2])}</td>
-            <td>
-                <input type="checkbox" class="include-labor" checked data-index="{row_index}" style="margin-right:5px;">
-                <input type="number" class="labor-input" data-index="{row_index}" value="{labor_val}" step="0.01" style="width:60px;">
-            </td>
-            <td>
-                <input type="checkbox" class="include-paint" checked data-index="{row_index}" style="margin-right:5px;">
-                <input type="number" class="paint-input" data-index="{row_index}" value="{paint_val}" step="0.01" style="width:60px;">
-            </td>
-        </tr>
-        """
-            row_index += 1
-    
-    # Add totals row
-    table_rows += """
-        <tr style="font-weight: bold; background-color: #f0f0f0;">
-            <td colspan="3">TOTALS</td>
-            <td><span id="labor-total">0.00</span></td>
-            <td><span id="paint-total">0.00</span></td>
-        </tr>
-        """
+        pages_html += f"<h3>Page {pi}</h3><div style='position:relative; width:{display_w}px; height:{int(h*scale)}px; border:1px solid #ccc; margin-bottom:20px;'>{boxes_html}</div>"
 
     html = f"""
 <html>
-<head>
-    <title>Estimate Editor</title>
-    <style>
-        body {{ font-family: Arial; padding: 20px; }}
-        table {{ border-collapse: collapse; margin-top: 20px; }}
-        th, td {{ border: 1px solid #ddd; padding: 8px; text-align: left; }}
-        th {{ background-color: #f9f9f9; }}
-        input[type="number"] {{ padding: 4px; }}
-        input[type="checkbox"] {{ cursor: pointer; }}
-    </style>
-</head>
-<body>
-    <h2>Estimate Editor</h2>
-    <table border="1" cellpadding="6" cellspacing="0">
-        <tr>
-            <th>Line</th>
-            <th>Op</th>
-            <th>Description</th>
-            <th>Labor Hours</th>
-            <th>Paint Hours</th>
-        </tr>
-        {table_rows}
-    </table>
-    <br><a href='/ui'>Back</a>
-    
-    <script>
-        function updateTotals() {{
-            let laborTotal = 0;
-            let paintTotal = 0;
-            
-            document.querySelectorAll('.labor-input').forEach(input => {{
-                const index = input.getAttribute('data-index');
-                const checkbox = document.querySelector(`.include-labor[data-index="${{index}}"]`);
-                if (checkbox && checkbox.checked) {{
-                    laborTotal += parseFloat(input.value) || 0;
-                }}
-            }});
-            
-            document.querySelectorAll('.paint-input').forEach(input => {{
-                const index = input.getAttribute('data-index');
-                const checkbox = document.querySelector(`.include-paint[data-index="${{index}}"]`);
-                if (checkbox && checkbox.checked) {{
-                    paintTotal += parseFloat(input.value) || 0;
-                }}
-            }});
-            
-            document.getElementById('labor-total').textContent = laborTotal.toFixed(2);
-            document.getElementById('paint-total').textContent = paintTotal.toFixed(2);
-        }}
-        
-        document.addEventListener('DOMContentLoaded', function() {{
-            // Initial calculation
-            updateTotals();
-            
-            // Add listeners to all inputs and checkboxes
-            document.querySelectorAll('.labor-input, .paint-input').forEach(input => {{
-                input.addEventListener('change', updateTotals);
-                input.addEventListener('input', updateTotals);
-            }});
-            
-            document.querySelectorAll('.include-labor, .include-paint').forEach(checkbox => {{
-                checkbox.addEventListener('change', updateTotals);
-            }});
-        }});
-    </script>
+<head><title>Visual Grid</title></head>
+<body style='font-family:Arial; padding:20px;'>
+  <h2>Document Visual Grid</h2>
+  {pages_html}
+  <br><a href='/ui'>Back</a>
 </body>
 </html>
 """
