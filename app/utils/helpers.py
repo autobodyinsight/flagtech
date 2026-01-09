@@ -40,7 +40,8 @@ def strip_line_artifacts(line: str) -> str:
 
 def is_estimate_line(line: str) -> bool:
     """Check if a line looks like a valid estimate row (starts with a line number)."""
-    return bool(re.match(r"^\|?\s*\d+\s*\|", line))
+    # Accept lines that start with a number (with or without surrounding pipes)
+    return bool(re.match(r"^\s*\d+\b", line))
 
 def safe_split(line: str, delimiter: str = "|") -> list[str]:
     """Split a line safely by delimiter and strip each part."""
