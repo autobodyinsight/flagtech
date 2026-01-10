@@ -62,21 +62,12 @@ async def upload_form():
 </head>
 <body style="font-family: Arial; padding: 40px;">
     <h2>Upload an Estimate PDF</h2>
-    <form action="/ui/parse" method="post" enctype="multipart/form-data">
-        <input type="file" name="file" accept="application/pdf" />
-        <br><br>
-        <button type="submit">Parse Estimate</button>
+    <form id="uploadForm" action="/ui/grid" method="post" enctype="multipart/form-data">
+        <input type="file" name="file" accept="application/pdf" onchange="this.form.submit()" />
     </form>
-    <br>
-    <h3>Visual Layout / Aligned Table</h3>
-    <form action="/ui/grid" method="post" enctype="multipart/form-data" style="display:inline-block; margin-right:12px;">
-        <input type="file" name="file" accept="application/pdf" />
-        <button type="submit">Show Visual Grid</button>
-    </form>
-    <form action="/ui/aligned" method="post" enctype="multipart/form-data" style="display:inline-block;">
-        <input type="file" name="file" accept="application/pdf" />
-        <button type="submit">Show Aligned Table</button>
-    </form>
+    <script>
+        // Auto-submit form when file is selected
+    </script>
 </body>
 </html>
 """
@@ -138,7 +129,7 @@ async def grid_ui(file: UploadFile = File(...)):
     if not pages:
         return "<html><body><p>No words found in PDF.</p><a href='/ui'>Back</a></body></html>"
 
-    display_w = 800
+    display_w = 1200
     # Prepare xmid/ymid and page index on words
     for pi, page in enumerate(pages, start=1):
         for w in page.get("words", []):
@@ -178,7 +169,33 @@ async def grid_ui(file: UploadFile = File(...)):
         if anchor_page and subtotals_page:
             break
 
+    # Collect all words to find column positions
+    all_words = []
+    for pi, page in enumerate(pages, start=1):
+        if anchor_page and pi < anchor_page:
+            continue
+        if subtotals_page and pi > subtotals_page:
+            continue
+        for wd in page.get("words", []):
+            if anchor_page and pi == anchor_page and anchor_ymid is not None:
+                if wd.get("ymid", 0) < (anchor_ymid - 3.0):
+                    continue
+            if subtotals_page and pi == subtotals_page and subtotals_ymid is not None:
+                if wd.get("ymid", 0) > subtotals_ymid:
+                    continue
+            all_words.append(wd)
+    
+    # Use k-means to find 5 columns
+    xvals = [w["xmid"] for w in all_words]
+    centers = _kmeans_1d(xvals, 5, iters=40)
+    centers_sorted = sorted(centers) if centers else []
+    
+    # Assume columns are: Line, Op, Description, Labor, Paint
+    line_col_x = centers_sorted[0] if len(centers_sorted) > 0 else None
+    paint_col_x = centers_sorted[4] if len(centers_sorted) > 4 else None
+
     pages_html = ""
+    paint_items = []  # Store items with paint values for the modal
     for pi, page in enumerate(pages, start=1):
         # skip pages before anchor
         if anchor_page and pi < anchor_page:
@@ -191,31 +208,161 @@ async def grid_ui(file: UploadFile = File(...)):
         scale = display_w / w if w else 1.0
 
         boxes_html = ""
+        
+        # First, group words into rows and extract line/paint pairs
+        page_words = []
         for wd in page.get("words", []):
             # if this is the anchor page, skip words above the anchor_ymid
             if anchor_page and pi == anchor_page and anchor_ymid is not None:
                 if wd.get("ymid", 0) < (anchor_ymid - 3.0):
                     continue
-            # if this is the subtotals page, skip words below the subtotals_ymid
+            # if this is the subtotals page, skip words at or below the subtotals_ymid
             if subtotals_page and pi == subtotals_page and subtotals_ymid is not None:
-                if wd.get("ymid", 0) > subtotals_ymid:
+                if wd.get("ymid", 0) >= (subtotals_ymid - 3.0):
                     continue
+            page_words.append(wd)
+        
+        # Group into rows
+        rows = _group_rows(page_words, y_thresh=6.0)
+        
+        # Extract line numbers and paint values from rows
+        for row in rows:
+            row_words = sorted(row["words"], key=lambda x: x["xmid"])
+            line_num = None
+            paint_val = None
+            
+            for wd in row_words:
+                word_xmid = wd.get("xmid", (wd["x0"] + wd["x1"]) / 2.0)
+                
+                # Check if this is a line number
+                if line_col_x and abs(word_xmid - line_col_x) < 40:
+                    if re.match(r'^\d+$', wd["text"].strip()):
+                        line_num = wd["text"].strip()
+                
+                # Check if this is a paint value (only in paint column, not labor)
+                if paint_col_x and abs(word_xmid - paint_col_x) < 30:
+                    if re.match(r'^(\d+\.?\d*)$', wd["text"].strip()):
+                        try:
+                            paint_val = float(wd["text"].strip())
+                        except:
+                            pass
+            
+            # Add to paint_items ONLY if we found a line number AND a paint value in the paint column
+            if line_num and paint_val is not None:
+                paint_items.append({
+                    "line": line_num,
+                    "value": paint_val
+                })
+        
+        # Now display all words
+        for wd in page_words:
             x = wd["x0"] * scale
             y = wd["y0"] * scale
             ww = (wd["x1"] - wd["x0"]) * scale
             hh = (wd["y1"] - wd["y0"]) * scale
             txt = wd["text"].replace("<", "&lt;").replace(">", "&gt;")
-            boxes_html += f"<div style='position:absolute; left:{x}px; top:{y}px; width:{ww}px; height:{hh}px; border:1px solid rgba(0,120,215,0.6); font-size:10px; overflow:hidden;'>{txt}</div>"
+            boxes_html += f"<div style='position:absolute; left:{x}px; top:{y}px; width:{ww}px; height:{hh}px; border:1px solid rgba(0,120,215,0.6); font-size:15px; overflow:hidden;'>{txt}</div>"
 
         pages_html += f"<h3>Page {pi}</h3><div style='position:relative; width:{display_w}px; height:{int(h*scale)}px; border:1px solid #ccc; margin-bottom:20px;'>{boxes_html}</div>"
 
+    # Calculate total paint value
+    total_paint = sum(item["value"] for item in paint_items)
+    paint_items_json = str(paint_items).replace("'", '"')
+
     html = f"""
 <html>
-<head><title>Visual Grid</title></head>
+<head>
+    <title>Visual Grid</title>
+    <style>
+        .modal {{
+            display: none;
+            position: fixed;
+            z-index: 1;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.4);
+        }}
+        .modal-content {{
+            background-color: #fefefe;
+            margin: 10% auto;
+            padding: 20px;
+            border: 1px solid #888;
+            width: 500px;
+            border-radius: 5px;
+        }}
+        .close {{
+            color: #aaa;
+            float: right;
+            font-size: 28px;
+            font-weight: bold;
+            cursor: pointer;
+        }}
+        .close:hover {{
+            color: black;
+        }}
+        .paint-item {{
+            padding: 8px;
+            border-bottom: 1px solid #ddd;
+            display: flex;
+            justify-content: space-between;
+        }}
+        .paint-total {{
+            padding: 12px 8px;
+            font-weight: bold;
+            background-color: #f0f0f0;
+            margin-top: 10px;
+            text-align: right;
+        }}
+    </style>
+</head>
 <body style='font-family:Arial; padding:20px;'>
   <h2>Document Visual Grid</h2>
+  <button onclick="openPaintModal()" style='padding:10px 20px; font-size:14px; cursor:pointer; background-color:#0078d7; color:white; border:none; border-radius:3px;'>Assign Paint</button>
+  <br><br>
   {pages_html}
   <br><a href='/ui'>Back</a>
+  
+  <div id="paintModal" class="modal">
+    <div class="modal-content">
+      <span class="close" onclick="closePaintModal()">&times;</span>
+      <h2>Paint Assignment</h2>
+      <div id="paintList"></div>
+      <div class="paint-total">Total Paint Hours: <span id="totalPaint">{total_paint}</span></div>
+    </div>
+  </div>
+  
+  <script>
+    const paintItems = {paint_items_json};
+    
+    function openPaintModal() {{
+      const modal = document.getElementById('paintModal');
+      let html = '';
+      
+      if (paintItems.length === 0) {{
+        html = '<p>No paint items found.</p>';
+      }} else {{
+        paintItems.forEach(item => {{
+          html += `<div class="paint-item"><span>Line ${{item.line}}</span><span>${{item.value}} hrs</span></div>`;
+        }});
+      }}
+      
+      document.getElementById('paintList').innerHTML = html;
+      modal.style.display = 'block';
+    }}
+    
+    function closePaintModal() {{
+      document.getElementById('paintModal').style.display = 'none';
+    }}
+    
+    window.onclick = function(event) {{
+      const modal = document.getElementById('paintModal');
+      if (event.target == modal) {{
+        modal.style.display = 'none';
+      }}
+    }}
+  </script>
 </body>
 </html>
 """
