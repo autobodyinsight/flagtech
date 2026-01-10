@@ -148,27 +148,43 @@ async def grid_ui(file: UploadFile = File(...)):
             if "ymid" not in w:
                 w["ymid"] = (w["y0"] + w["y1"]) / 2.0
 
-    # detect first line-item row (anchor)
+    # detect second RO row (anchor) and ESTIMATE TOTALS row (end marker)
     anchor_page = None
     anchor_ymid = None
+    subtotals_page = None
+    subtotals_ymid = None
+    ro_count = 0
+    
     for pi, page in enumerate(pages, start=1):
         rows = _group_rows(page.get("words", []), y_thresh=6.0)
         for r in rows:
-            # left-most word in row
-            left = min(r["words"], key=lambda w: w["xmid"]) if r["words"] else None
-            if not left:
-                continue
-            if re.search(r"\b\d+\b", left["text"]):
-                anchor_page = pi
-                anchor_ymid = r["ymid"]
+            row_text = " ".join(w.get("text", "") for w in r["words"]).strip()
+            
+            # Look for RO and use the second occurrence as anchor
+            if re.search(r"\bRO\b", row_text):
+                ro_count += 1
+                if ro_count == 2 and not anchor_page:
+                    anchor_page = pi
+                    anchor_ymid = r["ymid"]
+            
+            # Look for ESTIMATE TOTALS as end marker
+            if not subtotals_page and re.search(r"\bESTIMATE\s+TOTALS\b", row_text):
+                subtotals_page = pi
+                subtotals_ymid = r["ymid"]
+            
+            if anchor_page and subtotals_page:
                 break
-        if anchor_page:
+        
+        if anchor_page and subtotals_page:
             break
 
     pages_html = ""
     for pi, page in enumerate(pages, start=1):
         # skip pages before anchor
         if anchor_page and pi < anchor_page:
+            continue
+        # skip pages after subtotals
+        if subtotals_page and pi > subtotals_page:
             continue
         w = page.get("width", 1)
         h = page.get("height", 1)
@@ -179,6 +195,10 @@ async def grid_ui(file: UploadFile = File(...)):
             # if this is the anchor page, skip words above the anchor_ymid
             if anchor_page and pi == anchor_page and anchor_ymid is not None:
                 if wd.get("ymid", 0) < (anchor_ymid - 3.0):
+                    continue
+            # if this is the subtotals page, skip words below the subtotals_ymid
+            if subtotals_page and pi == subtotals_page and subtotals_ymid is not None:
+                if wd.get("ymid", 0) > subtotals_ymid:
                     continue
             x = wd["x0"] * scale
             y = wd["y0"] * scale
@@ -221,24 +241,43 @@ async def aligned_ui(file: UploadFile = File(...)):
     if not all_words:
         return "<html><body><p>No words found in PDF.</p><a href='/ui'>Back</a></body></html>"
 
-    # determine anchor (first detected line-item row)
+    # determine anchor (second RO row) and end marker (ESTIMATE TOTALS row)
     anchor_page = None
     anchor_ymid = None
+    subtotals_page = None
+    subtotals_ymid = None
+    ro_count = 0
+    
     for pi, page in enumerate(pages, start=1):
         rows = _group_rows(page.get("words", []), y_thresh=6.0)
         for r in rows:
-            left = min(r["words"], key=lambda w: w.get("xmid", 0)) if r["words"] else None
-            if left and re.search(r"\b\d+\b", left.get("text", "")):
-                anchor_page = pi
-                anchor_ymid = r["ymid"]
+            row_text = " ".join(w.get("text", "") for w in r["words"]).strip()
+            
+            # Look for RO and use the second occurrence as anchor
+            if re.search(r"\bRO\b", row_text):
+                ro_count += 1
+                if ro_count == 2 and not anchor_page:
+                    anchor_page = pi
+                    anchor_ymid = r["ymid"]
+            
+            # Look for ESTIMATE TOTALS as end marker
+            if not subtotals_page and re.search(r"\bESTIMATE\s+TOTALS\b", row_text):
+                subtotals_page = pi
+                subtotals_ymid = r["ymid"]
+            
+            if anchor_page and subtotals_page:
                 break
-        if anchor_page:
+        
+        if anchor_page and subtotals_page:
             break
 
     # collect all xmid values to cluster into 5 columns (global across pages)
-    # if anchor found, only use words at/after anchor to compute centers
+    # if anchor found, only use words at/after anchor and before subtotals to compute centers
     if anchor_page:
-        xvals = [w["xmid"] for w in all_words if (w["page_index"] > anchor_page) or (w["page_index"] == anchor_page and w["ymid"] >= (anchor_ymid - 3.0))]
+        if subtotals_page:
+            xvals = [w["xmid"] for w in all_words if (w["page_index"] > anchor_page and w["page_index"] < subtotals_page) or (w["page_index"] == anchor_page and w["ymid"] >= anchor_ymid) or (w["page_index"] == subtotals_page and w["ymid"] <= subtotals_ymid)]
+        else:
+            xvals = [w["xmid"] for w in all_words if (w["page_index"] > anchor_page) or (w["page_index"] == anchor_page and w["ymid"] >= anchor_ymid)]
     else:
         xvals = [w["xmid"] for w in all_words]
     centers = _kmeans_1d(xvals, 5, iters=40)
@@ -251,6 +290,10 @@ async def aligned_ui(file: UploadFile = File(...)):
     table_rows = ""
     # process pages in order and append their rows
     for page_idx, page in enumerate(pages, start=1):
+        # skip pages after subtotals
+        if subtotals_page and page_idx > subtotals_page:
+            continue
+        
         # ensure per-page xmid/ymid are present
         for wdict in page.get("words", []):
             if "xmid" not in wdict:
@@ -260,6 +303,14 @@ async def aligned_ui(file: UploadFile = File(...)):
 
         rows = _group_rows(page.get("words", []), y_thresh=6.0)
         for r in rows:
+            # skip rows above anchor (RO) or at/below subtotals
+            if anchor_page and page_idx == anchor_page and anchor_ymid is not None:
+                if r["ymid"] < anchor_ymid:
+                    continue
+            if subtotals_page and page_idx == subtotals_page and subtotals_ymid is not None:
+                if r["ymid"] >= subtotals_ymid:
+                    continue
+            
             # sort words in row by x
             wlist = sorted(r["words"], key=lambda ww: ww["xmid"])
             cols = {i: [] for i in range(len(centers_sorted))}
@@ -278,7 +329,7 @@ async def aligned_ui(file: UploadFile = File(...)):
             left_col = vals[0].strip() if vals else ""
             combined_text = " ".join(vals).lower()
             if not re.search(r"\b\d+\b", left_col):
-                if any(k in combined_text for k in ("customer", "address", "vin", "page", "estimate", "phone", "fax")):
+                if any(k in combined_text for k in ("customer", "address", "vin", "page", "estimate", "phone", "fax", "ro")):
                     continue
                 if left_col.lower() in ("line", "line#", "no", "qty"):
                     continue
