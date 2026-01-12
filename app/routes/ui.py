@@ -230,6 +230,7 @@ async def grid_ui(file: UploadFile = File(...)):
             row_words = sorted(row["words"], key=lambda x: x["xmid"])
             line_num = None
             paint_val = None
+            description = []
             
             for wd in row_words:
                 word_xmid = wd.get("xmid", (wd["x0"] + wd["x1"]) / 2.0)
@@ -238,6 +239,11 @@ async def grid_ui(file: UploadFile = File(...)):
                 if line_col_x and abs(word_xmid - line_col_x) < 40:
                     if re.match(r'^\d+$', wd["text"].strip()):
                         line_num = wd["text"].strip()
+                
+                # Collect description text (everything in the middle)
+                elif line_col_x and paint_col_x:
+                    if line_col_x < word_xmid < paint_col_x:
+                        description.append(wd["text"].strip())
                 
                 # Check if this is a paint value (only in paint column, not labor)
                 if paint_col_x and abs(word_xmid - paint_col_x) < 30:
@@ -251,6 +257,7 @@ async def grid_ui(file: UploadFile = File(...)):
             if line_num and paint_val is not None:
                 paint_items.append({
                     "line": line_num,
+                    "description": " ".join(description),
                     "value": paint_val
                 })
         
@@ -286,10 +293,13 @@ async def grid_ui(file: UploadFile = File(...)):
         }}
         .modal-content {{
             background-color: #fefefe;
-            margin: 10% auto;
+            margin: 2% auto;
             padding: 20px;
             border: 1px solid #888;
-            width: 500px;
+            width: 95%;
+            max-width: 1400px;
+            height: 80vh;
+            overflow-y: auto;
             border-radius: 5px;
         }}
         .close {{
@@ -303,10 +313,12 @@ async def grid_ui(file: UploadFile = File(...)):
             color: black;
         }}
         .paint-item {{
-            padding: 8px;
+            padding: 12px;
             border-bottom: 1px solid #ddd;
             display: flex;
             justify-content: space-between;
+            align-items: flex-start;
+            gap: 20px;
         }}
         .paint-total {{
             padding: 12px 8px;
@@ -344,7 +356,7 @@ async def grid_ui(file: UploadFile = File(...)):
         html = '<p>No paint items found.</p>';
       }} else {{
         paintItems.forEach(item => {{
-          html += `<div class="paint-item"><span>Line ${{item.line}}</span><span>${{item.value}} hrs</span></div>`;
+          html += `<div class="paint-item"><div><strong>Line ${{item.line}}</strong> - ${{item.description}}</div><div>${{item.value}} hrs</div></div>`;
         }});
       }}
       
