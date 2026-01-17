@@ -78,6 +78,9 @@ async def home_screen():
             flex-direction: column;
             gap: 10px;
             padding: 20px;
+            position: fixed;
+            height: 100vh;
+            overflow-y: auto;
         }
         .nav-box {
             padding: 15px;
@@ -103,6 +106,9 @@ async def home_screen():
             flex: 1;
             padding: 40px;
             overflow-y: auto;
+            margin-left: 150px;
+            background-color: white;
+            min-height: 100vh;
         }
         .screen {
             display: none;
@@ -123,9 +129,10 @@ async def home_screen():
     <div class="content-area">
         <div id="upload" class="screen active">
             <h2>Upload an Estimate PDF</h2>
-            <form id="uploadForm" action="/ui/grid" method="post" enctype="multipart/form-data">
-                <input type="file" name="file" accept="application/pdf" onchange="this.form.submit()" />
+            <form id="uploadForm" enctype="multipart/form-data">
+                <input type="file" id="fileInput" name="file" accept="application/pdf" onchange="handleFileUpload()" />
             </form>
+            <div id="uploadStatus"></div>
         </div>
         
         <div id="tech" class="screen">
@@ -159,6 +166,39 @@ async def home_screen():
             
             // Add active class to clicked nav box
             event.target.classList.add('active');
+        }
+        
+        function handleFileUpload() {
+            const fileInput = document.getElementById('fileInput');
+            const file = fileInput.files[0];
+            if (!file) return;
+            
+            const formData = new FormData();
+            formData.append('file', file);
+            
+            const statusDiv = document.getElementById('uploadStatus');
+            statusDiv.innerHTML = '<p>Processing...</p>';
+            
+            fetch('/ui/grid?ajax=true', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.text())
+            .then(html => {
+                statusDiv.innerHTML = html;
+                fileInput.value = '';
+                
+                // Execute any scripts in the loaded content
+                const scripts = statusDiv.querySelectorAll('script');
+                scripts.forEach(oldScript => {
+                    const newScript = document.createElement('script');
+                    newScript.innerHTML = oldScript.innerHTML;
+                    document.body.appendChild(newScript);
+                });
+            })
+            .catch(error => {
+                statusDiv.innerHTML = '<p>Error: ' + error.message + '</p>';
+            });
         }
     </script>
 </body>
@@ -236,7 +276,7 @@ async def parse_ui(file: UploadFile = File(...)):
 
 
 @router.post("/grid", response_class=HTMLResponse)
-async def grid_ui(file: UploadFile = File(...)):
+async def grid_ui(file: UploadFile = File(...), ajax: str = None):
     pages = extract_words_from_pdf(file)
     if not pages:
         return "<html><body><p>No words found in PDF.</p><a href='/ui'>Back</a></body></html>"
@@ -400,233 +440,228 @@ async def grid_ui(file: UploadFile = File(...)):
     total_paint = sum(item["value"] for item in paint_items)
     paint_items_json = str(paint_items).replace("'", '"')
 
-    html = f"""
-<html>
-<head>
-    <title>Visual Grid</title>
-    <style>
-        .modal {{
-            display: none;
-            position: fixed;
-            z-index: 1;
-            left: 0;
-            top: 0;
-            width: 100%;
-            height: 100%;
-            background-color: rgba(0,0,0,0.4);
-        }}
-        .modal-content {{
-            background-color: #fefefe;
-            margin: 2% auto;
-            padding: 20px;
-            border: 1px solid #888;
-            width: 95%;
-            max-width: 1400px;
-            height: 80vh;
-            overflow-y: auto;
-            border-radius: 5px;
-        }}
-        .close {{
-            color: #aaa;
-            float: right;
-            font-size: 28px;
-            font-weight: bold;
-            cursor: pointer;
-        }}
-        .close:hover {{
-            color: black;
-        }}
-        .paint-item {{
-            padding: 12px;
-            border-bottom: 1px solid #ddd;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            gap: 20px;
-        }}
-        .paint-item.deducted {{
-            background-color: #f0f0f0;
-            text-decoration: line-through;
-            opacity: 0.6;
-        }}
-        .paint-item-checkbox {{
-            cursor: pointer;
-            width: 18px;
-            height: 18px;
-            margin-right: 10px;
-        }}
-        .paint-total {{
-            padding: 12px 8px;
-            font-weight: bold;
-            background-color: #f0f0f0;
-            margin-top: 10px;
-            text-align: right;
-        }}
-    </style>
-</head>
-<body style='font-family:Arial; padding:20px;'>
-  <h2>Document Visual Grid</h2>
-  <button onclick="openPaintModal()" style='padding:10px 20px; font-size:14px; cursor:pointer; background-color:#0078d7; color:white; border:none; border-radius:3px;'>Assign Labor</button>
-  <br><br>
-  {pages_html}
-  <br><a href='/ui'>Back</a>
-  
-  <div id="paintModal" class="modal">
-    <div class="modal-content">
-      <span class="close" onclick="closePaintModal()">&times;</span>
-      <div style="margin-bottom: 15px;">
-        <div style="font-weight: bold; font-size: 14px; margin-bottom: 5px;">{second_ro_line}</div>
-        <div style="font-size: 14px; color: #333;">{vehicle_info_line}</div>
-      </div>
-      <div style="margin-bottom: 15px;">
-        <label style="font-weight: bold; font-size: 14px;">TECH:</label>
-        <input type="text" id="techInput" style="padding: 8px; font-size: 14px; margin-left: 10px; width: 200px; border: 1px solid #ccc; border-radius: 3px;" placeholder="Enter technician name" />
-      </div>
-      <h2>Labor Assignment</h2>
-      <div id="paintList"></div>
-      <div class="paint-total">Total Labor: <span id="totalPaint">{total_paint}</span></div>
-      <div style="margin-top: 20px; display: flex; gap: 10px; justify-content: flex-end;">
-        <button onclick="printModal()" style='padding:10px 20px; font-size:14px; cursor:pointer; background-color:#50b350; color:white; border:none; border-radius:3px;'>Print</button>
-        <button onclick="saveModal()" style='padding:10px 20px; font-size:14px; cursor:pointer; background-color:#0078d7; color:white; border:none; border-radius:3px;'>Save</button>
-      </div>
+    # If AJAX request, return just the content without HTML wrapper
+    if ajax:
+        content = f"""
+<h2>Document Visual Grid</h2>
+<button onclick="openPaintModal()" style='padding:10px 20px; font-size:14px; cursor:pointer; background-color:#0078d7; color:white; border:none; border-radius:3px;'>Assign Labor</button>
+<br><br>
+{pages_html}
+<br><a href='/ui'>Back</a>
+
+<div id="paintModal" class="modal">
+  <div class="modal-content">
+    <span class="close" onclick="closePaintModal()">&times;</span>
+    <div style="margin-bottom: 15px;">
+      <div style="font-weight: bold; font-size: 14px; margin-bottom: 5px;">{second_ro_line}</div>
+      <div style="font-size: 14px; color: #333;">{vehicle_info_line}</div>
+    </div>
+    <div style="margin-bottom: 15px;">
+      <label style="font-weight: bold; font-size: 14px;">TECH:</label>
+      <input type="text" id="techInput" style="padding: 8px; font-size: 14px; margin-left: 10px; width: 200px; border: 1px solid #ccc; border-radius: 3px;" placeholder="Enter technician name" />
+    </div>
+    <h2>Labor Assignment</h2>
+    <div id="paintList"></div>
+    <div class="paint-total">Total Labor: <span id="totalPaint">{total_paint}</span></div>
+    <div style="margin-top: 20px; display: flex; gap: 10px; justify-content: flex-end;">
+      <button onclick="printModal()" style='padding:10px 20px; font-size:14px; cursor:pointer; background-color:#50b350; color:white; border:none; border-radius:3px;'>Print</button>
+      <button onclick="saveModal()" style='padding:10px 20px; font-size:14px; cursor:pointer; background-color:#0078d7; color:white; border:none; border-radius:3px;'>Save</button>
     </div>
   </div>
-  
-  <script>
-    const paintItems = {paint_items_json};
-    const initialTotal = {total_paint};
-    
-    function updateTotal() {{
-      const checkboxes = document.querySelectorAll('.paint-item-checkbox');
-      let deductedTotal = 0;
-      
-      checkboxes.forEach((checkbox, index) => {{
-        if (checkbox.checked) {{
-          deductedTotal += paintItems[index].value;
-        }}
-      }});
-      
-      const newTotal = (initialTotal - deductedTotal).toFixed(1);
-      document.getElementById('totalPaint').innerText = newTotal;
-    }}
-    
-    function toggleDeduction(index) {{
-      const item = document.getElementById('item-' + index);
-      item.classList.toggle('deducted');
-      updateTotal();
-    }}
-    
-    function openPaintModal() {{
-      const modal = document.getElementById('paintModal');
-      let html = '';
-      
-      if (paintItems.length === 0) {{
-        html = '<p>No paint items found.</p>';
-      }} else {{
-        paintItems.forEach((item, index) => {{
-          html += '<div class="paint-item" id="item-' + index + '">';
-          html += '<input type="checkbox" class="paint-item-checkbox" onchange="toggleDeduction(' + index + ')" />';
-          html += '<div style="flex: 1;"><strong>Line ' + item.line + '</strong> - ' + item.description + '</div>';
-          html += '<div>' + item.value + ' hrs</div>';
-          html += '</div>';
-        }});
-      }}
-      
-      document.getElementById('paintList').innerHTML = html;
-      modal.style.display = 'block';
-    }}
-    
-    function closePaintModal() {{
-      document.getElementById('paintModal').style.display = 'none';
-    }}
-    
-    function printModal() {{
-      const printWindow = window.open('', '', 'height=600,width=800');
-      const techValue = document.getElementById('techInput').value;
-      
-      const checkboxes = document.querySelectorAll('.paint-item-checkbox');
-      let deductedTotal = 0;
-      let printContent = '<html><head><title>Labor Assignment</title></head><body style="font-family: Arial; padding: 20px;">';
-      
-      printContent += '<div style="margin-bottom: 15px;">';
-      printContent += '<div style="font-weight: bold; font-size: 14px; margin-bottom: 5px;">{second_ro_line}</div>';
-      printContent += '<div style="font-size: 14px; color: #333;">{vehicle_info_line}</div>';
-      printContent += '</div>';
-      printContent += '<div style="margin-bottom: 15px;">';
-      printContent += '<label style="font-weight: bold; font-size: 14px;">TECH:</label>';
-      printContent += '<span style="font-size: 14px; margin-left: 10px;">' + techValue + '</span>';
-      printContent += '</div>';
-      
-      printContent += '<h2>Labor Assignment</h2>';
-      
-      let totalLabor = 0;
-      checkboxes.forEach((checkbox, index) => {{
-        if (!checkbox.checked) {{
-          printContent += '<div style="padding: 12px 8px; border-bottom: 1px solid #ddd;">';
-          printContent += '<input type="checkbox" disabled style="margin-right: 10px;" />';
-          printContent += '<strong>Line ' + paintItems[index].line + '</strong> - ' + paintItems[index].description;
-          printContent += ' <div style="display: inline; float: right;">' + paintItems[index].value + ' hrs</div>';
-          printContent += '</div>';
-          totalLabor += paintItems[index].value;
-        }} else {{
-          deductedTotal += paintItems[index].value;
-        }}
-      }});
-      
-      printContent += '<div style="padding: 12px 8px; font-weight: bold; background-color: #f0f0f0; margin-top: 10px; text-align: right;">';
-      printContent += 'Total Labor: ' + totalLabor.toFixed(1);
-      printContent += '</div>';
-      
-      printContent += '</body></html>';
-      
-      printWindow.document.write(printContent);
-      printWindow.document.close();
-      printWindow.print();
-    }}
-    
-    function saveModal() {{
-      const checkboxes = document.querySelectorAll('.paint-item-checkbox');
-      let selectedItems = [];
-      let deductedTotal = 0;
-      
-      checkboxes.forEach((checkbox, index) => {{
-        if (checkbox.checked) {{
-          selectedItems.push(paintItems[index]);
-          deductedTotal += paintItems[index].value;
-        }}
-      }});
-      
-      const newTotal = (initialTotal - deductedTotal).toFixed(1);
-      
-      const data = {{
-        items: selectedItems,
-        totalLabor: newTotal,
-        timestamp: new Date().toISOString()
-      }};
-      
-      // Create and download JSON file
-      const dataStr = JSON.stringify(data, null, 2);
-      const dataBlob = new Blob([dataStr], {{ type: 'application/json' }});
-      const url = URL.createObjectURL(dataBlob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = 'labor-assignment-' + new Date().getTime() + '.json';
-      link.click();
-      URL.revokeObjectURL(url);
-    }}
-    
-    window.onclick = function(event) {{  
-      const modal = document.getElementById('paintModal');
-      if (event.target == modal) {{
-        modal.style.display = 'none';
-      }}
-    }}
-  </script>
-</body>
-</html>
-"""
+</div>
 
-    return html
+<style>
+  .modal {{
+    display: none;
+    position: fixed;
+    z-index: 1;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0,0,0,0.4);
+  }}
+  .modal-content {{
+    background-color: #fefefe;
+    margin: 2% auto;
+    padding: 20px;
+    border: 1px solid #888;
+    width: 95%;
+    max-width: 1400px;
+    height: 80vh;
+    overflow-y: auto;
+    border-radius: 5px;
+  }}
+  .close {{
+    color: #aaa;
+    float: right;
+    font-size: 28px;
+    font-weight: bold;
+    cursor: pointer;
+  }}
+  .close:hover {{
+    color: black;
+  }}
+  .paint-item {{
+    padding: 12px;
+    border-bottom: 1px solid #ddd;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 20px;
+  }}
+  .paint-item.deducted {{
+    background-color: #f0f0f0;
+    text-decoration: line-through;
+    opacity: 0.6;
+  }}
+  .paint-item-checkbox {{
+    cursor: pointer;
+    width: 18px;
+    height: 18px;
+    margin-right: 10px;
+  }}
+  .paint-total {{
+    padding: 12px 8px;
+    font-weight: bold;
+    background-color: #f0f0f0;
+    margin-top: 10px;
+    text-align: right;
+  }}
+</style>
+
+<script>
+  const paintItems = {paint_items_json};
+  const initialTotal = {total_paint};
+  
+  function updateTotal() {{
+    const checkboxes = document.querySelectorAll('.paint-item-checkbox');
+    let deductedTotal = 0;
+    
+    checkboxes.forEach((checkbox, index) => {{
+      if (checkbox.checked) {{
+        deductedTotal += paintItems[index].value;
+      }}
+    }});
+    
+    const newTotal = (initialTotal - deductedTotal).toFixed(1);
+    document.getElementById('totalPaint').innerText = newTotal;
+  }}
+  
+  function toggleDeduction(index) {{
+    const item = document.getElementById('item-' + index);
+    item.classList.toggle('deducted');
+    updateTotal();
+  }}
+  
+  function openPaintModal() {{
+    const modal = document.getElementById('paintModal');
+    let html = '';
+    
+    if (paintItems.length === 0) {{
+      html = '<p>No paint items found.</p>';
+    }} else {{
+      paintItems.forEach((item, index) => {{
+        html += '<div class="paint-item" id="item-' + index + '">';
+        html += '<input type="checkbox" class="paint-item-checkbox" onchange="toggleDeduction(' + index + ')" />';
+        html += '<div style="flex: 1;"><strong>Line ' + item.line + '</strong> - ' + item.description + '</div>';
+        html += '<div>' + item.value + ' hrs</div>';
+        html += '</div>';
+      }});
+    }}
+    
+    document.getElementById('paintList').innerHTML = html;
+    modal.style.display = 'block';
+  }}
+  
+  function closePaintModal() {{
+    document.getElementById('paintModal').style.display = 'none';
+  }}
+  
+  function printModal() {{
+    const printWindow = window.open('', '', 'height=600,width=800');
+    const techValue = document.getElementById('techInput').value;
+    
+    const checkboxes = document.querySelectorAll('.paint-item-checkbox');
+    let deductedTotal = 0;
+    let printContent = '<html><head><title>Labor Assignment</title></head><body style="font-family: Arial; padding: 20px;">';
+    
+    printContent += '<div style="margin-bottom: 15px;">';
+    printContent += '<div style="font-weight: bold; font-size: 14px; margin-bottom: 5px;">{second_ro_line}</div>';
+    printContent += '<div style="font-size: 14px; color: #333;">{vehicle_info_line}</div>';
+    printContent += '</div>';
+    printContent += '<div style="margin-bottom: 15px;">';
+    printContent += '<label style="font-weight: bold; font-size: 14px;">TECH:</label>';
+    printContent += '<span style="font-size: 14px; margin-left: 10px;">' + techValue + '</span>';
+    printContent += '</div>';
+    
+    printContent += '<h2>Labor Assignment</h2>';
+    
+    let totalLabor = 0;
+    checkboxes.forEach((checkbox, index) => {{
+      if (!checkbox.checked) {{
+        printContent += '<div style="padding: 12px 8px; border-bottom: 1px solid #ddd;">';
+        printContent += '<input type="checkbox" disabled style="margin-right: 10px;" />';
+        printContent += '<strong>Line ' + paintItems[index].line + '</strong> - ' + paintItems[index].description;
+        printContent += ' <div style="display: inline; float: right;">' + paintItems[index].value + ' hrs</div>';
+        printContent += '</div>';
+        totalLabor += paintItems[index].value;
+      }} else {{
+        deductedTotal += paintItems[index].value;
+      }}
+    }});
+    
+    printContent += '<div style="padding: 12px 8px; font-weight: bold; background-color: #f0f0f0; margin-top: 10px; text-align: right;">';
+    printContent += 'Total Labor: ' + totalLabor.toFixed(1);
+    printContent += '</div>';
+    
+    printContent += '</body></html>';
+    
+    printWindow.document.write(printContent);
+    printWindow.document.close();
+    printWindow.print();
+  }}
+  
+  function saveModal() {{
+    const checkboxes = document.querySelectorAll('.paint-item-checkbox');
+    let selectedItems = [];
+    let deductedTotal = 0;
+    
+    checkboxes.forEach((checkbox, index) => {{
+      if (checkbox.checked) {{
+        selectedItems.push(paintItems[index]);
+        deductedTotal += paintItems[index].value;
+      }}
+    }});
+    
+    const newTotal = (initialTotal - deductedTotal).toFixed(1);
+    
+    const data = {{
+      items: selectedItems,
+      totalLabor: newTotal,
+      timestamp: new Date().toISOString()
+    }};
+    
+    // Create and download JSON file
+    const dataStr = JSON.stringify(data, null, 2);
+    const dataBlob = new Blob([dataStr], {{ type: 'application/json' }});
+    const url = URL.createObjectURL(dataBlob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'labor-assignment-' + new Date().getTime() + '.json';
+    link.click();
+    URL.revokeObjectURL(url);
+  }}
+  
+  window.onclick = function(event) {{  
+    const modal = document.getElementById('paintModal');
+    if (event.target == modal) {{
+      modal.style.display = 'none';
+    }}
+  }}
+</script>
+"""
+        return content
 
 
 @router.post("/aligned", response_class=HTMLResponse)
