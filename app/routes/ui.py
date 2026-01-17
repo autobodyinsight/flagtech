@@ -54,6 +54,118 @@ def _group_rows(words, y_thresh=8.0):
 router = APIRouter()
 
 @router.get("/", response_class=HTMLResponse)
+async def home_screen():
+    return """
+<html>
+<head>
+    <title>FlagTech</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            height: 100vh;
+            background-color: #f5f5f5;
+        }
+        .sidebar {
+            width: 150px;
+            background-color: #0078d7;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            padding: 20px;
+        }
+        .nav-box {
+            padding: 15px;
+            background-color: #005a9e;
+            color: white;
+            text-align: center;
+            cursor: pointer;
+            border-radius: 5px;
+            font-weight: bold;
+            border: 2px solid transparent;
+            transition: all 0.3s ease;
+        }
+        .nav-box:hover {
+            background-color: #0078d7;
+            border: 2px solid white;
+        }
+        .nav-box.active {
+            background-color: #ffffff;
+            color: #0078d7;
+            border: 2px solid #0078d7;
+        }
+        .content-area {
+            flex: 1;
+            padding: 40px;
+            overflow-y: auto;
+        }
+        .screen {
+            display: none;
+        }
+        .screen.active {
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <div class="sidebar">
+        <div class="nav-box active" onclick="switchScreen('upload')">UPLOAD</div>
+        <div class="nav-box" onclick="switchScreen('tech')">TECH</div>
+        <div class="nav-box" onclick="switchScreen('ros')">RO'S</div>
+        <div class="nav-box" onclick="switchScreen('flagtech')">FLAG TECH</div>
+    </div>
+    
+    <div class="content-area">
+        <div id="upload" class="screen active">
+            <h2>Upload an Estimate PDF</h2>
+            <form id="uploadForm" action="/ui/grid" method="post" enctype="multipart/form-data">
+                <input type="file" name="file" accept="application/pdf" onchange="this.form.submit()" />
+            </form>
+        </div>
+        
+        <div id="tech" class="screen">
+            <h2>TECH</h2>
+            <p>Tech management screen - coming soon</p>
+        </div>
+        
+        <div id="ros" class="screen">
+            <h2>RO'S</h2>
+            <p>RO's management screen - coming soon</p>
+        </div>
+        
+        <div id="flagtech" class="screen">
+            <h2>FLAG TECH</h2>
+            <p>Flag Tech screen - coming soon</p>
+        </div>
+    </div>
+    
+    <script>
+        function switchScreen(screenName) {
+            // Hide all screens
+            const screens = document.querySelectorAll('.screen');
+            screens.forEach(screen => screen.classList.remove('active'));
+            
+            // Remove active class from all nav boxes
+            const navBoxes = document.querySelectorAll('.nav-box');
+            navBoxes.forEach(box => box.classList.remove('active'));
+            
+            // Show selected screen
+            document.getElementById(screenName).classList.add('active');
+            
+            // Add active class to clicked nav box
+            event.target.classList.add('active');
+        }
+    </script>
+</body>
+</html>
+"""
+
+@router.get("/upload", response_class=HTMLResponse)
 async def upload_form():
     return """
 <html>
