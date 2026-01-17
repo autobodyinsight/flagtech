@@ -366,6 +366,10 @@ async def grid_ui(file: UploadFile = File(...)):
         <div style="font-weight: bold; font-size: 14px; margin-bottom: 5px;">{second_ro_line}</div>
         <div style="font-size: 14px; color: #333;">{vehicle_info_line}</div>
       </div>
+      <div style="margin-bottom: 15px;">
+        <label style="font-weight: bold; font-size: 14px;">TECH:</label>
+        <input type="text" id="techInput" style="padding: 8px; font-size: 14px; margin-left: 10px; width: 200px; border: 1px solid #ccc; border-radius: 3px;" placeholder="Enter technician name" />
+      </div>
       <h2>Labor Assignment</h2>
       <div id="paintList"></div>
       <div class="paint-total">Total Labor: <span id="totalPaint">{total_paint}</span></div>
@@ -426,6 +430,7 @@ async def grid_ui(file: UploadFile = File(...)):
     
     function printModal() {{
       const printWindow = window.open('', '', 'height=600,width=800');
+      const techValue = document.getElementById('techInput').value;
       
       const checkboxes = document.querySelectorAll('.paint-item-checkbox');
       let deductedTotal = 0;
@@ -434,6 +439,10 @@ async def grid_ui(file: UploadFile = File(...)):
       printContent += '<div style="margin-bottom: 15px;">';
       printContent += '<div style="font-weight: bold; font-size: 14px; margin-bottom: 5px;">{second_ro_line}</div>';
       printContent += '<div style="font-size: 14px; color: #333;">{vehicle_info_line}</div>';
+      printContent += '</div>';
+      printContent += '<div style="margin-bottom: 15px;">';
+      printContent += '<label style="font-weight: bold; font-size: 14px;">TECH:</label>';
+      printContent += '<span style="font-size: 14px; margin-left: 10px;">' + techValue + '</span>';
       printContent += '</div>';
       
       printContent += '<h2>Labor Assignment</h2>';
