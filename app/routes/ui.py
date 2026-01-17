@@ -369,6 +369,10 @@ async def grid_ui(file: UploadFile = File(...)):
       <h2>Labor Assignment</h2>
       <div id="paintList"></div>
       <div class="paint-total">Total Labor: <span id="totalPaint">{total_paint}</span></div>
+      <div style="margin-top: 20px; display: flex; gap: 10px; justify-content: flex-end;">
+        <button onclick="printModal()" style='padding:10px 20px; font-size:14px; cursor:pointer; background-color:#50b350; color:white; border:none; border-radius:3px;'>Print</button>
+        <button onclick="saveModal()" style='padding:10px 20px; font-size:14px; cursor:pointer; background-color:#0078d7; color:white; border:none; border-radius:3px;'>Save</button>
+      </div>
     </div>
   </div>
   
@@ -418,6 +422,76 @@ async def grid_ui(file: UploadFile = File(...)):
     
     function closePaintModal() {{
       document.getElementById('paintModal').style.display = 'none';
+    }}
+    
+    function printModal() {{
+      const printWindow = window.open('', '', 'height=600,width=800');
+      
+      const checkboxes = document.querySelectorAll('.paint-item-checkbox');
+      let deductedTotal = 0;
+      let printContent = '<html><head><title>Labor Assignment</title></head><body style="font-family: Arial; padding: 20px;">';
+      
+      printContent += '<div style="margin-bottom: 15px;">';
+      printContent += '<div style="font-weight: bold; font-size: 14px; margin-bottom: 5px;">{second_ro_line}</div>';
+      printContent += '<div style="font-size: 14px; color: #333;">{vehicle_info_line}</div>';
+      printContent += '</div>';
+      
+      printContent += '<h2>Labor Assignment</h2>';
+      
+      let totalLabor = 0;
+      checkboxes.forEach((checkbox, index) => {{
+        if (!checkbox.checked) {{
+          printContent += '<div style="padding: 12px 8px; border-bottom: 1px solid #ddd;">';
+          printContent += '<input type="checkbox" disabled style="margin-right: 10px;" />';
+          printContent += '<strong>Line ' + paintItems[index].line + '</strong> - ' + paintItems[index].description;
+          printContent += ' <div style="display: inline; float: right;">' + paintItems[index].value + ' hrs</div>';
+          printContent += '</div>';
+          totalLabor += paintItems[index].value;
+        }} else {{
+          deductedTotal += paintItems[index].value;
+        }}
+      }});
+      
+      printContent += '<div style="padding: 12px 8px; font-weight: bold; background-color: #f0f0f0; margin-top: 10px; text-align: right;">';
+      printContent += 'Total Labor: ' + totalLabor.toFixed(1);
+      printContent += '</div>';
+      
+      printContent += '</body></html>';
+      
+      printWindow.document.write(printContent);
+      printWindow.document.close();
+      printWindow.print();
+    }}
+    
+    function saveModal() {{
+      const checkboxes = document.querySelectorAll('.paint-item-checkbox');
+      let selectedItems = [];
+      let deductedTotal = 0;
+      
+      checkboxes.forEach((checkbox, index) => {{
+        if (checkbox.checked) {{
+          selectedItems.push(paintItems[index]);
+          deductedTotal += paintItems[index].value;
+        }}
+      }});
+      
+      const newTotal = (initialTotal - deductedTotal).toFixed(1);
+      
+      const data = {{
+        items: selectedItems,
+        totalLabor: newTotal,
+        timestamp: new Date().toISOString()
+      }};
+      
+      // Create and download JSON file
+      const dataStr = JSON.stringify(data, null, 2);
+      const dataBlob = new Blob([dataStr], {{ type: 'application/json' }});
+      const url = URL.createObjectURL(dataBlob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = 'labor-assignment-' + new Date().getTime() + '.json';
+      link.click();
+      URL.revokeObjectURL(url);
     }}
     
     window.onclick = function(event) {{  
