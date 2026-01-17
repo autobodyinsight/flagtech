@@ -140,23 +140,35 @@ async def grid_ui(file: UploadFile = File(...)):
                 w["ymid"] = (w["y0"] + w["y1"]) / 2.0
 
     # detect second RO row (anchor) and ESTIMATE TOTALS row (end marker)
+    # also capture second RO line for vehicle info
     anchor_page = None
     anchor_ymid = None
     subtotals_page = None
     subtotals_ymid = None
     ro_count = 0
+    second_ro_line = ""
+    vehicle_info_line = ""
     
     for pi, page in enumerate(pages, start=1):
         rows = _group_rows(page.get("words", []), y_thresh=6.0)
-        for r in rows:
+        for idx, r in enumerate(rows):
             row_text = " ".join(w.get("text", "") for w in r["words"]).strip()
             
             # Look for RO and use the second occurrence as anchor
             if re.search(r"\bRO\b", row_text):
                 ro_count += 1
+                # Capture second RO line and search for vehicle info
                 if ro_count == 2 and not anchor_page:
                     anchor_page = pi
                     anchor_ymid = r["ymid"]
+                    second_ro_line = row_text
+                    # Search for vehicle info line (contains 4-digit year)
+                    for j in range(idx + 1, min(idx + 10, len(rows))):
+                        next_line = " ".join(w.get("text", "") for w in rows[j]["words"]).strip()
+                        # Look for a line with a 4-digit year (19xx or 20xx)
+                        if re.search(r'\b(19\d{2}|20\d{2})\b', next_line):
+                            vehicle_info_line = next_line
+                            break
             
             # Look for ESTIMATE TOTALS as end marker
             if not subtotals_page and re.search(r"\bESTIMATE\s+TOTALS\b", row_text):
@@ -317,8 +329,19 @@ async def grid_ui(file: UploadFile = File(...)):
             border-bottom: 1px solid #ddd;
             display: flex;
             justify-content: space-between;
-            align-items: flex-start;
+            align-items: center;
             gap: 20px;
+        }}
+        .paint-item.deducted {{
+            background-color: #f0f0f0;
+            text-decoration: line-through;
+            opacity: 0.6;
+        }}
+        .paint-item-checkbox {{
+            cursor: pointer;
+            width: 18px;
+            height: 18px;
+            margin-right: 10px;
         }}
         .paint-total {{
             padding: 12px 8px;
@@ -331,7 +354,7 @@ async def grid_ui(file: UploadFile = File(...)):
 </head>
 <body style='font-family:Arial; padding:20px;'>
   <h2>Document Visual Grid</h2>
-  <button onclick="openPaintModal()" style='padding:10px 20px; font-size:14px; cursor:pointer; background-color:#0078d7; color:white; border:none; border-radius:3px;'>Assign Paint</button>
+  <button onclick="openPaintModal()" style='padding:10px 20px; font-size:14px; cursor:pointer; background-color:#0078d7; color:white; border:none; border-radius:3px;'>Assign Labor</button>
   <br><br>
   {pages_html}
   <br><a href='/ui'>Back</a>
@@ -339,14 +362,39 @@ async def grid_ui(file: UploadFile = File(...)):
   <div id="paintModal" class="modal">
     <div class="modal-content">
       <span class="close" onclick="closePaintModal()">&times;</span>
-      <h2>Paint Assignment</h2>
+      <div style="margin-bottom: 15px;">
+        <div style="font-weight: bold; font-size: 14px; margin-bottom: 5px;">{second_ro_line}</div>
+        <div style="font-size: 14px; color: #333;">{vehicle_info_line}</div>
+      </div>
+      <h2>Labor Assignment</h2>
       <div id="paintList"></div>
-      <div class="paint-total">Total Paint Hours: <span id="totalPaint">{total_paint}</span></div>
+      <div class="paint-total">Total Labor: <span id="totalPaint">{total_paint}</span></div>
     </div>
   </div>
   
   <script>
     const paintItems = {paint_items_json};
+    const initialTotal = {total_paint};
+    
+    function updateTotal() {{
+      const checkboxes = document.querySelectorAll('.paint-item-checkbox');
+      let deductedTotal = 0;
+      
+      checkboxes.forEach((checkbox, index) => {{
+        if (checkbox.checked) {{
+          deductedTotal += paintItems[index].value;
+        }}
+      }});
+      
+      const newTotal = (initialTotal - deductedTotal).toFixed(1);
+      document.getElementById('totalPaint').innerText = newTotal;
+    }}
+    
+    function toggleDeduction(index) {{
+      const item = document.getElementById('item-' + index);
+      item.classList.toggle('deducted');
+      updateTotal();
+    }}
     
     function openPaintModal() {{
       const modal = document.getElementById('paintModal');
@@ -355,8 +403,12 @@ async def grid_ui(file: UploadFile = File(...)):
       if (paintItems.length === 0) {{
         html = '<p>No paint items found.</p>';
       }} else {{
-        paintItems.forEach(item => {{
-          html += `<div class="paint-item"><div><strong>Line ${{item.line}}</strong> - ${{item.description}}</div><div>${{item.value}} hrs</div></div>`;
+        paintItems.forEach((item, index) => {{
+          html += '<div class="paint-item" id="item-' + index + '">';
+          html += '<input type="checkbox" class="paint-item-checkbox" onchange="toggleDeduction(' + index + ')" />';
+          html += '<div style="flex: 1;"><strong>Line ' + item.line + '</strong> - ' + item.description + '</div>';
+          html += '<div>' + item.value + ' hrs</div>';
+          html += '</div>';
         }});
       }}
       
@@ -368,7 +420,7 @@ async def grid_ui(file: UploadFile = File(...)):
       document.getElementById('paintModal').style.display = 'none';
     }}
     
-    window.onclick = function(event) {{
+    window.onclick = function(event) {{  
       const modal = document.getElementById('paintModal');
       if (event.target == modal) {{
         modal.style.display = 'none';
