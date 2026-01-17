@@ -73,7 +73,7 @@ async def home_screen():
         }
         .sidebar {
             width: 150px;
-            background-color: #0078d7;
+            background-color: #505050;
             display: flex;
             flex-direction: column;
             gap: 10px;
@@ -84,7 +84,7 @@ async def home_screen():
         }
         .nav-box {
             padding: 15px;
-            background-color: #005a9e;
+            background-color: #666666;
             color: white;
             text-align: center;
             cursor: pointer;
@@ -94,13 +94,13 @@ async def home_screen():
             transition: all 0.3s ease;
         }
         .nav-box:hover {
-            background-color: #0078d7;
+            background-color: #707070;
             border: 2px solid white;
         }
         .nav-box.active {
-            background-color: #ffffff;
-            color: #0078d7;
-            border: 2px solid #0078d7;
+            background-color: #d32f2f;
+            color: white;
+            border: 2px solid #d32f2f;
         }
         .content-area {
             flex: 1;
@@ -121,7 +121,7 @@ async def home_screen():
 <body>
     <div class="sidebar">
         <div class="nav-box active" onclick="switchScreen('upload')">UPLOAD</div>
-        <div class="nav-box" onclick="switchScreen('tech')">TECH</div>
+        <div class="nav-box" onclick="switchScreen('tech')">TECH'S</div>
         <div class="nav-box" onclick="switchScreen('ros')">RO'S</div>
         <div class="nav-box" onclick="switchScreen('flagtech')">FLAG TECH</div>
     </div>
@@ -130,7 +130,7 @@ async def home_screen():
         <div id="upload" class="screen active">
             <h2>Upload an Estimate PDF</h2>
             <form id="uploadForm" enctype="multipart/form-data">
-                <input type="file" id="fileInput" name="file" accept="application/pdf" onchange="handleFileUpload()" />
+                <input type="file" id="fileInput" name="file" accept="application/pdf" onchange="handleFileUpload()" style="padding: 10px; cursor: pointer;" />
             </form>
             <div id="uploadStatus"></div>
         </div>
@@ -444,7 +444,7 @@ async def grid_ui(file: UploadFile = File(...), ajax: str = None):
     if ajax:
         content = f"""
 <h2>Document Visual Grid</h2>
-<button onclick="openPaintModal()" style='padding:10px 20px; font-size:14px; cursor:pointer; background-color:#0078d7; color:white; border:none; border-radius:3px;'>Assign Labor</button>
+<button onclick="openPaintModal()" style='padding:10px 20px; font-size:14px; cursor:pointer; background-color:#505050; color:white; border:none; border-radius:3px;'>Assign Labor</button>
 <br><br>
 {pages_html}
 <br><a href='/ui'>Back</a>
@@ -464,8 +464,8 @@ async def grid_ui(file: UploadFile = File(...), ajax: str = None):
     <div id="paintList"></div>
     <div class="paint-total">Total Labor: <span id="totalPaint">{total_paint}</span></div>
     <div style="margin-top: 20px; display: flex; gap: 10px; justify-content: flex-end;">
-      <button onclick="printModal()" style='padding:10px 20px; font-size:14px; cursor:pointer; background-color:#50b350; color:white; border:none; border-radius:3px;'>Print</button>
-      <button onclick="saveModal()" style='padding:10px 20px; font-size:14px; cursor:pointer; background-color:#0078d7; color:white; border:none; border-radius:3px;'>Save</button>
+      <button onclick="printModal()" style='padding:10px 20px; font-size:14px; cursor:pointer; background-color:#505050; color:white; border:none; border-radius:3px;'>Print</button>
+        <button onclick="saveModal()" style='padding:10px 20px; font-size:14px; cursor:pointer; background-color:#505050; color:white; border:none; border-radius:3px;'>Save</button>
     </div>
   </div>
 </div>
