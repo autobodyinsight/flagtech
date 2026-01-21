@@ -1,196 +1,139 @@
 import re
+from typing import List
 from app.models.estimate import LineItem
-from app.utils import helpers
+
+EXPECTED_HEADERS = [
+    "line", "oper", "description", "part", "qty",
+    "extended", "labor", "paint"
+]
+
+LABOR_PATTERN = re.compile(r"^\d+(\.\d+)?$|^incl$", re.IGNORECASE)
 
 
-def _parse_space_delimited_line(stripped: str):
-    # returns (line_no:int, operation:str|None, description:str, labor:float|None, paint:float|None)
-    tokens = stripped.split()
-    # find leading line number
-    m = re.match(r"^\s*(\d+)\b", stripped)
-    if not m:
-        return None
-    line_no = int(m.group(1))
+def find_headers(page):
+    header_positions = {}
 
-    # Guard: very large leading numbers are likely address/year/page numbers,
-    # not table line numbers. Skip if clearly not a table line.
-    if line_no > 999:
-        return None
+    for block in page.get_text("dict")["blocks"]:
+        if block["type"] != 0:
+            continue
+        for line in block["lines"]:
+            for span in line["spans"]:
+                text = span["text"].strip().lower()
+                for header in EXPECTED_HEADERS:
+                    if text.startswith(header):
+                        header_positions[header] = span["bbox"][0]
 
-    # remove leading numeric token from tokens
-    if re.match(r"^\d+$", tokens[0]):
-        idx = 1
-    else:
-        # find first token that's numeric
-        idx = 0
-        for i, t in enumerate(tokens):
-            if re.match(r"^\d+$", t):
-                idx = i + 1
-                break
+    return dict(sorted(header_positions.items(), key=lambda x: x[1]))
 
-    # detect operation token (if it's a known op)
-    operation = None
-    if idx < len(tokens):
-        op_candidate = tokens[idx]
-        normalized = helpers.normalize_operation(op_candidate)
-        if normalized:
-            operation = normalized
-            idx += 1
 
-    # Find numeric tokens and classify currency-like tokens so we don't
-    # confuse extended price with labor/paint hours. Scan left-to-right so
-    # we can assign small-number candidates in reading order.
-    numeric_tokens = []  # (i, raw_token, float_value)
-    for i in range(idx, len(tokens)):
-        raw = tokens[i]
-        raw_clean = raw.replace(",", "").replace("$", "")
-        if re.match(r"^-?\d+(?:\.\d+)?$", raw_clean):
-            try:
-                val = float(raw_clean)
-            except Exception:
+def assign_column(x, header_positions):
+    headers = list(header_positions.items())
+    for i, (header, x_pos) in enumerate(headers):
+        if i == len(headers) - 1:
+            return header
+        next_x = headers[i+1][1]
+        if x_pos <= x < next_x:
+            return header
+    return None
+
+
+def extract_repair_lines(page, header_positions):
+    results = []
+
+    for block in page.get_text("dict")["blocks"]:
+        if block["type"] != 0:
+            continue
+
+        for line in block["lines"]:
+            spans = line["spans"]
+            if not spans:
                 continue
-            numeric_tokens.append((i, raw, val))
 
-    def is_currency_like(tok, val):
-        s = tok.replace(",", "")
-        if "$" in tok:
-            return True
-        if abs(val) >= 100:
-            return True
-        m = re.match(r"^(\d+)(?:\.\d+)?$", s)
-        if m and len(m.group(1)) >= 3:
-            return True
-        return False
+            # Must start with a line number
+            first = spans[0]["text"].strip()
+            if not first.isdigit():
+                continue
 
-    # Precompute currency-like tokens for use in heuristics
-    currency_tokens = [(i, raw, val) for (i, raw, val) in numeric_tokens if is_currency_like(raw, val)]
+            row = {h: "" for h in header_positions}
 
-    # collect small-number candidates (likely hours), skipping qty before currency
-    small_candidates = []  # (i,val)
-    for idx_num, raw, val in numeric_tokens:
-        next_idx = idx_num + 1
-        next_is_currency = False
-        if next_idx < len(tokens):
-            nxt = tokens[next_idx].replace(",", "").replace("$", "")
-            if re.match(r"^-?\d+(?:\.\d+)?$", nxt):
-                try:
-                    nxt_val = float(nxt)
-                    if is_currency_like(tokens[next_idx], nxt_val):
-                        next_is_currency = True
-                except Exception:
-                    pass
+            for span in spans:
+                text = span["text"].strip()
+                x = span["bbox"][0]
+                col = assign_column(x, header_positions)
+                if col:
+                    row[col] = (row[col] + " " + text).strip()
 
-        if is_currency_like(raw, val):
-            continue
-        if next_is_currency and float(val).is_integer():
-            # probably a Qty value (e.g., '1' before extended price) -> skip
-            continue
-        if abs(val) <= 24:
-            small_candidates.append((idx_num, val))
+            results.append(row)
 
-    labor = None
-    paint = None
-    # Decide mapping of small numeric candidates to labor/paint
-    if small_candidates:
-        # If two or more small numbers, assume penultimate->labor and last->paint
-        if len(small_candidates) >= 2:
-            labor = helpers.clean_float(str(small_candidates[-2][1]))
-            paint = helpers.clean_float(str(small_candidates[-1][1]))
-        else:
-            # Single small candidate: decide by presence of 'Incl' or currency before it
-            idx_single, val_single = small_candidates[0]
-            tokens_after_desc = tokens[idx:idx_single]
-            incl_present = any(t.lower().strip(".,") in ("incl", "incl.", "m") for t in tokens_after_desc)
-            currency_before = any(i < idx_single for (i, _, _) in currency_tokens)
-
-            if incl_present:
-                # labor is 'Incl.' -> treat single small as paint
-                paint = helpers.clean_float(str(val_single))
-            elif currency_before:
-                # presence of currency earlier suggests this small number is paint
-                paint = helpers.clean_float(str(val_single))
-            else:
-                # default: single small number is labor
-                labor = helpers.clean_float(str(val_single))
-
-    numeric_indices = [i for i, _, _ in numeric_tokens]
-    end_idx = numeric_indices[0] if numeric_indices else len(tokens)
-
-    # Build description but strip part-number tokens (alphanumeric IDs)
-    desc_tokens = []
-    part_re = re.compile(r"(?=.*[A-Za-z])(?=.*\d)[A-Za-z0-9\-_/]{4,}")
-    for t in tokens[idx:end_idx]:
-        if part_re.search(t):
-            continue
-        if t.lower() in ("incl.", "incl", "m"):
-            continue
-        desc_tokens.append(t)
-    description = " ".join(desc_tokens).strip()
-
-    return (line_no, operation, description, labor, paint)
+    return results
 
 
-def parse_estimate_text(text: str):
-    """Parse estimate text into a list of LineItem objects.
+def filter_labor_lines(lines):
+    return [
+        row for row in lines
+        if LABOR_PATTERN.match(row.get("labor", ""))
+    ]
 
-    Handles both pipe-delimited rows and space-delimited rows extracted from
-    plain-text PDFs. Returns only the fields the UI needs: operation,
-    description, labor, and paint.
-    """
+
+def parse_estimate_pdf(doc):
+    page = doc[0]  # CCC repair lines are on page 1
+
+    headers = find_headers(page)
+    repair_lines = extract_repair_lines(page, headers)
+    labor_lines = filter_labor_lines(repair_lines)
+
+    return labor_lines
+
+
+def parse_estimate_text(text: str) -> List[LineItem]:
+    """Parse estimate text and return a list of LineItem objects."""
     items = []
-    in_table = False
-    for line in text.splitlines():
-        # Start parsing when we see the explicit table header (avoid numeric headers elsewhere)
-        if not in_table:
-            if re.search(r"\bLine\b", line, re.IGNORECASE) and (re.search(r"\bOper\b|\bOperation\b", line, re.IGNORECASE) or re.search(r"\bDescription\b", line, re.IGNORECASE) or re.search(r"\bLabor\b", line, re.IGNORECASE)):
-                in_table = True
-            else:
-                continue
-
-        if not helpers.is_estimate_line(line):
+    
+    # Split text into lines
+    lines = text.split('\n')
+    
+    for line_text in lines:
+        line_text = line_text.strip()
+        if not line_text:
             continue
-
-        stripped = helpers.strip_line_artifacts(line)
-
-        # If pipe-delimited, prefer the old column parsing
-        if "|" in stripped:
-            parts = helpers.safe_split(stripped, "|")
-
-            def get(idx: int) -> str:
-                return parts[idx] if idx < len(parts) else ""
-
-            m = re.search(r"\d+", get(0) or "")
-            if not m:
-                continue
-            line_no = int(m.group())
-
-            op_raw = get(1)
-            operation = helpers.normalize_operation(op_raw) or (op_raw.strip() or None)
-            description = get(2).strip()
-            labor = helpers.clean_float(get(6))
-            paint = helpers.clean_float(get(7))
-
+            
+        # Try to match lines that start with a number (line number)
+        # Basic pattern: line_num operation description labor paint
+        match = re.match(r'^(\d+)\s+(.+)', line_text)
+        if match:
+            line_num = int(match.group(1))
+            rest = match.group(2).strip()
+            
+            # Try to extract labor and paint values (numbers at the end)
+            # Look for patterns like "1.5" or "2.0" at the end
+            labor = None
+            paint = None
+            operation = None
+            description = rest
+            
+            # Extract numbers from the end of the line
+            numbers = re.findall(r'\d+\.\d+|\d+', rest)
+            if numbers:
+                # Last number could be paint, second to last could be labor
+                if len(numbers) >= 1:
+                    try:
+                        labor = float(numbers[-1])
+                    except:
+                        pass
+                if len(numbers) >= 2:
+                    try:
+                        paint = float(numbers[-2])
+                        # Remove paint from the description
+                        description = rest
+                    except:
+                        pass
+            
             items.append(LineItem(
-                line=line_no,
+                line=line_num,
                 operation=operation,
                 description=description,
                 labor=labor,
-                paint=paint,
+                paint=paint
             ))
-            continue
-
-        parsed = _parse_space_delimited_line(stripped)
-        if not parsed:
-            continue
-
-        line_no, operation, description, labor, paint = parsed
-
-        items.append(LineItem(
-            line=line_no,
-            operation=operation,
-            description=description or "",
-            labor=labor,
-            paint=paint,
-        ))
-
+    
     return items

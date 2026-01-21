@@ -349,17 +349,23 @@ async def grid_ui(file: UploadFile = File(...), ajax: str = None):
                     continue
             all_words.append(wd)
     
-    # Use k-means to find 5 columns
+    # Use k-means to find 8 columns: Line, Oper, Description, Part Number, Qty, Extended Price, Labor, Paint
     xvals = [w["xmid"] for w in all_words]
-    centers = _kmeans_1d(xvals, 5, iters=40)
+    centers = _kmeans_1d(xvals, 8, iters=40)
     centers_sorted = sorted(centers) if centers else []
     
-    # Assume columns are: Line, Op, Description, Labor, Paint
+    # Debug: print column positions
+    print(f"[DEBUG] Column centers detected: {centers_sorted}")
+    
+    # Identify column positions: 0=Line, 1=Oper, 2=Description, 3=Part Number, 4=Qty, 5=Extended Price, 6=Labor, 7=Paint
     line_col_x = centers_sorted[0] if len(centers_sorted) > 0 else None
-    paint_col_x = centers_sorted[4] if len(centers_sorted) > 4 else None
+    labor_col_x = centers_sorted[6] if len(centers_sorted) > 6 else None
+    paint_col_x = centers_sorted[7] if len(centers_sorted) > 7 else None
+    
+    print(f"[DEBUG] Line column X: {line_col_x}, Labor column X: {labor_col_x}, Paint column X: {paint_col_x}")
 
     pages_html = ""
-    paint_items = []  # Store items with paint values for the modal
+    labor_items = []  # Store items with labor values for the modal
     for pi, page in enumerate(pages, start=1):
         # skip pages before anchor
         if anchor_page and pi < anchor_page:
@@ -373,7 +379,7 @@ async def grid_ui(file: UploadFile = File(...), ajax: str = None):
 
         boxes_html = ""
         
-        # First, group words into rows and extract line/paint pairs
+        # First, group words into rows and extract line/labor pairs
         page_words = []
         for wd in page.get("words", []):
             # if this is the anchor page, skip words above the anchor_ymid
@@ -389,41 +395,55 @@ async def grid_ui(file: UploadFile = File(...), ajax: str = None):
         # Group into rows
         rows = _group_rows(page_words, y_thresh=6.0)
         
-        # Extract line numbers and paint values from rows
+        # Extract line numbers and labor values from rows
         for row in rows:
             row_words = sorted(row["words"], key=lambda x: x["xmid"])
             line_num = None
-            paint_val = None
+            labor_val = None
             description = []
             
             for wd in row_words:
                 word_xmid = wd.get("xmid", (wd["x0"] + wd["x1"]) / 2.0)
+                word_text = wd["text"].strip()
                 
-                # Check if this is a line number
+                # Check if this is a line number (max 3 digits in Line column)
                 if line_col_x and abs(word_xmid - line_col_x) < 40:
-                    if re.match(r'^\d+$', wd["text"].strip()):
-                        line_num = wd["text"].strip()
+                    if re.match(r'^\d{1,3}$', word_text):
+                        line_num = word_text
                 
-                # Collect description text (everything in the middle)
-                elif line_col_x and paint_col_x:
-                    if line_col_x < word_xmid < paint_col_x:
-                        description.append(wd["text"].strip())
+                # Collect description text (between line and labor columns)
+                elif line_col_x and labor_col_x:
+                    if line_col_x < word_xmid < labor_col_x - 50:  # Leave space for qty and price columns
+                        description.append(word_text)
                 
-                # Check if this is a paint value (only in paint column, not labor)
-                if paint_col_x and abs(word_xmid - paint_col_x) < 30:
-                    if re.match(r'^(\d+\.?\d*)$', wd["text"].strip()):
+                # Check if this is a labor value in the Labor column
+                # Labor format: x.x or xx.x, may be negative, or text "Incl"
+                if labor_col_x and abs(word_xmid - labor_col_x) < 40:
+                    # Check for decimal format (positive or negative)
+                    if re.match(r'^-?\d+\.\d+$', word_text):
                         try:
-                            paint_val = float(wd["text"].strip())
+                            labor_val = float(word_text)
                         except:
                             pass
+                    # Also accept "Incl" as a valid labor indicator
+                    elif word_text.lower() == 'incl':
+                        labor_val = 0.0  # Represent Incl as 0.0 for tracking purposes
             
-            # Add to paint_items ONLY if we found a line number AND a paint value in the paint column
-            if line_num and paint_val is not None:
-                paint_items.append({
+            # Add to labor_items if we found a line number AND a labor value/indicator in the labor column
+            if line_num and labor_val is not None:
+                labor_items.append({
                     "line": line_num,
                     "description": " ".join(description),
-                    "value": paint_val
+                    "value": labor_val
                 })
+        
+        # Debug logging
+        if pi == 1:
+            print(f"[DEBUG] Found {len(labor_items)} labor items on page {pi}")
+            print(f"[DEBUG] Labor column X position: {labor_col_x}")
+            print(f"[DEBUG] Line column X position: {line_col_x}")
+            if labor_items:
+                print(f"[DEBUG] Sample labor items: {labor_items[:3]}")
         
         # Now display all words
         for wd in page_words:
@@ -432,26 +452,31 @@ async def grid_ui(file: UploadFile = File(...), ajax: str = None):
             ww = (wd["x1"] - wd["x0"]) * scale
             hh = (wd["y1"] - wd["y0"]) * scale
             txt = wd["text"].replace("<", "&lt;").replace(">", "&gt;")
-            boxes_html += f"<div style='position:absolute; left:{x}px; top:{y}px; width:{ww}px; height:{hh}px; border:1px solid rgba(0,120,215,0.6); font-size:15px; overflow:hidden;'>{txt}</div>"
+            boxes_html += f"<div style='position:absolute; left:{x}px; top:{y}px; width:{ww}px; height:{hh}px; font-size:15px; overflow:hidden;'>{txt}</div>"
 
         pages_html += f"<h3>Page {pi}</h3><div style='position:relative; width:{display_w}px; height:{int(h*scale)}px; border:1px solid #ccc; margin-bottom:20px;'>{boxes_html}</div>"
 
-    # Calculate total paint value
-    total_paint = sum(item["value"] for item in paint_items)
-    paint_items_json = str(paint_items).replace("'", '"')
+    # Calculate total labor value
+    total_labor = sum(item["value"] for item in labor_items)
+    labor_items_json = str(labor_items).replace("'", '"')
+    
+    print(f"[DEBUG] Total labor items found: {len(labor_items)}")
+    print(f"[DEBUG] Total labor hours: {total_labor}")
+    if labor_items:
+        print(f"[DEBUG] First few labor items: {labor_items[:5]}")
 
     # If AJAX request, return just the content without HTML wrapper
     if ajax:
         content = f"""
 <h2>Document Visual Grid</h2>
-<button onclick="openPaintModal()" style='padding:10px 20px; font-size:14px; cursor:pointer; background-color:#505050; color:white; border:none; border-radius:3px;'>Assign Labor</button>
+<button onclick="openLaborModal()" style='padding:10px 20px; font-size:14px; cursor:pointer; background-color:#505050; color:white; border:none; border-radius:3px;'>Assign Labor</button>
 <br><br>
 {pages_html}
 <br><a href='/ui'>Back</a>
 
-<div id="paintModal" class="modal">
+<div id="laborModal" class="modal">
   <div class="modal-content">
-    <span class="close" onclick="closePaintModal()">&times;</span>
+    <span class="close" onclick="closeLaborModal()">&times;</span>
     <div style="margin-bottom: 15px;">
       <div style="font-weight: bold; font-size: 14px; margin-bottom: 5px;">{second_ro_line}</div>
       <div style="font-size: 14px; color: #333;">{vehicle_info_line}</div>
@@ -461,8 +486,8 @@ async def grid_ui(file: UploadFile = File(...), ajax: str = None):
       <input type="text" id="techInput" style="padding: 8px; font-size: 14px; margin-left: 10px; width: 200px; border: 1px solid #ccc; border-radius: 3px;" placeholder="Enter technician name" />
     </div>
     <h2>Labor Assignment</h2>
-    <div id="paintList"></div>
-    <div class="paint-total">Total Labor: <span id="totalPaint">{total_paint}</span></div>
+    <div id="laborList"></div>
+    <div class="labor-total">Total Labor: <span id="totalLabor">{total_labor}</span></div>
     <div style="margin-top: 20px; display: flex; gap: 10px; justify-content: flex-end;">
       <button onclick="printModal()" style='padding:10px 20px; font-size:14px; cursor:pointer; background-color:#505050; color:white; border:none; border-radius:3px;'>Print</button>
         <button onclick="saveModal()" style='padding:10px 20px; font-size:14px; cursor:pointer; background-color:#505050; color:white; border:none; border-radius:3px;'>Save</button>
@@ -502,7 +527,7 @@ async def grid_ui(file: UploadFile = File(...), ajax: str = None):
   .close:hover {{
     color: black;
   }}
-  .paint-item {{
+  .labor-item {{
     padding: 12px;
     border-bottom: 1px solid #ddd;
     display: flex;
@@ -510,18 +535,18 @@ async def grid_ui(file: UploadFile = File(...), ajax: str = None):
     align-items: center;
     gap: 20px;
   }}
-  .paint-item.deducted {{
+  .labor-item.deducted {{
     background-color: #f0f0f0;
     text-decoration: line-through;
     opacity: 0.6;
   }}
-  .paint-item-checkbox {{
+  .labor-item-checkbox {{
     cursor: pointer;
     width: 18px;
     height: 18px;
     margin-right: 10px;
   }}
-  .paint-total {{
+  .labor-total {{
     padding: 12px 8px;
     font-weight: bold;
     background-color: #f0f0f0;
@@ -531,21 +556,21 @@ async def grid_ui(file: UploadFile = File(...), ajax: str = None):
 </style>
 
 <script>
-  const paintItems = {paint_items_json};
-  const initialTotal = {total_paint};
+  const laborItems = {labor_items_json};
+  const initialTotal = {total_labor};
   
   function updateTotal() {{
-    const checkboxes = document.querySelectorAll('.paint-item-checkbox');
+    const checkboxes = document.querySelectorAll('.labor-item-checkbox');
     let deductedTotal = 0;
     
     checkboxes.forEach((checkbox, index) => {{
       if (checkbox.checked) {{
-        deductedTotal += paintItems[index].value;
+        deductedTotal += laborItems[index].value;
       }}
     }});
     
     const newTotal = (initialTotal - deductedTotal).toFixed(1);
-    document.getElementById('totalPaint').innerText = newTotal;
+    document.getElementById('totalLabor').innerText = newTotal;
   }}
   
   function toggleDeduction(index) {{
@@ -554,35 +579,35 @@ async def grid_ui(file: UploadFile = File(...), ajax: str = None):
     updateTotal();
   }}
   
-  function openPaintModal() {{
-    const modal = document.getElementById('paintModal');
+  function openLaborModal() {{
+    const modal = document.getElementById('laborModal');
     let html = '';
     
-    if (paintItems.length === 0) {{
-      html = '<p>No paint items found.</p>';
+    if (laborItems.length === 0) {{
+      html = '<p>No labor items found.</p>';
     }} else {{
-      paintItems.forEach((item, index) => {{
-        html += '<div class="paint-item" id="item-' + index + '">';
-        html += '<input type="checkbox" class="paint-item-checkbox" onchange="toggleDeduction(' + index + ')" />';
+      laborItems.forEach((item, index) => {{
+        html += '<div class="labor-item" id="item-' + index + '">';
+        html += '<input type="checkbox" class="labor-item-checkbox" onchange="toggleDeduction(' + index + ')" />';
         html += '<div style="flex: 1;"><strong>Line ' + item.line + '</strong> - ' + item.description + '</div>';
         html += '<div>' + item.value + ' hrs</div>';
         html += '</div>';
       }});
     }}
     
-    document.getElementById('paintList').innerHTML = html;
+    document.getElementById('laborList').innerHTML = html;
     modal.style.display = 'block';
   }}
   
-  function closePaintModal() {{
-    document.getElementById('paintModal').style.display = 'none';
+  function closeLaborModal() {{
+    document.getElementById('laborModal').style.display = 'none';
   }}
   
   function printModal() {{
     const printWindow = window.open('', '', 'height=600,width=800');
     const techValue = document.getElementById('techInput').value;
     
-    const checkboxes = document.querySelectorAll('.paint-item-checkbox');
+    const checkboxes = document.querySelectorAll('.labor-item-checkbox');
     let deductedTotal = 0;
     let printContent = '<html><head><title>Labor Assignment</title></head><body style="font-family: Arial; padding: 20px;">';
     
@@ -602,12 +627,12 @@ async def grid_ui(file: UploadFile = File(...), ajax: str = None):
       if (!checkbox.checked) {{
         printContent += '<div style="padding: 12px 8px; border-bottom: 1px solid #ddd;">';
         printContent += '<input type="checkbox" disabled style="margin-right: 10px;" />';
-        printContent += '<strong>Line ' + paintItems[index].line + '</strong> - ' + paintItems[index].description;
-        printContent += ' <div style="display: inline; float: right;">' + paintItems[index].value + ' hrs</div>';
+        printContent += '<strong>Line ' + laborItems[index].line + '</strong> - ' + laborItems[index].description;
+        printContent += ' <div style="display: inline; float: right;">' + laborItems[index].value + ' hrs</div>';
         printContent += '</div>';
-        totalLabor += paintItems[index].value;
+        totalLabor += laborItems[index].value;
       }} else {{
-        deductedTotal += paintItems[index].value;
+        deductedTotal += laborItems[index].value;
       }}
     }});
     
@@ -623,14 +648,14 @@ async def grid_ui(file: UploadFile = File(...), ajax: str = None):
   }}
   
   function saveModal() {{
-    const checkboxes = document.querySelectorAll('.paint-item-checkbox');
+    const checkboxes = document.querySelectorAll('.labor-item-checkbox');
     let selectedItems = [];
     let deductedTotal = 0;
     
     checkboxes.forEach((checkbox, index) => {{
       if (checkbox.checked) {{
-        selectedItems.push(paintItems[index]);
-        deductedTotal += paintItems[index].value;
+        selectedItems.push(laborItems[index]);
+        deductedTotal += laborItems[index].value;
       }}
     }});
     
@@ -654,7 +679,7 @@ async def grid_ui(file: UploadFile = File(...), ajax: str = None):
   }}
   
   window.onclick = function(event) {{  
-    const modal = document.getElementById('paintModal');
+    const modal = document.getElementById('laborModal');
     if (event.target == modal) {{
       modal.style.display = 'none';
     }}
