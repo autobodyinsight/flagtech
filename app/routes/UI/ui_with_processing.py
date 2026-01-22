@@ -2,7 +2,7 @@ from fastapi import APIRouter, UploadFile, File
 from fastapi.responses import HTMLResponse
 from app.services.extractor import extract_text_from_pdf, extract_words_from_pdf
 from app.services.parser import parse_estimate_text
-from .shared_utils import kmeans_1d as _kmeans_1d, group_rows as _group_rows
+from app.services.grid_processor import process_pdf_grid, generate_pages_html
 from .flagout import get_flagtech_screen_html
 from .ros import get_ros_screen_html
 from .techs import get_techs_screen_html
@@ -202,253 +202,26 @@ async def grid_ui(file: UploadFile = File(...), ajax: str = None):
     if not pages:
         return "<html><body><p>No words found in PDF.</p><a href='/ui'>Back</a></body></html>"
 
-    display_w = 1200
-    # Prepare xmid/ymid and page index on words
-    for pi, page in enumerate(pages, start=1):
-        for w in page.get("words", []):
-            w["page_index"] = pi
-            if "xmid" not in w:
-                w["xmid"] = (w["x0"] + w["x1"]) / 2.0
-            if "ymid" not in w:
-                w["ymid"] = (w["y0"] + w["y1"]) / 2.0
-
-    # detect second RO row (anchor) and ESTIMATE TOTALS row (end marker)
-    # also capture second RO line for vehicle info
-    anchor_page = None
-    anchor_ymid = None
-    subtotals_page = None
-    subtotals_ymid = None
-    ro_count = 0
-    second_ro_line = ""
-    vehicle_info_line = ""
+    # Process PDF using service layer
+    result = process_pdf_grid(pages)
     
-    for pi, page in enumerate(pages, start=1):
-        rows = _group_rows(page.get("words", []), y_thresh=6.0)
-        for idx, r in enumerate(rows):
-            row_text = " ".join(w.get("text", "") for w in r["words"]).strip()
-            
-            # Look for RO and use the second occurrence as anchor
-            if re.search(r"\bRO\b", row_text):
-                ro_count += 1
-                # Capture second RO line and search for vehicle info
-                if ro_count == 2 and not anchor_page:
-                    anchor_page = pi
-                    anchor_ymid = r["ymid"]
-                    second_ro_line = row_text
-                    # Search for vehicle info line (contains 4-digit year)
-                    for j in range(idx + 1, min(idx + 10, len(rows))):
-                        next_line = " ".join(w.get("text", "") for w in rows[j]["words"]).strip()
-                        # Look for a line with a 4-digit year (19xx or 20xx)
-                        if re.search(r'\b(19\d{2}|20\d{2})\b', next_line):
-                            vehicle_info_line = next_line
-                            break
-            
-            # Look for ESTIMATE TOTALS as end marker
-            if not subtotals_page and re.search(r"\bESTIMATE\s+TOTALS\b", row_text):
-                subtotals_page = pi
-                subtotals_ymid = r["ymid"]
-            
-            if anchor_page and subtotals_page:
-                break
-        
-        if anchor_page and subtotals_page:
-            break
-
-    # Collect all words to find column positions
-    all_words = []
-    for pi, page in enumerate(pages, start=1):
-        if anchor_page and pi < anchor_page:
-            continue
-        if subtotals_page and pi > subtotals_page:
-            continue
-        for wd in page.get("words", []):
-            if anchor_page and pi == anchor_page and anchor_ymid is not None:
-                if wd.get("ymid", 0) < (anchor_ymid - 3.0):
-                    continue
-            if subtotals_page and pi == subtotals_page and subtotals_ymid is not None:
-                if wd.get("ymid", 0) > subtotals_ymid:
-                    continue
-            all_words.append(wd)
+    # Extract results from service
+    labor_items = result["labor_items"]
+    paint_items = result["paint_items"]
+    total_labor = result["total_labor"]
+    total_paint = result["total_paint"]
+    second_ro_line = result["second_ro_line"]
+    vehicle_info_line = result["vehicle_info_line"]
+    anchor_page = result["anchor_page"]
+    anchor_ymid = result["anchor_ymid"]
+    subtotals_page = result["subtotals_page"]
+    subtotals_ymid = result["subtotals_ymid"]
     
-    # Use k-means to find 8 columns: Line, Oper, Description, Part Number, Qty, Extended Price, Labor, Paint
-    xvals = [w["xmid"] for w in all_words]
-    centers = _kmeans_1d(xvals, 8, iters=40)
-    centers_sorted = sorted(centers) if centers else []
+    # Generate pages HTML visualization
+    pages_html = generate_pages_html(pages, anchor_page, anchor_ymid, subtotals_page, subtotals_ymid)
     
-    # Debug: print column positions
-    print(f"[DEBUG] Column centers detected: {centers_sorted}")
-    
-    # Identify column positions: 0=Line, 1=Oper, 2=Description, 3=Part Number, 4=Qty, 5=Extended Price, 6=Labor, 7=Paint
-    line_col_x = centers_sorted[0] if len(centers_sorted) > 0 else None
-    oper_col_x = centers_sorted[1] if len(centers_sorted) > 1 else None
-    labor_col_x = centers_sorted[6] if len(centers_sorted) > 6 else None
-    paint_col_x = centers_sorted[7] if len(centers_sorted) > 7 else None
-    
-    print(f"[DEBUG] Line column X: {line_col_x}, Oper column X: {oper_col_x}, Labor column X: {labor_col_x}, Paint column X: {paint_col_x}")
-
-    pages_html = ""
-    labor_items = []  # Store items with labor values for the modal
-    paint_items = []  # Store items with paint values for the refinish modal
-    for pi, page in enumerate(pages, start=1):
-        # skip pages before anchor
-        if anchor_page and pi < anchor_page:
-            continue
-        # skip pages after subtotals
-        if subtotals_page and pi > subtotals_page:
-            continue
-        w = page.get("width", 1)
-        h = page.get("height", 1)
-        scale = display_w / w if w else 1.0
-
-        boxes_html = ""
-        
-        # First, group words into rows and extract line/labor pairs
-        page_words = []
-        for wd in page.get("words", []):
-            # if this is the anchor page, skip words above the anchor_ymid
-            if anchor_page and pi == anchor_page and anchor_ymid is not None:
-                if wd.get("ymid", 0) < (anchor_ymid - 3.0):
-                    continue
-            # if this is the subtotals page, skip words at or below the subtotals_ymid
-            if subtotals_page and pi == subtotals_page and subtotals_ymid is not None:
-                if wd.get("ymid", 0) >= (subtotals_ymid - 3.0):
-                    continue
-            page_words.append(wd)
-        
-        # Group into rows
-        rows = _group_rows(page_words, y_thresh=6.0)
-        
-        # Extract line numbers and labor/paint values from rows
-        for row in rows:
-            row_words = sorted(row["words"], key=lambda x: x["xmid"])
-            line_num = None
-            oper = None
-            labor_val = None
-            paint_val = None
-            description = []
-            
-            for wd in row_words:
-                word_xmid = wd.get("xmid", (wd["x0"] + wd["x1"]) / 2.0)
-                word_text = wd["text"].strip()
-                
-                # Check if this is a line number (max 3 digits in Line column)
-                if line_col_x and abs(word_xmid - line_col_x) < 40:
-                    if re.match(r'^\d{1,3}$', word_text):
-                        line_num = word_text
-                
-                # Check if this is an operation (r&i, rpr, repl in Oper column)
-                if oper_col_x and abs(word_xmid - oper_col_x) < 40:
-                    if word_text.lower() in ['r&i', 'rpr', 'repl', 'r&r']:
-                        oper = word_text.lower()
-                
-                # Collect description text (between line and labor columns)
-                elif line_col_x and labor_col_x:
-                    if line_col_x < word_xmid < labor_col_x - 50:  # Leave space for qty and price columns
-                        description.append(word_text)
-                
-                # Check if this is a labor value in the Labor column
-                # Labor format: x.x or xx.x, may be negative, or text "Incl"
-                # IMPORTANT: Labor hours must be in range 0.0-99.9 (not prices like 506.78!)
-                if labor_col_x and abs(word_xmid - labor_col_x) < 40:
-                    # Check for decimal format (positive or negative)
-                    if re.match(r'^-?\d+\.\d+$', word_text):
-                        try:
-                            val = float(word_text)
-                            # Only accept values in valid labor hour range (0.0-99.9)
-                            if 0.0 <= val <= 99.9:
-                                labor_val = val
-                        except:
-                            pass
-                    # Also accept "Incl" as a valid labor indicator
-                    elif word_text.lower() == 'incl':
-                        labor_val = 0.0  # Represent Incl as 0.0 for tracking purposes
-                
-                # Check if this is a paint value in the Paint column
-                # Paint format: x.x or xx.x, may be negative, or text "Incl"
-                # IMPORTANT: Paint hours must be in range 0.0-99.9 (not prices!)
-                if paint_col_x and abs(word_xmid - paint_col_x) < 40:
-                    # Check for decimal format (positive or negative)
-                    if re.match(r'^-?\d+\.\d+$', word_text):
-                        try:
-                            val = float(word_text)
-                            # Only accept values in valid paint hour range (0.0-99.9)
-                            if 0.0 <= val <= 99.9:
-                                paint_val = val
-                        except:
-                            pass
-                    # Also accept "Incl" as a valid paint indicator
-                    elif word_text.lower() == 'incl':
-                        paint_val = 0.0  # Represent Incl as 0.0 for tracking purposes
-            
-            # Classify repair line based on labor/paint presence
-            desc_text = " ".join(description).lower()
-
-            if line_num and "add for clear coat" not in desc_text:
-
-                # Labor only
-                if labor_val is not None and paint_val is None:
-                    labor_items.append({
-                        "line": line_num,
-                        "description": " ".join(description),
-                        "value": labor_val
-                    })
-
-                # Paint only
-                elif labor_val is None and paint_val is not None and oper != 'r&i' and paint_val != 0.0:
-                    paint_items.append({
-                        "line": line_num,
-                        "description": " ".join(description),
-                        "value": paint_val
-                    })
-
-                # Both labor and paint
-                elif labor_val is not None and paint_val is not None:
-                    labor_items.append({
-                        "line": line_num,
-                        "description": " ".join(description),
-                        "value": labor_val
-                    })
-                    if oper != 'r&i' and paint_val != 0.0:
-                        paint_items.append({
-                            "line": line_num,
-                            "description": " ".join(description),
-                            "value": paint_val
-                        })
-        
-        # Now display all words
-        for wd in page_words:
-            x = wd["x0"] * scale
-            y = wd["y0"] * scale
-            ww = (wd["x1"] - wd["x0"]) * scale
-            hh = (wd["y1"] - wd["y0"]) * scale
-            txt = wd["text"].replace("<", "&lt;").replace(">", "&gt;")
-            boxes_html += f"<div style='position:absolute; left:{x}px; top:{y}px; width:{ww}px; height:{hh}px; font-size:15px; overflow:hidden;'>{txt}</div>"
-
-        pages_html += f"<h3>Page {pi}</h3><div style='position:relative; width:{display_w}px; height:{int(h*scale)}px; border:1px solid #ccc; margin-bottom:20px;'>{boxes_html}</div>"
-
-    # UI-side detection of collapsed labor column (CCC quirk)
-    labor_has_values = any(item["value"] != 0.0 for item in labor_items)
-    paint_has_values = any(item["value"] != 0.0 for item in paint_items)
-
-    if not labor_has_values and paint_has_values:
-        print("[DEBUG] UI: CCC collapsed labor column → swapping labor and paint")
-        labor_items, paint_items = paint_items, labor_items
-
-    # Now calculate totals using the (possibly swapped) lists
-    total_labor = sum(item["value"] for item in labor_items)
-    total_paint = sum(item["value"] for item in paint_items)
-
     labor_items_json = json.dumps(labor_items)
     paint_items_json = json.dumps(paint_items)
-
-    print(f"[DEBUG] Total labor items found: {len(labor_items)}")
-    print(f"[DEBUG] Total labor hours: {total_labor}")
-    print(f"[DEBUG] Total paint items found: {len(paint_items)}")
-    print(f"[DEBUG] Total paint hours: {total_paint}")
-    if labor_items:
-        print(f"[DEBUG] First few labor items: {labor_items[:5]}")
-    if paint_items:
-        print(f"[DEBUG] First few paint items: {paint_items[:5]}")
 
     # If AJAX request, return just the content without HTML wrapper
     if ajax:
@@ -523,6 +296,8 @@ async def grid_ui(file: UploadFile = File(...), ajax: str = None):
 
 @router.post("/aligned", response_class=HTMLResponse)
 async def aligned_ui(file: UploadFile = File(...)):
+    from app.services.grid_processor import kmeans_1d, group_rows
+    
     pages = extract_words_from_pdf(file)
     if not pages:
         return "<html><body><p>No words found in PDF.</p><a href='/ui'>Back</a></body></html>"
@@ -547,7 +322,7 @@ async def aligned_ui(file: UploadFile = File(...)):
     ro_count = 0
     
     for pi, page in enumerate(pages, start=1):
-        rows = _group_rows(page.get("words", []), y_thresh=6.0)
+        rows = group_rows(page.get("words", []), y_thresh=6.0)
         for r in rows:
             row_text = " ".join(w.get("text", "") for w in r["words"]).strip()
             
@@ -578,7 +353,7 @@ async def aligned_ui(file: UploadFile = File(...)):
             xvals = [w["xmid"] for w in all_words if (w["page_index"] > anchor_page) or (w["page_index"] == anchor_page and w["ymid"] >= anchor_ymid)]
     else:
         xvals = [w["xmid"] for w in all_words]
-    centers = _kmeans_1d(xvals, 5, iters=40)
+    centers = kmeans_1d(xvals, 5, iters=40)
     if not centers:
         return "<html><body><p>Could not compute columns.</p><a href='/ui'>Back</a></body></html>"
 
@@ -599,7 +374,7 @@ async def aligned_ui(file: UploadFile = File(...)):
             if "ymid" not in wdict:
                 wdict["ymid"] = (wdict["y0"] + wdict["y1"]) / 2.0
 
-        rows = _group_rows(page.get("words", []), y_thresh=6.0)
+        rows = group_rows(page.get("words", []), y_thresh=6.0)
         for r in rows:
             # skip rows above anchor (RO) or at/below subtotals
             if anchor_page and page_idx == anchor_page and anchor_ymid is not None:
