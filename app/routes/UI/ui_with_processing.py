@@ -2,76 +2,46 @@ from fastapi import APIRouter, UploadFile, File
 from fastapi.responses import HTMLResponse
 from app.services.extractor import extract_text_from_pdf, extract_words_from_pdf
 from app.services.parser import parse_estimate_text
+from .shared_utils import kmeans_1d as _kmeans_1d, group_rows as _group_rows
+from .flagout import get_flagtech_screen_html
+from .ros import get_ros_screen_html
+from .techs import get_techs_screen_html
+try:
+    from .upload_ui.upload import get_upload_screen_html, get_upload_script
+except ImportError:
+    # Fallback if directory name has space
+    import sys
+    from pathlib import Path
+    upload_dir = Path(__file__).parent / "upload ui"
+    sys.path.insert(0, str(upload_dir))
+    from upload import get_upload_screen_html, get_upload_script
+    from labor import get_labor_modal_html, get_labor_modal_styles, get_labor_modal_script
+    from paint import get_refinish_modal_html, get_refinish_modal_styles, get_refinish_modal_script, get_modal_close_handler
 import math
 import re
-
-
-def _kmeans_1d(values, k, iters=20):
-    if not values or k <= 0:
-        return []
-    # initialize centers as quantiles
-    vals = sorted(values)
-    centers = []
-    n = len(vals)
-    for i in range(k):
-        idx = int((i + 0.5) * n / k)
-        centers.append(vals[min(idx, n - 1)])
-
-    for _ in range(iters):
-        groups = {i: [] for i in range(k)}
-        for v in vals:
-            best = min(range(k), key=lambda c: abs(v - centers[c]))
-            groups[best].append(v)
-        changed = False
-        for i in range(k):
-            if groups[i]:
-                newc = sum(groups[i]) / len(groups[i])
-                if abs(newc - centers[i]) > 1e-6:
-                    changed = True
-                centers[i] = newc
-        if not changed:
-            break
-    return centers
-
-
-def _group_rows(words, y_thresh=8.0):
-    # words: list of dicts with y0,y1; group by y-center proximity
-    rows = []
-    for w in sorted(words, key=lambda x: (x["y0"] + x["y1"]) / 2):
-        ymid = (w["y0"] + w["y1"]) / 2
-        placed = False
-        for r in rows:
-            if abs(r["ymid"] - ymid) <= y_thresh:
-                r["words"].append(w)
-                # update average ymid
-                r["ymid"] = sum(( (ww["y0"]+ww["y1"]) / 2 for ww in r["words"] )) / len(r["words"])
-                placed = True
-                break
-        if not placed:
-            rows.append({"ymid": ymid, "words": [w]})
-    return rows
+import json
 
 router = APIRouter()
 
 @router.get("/", response_class=HTMLResponse)
 async def home_screen():
-    return """
+    return f"""
 <html>
 <head>
     <title>FlagTech</title>
     <style>
-        * {
+        * {{
             margin: 0;
             padding: 0;
             box-sizing: border-box;
-        }
-        body {
+        }}
+        body {{
             font-family: Arial, sans-serif;
             display: flex;
             height: 100vh;
             background-color: #f5f5f5;
-        }
-        .sidebar {
+        }}
+        .sidebar {{
             width: 150px;
             background-color: #505050;
             display: flex;
@@ -81,8 +51,8 @@ async def home_screen():
             position: fixed;
             height: 100vh;
             overflow-y: auto;
-        }
-        .nav-box {
+        }}
+        .nav-box {{
             padding: 15px;
             background-color: #666666;
             color: white;
@@ -92,30 +62,30 @@ async def home_screen():
             font-weight: bold;
             border: 2px solid transparent;
             transition: all 0.3s ease;
-        }
-        .nav-box:hover {
+        }}
+        .nav-box:hover {{
             background-color: #707070;
             border: 2px solid white;
-        }
-        .nav-box.active {
+        }}
+        .nav-box.active {{
             background-color: #d32f2f;
             color: white;
             border: 2px solid #d32f2f;
-        }
-        .content-area {
+        }}
+        .content-area {{
             flex: 1;
             padding: 40px;
             overflow-y: auto;
             margin-left: 150px;
             background-color: white;
             min-height: 100vh;
-        }
-        .screen {
+        }}
+        .screen {{
             display: none;
-        }
-        .screen.active {
+        }}
+        .screen.active {{
             display: block;
-        }
+        }}
     </style>
 </head>
 <body>
@@ -127,32 +97,14 @@ async def home_screen():
     </div>
     
     <div class="content-area">
-        <div id="upload" class="screen active">
-            <h2>Upload an Estimate PDF</h2>
-            <form id="uploadForm" enctype="multipart/form-data">
-                <input type="file" id="fileInput" name="file" accept="application/pdf" onchange="handleFileUpload()" style="padding: 10px; cursor: pointer;" />
-            </form>
-            <div id="uploadStatus"></div>
-        </div>
-        
-        <div id="tech" class="screen">
-            <h2>TECH</h2>
-            <p>Tech management screen - coming soon</p>
-        </div>
-        
-        <div id="ros" class="screen">
-            <h2>RO'S</h2>
-            <p>RO's management screen - coming soon</p>
-        </div>
-        
-        <div id="flagtech" class="screen">
-            <h2>FLAG TECH</h2>
-            <p>Flag Tech screen - coming soon</p>
-        </div>
+        {get_upload_screen_html()}
+        {get_techs_screen_html()}
+        {get_ros_screen_html()}
+        {get_flagtech_screen_html()}
     </div>
     
     <script>
-        function switchScreen(screenName) {
+        function switchScreen(screenName) {{
             // Hide all screens
             const screens = document.querySelectorAll('.screen');
             screens.forEach(screen => screen.classList.remove('active'));
@@ -166,40 +118,9 @@ async def home_screen():
             
             // Add active class to clicked nav box
             event.target.classList.add('active');
-        }
+        }}
         
-        function handleFileUpload() {
-            const fileInput = document.getElementById('fileInput');
-            const file = fileInput.files[0];
-            if (!file) return;
-            
-            const formData = new FormData();
-            formData.append('file', file);
-            
-            const statusDiv = document.getElementById('uploadStatus');
-            statusDiv.innerHTML = '<p>Processing...</p>';
-            
-            fetch('/ui/grid?ajax=true', {
-                method: 'POST',
-                body: formData
-            })
-            .then(response => response.text())
-            .then(html => {
-                statusDiv.innerHTML = html;
-                fileInput.value = '';
-                
-                // Execute any scripts in the loaded content
-                const scripts = statusDiv.querySelectorAll('script');
-                scripts.forEach(oldScript => {
-                    const newScript = document.createElement('script');
-                    newScript.innerHTML = oldScript.innerHTML;
-                    document.body.appendChild(newScript);
-                });
-            })
-            .catch(error => {
-                statusDiv.innerHTML = '<p>Error: ' + error.message + '</p>';
-            });
-        }
+        {get_upload_script()}
     </script>
 </body>
 </html>
@@ -359,13 +280,15 @@ async def grid_ui(file: UploadFile = File(...), ajax: str = None):
     
     # Identify column positions: 0=Line, 1=Oper, 2=Description, 3=Part Number, 4=Qty, 5=Extended Price, 6=Labor, 7=Paint
     line_col_x = centers_sorted[0] if len(centers_sorted) > 0 else None
+    oper_col_x = centers_sorted[1] if len(centers_sorted) > 1 else None
     labor_col_x = centers_sorted[6] if len(centers_sorted) > 6 else None
     paint_col_x = centers_sorted[7] if len(centers_sorted) > 7 else None
     
-    print(f"[DEBUG] Line column X: {line_col_x}, Labor column X: {labor_col_x}, Paint column X: {paint_col_x}")
+    print(f"[DEBUG] Line column X: {line_col_x}, Oper column X: {oper_col_x}, Labor column X: {labor_col_x}, Paint column X: {paint_col_x}")
 
     pages_html = ""
     labor_items = []  # Store items with labor values for the modal
+    paint_items = []  # Store items with paint values for the refinish modal
     for pi, page in enumerate(pages, start=1):
         # skip pages before anchor
         if anchor_page and pi < anchor_page:
@@ -395,11 +318,13 @@ async def grid_ui(file: UploadFile = File(...), ajax: str = None):
         # Group into rows
         rows = _group_rows(page_words, y_thresh=6.0)
         
-        # Extract line numbers and labor values from rows
+        # Extract line numbers and labor/paint values from rows
         for row in rows:
             row_words = sorted(row["words"], key=lambda x: x["xmid"])
             line_num = None
+            oper = None
             labor_val = None
+            paint_val = None
             description = []
             
             for wd in row_words:
@@ -411,6 +336,11 @@ async def grid_ui(file: UploadFile = File(...), ajax: str = None):
                     if re.match(r'^\d{1,3}$', word_text):
                         line_num = word_text
                 
+                # Check if this is an operation (r&i, rpr, repl in Oper column)
+                if oper_col_x and abs(word_xmid - oper_col_x) < 40:
+                    if word_text.lower() in ['r&i', 'rpr', 'repl', 'r&r']:
+                        oper = word_text.lower()
+                
                 # Collect description text (between line and labor columns)
                 elif line_col_x and labor_col_x:
                     if line_col_x < word_xmid < labor_col_x - 50:  # Leave space for qty and price columns
@@ -418,32 +348,72 @@ async def grid_ui(file: UploadFile = File(...), ajax: str = None):
                 
                 # Check if this is a labor value in the Labor column
                 # Labor format: x.x or xx.x, may be negative, or text "Incl"
+                # IMPORTANT: Labor hours must be in range 0.0-99.9 (not prices like 506.78!)
                 if labor_col_x and abs(word_xmid - labor_col_x) < 40:
                     # Check for decimal format (positive or negative)
                     if re.match(r'^-?\d+\.\d+$', word_text):
                         try:
-                            labor_val = float(word_text)
+                            val = float(word_text)
+                            # Only accept values in valid labor hour range (0.0-99.9)
+                            if 0.0 <= val <= 99.9:
+                                labor_val = val
                         except:
                             pass
                     # Also accept "Incl" as a valid labor indicator
                     elif word_text.lower() == 'incl':
                         labor_val = 0.0  # Represent Incl as 0.0 for tracking purposes
+                
+                # Check if this is a paint value in the Paint column
+                # Paint format: x.x or xx.x, may be negative, or text "Incl"
+                # IMPORTANT: Paint hours must be in range 0.0-99.9 (not prices!)
+                if paint_col_x and abs(word_xmid - paint_col_x) < 40:
+                    # Check for decimal format (positive or negative)
+                    if re.match(r'^-?\d+\.\d+$', word_text):
+                        try:
+                            val = float(word_text)
+                            # Only accept values in valid paint hour range (0.0-99.9)
+                            if 0.0 <= val <= 99.9:
+                                paint_val = val
+                        except:
+                            pass
+                    # Also accept "Incl" as a valid paint indicator
+                    elif word_text.lower() == 'incl':
+                        paint_val = 0.0  # Represent Incl as 0.0 for tracking purposes
             
-            # Add to labor_items if we found a line number AND a labor value/indicator in the labor column
-            if line_num and labor_val is not None:
-                labor_items.append({
-                    "line": line_num,
-                    "description": " ".join(description),
-                    "value": labor_val
-                })
-        
-        # Debug logging
-        if pi == 1:
-            print(f"[DEBUG] Found {len(labor_items)} labor items on page {pi}")
-            print(f"[DEBUG] Labor column X position: {labor_col_x}")
-            print(f"[DEBUG] Line column X position: {line_col_x}")
-            if labor_items:
-                print(f"[DEBUG] Sample labor items: {labor_items[:3]}")
+            # Classify repair line based on labor/paint presence
+            desc_text = " ".join(description).lower()
+
+            if line_num and "add for clear coat" not in desc_text:
+
+                # Labor only
+                if labor_val is not None and paint_val is None:
+                    labor_items.append({
+                        "line": line_num,
+                        "description": " ".join(description),
+                        "value": labor_val
+                    })
+
+                # Paint only
+                elif labor_val is None and paint_val is not None and oper != 'r&i' and paint_val != 0.0:
+                    paint_items.append({
+                        "line": line_num,
+                        "description": " ".join(description),
+                        "value": paint_val
+                    })
+
+                # Both labor and paint
+                elif labor_val is not None and paint_val is not None:
+                    labor_items.append({
+                        "line": line_num,
+                        "description": " ".join(description),
+                        "value": labor_val
+                    })
+                    if oper != 'r&i' and paint_val != 0.0:
+                        paint_items.append({
+                            "line": line_num,
+                            "description": " ".join(description),
+                            "value": paint_val
+                        })
         
         # Now display all words
         for wd in page_words:
@@ -456,44 +426,55 @@ async def grid_ui(file: UploadFile = File(...), ajax: str = None):
 
         pages_html += f"<h3>Page {pi}</h3><div style='position:relative; width:{display_w}px; height:{int(h*scale)}px; border:1px solid #ccc; margin-bottom:20px;'>{boxes_html}</div>"
 
-    # Calculate total labor value
+    # UI-side detection of collapsed labor column (CCC quirk)
+    labor_has_values = any(item["value"] != 0.0 for item in labor_items)
+    paint_has_values = any(item["value"] != 0.0 for item in paint_items)
+
+    if not labor_has_values and paint_has_values:
+        print("[DEBUG] UI: CCC collapsed labor column → swapping labor and paint")
+        labor_items, paint_items = paint_items, labor_items
+
+    # Now calculate totals using the (possibly swapped) lists
     total_labor = sum(item["value"] for item in labor_items)
-    labor_items_json = str(labor_items).replace("'", '"')
-    
+    total_paint = sum(item["value"] for item in paint_items)
+
+    labor_items_json = json.dumps(labor_items)
+    paint_items_json = json.dumps(paint_items)
+
     print(f"[DEBUG] Total labor items found: {len(labor_items)}")
     print(f"[DEBUG] Total labor hours: {total_labor}")
+    print(f"[DEBUG] Total paint items found: {len(paint_items)}")
+    print(f"[DEBUG] Total paint hours: {total_paint}")
     if labor_items:
         print(f"[DEBUG] First few labor items: {labor_items[:5]}")
+    if paint_items:
+        print(f"[DEBUG] First few paint items: {paint_items[:5]}")
 
     # If AJAX request, return just the content without HTML wrapper
     if ajax:
+        # Generate modal HTML using imported functions
+        labor_modal = get_labor_modal_html(second_ro_line, vehicle_info_line, total_labor)
+        refinish_modal = get_refinish_modal_html(second_ro_line, vehicle_info_line, total_paint)
+        
+        # Generate modal styles
+        labor_styles = get_labor_modal_styles()
+        refinish_styles = get_refinish_modal_styles()
+        
+        # Generate modal scripts
+        labor_script = get_labor_modal_script(labor_items_json, total_labor, second_ro_line, vehicle_info_line)
+        refinish_script = get_refinish_modal_script(paint_items_json, total_paint, second_ro_line, vehicle_info_line)
+        close_handler = get_modal_close_handler()
+        
         content = f"""
 <h2>Document Visual Grid</h2>
-<button onclick="openLaborModal()" style='padding:10px 20px; font-size:14px; cursor:pointer; background-color:#505050; color:white; border:none; border-radius:3px;'>Assign Labor</button>
+<button onclick="openLaborModal()" style='padding:10px 20px; font-size:14px; cursor:pointer; background-color:#505050; color:white; border:none; border-radius:3px; margin-right:10px;'>Assign Labor</button>
+<button onclick="openRefinishModal()" style='padding:10px 20px; font-size:14px; cursor:pointer; background-color:#505050; color:white; border:none; border-radius:3px;'>Assign Refinish</button>
 <br><br>
 {pages_html}
 <br><a href='/ui'>Back</a>
 
-<div id="laborModal" class="modal">
-  <div class="modal-content">
-    <span class="close" onclick="closeLaborModal()">&times;</span>
-    <div style="margin-bottom: 15px;">
-      <div style="font-weight: bold; font-size: 14px; margin-bottom: 5px;">{second_ro_line}</div>
-      <div style="font-size: 14px; color: #333;">{vehicle_info_line}</div>
-    </div>
-    <div style="margin-bottom: 15px;">
-      <label style="font-weight: bold; font-size: 14px;">TECH:</label>
-      <input type="text" id="techInput" style="padding: 8px; font-size: 14px; margin-left: 10px; width: 200px; border: 1px solid #ccc; border-radius: 3px;" placeholder="Enter technician name" />
-    </div>
-    <h2>Labor Assignment</h2>
-    <div id="laborList"></div>
-    <div class="labor-total">Total Labor: <span id="totalLabor">{total_labor}</span></div>
-    <div style="margin-top: 20px; display: flex; gap: 10px; justify-content: flex-end;">
-      <button onclick="printModal()" style='padding:10px 20px; font-size:14px; cursor:pointer; background-color:#505050; color:white; border:none; border-radius:3px;'>Print</button>
-        <button onclick="saveModal()" style='padding:10px 20px; font-size:14px; cursor:pointer; background-color:#505050; color:white; border:none; border-radius:3px;'>Save</button>
-    </div>
-  </div>
-</div>
+{labor_modal}
+{refinish_modal}
 
 <style>
   .modal {{
@@ -527,165 +508,16 @@ async def grid_ui(file: UploadFile = File(...), ajax: str = None):
   .close:hover {{
     color: black;
   }}
-  .labor-item {{
-    padding: 12px;
-    border-bottom: 1px solid #ddd;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    gap: 20px;
-  }}
-  .labor-item.deducted {{
-    background-color: #f0f0f0;
-    text-decoration: line-through;
-    opacity: 0.6;
-  }}
-  .labor-item-checkbox {{
-    cursor: pointer;
-    width: 18px;
-    height: 18px;
-    margin-right: 10px;
-  }}
-  .labor-total {{
-    padding: 12px 8px;
-    font-weight: bold;
-    background-color: #f0f0f0;
-    margin-top: 10px;
-    text-align: right;
-  }}
+{labor_styles}
+{refinish_styles}
 </style>
 
 <script>
-  const laborItems = {labor_items_json};
-  const initialTotal = {total_labor};
-  
-  function updateTotal() {{
-    const checkboxes = document.querySelectorAll('.labor-item-checkbox');
-    let deductedTotal = 0;
-    
-    checkboxes.forEach((checkbox, index) => {{
-      if (checkbox.checked) {{
-        deductedTotal += laborItems[index].value;
-      }}
-    }});
-    
-    const newTotal = (initialTotal - deductedTotal).toFixed(1);
-    document.getElementById('totalLabor').innerText = newTotal;
-  }}
-  
-  function toggleDeduction(index) {{
-    const item = document.getElementById('item-' + index);
-    item.classList.toggle('deducted');
-    updateTotal();
-  }}
-  
-  function openLaborModal() {{
-    const modal = document.getElementById('laborModal');
-    let html = '';
-    
-    if (laborItems.length === 0) {{
-      html = '<p>No labor items found.</p>';
-    }} else {{
-      laborItems.forEach((item, index) => {{
-        html += '<div class="labor-item" id="item-' + index + '">';
-        html += '<input type="checkbox" class="labor-item-checkbox" onchange="toggleDeduction(' + index + ')" />';
-        html += '<div style="flex: 1;"><strong>Line ' + item.line + '</strong> - ' + item.description + '</div>';
-        html += '<div>' + item.value + ' hrs</div>';
-        html += '</div>';
-      }});
-    }}
-    
-    document.getElementById('laborList').innerHTML = html;
-    modal.style.display = 'block';
-  }}
-  
-  function closeLaborModal() {{
-    document.getElementById('laborModal').style.display = 'none';
-  }}
-  
-  function printModal() {{
-    const printWindow = window.open('', '', 'height=600,width=800');
-    const techValue = document.getElementById('techInput').value;
-    
-    const checkboxes = document.querySelectorAll('.labor-item-checkbox');
-    let deductedTotal = 0;
-    let printContent = '<html><head><title>Labor Assignment</title></head><body style="font-family: Arial; padding: 20px;">';
-    
-    printContent += '<div style="margin-bottom: 15px;">';
-    printContent += '<div style="font-weight: bold; font-size: 14px; margin-bottom: 5px;">{second_ro_line}</div>';
-    printContent += '<div style="font-size: 14px; color: #333;">{vehicle_info_line}</div>';
-    printContent += '</div>';
-    printContent += '<div style="margin-bottom: 15px;">';
-    printContent += '<label style="font-weight: bold; font-size: 14px;">TECH:</label>';
-    printContent += '<span style="font-size: 14px; margin-left: 10px;">' + techValue + '</span>';
-    printContent += '</div>';
-    
-    printContent += '<h2>Labor Assignment</h2>';
-    
-    let totalLabor = 0;
-    checkboxes.forEach((checkbox, index) => {{
-      if (!checkbox.checked) {{
-        printContent += '<div style="padding: 12px 8px; border-bottom: 1px solid #ddd;">';
-        printContent += '<input type="checkbox" disabled style="margin-right: 10px;" />';
-        printContent += '<strong>Line ' + laborItems[index].line + '</strong> - ' + laborItems[index].description;
-        printContent += ' <div style="display: inline; float: right;">' + laborItems[index].value + ' hrs</div>';
-        printContent += '</div>';
-        totalLabor += laborItems[index].value;
-      }} else {{
-        deductedTotal += laborItems[index].value;
-      }}
-    }});
-    
-    printContent += '<div style="padding: 12px 8px; font-weight: bold; background-color: #f0f0f0; margin-top: 10px; text-align: right;">';
-    printContent += 'Total Labor: ' + totalLabor.toFixed(1);
-    printContent += '</div>';
-    
-    printContent += '</body></html>';
-    
-    printWindow.document.write(printContent);
-    printWindow.document.close();
-    printWindow.print();
-  }}
-  
-  function saveModal() {{
-    const checkboxes = document.querySelectorAll('.labor-item-checkbox');
-    let selectedItems = [];
-    let deductedTotal = 0;
-    
-    checkboxes.forEach((checkbox, index) => {{
-      if (checkbox.checked) {{
-        selectedItems.push(laborItems[index]);
-        deductedTotal += laborItems[index].value;
-      }}
-    }});
-    
-    const newTotal = (initialTotal - deductedTotal).toFixed(1);
-    
-    const data = {{
-      items: selectedItems,
-      totalLabor: newTotal,
-      timestamp: new Date().toISOString()
-    }};
-    
-    // Create and download JSON file
-    const dataStr = JSON.stringify(data, null, 2);
-    const dataBlob = new Blob([dataStr], {{ type: 'application/json' }});
-    const url = URL.createObjectURL(dataBlob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = 'labor-assignment-' + new Date().getTime() + '.json';
-    link.click();
-    URL.revokeObjectURL(url);
-  }}
-  
-  window.onclick = function(event) {{  
-    const modal = document.getElementById('laborModal');
-    if (event.target == modal) {{
-      modal.style.display = 'none';
-    }}
-  }}
+{labor_script}
+{refinish_script}
+{close_handler}
 </script>
-"""
+        """
         return content
 
 
