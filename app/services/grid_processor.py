@@ -11,7 +11,6 @@ def group_rows(words: List[Dict], y_thresh: float = 8.0) -> List[Dict]:
         for r in rows:
             if abs(r["ymid"] - ymid) <= y_thresh:
                 r["words"].append(w)
-                # Update average ymid
                 r["ymid"] = sum(((ww["y0"] + ww["y1"]) / 2 for ww in r["words"])) / len(r["words"])
                 placed = True
                 break
@@ -25,7 +24,6 @@ def detect_anchors_and_vehicle_info(
 ) -> Tuple[Optional[int], Optional[float], Optional[int], Optional[float], str, str]:
     """
     Detect anchor points in PDF and extract vehicle information.
-
     Returns:
         (anchor_page, anchor_ymid, subtotals_page, subtotals_ymid, second_ro_line, vehicle_info_line)
     """
@@ -42,7 +40,6 @@ def detect_anchors_and_vehicle_info(
         for idx, r in enumerate(rows):
             row_text = " ".join(w.get("text", "") for w in r["words"]).strip()
 
-            # Look for RO and use the second occurrence as anchor
             if re.search(r"\bRO\b", row_text):
                 ro_count += 1
                 if ro_count == 2 and not anchor_page:
@@ -50,14 +47,12 @@ def detect_anchors_and_vehicle_info(
                     anchor_ymid = r["ymid"]
                     second_ro_line = row_text
 
-                    # Search for vehicle info line (contains 4-digit year)
                     for j in range(idx + 1, min(idx + 10, len(rows))):
                         next_line = " ".join(w.get("text", "") for w in rows[j]["words"]).strip()
                         if re.search(r'\b(19\d{2}|20\d{2})\b', next_line):
                             vehicle_info_line = next_line
                             break
 
-            # Look for ESTIMATE TOTALS as end marker
             if not subtotals_page and re.search(r"\bESTIMATE\s+TOTALS\b", row_text):
                 subtotals_page = pi
                 subtotals_ymid = r["ymid"]
@@ -104,7 +99,7 @@ def detect_header_columns(
 ) -> Dict[str, Optional[float]]:
     """
     Detect column x-positions by finding the header row containing:
-    LINE, OPER, DESCRIPTION, PART, QTY, EXTENDED (or EXT), LABOR, PAINT.
+    LINE, OPER, DESCRIPTION, PART, QTY, EXTENDED, LABOR, PAINT.
     """
     header_columns = {
         "line": None,
@@ -123,7 +118,6 @@ def detect_header_columns(
         if subtotals_page and pi > subtotals_page:
             continue
 
-        # Filter words in range for this page
         page_words = []
         for wd in page.get("words", []):
             if anchor_page and pi == anchor_page and anchor_ymid is not None:
@@ -139,23 +133,17 @@ def detect_header_columns(
         for row in rows:
             row_text_upper = " ".join(w["text"] for w in row["words"]).upper()
 
-            # Require key headers to be present
-            if all(
-                token in row_text_upper
-                for token in ["LINE", "OPER", "DESCRIPTION", "LABOR", "PAINT"]
-            ):
-                # Map each header word to a column by its text
+            if all(token in row_text_upper for token in ["LINE", "OPER", "DESCRIPTION", "LABOR", "PAINT"]):
                 for wd in row["words"]:
                     txt = wd["text"].upper()
-                    xmid = wd.get("xmid", (wd["x0"] + wd["x1"]) / 2.0)
+                    xmid = wd["xmid"]
 
                     if "LINE" in txt and header_columns["line"] is None:
                         header_columns["line"] = xmid
                     elif "OPER" in txt and header_columns["oper"] is None:
                         header_columns["oper"] = xmid
                     elif "DESC" in txt or "DESCRIPTION" in txt:
-                        if header_columns["description"] is None:
-                            header_columns["description"] = xmid
+                        header_columns["description"] = xmid
                     elif "PART" in txt and header_columns["part_number"] is None:
                         header_columns["part_number"] = xmid
                     elif "QTY" in txt and header_columns["qty"] is None:
@@ -167,31 +155,23 @@ def detect_header_columns(
                     elif "PAINT" in txt and header_columns["paint"] is None:
                         header_columns["paint"] = xmid
 
-                # Once we find a header row, we can stop
                 return header_columns
 
     return header_columns
 
 
 def _parse_numeric_or_incl(text: str) -> Optional[float]:
-    """
-    Parse a numeric value or 'Incl' into a float.
-    Returns:
-        float value, or 0.0 for 'Incl', or None if invalid.
-    """
+    """Parse numeric or 'Incl'. Returns float or None."""
     t = text.strip()
     if not t:
         return None
-
     if t.lower() == "incl":
         return 0.0
-
     if re.match(r'^-?\d+(?:\.\d+)?$', t):
         try:
             return float(t)
         except Exception:
             return None
-
     return None
 
 
@@ -204,180 +184,112 @@ def extract_labor_paint_items(
     subtotals_ymid: Optional[float],
 ) -> Tuple[List[Dict], List[Dict]]:
     """
-    Extract labor and paint items from pages using the detected header columns.
-
-    Rules (CCC-specific):
-    - A repair line is valid if it has a line number in the Line column.
-    - A labor line is valid if:
-        - It has a line number, AND
-        - Labor column has a value in [-99.9, 99.9] or 'Incl',
-        - BUT NOT 0.0 (0.0 means not a labor line).
-    - A paint line is valid if:
-        - It has a line number, AND
-        - Paint column has a value in [-99.9, 99.9] or 'Incl',
-        - BUT NOT 0.0 (0.0 means not a paint line).
-    - Multi-line descriptions are allowed, but only the first line has the line number.
-      We do not need to merge; we treat each row independently.
+    Extract labor and paint items using CCC rules.
     """
-    labor_items: List[Dict] = []
-    paint_items: List[Dict] = []
+    labor_items = []
+    paint_items = []
 
-    line_col_x = columns.get("line")
-    labor_col_x = columns.get("labor")
-    paint_col_x = columns.get("paint")
-    desc_col_x = columns.get("description")
-
-    # Reasonable horizontal tolerance around each column
     col_tol = 25.0
 
     for pi, page in enumerate(pages, start=1):
-        # Skip pages outside range
         if anchor_page and pi < anchor_page:
             continue
         if subtotals_page and pi > subtotals_page:
             continue
 
-        # Filter words in range for this page
         page_words = []
         for wd in page.get("words", []):
             if anchor_page and pi == anchor_page and anchor_ymid is not None:
-                if wd.get("ymid", 0) < (anchor_ymid - 3.0):
+                if wd["ymid"] < (anchor_ymid - 3.0):
                     continue
             if subtotals_page and pi == subtotals_page and subtotals_ymid is not None:
-                if wd.get("ymid", 0) >= (subtotals_ymid - 3.0):
+                if wd["ymid"] >= (subtotals_ymid - 3.0):
                     continue
             page_words.append(wd)
 
         rows = group_rows(page_words, y_thresh=6.0)
 
         for row in rows:
-            row_words = sorted(row["words"], key=lambda x: x.get("xmid", (x["x0"] + x["x1"]) / 2.0))
-            row_ymid = row["ymid"]
+            row_words = sorted(row["words"], key=lambda x: x["xmid"])
 
-            line_num: Optional[str] = None
-            labor_val: Optional[float] = None
-            paint_val: Optional[float] = None
-            description_parts: List[str] = []
+            line_num = None
+            labor_val = None
+            paint_val = None
+            description_parts = []
 
             for wd in row_words:
-                word_xmid = wd.get("xmid", (wd["x0"] + wd["x1"]) / 2.0)
+                word_xmid = wd["xmid"]
                 word_text = wd["text"].strip()
 
-                # Line column: detect line number (1-3 digits)
-                if line_col_x is not None and abs(word_xmid - line_col_x) < col_tol:
+                # Line number
+                if columns["line"] is not None and abs(word_xmid - columns["line"]) < col_tol:
                     if re.match(r'^\d{1,3}$', word_text):
                         line_num = word_text
 
-                # Description: any text between OPER and QTY columns
+                # Description between OPER and QTY
                 if columns["oper"] is not None and columns["qty"] is not None:
                     if columns["oper"] + col_tol < word_xmid < columns["qty"] - col_tol:
                         description_parts.append(word_text)
 
-                # Labor column
-                if labor_col_x is not None and abs(word_xmid - labor_col_x) < col_tol:
+                # Labor
+                if columns["labor"] is not None and abs(word_xmid - columns["labor"]) < col_tol:
                     parsed = _parse_numeric_or_incl(word_text)
-                    if parsed is not None:
-                        # Valid numeric or 'Incl'
-                        # But 0.0 means NOT a labor line
-                        if parsed != 0.0 and -99.9 <= parsed <= 99.9:
-                            labor_val = parsed
+                    if parsed is not None and parsed != 0.0 and -99.9 <= parsed <= 99.9:
+                        labor_val = parsed
 
-                # Paint column
-                if paint_col_x is not None and abs(word_xmid - paint_col_x) < col_tol:
+                # Paint
+                if columns["paint"] is not None and abs(word_xmid - columns["paint"]) < col_tol:
                     parsed = _parse_numeric_or_incl(word_text)
-                    if parsed is not None:
-                        # Valid numeric or 'Incl'
-                        # But 0.0 means NOT a paint line
-                        if parsed != 0.0 and -99.9 <= parsed <= 99.9:
-                            paint_val = parsed
+                    if parsed is not None and parsed != 0.0 and -99.9 <= parsed <= 99.9:
+                        paint_val = parsed
 
             desc_text = " ".join(description_parts).strip()
             desc_lower = desc_text.lower()
 
-            # Exclude clear coat adders from both labor and paint
             if "add for clear coat" in desc_lower:
                 continue
 
-            # Labor line: must have line number AND valid labor_val
-            if line_num and labor_val is not None:
-                labor_items.append(
-                    {
-                        "line": line_num,
-                        "description": desc_text,
-                        "value": labor_val,
-                    }
-                )
+            # Labor override for REPL or R&I
+            is_repl_or_ri = ("repl" in desc_lower) or ("r&i" in desc_lower)
 
-            # Paint line: must have line number AND valid paint_val
+            if line_num and (labor_val is not None or is_repl_or_ri):
+                labor_items.append({
+                    "line": line_num,
+                    "description": desc_text,
+                    "value": labor_val if labor_val is not None else 0.0,
+                })
+
             if line_num and paint_val is not None:
-                paint_items.append(
-                    {
-                        "line": line_num,
-                        "description": desc_text,
-                        "value": paint_val,
-                    }
-                )
+                paint_items.append({
+                    "line": line_num,
+                    "description": desc_text,
+                    "value": paint_val,
+                })
 
     return labor_items, paint_items
 
 
 def process_pdf_grid(pages: List[Dict]) -> Dict[str, Any]:
-    """
-    Main function to process PDF grid and extract all necessary data.
-
-    Returns a dictionary containing:
-        - labor_items: List of labor line items
-        - paint_items: List of paint line items
-        - total_labor: Total labor hours
-        - total_paint: Total paint hours
-        - second_ro_line: RO information line
-        - vehicle_info_line: Vehicle information line
-        - anchor_page, anchor_ymid: Anchor position
-        - subtotals_page, subtotals_ymid: Subtotals position
-    """
-    # Prepare xmid/ymid and page index on words
+    """Main entry point."""
     for pi, page in enumerate(pages, start=1):
         for w in page.get("words", []):
             w["page_index"] = pi
-            if "xmid" not in w:
-                w["xmid"] = (w["x0"] + w["x1"]) / 2.0
-            if "ymid" not in w:
-                w["ymid"] = (w["y0"] + w["y1"]) / 2.0
+            w["xmid"] = (w["x0"] + w["x1"]) / 2.0
+            w["ymid"] = (w["y0"] + w["y1"]) / 2.0
 
-    # Detect anchors and vehicle info
-    (
-        anchor_page,
-        anchor_ymid,
-        subtotals_page,
-        subtotals_ymid,
-        second_ro_line,
-        vehicle_info_line,
-    ) = detect_anchors_and_vehicle_info(pages)
+    anchor_page, anchor_ymid, subtotals_page, subtotals_ymid, second_ro_line, vehicle_info_line = \
+        detect_anchors_and_vehicle_info(pages)
 
-    # Collect words in range (not strictly needed for header detection, but useful for debugging)
     all_words = collect_words_in_range(pages, anchor_page, anchor_ymid, subtotals_page, subtotals_ymid)
 
-    # Detect header columns from header row
     columns = detect_header_columns(pages, anchor_page, anchor_ymid, subtotals_page, subtotals_ymid)
 
-    # Extract labor and paint items
     labor_items, paint_items = extract_labor_paint_items(
         pages, columns, anchor_page, anchor_ymid, subtotals_page, subtotals_ymid
     )
 
-    # Calculate totals
     total_labor = sum(item["value"] for item in labor_items)
     total_paint = sum(item["value"] for item in paint_items)
-
-    print(f"[DEBUG] Columns detected: {columns}")
-    print(f"[DEBUG] Total labor items found: {len(labor_items)}")
-    print(f"[DEBUG] Total labor hours: {total_labor}")
-    print(f"[DEBUG] Total paint items found: {len(paint_items)}")
-    print(f"[DEBUG] Total paint hours: {total_paint}")
-    if labor_items:
-        print(f"[DEBUG] First few labor items: {labor_items[:5]}")
-    if paint_items:
-        print(f"[DEBUG] First few paint items: {paint_items[:5]}")
 
     return {
         "labor_items": labor_items,
@@ -401,11 +313,10 @@ def generate_pages_html(
     subtotals_ymid: Optional[float],
     display_w: int = 1200,
 ) -> str:
-    """Generate HTML visualization of PDF pages within the anchor/subtotals range."""
+    """Generate HTML visualization."""
     pages_html = ""
 
     for pi, page in enumerate(pages, start=1):
-        # Skip pages outside range
         if anchor_page and pi < anchor_page:
             continue
         if subtotals_page and pi > subtotals_page:
@@ -420,10 +331,10 @@ def generate_pages_html(
 
         for wd in page.get("words", []):
             if anchor_page and pi == anchor_page and anchor_ymid is not None:
-                if wd.get("ymid", 0) < (anchor_ymid - 3.0):
+                if wd["ymid"] < (anchor_ymid - 3.0):
                     continue
             if subtotals_page and pi == subtotals_page and subtotals_ymid is not None:
-                if wd.get("ymid", 0) >= (subtotals_ymid - 3.0):
+                if wd["ymid"] >= (subtotals_ymid - 3.0):
                     continue
             page_words.append(wd)
 
