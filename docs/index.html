@@ -98,19 +98,23 @@
     </div>
     
     <script>
+
+        /* ⭐ NEW: Global array to store the displayed grid rows */
+        let displayedRows = [];
+
+        /* ⭐ NEW: Called by backend-generated script for each row */
+        function registerDisplayedRow(row) {
+            displayedRows.push(row);
+        }
+
         function switchScreen(screenName) {
-            // Hide all screens
             const screens = document.querySelectorAll('.screen');
             screens.forEach(screen => screen.classList.remove('active'));
             
-            // Remove active class from all nav boxes
             const navBoxes = document.querySelectorAll('.nav-box');
             navBoxes.forEach(box => box.classList.remove('active'));
             
-            // Show selected screen
             document.getElementById(screenName).classList.add('active');
-            
-            // Add active class to clicked nav box
             event.target.classList.add('active');
         }
         
@@ -135,7 +139,6 @@
                 statusDiv.innerHTML = html;
                 fileInput.value = '';
                 
-                // Execute any scripts in the loaded content
                 const scripts = statusDiv.querySelectorAll('script');
                 scripts.forEach(oldScript => {
                     const newScript = document.createElement('script');
@@ -149,6 +152,5 @@
         }
     
     </script>
-
 
 </body></html>
