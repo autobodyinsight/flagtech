@@ -64,6 +64,11 @@ def get_labor_modal_script(labor_items_json, total_labor, second_ro_line, vehicl
     return f"""
   const laborItems = {labor_items_json};
   const initialTotal = {total_labor};
+
+  function formatHours(val) {{
+    const num = Number(val);
+    return Number.isFinite(num) ? num.toFixed(1) : val;
+  }}
   
   function updateTotal() {{
     const checkboxes = document.querySelectorAll('.labor-item-checkbox');
@@ -96,7 +101,7 @@ def get_labor_modal_script(labor_items_json, total_labor, second_ro_line, vehicl
         html += '<div class="labor-item" id="item-' + index + '">';
         html += '<input type="checkbox" class="labor-item-checkbox" onchange="toggleDeduction(' + index + ')" />';
         html += '<div style="flex: 1;"><strong>Line ' + item.line + '</strong> - ' + item.description + '</div>';
-        html += '<div>' + item.value + ' hrs</div>';
+        html += '<div>' + formatHours(item.value) + ' hrs</div>';
         html += '</div>';
       }});
     }}
@@ -134,7 +139,7 @@ def get_labor_modal_script(labor_items_json, total_labor, second_ro_line, vehicl
         printContent += '<div style="padding: 12px 8px; border-bottom: 1px solid #ddd;">';
         printContent += '<input type="checkbox" disabled style="margin-right: 10px;" />';
         printContent += '<strong>Line ' + laborItems[index].line + '</strong> - ' + laborItems[index].description;
-        printContent += ' <div style="display: inline; float: right;">' + laborItems[index].value + ' hrs</div>';
+        printContent += ' <div style="display: inline; float: right;">' + formatHours(laborItems[index].value) + ' hrs</div>';
         printContent += '</div>';
         totalLabor += laborItems[index].value;
       }} else {{

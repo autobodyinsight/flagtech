@@ -65,6 +65,11 @@ def get_refinish_modal_script(paint_items_json, total_paint, second_ro_line, veh
   // Refinish Modal Functions
   const paintItems = {paint_items_json};
   const initialPaintTotal = {total_paint};
+
+  function formatHours(val) {{
+    const num = Number(val);
+    return Number.isFinite(num) ? num.toFixed(1) : val;
+  }}
   
   function updatePaintTotal() {{
     const checkboxes = document.querySelectorAll('.paint-item-checkbox');
@@ -97,7 +102,7 @@ def get_refinish_modal_script(paint_items_json, total_paint, second_ro_line, veh
         html += '<div class="paint-item" id="paint-item-' + index + '">';
         html += '<input type="checkbox" class="paint-item-checkbox" onchange="togglePaintDeduction(' + index + ')" />';
         html += '<div style="flex: 1;"><strong>Line ' + item.line + '</strong> - ' + item.description + '</div>';
-        html += '<div>' + item.value + ' hrs</div>';
+        html += '<div>' + formatHours(item.value) + ' hrs</div>';
         html += '</div>';
       }});
     }}
@@ -135,7 +140,7 @@ def get_refinish_modal_script(paint_items_json, total_paint, second_ro_line, veh
         printContent += '<div style="padding: 12px 8px; border-bottom: 1px solid #ddd;">';
         printContent += '<input type="checkbox" disabled style="margin-right: 10px;" />';
         printContent += '<strong>Line ' + paintItems[index].line + '</strong> - ' + paintItems[index].description;
-        printContent += ' <div style="display: inline; float: right;">' + paintItems[index].value + ' hrs</div>';
+        printContent += ' <div style="display: inline; float: right;">' + formatHours(paintItems[index].value) + ' hrs</div>';
         printContent += '</div>';
         totalPaint += paintItems[index].value;
       }} else {{
