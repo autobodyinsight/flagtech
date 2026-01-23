@@ -17,10 +17,14 @@ def get_labor_modal_html(second_ro_line, vehicle_info_line, total_labor):
     </div>
     <h2>Labor Assignment</h2>
     <div id="laborList"></div>
+    <div id="laborAdditionalHours"></div>
     <div class="labor-total">Total Labor: <span id="totalLabor">{total_labor}</span></div>
-    <div style="margin-top: 20px; display: flex; gap: 10px; justify-content: flex-end;">
-      <button onclick="printModal()" style='padding:10px 20px; font-size:14px; cursor:pointer; background-color:#505050; color:white; border:none; border-radius:3px;'>Print</button>
+    <div style="margin-top: 20px; display: flex; gap: 10px; justify-content: space-between;">
+      <button onclick="addLaborAdditionalHours()" style='padding:10px 20px; font-size:14px; cursor:pointer; background-color:#666; color:white; border:none; border-radius:3px;'>Adtl HRS</button>
+      <div style="display: flex; gap: 10px;">
+        <button onclick="printModal()" style='padding:10px 20px; font-size:14px; cursor:pointer; background-color:#505050; color:white; border:none; border-radius:3px;'>Print</button>
         <button onclick="saveModal()" style='padding:10px 20px; font-size:14px; cursor:pointer; background-color:#505050; color:white; border:none; border-radius:3px;'>Save</button>
+      </div>
     </div>
   </div>
 </div>
@@ -56,6 +60,29 @@ def get_labor_modal_styles():
     margin-top: 10px;
     text-align: right;
   }
+  .labor-additional-item {
+    padding: 12px;
+    border-bottom: 1px solid #ddd;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 20px;
+    background-color: #fffacd;
+  }
+  .labor-additional-item input[type="text"] {
+    flex: 1;
+    padding: 6px;
+    font-size: 14px;
+    border: 1px solid #ccc;
+    border-radius: 3px;
+  }
+  .labor-additional-item input[type="number"] {
+    width: 80px;
+    padding: 6px;
+    font-size: 14px;
+    border: 1px solid #ccc;
+    border-radius: 3px;
+  }
 """
 
 
@@ -64,6 +91,29 @@ def get_labor_modal_script(labor_items_json, total_labor, second_ro_line, vehicl
     return f"""
   const laborItems = {labor_items_json};
   const initialTotal = {total_labor};
+  let laborAdditionalCounter = 0;
+
+  function addLaborAdditionalHours() {{
+    const container = document.getElementById('laborAdditionalHours');
+    const itemId = 'labor-addl-' + laborAdditionalCounter++;
+    
+    const itemDiv = document.createElement('div');
+    itemDiv.className = 'labor-additional-item';
+    itemDiv.id = itemId;
+    itemDiv.innerHTML = '<input type="text" class="labor-addl-desc" placeholder="Enter description" />' +
+                        '<input type="number" class="labor-addl-value" step="0.1" placeholder="0.0" onchange="updateTotal()" /> hrs' +
+                        '<button onclick="removeLaborAdditionalItem(\\'' + itemId + '\\')">Remove</button>';
+    
+    container.appendChild(itemDiv);
+  }}
+  
+  function removeLaborAdditionalItem(itemId) {{
+    const item = document.getElementById(itemId);
+    if (item) {{
+      item.remove();
+      updateTotal();
+    }}
+  }}
 
   function formatHours(val) {{
     const num = Number(val);
@@ -80,7 +130,15 @@ def get_labor_modal_script(labor_items_json, total_labor, second_ro_line, vehicl
       }}
     }});
     
-    const newTotal = (initialTotal - deductedTotal).toFixed(1);
+    // Add additional hours
+    let additionalTotal = 0;
+    const additionalInputs = document.querySelectorAll('.labor-addl-value');
+    additionalInputs.forEach(input => {{
+      const val = parseFloat(input.value) || 0;
+      additionalTotal += val;
+    }});
+    
+    const newTotal = (initialTotal - deductedTotal + additionalTotal).toFixed(1);
     document.getElementById('totalLabor').innerText = newTotal;
   }}
   
@@ -144,6 +202,22 @@ def get_labor_modal_script(labor_items_json, total_labor, second_ro_line, vehicl
         totalLabor += laborItems[index].value;
       }} else {{
         deductedTotal += laborItems[index].value;
+      }}
+    }});
+    
+    // Add additional hours to print
+    const additionalDescs = document.querySelectorAll('.labor-addl-desc');
+    const additionalValues = document.querySelectorAll('.labor-addl-value');
+    additionalDescs.forEach((descInput, index) => {{
+      const desc = descInput.value;
+      const val = parseFloat(additionalValues[index].value) || 0;
+      if (desc || val) {{
+        printContent += '<div style="padding: 12px 8px; border-bottom: 1px solid #ddd; background-color: #fffacd;">';
+        printContent += '<input type="checkbox" disabled style="margin-right: 10px;" />';
+        printContent += '<strong>Additional</strong> - ' + desc;
+        printContent += ' <div style="display: inline; float: right;">' + formatHours(val) + ' hrs</div>';
+        printContent += '</div>';
+        totalLabor += val;
       }}
     }});
     

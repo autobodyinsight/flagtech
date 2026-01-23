@@ -17,10 +17,14 @@ def get_refinish_modal_html(second_ro_line, vehicle_info_line, total_paint):
     </div>
     <h2>Refinish Assignment</h2>
     <div id="paintList"></div>
+    <div id="paintAdditionalHours"></div>
     <div class="paint-total">Total Refinish: <span id="totalPaint">{total_paint}</span></div>
-    <div style="margin-top: 20px; display: flex; gap: 10px; justify-content: flex-end;">
-      <button onclick="printRefinishModal()" style='padding:10px 20px; font-size:14px; cursor:pointer; background-color:#505050; color:white; border:none; border-radius:3px;'>Print</button>
-      <button onclick="saveRefinishModal()" style='padding:10px 20px; font-size:14px; cursor:pointer; background-color:#505050; color:white; border:none; border-radius:3px;'>Save</button>
+    <div style="margin-top: 20px; display: flex; gap: 10px; justify-content: space-between;">
+      <button onclick="addPaintAdditionalHours()" style='padding:10px 20px; font-size:14px; cursor:pointer; background-color:#666; color:white; border:none; border-radius:3px;'>Adtl HRS</button>
+      <div style="display: flex; gap: 10px;">
+        <button onclick="printRefinishModal()" style='padding:10px 20px; font-size:14px; cursor:pointer; background-color:#505050; color:white; border:none; border-radius:3px;'>Print</button>
+        <button onclick="saveRefinishModal()" style='padding:10px 20px; font-size:14px; cursor:pointer; background-color:#505050; color:white; border:none; border-radius:3px;'>Save</button>
+      </div>
     </div>
   </div>
 </div>
@@ -56,6 +60,29 @@ def get_refinish_modal_styles():
     margin-top: 10px;
     text-align: right;
   }
+  .paint-additional-item {
+    padding: 12px;
+    border-bottom: 1px solid #ddd;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 20px;
+    background-color: #fffacd;
+  }
+  .paint-additional-item input[type="text"] {
+    flex: 1;
+    padding: 6px;
+    font-size: 14px;
+    border: 1px solid #ccc;
+    border-radius: 3px;
+  }
+  .paint-additional-item input[type="number"] {
+    width: 80px;
+    padding: 6px;
+    font-size: 14px;
+    border: 1px solid #ccc;
+    border-radius: 3px;
+  }
 """
 
 
@@ -65,6 +92,29 @@ def get_refinish_modal_script(paint_items_json, total_paint, second_ro_line, veh
   // Refinish Modal Functions
   const paintItems = {paint_items_json};
   const initialPaintTotal = {total_paint};
+  let paintAdditionalCounter = 0;
+
+  function addPaintAdditionalHours() {{
+    const container = document.getElementById('paintAdditionalHours');
+    const itemId = 'paint-addl-' + paintAdditionalCounter++;
+    
+    const itemDiv = document.createElement('div');
+    itemDiv.className = 'paint-additional-item';
+    itemDiv.id = itemId;
+    itemDiv.innerHTML = '<input type="text" class="paint-addl-desc" placeholder="Enter description" />' +
+                        '<input type="number" class="paint-addl-value" step="0.1" placeholder="0.0" onchange="updatePaintTotal()" /> hrs' +
+                        '<button onclick="removePaintAdditionalItem(\\'' + itemId + '\\')">Remove</button>';
+    
+    container.appendChild(itemDiv);
+  }}
+  
+  function removePaintAdditionalItem(itemId) {{
+    const item = document.getElementById(itemId);
+    if (item) {{
+      item.remove();
+      updatePaintTotal();
+    }}
+  }}
 
   function formatHours(val) {{
     const num = Number(val);
@@ -81,7 +131,15 @@ def get_refinish_modal_script(paint_items_json, total_paint, second_ro_line, veh
       }}
     }});
     
-    const newTotal = (initialPaintTotal - deductedTotal).toFixed(1);
+    // Add additional hours
+    let additionalTotal = 0;
+    const additionalInputs = document.querySelectorAll('.paint-addl-value');
+    additionalInputs.forEach(input => {{
+      const val = parseFloat(input.value) || 0;
+      additionalTotal += val;
+    }});
+    
+    const newTotal = (initialPaintTotal - deductedTotal + additionalTotal).toFixed(1);
     document.getElementById('totalPaint').innerText = newTotal;
   }}
   
@@ -145,6 +203,22 @@ def get_refinish_modal_script(paint_items_json, total_paint, second_ro_line, veh
         totalPaint += paintItems[index].value;
       }} else {{
         deductedTotal += paintItems[index].value;
+      }}
+    }});
+    
+    // Add additional hours to print
+    const additionalDescs = document.querySelectorAll('.paint-addl-desc');
+    const additionalValues = document.querySelectorAll('.paint-addl-value');
+    additionalDescs.forEach((descInput, index) => {{
+      const desc = descInput.value;
+      const val = parseFloat(additionalValues[index].value) || 0;
+      if (desc || val) {{
+        printContent += '<div style="padding: 12px 8px; border-bottom: 1px solid #ddd; background-color: #fffacd;">';
+        printContent += '<input type="checkbox" disabled style="margin-right: 10px;" />';
+        printContent += '<strong>Additional</strong> - ' + desc;
+        printContent += ' <div style="display: inline; float: right;">' + formatHours(val) + ' hrs</div>';
+        printContent += '</div>';
+        totalPaint += val;
       }}
     }});
     

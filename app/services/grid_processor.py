@@ -226,9 +226,9 @@ def extract_labor_paint_items(
                     if re.match(r'^\d{1,3}$', word_text):
                         line_num = word_text
 
-                # Description between OPER and QTY
-                if columns["oper"] is not None and columns["qty"] is not None:
-                    if columns["oper"] + col_tol < word_xmid < columns["qty"] - col_tol:
+                # Description from LINE to QTY to capture full text
+                if columns["line"] is not None and columns["qty"] is not None:
+                    if columns["line"] + col_tol < word_xmid < columns["qty"] - col_tol:
                         description_parts.append(word_text)
 
                 # Labor
@@ -246,13 +246,13 @@ def extract_labor_paint_items(
             desc_text = " ".join(description_parts).strip()
             desc_lower = desc_text.lower()
 
-            if "add for clear coat" in desc_lower:
-                continue
+            # Clear coat lines are paint-only, exclude from labor
+            is_clear_coat = "add for clear coat" in desc_lower
 
             # Labor override for REPL or R&I
             is_repl_or_ri = ("repl" in desc_lower) or ("r&i" in desc_lower)
 
-            if line_num and (labor_val is not None or is_repl_or_ri):
+            if line_num and (labor_val is not None or is_repl_or_ri) and not is_clear_coat:
                 labor_items.append({
                     "line": line_num,
                     "description": desc_text,
