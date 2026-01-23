@@ -268,9 +268,9 @@ def extract_labor_paint_items(
                     if re.match(r'^\d{1,3}$', word_text):
                         line_num = word_text
 
-                # Description: any text between description column and labor column
-                if desc_col_x is not None and labor_col_x is not None:
-                    if desc_col_x - col_tol < word_xmid < labor_col_x - col_tol:
+                # Description: any text between OPER and QTY columns
+                if columns["oper"] is not None and columns["qty"] is not None:
+                    if columns["oper"] + col_tol < word_xmid < columns["qty"] - col_tol:
                         description_parts.append(word_text)
 
                 # Labor column
