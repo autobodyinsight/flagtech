@@ -126,7 +126,7 @@
             const statusDiv = document.getElementById('uploadStatus');
             statusDiv.innerHTML = '<p>Processing...</p>';
             
-            fetch('/ui/grid?ajax=true', {
+            fetch('https://flagtech1.onrender.com/ui/grid?ajax=true', {
                 method: 'POST',
                 body: formData
             })
