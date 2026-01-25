@@ -1,0 +1,16 @@
+                                          Table "public.labor_assignments"
+      Column      |           Type           | Collation | Nullable |                    Default                    
+------------------+--------------------------+-----------+----------+-----------------------------------------------
+ id               | integer                  |           | not null | nextval('labor_assignments_id_seq'::regclass)
+ ro               | text                     |           | not null | 
+ vehicle          | text                     |           | not null | 
+ tech             | text                     |           |          | 
+ assigned         | jsonb                    |           | not null | 
+ unassigned       | jsonb                    |           | not null | 
+ additional       | jsonb                    |           | not null | 
+ total_labor      | numeric                  |           | not null | 
+ total_unassigned | numeric                  |           | not null | 
+ timestamp        | timestamp with time zone |           | not null | 
+Indexes:
+    "labor_assignments_pkey" PRIMARY KEY, btree (id)
+

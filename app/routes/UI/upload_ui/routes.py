@@ -5,7 +5,7 @@ from fastapi.responses import HTMLResponse
 from app.services.extractor import extract_text_from_pdf, extract_words_from_pdf
 from app.services.parser import parse_estimate_text
 from app.services.grid_processor import kmeans_1d as _kmeans_1d, group_rows as _group_rows
-from services.db import conn
+from app.services.db import conn
 import re
 import json
 

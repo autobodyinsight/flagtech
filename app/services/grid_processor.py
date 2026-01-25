@@ -2,6 +2,49 @@ import re
 from typing import List, Dict, Any, Tuple, Optional
 
 
+def kmeans_1d(values: List[float], k: int, iters: int = 40) -> List[float]:
+    """
+    Simple 1D k-means clustering to find k cluster centers.
+    Returns sorted list of k centers.
+    """
+    if not values or k <= 0:
+        return []
+    
+    if len(values) < k:
+        return sorted(set(values))
+    
+    # Initialize centers with evenly spaced quantiles
+    sorted_vals = sorted(values)
+    centers = []
+    step = len(sorted_vals) / k
+    for i in range(k):
+        idx = int(i * step)
+        if idx >= len(sorted_vals):
+            idx = len(sorted_vals) - 1
+        centers.append(sorted_vals[idx])
+    
+    # Iterate to refine centers
+    for _ in range(iters):
+        # Assign each value to nearest center
+        clusters = [[] for _ in range(k)]
+        for val in values:
+            nearest_idx = min(range(k), key=lambda i: abs(val - centers[i]))
+            clusters[nearest_idx].append(val)
+        
+        # Update centers as mean of assigned values
+        new_centers = []
+        for cluster in clusters:
+            if cluster:
+                new_centers.append(sum(cluster) / len(cluster))
+            else:
+                # Keep old center if cluster is empty
+                new_centers.append(centers[len(new_centers)])
+        
+        centers = new_centers
+    
+    return sorted(centers)
+
+
 def group_rows(words: List[Dict], y_thresh: float = 8.0) -> List[Dict]:
     """Group words into rows by y-center proximity."""
     rows = []
