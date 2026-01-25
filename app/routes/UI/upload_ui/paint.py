@@ -282,7 +282,7 @@ def get_refinish_modal_script(paint_items_json, total_paint, second_ro_line, veh
     timestamp: new Date().toISOString()
   }};
 
-  fetch('https://flagtech1.onrender.com/ui/save-refinish', {{
+  fetch('https://flagtech1.onrender.com/save-refinish', {{
     method: 'POST',
     headers: {{ 'Content-Type': 'application/json' }},
     body: JSON.stringify(data)

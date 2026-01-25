@@ -2,29 +2,49 @@ from fastapi import FastAPI
 from fastapi.responses import RedirectResponse
 from fastapi.middleware.cors import CORSMiddleware
 
+# Routers
 from app.routes.estimate import router as estimate_router
 from app.routes.UI.ui import router as ui_router
 from app.routes.UI.ui_with_processing import router as processing_router
-
-# ⭐ NEW: import your save‑routes router
 from app.routes.UI.upload_ui.routes import router as ui_routes_router
+
 
 app = FastAPI(title="FlagTech Estimate Parser")
 
-# CORS
+# ---------------------------------------------------------
+# CORS CONFIGURATION
+# ---------------------------------------------------------
+
+# Add every frontend origin that needs access to Render backend
+ALLOWED_ORIGINS = [
+    # GitHub Pages (public site)
+    "https://autobodyinsight.github.io",
+    "https://autobodyinsight.github.io/flagtech",
+
+    # GitHub Codespaces (your dev environment)
+    # IMPORTANT: Codespaces generates a NEW URL every time.
+    # Add your current one here:
+    "https://studious-space-doodle-jjw4vjxg77w7f5vq-8000.app.github.dev",
+
+    # Local development (optional)
+    "http://localhost:8000",
+    "http://127.0.0.1:8000",
+
+    # Wix domain (add once published)
+    # "https://your-wix-domain.com",
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "https://autobodyinsight.github.io",
-        "https://autobodyinsight.github.io/flagtech",
-        "https://www.autobodyinsight.github.io",
-        "https://www.autobodyinsight.github.io/flagtech",
-        # Add your Wix domain after publishing
-    ],
+    allow_origins=ALLOWED_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# ---------------------------------------------------------
+# ROUTERS
+# ---------------------------------------------------------
 
 # API endpoints
 app.include_router(estimate_router, prefix="/api")
@@ -35,10 +55,13 @@ app.include_router(ui_router, prefix="/ui")
 # PDF processing routes
 app.include_router(processing_router, prefix="/ui")
 
-# ⭐ NEW: Save routes (labor + refinish)
+# Save routes (labor + refinish)
 app.include_router(ui_routes_router, prefix="/ui")
 
-# Redirect root to UI
+# ---------------------------------------------------------
+# ROOT REDIRECT
+# ---------------------------------------------------------
+
 @app.get("/", include_in_schema=False)
 def root():
     return RedirectResponse(url="/ui/")
