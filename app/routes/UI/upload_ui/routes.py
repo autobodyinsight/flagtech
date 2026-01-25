@@ -2,18 +2,17 @@
 
 from fastapi import APIRouter, UploadFile, File, Request
 from fastapi.responses import HTMLResponse
-from app.services.extractor import extract_text_from_pdf, extract_words_from_pdf
+from app.services.extractor import extract_text_from_pdf
 from app.services.parser import parse_estimate_text
 from app.services.grid_processor import kmeans_1d as _kmeans_1d, group_rows as _group_rows
 from app.services.db import conn
-import re
 import json
 
 router = APIRouter()
 
-# -------------------------------
+# ============================================================
 # UPLOAD + PARSE UI
-# -------------------------------
+# ============================================================
 
 @router.get("/upload", response_class=HTMLResponse)
 async def upload_form():
@@ -27,9 +26,6 @@ async def upload_form():
     <form id="uploadForm" action="/ui/grid" method="post" enctype="multipart/form-data">
         <input type="file" name="file" accept="application/pdf" onchange="this.form.submit()" />
     </form>
-    <script>
-        // Auto-submit form when file is selected
-    </script>
 </body>
 </html>
 """
@@ -84,9 +80,9 @@ async def parse_ui(file: UploadFile = File(...)):
 </html>
 """
 
-# -------------------------------
-# NEW: SAVE LABOR + REFINISH
-# -------------------------------
+# ============================================================
+# SAVE LABOR + REFINISH
+# ============================================================
 
 @router.post("/save-labor")
 async def save_labor(request: Request):
@@ -136,3 +132,196 @@ async def save_refinish(request: Request):
 
     conn.commit()
     return {"status": "refinish saved"}
+
+# ============================================================
+# TECH MANAGEMENT (Add / List / Delete)
+# ============================================================
+
+@router.post("/techs/add")
+async def add_tech(request: Request):
+    data = await request.json()
+    cur = conn.cursor()
+
+    cur.execute("""
+        INSERT INTO techs (first_name, last_name, pay_rate)
+        VALUES (%s, %s, %s)
+        RETURNING id, first_name, last_name, pay_rate, active
+    """, (
+        data["first_name"],
+        data["last_name"],
+        data["pay_rate"]
+    ))
+
+    row = cur.fetchone()
+    conn.commit()
+
+    return {
+        "tech": {
+            "id": row[0],
+            "first_name": row[1],
+            "last_name": row[2],
+            "pay_rate": float(row[3]),
+            "active": row[4]
+        }
+    }
+
+
+@router.get("/techs/list")
+async def list_techs():
+    cur = conn.cursor()
+    cur.execute("""
+        SELECT id, first_name, last_name, pay_rate, active
+        FROM techs
+        WHERE active = TRUE
+        ORDER BY last_name, first_name
+    """)
+
+    rows = cur.fetchall()
+    techs = [
+        {
+            "id": r[0],
+            "first_name": r[1],
+            "last_name": r[2],
+            "pay_rate": float(r[3]),
+            "active": r[4]
+        }
+        for r in rows
+    ]
+
+    return {"techs": techs}
+
+
+@router.delete("/techs/{tech_id}")
+async def delete_tech(tech_id: int):
+    cur = conn.cursor()
+    cur.execute("UPDATE techs SET active = FALSE WHERE id = %s", (tech_id,))
+    conn.commit()
+    return {"status": "deleted", "tech_id": tech_id}
+
+@router.get("/techs/summary")
+async def tech_summary():
+    cur = conn.cursor()
+
+    # Labor hours
+    cur.execute("""
+        SELECT tech,
+               COUNT(DISTINCT ro) AS ro_count,
+               SUM(total_labor) AS total_hours
+        FROM labor_assignments
+        WHERE tech IS NOT NULL AND tech <> ''
+        GROUP BY tech
+    """)
+    labor_rows = cur.fetchall()
+
+    # Paint hours
+    cur.execute("""
+        SELECT tech,
+               COUNT(DISTINCT ro) AS ro_count,
+               SUM(total_paint) AS total_hours
+        FROM refinish_assignments
+        WHERE tech IS NOT NULL AND tech <> ''
+        GROUP BY tech
+    """)
+    paint_rows = cur.fetchall()
+
+    summary = {}
+
+    # Combine labor
+    for tech, ro_count, hours in labor_rows:
+        if tech not in summary:
+            summary[tech] = {"tech": tech, "ro_count": 0, "hours": 0}
+        summary[tech]["ro_count"] += ro_count
+        summary[tech]["hours"] += float(hours or 0)
+
+    # Combine paint
+    for tech, ro_count, hours in paint_rows:
+        if tech not in summary:
+            summary[tech] = {"tech": tech, "ro_count": 0, "hours": 0}
+        summary[tech]["ro_count"] += ro_count
+        summary[tech]["hours"] += float(hours or 0)
+
+    return {"summary": list(summary.values())}
+
+@router.get("/techs/{tech}/ros")
+async def tech_ro_list(tech: str):
+    cur = conn.cursor()
+
+    # Labor assignments
+    cur.execute("""
+        SELECT ro, vehicle, SUM(total_labor) AS hours
+        FROM labor_assignments
+        WHERE tech = %s
+        GROUP BY ro, vehicle
+    """, (tech,))
+    labor_rows = cur.fetchall()
+
+    # Paint assignments
+    cur.execute("""
+        SELECT ro, vehicle, SUM(total_paint) AS hours
+        FROM refinish_assignments
+        WHERE tech = %s
+        GROUP BY ro, vehicle
+    """, (tech,))
+    paint_rows = cur.fetchall()
+
+    ros = {}
+
+    # Merge labor
+    for ro, vehicle, hours in labor_rows:
+        if ro not in ros:
+            ros[ro] = {"ro": ro, "vehicle": vehicle, "total_hours": 0}
+        ros[ro]["total_hours"] += float(hours or 0)
+
+    # Merge paint
+    for ro, vehicle, hours in paint_rows:
+        if ro not in ros:
+            ros[ro] = {"ro": ro, "vehicle": vehicle, "total_hours": 0}
+        ros[ro]["total_hours"] += float(hours or 0)
+
+    return {"ros": list(ros.values())}
+
+@router.get("/techs/{tech}/{ro}/lines")
+async def tech_ro_lines(tech: str, ro: str):
+    cur = conn.cursor()
+
+    # Labor lines
+    cur.execute("""
+        SELECT assigned
+        FROM labor_assignments
+        WHERE tech = %s AND ro = %s
+    """, (tech, ro))
+    labor_rows = cur.fetchall()
+
+    # Paint lines
+    cur.execute("""
+        SELECT assigned
+        FROM refinish_assignments
+        WHERE tech = %s AND ro = %s
+    """, (tech, ro))
+    paint_rows = cur.fetchall()
+
+    lines = []
+
+    # Labor
+    for row in labor_rows:
+        assigned = json.loads(row[0])
+        for item in assigned:
+            lines.append({
+                "line": item["line"],
+                "description": item["description"],
+                "value": float(item["value"]),
+                "type": "labor"
+            })
+
+    # Paint
+    for row in paint_rows:
+        assigned = json.loads(row[0])
+        for item in assigned:
+            lines.append({
+                "line": item["line"],
+                "description": item["description"],
+                "value": float(item["value"]),
+                "type": "paint"
+            })
+
+    return {"lines": lines}
