@@ -1,10 +1,12 @@
 """Main UI display for FlagTech - simplified version with just the display screen."""
 
-from fastapi import APIRouter
-from fastapi.responses import HTMLResponse
+from fastapi import APIRouter, Request
+from fastapi.responses import HTMLResponse, JSONResponse
+
 from .flagout import get_flagtech_screen_html
 from .ros import get_ros_screen_html
 from .techs import get_techs_screen_html
+
 try:
     from .upload_ui.upload import get_upload_screen_html, get_upload_script
 except ImportError:
@@ -102,18 +104,13 @@ async def home_screen():
     
     <script>
         function switchScreen(screenName) {{
-            // Hide all screens
             const screens = document.querySelectorAll('.screen');
             screens.forEach(screen => screen.classList.remove('active'));
             
-            // Remove active class from all nav boxes
             const navBoxes = document.querySelectorAll('.nav-box');
             navBoxes.forEach(box => box.classList.remove('active'));
             
-            // Show selected screen
             document.getElementById(screenName).classList.add('active');
-            
-            // Add active class to clicked nav box
             event.target.classList.add('active');
         }}
         
@@ -122,3 +119,21 @@ async def home_screen():
 </body>
 </html>
 """
+
+
+# ---------------------------------------------------------
+# 🔥 NEW BACKEND ROUTES FOR LABOR & REFINISH SAVE BUTTONS
+# ---------------------------------------------------------
+
+@router.post("/save-labor")
+async def save_labor(request: Request):
+    data = await request.json()
+    print("Labor data received:", data)
+    return JSONResponse(content={"status": "ok"})
+
+
+@router.post("/save-refinish")
+async def save_refinish(request: Request):
+    data = await request.json()
+    print("Refinish data received:", data)
+    return JSONResponse(content={"status": "ok"})
