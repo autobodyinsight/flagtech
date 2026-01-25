@@ -1,16 +1,19 @@
 """Upload processing routes for PDF parsing and grid display."""
 
-from fastapi import APIRouter, UploadFile, File
+from fastapi import APIRouter, UploadFile, File, Request
 from fastapi.responses import HTMLResponse
 from app.services.extractor import extract_text_from_pdf, extract_words_from_pdf
 from app.services.parser import parse_estimate_text
 from app.services.grid_processor import kmeans_1d as _kmeans_1d, group_rows as _group_rows
+from services.db import conn
 import re
 import json
 
-
 router = APIRouter()
 
+# -------------------------------
+# UPLOAD + PARSE UI
+# -------------------------------
 
 @router.get("/upload", response_class=HTMLResponse)
 async def upload_form():
@@ -35,7 +38,7 @@ async def upload_form():
 @router.post("/parse", response_class=HTMLResponse)
 async def parse_ui(file: UploadFile = File(...)):
     text = extract_text_from_pdf(file)
-    # Debug logging: show a truncated preview of extracted text
+
     try:
         print("===EXTRACTED TEXT PREVIEW (truncated)===")
         print(text[:4000])
@@ -80,3 +83,56 @@ async def parse_ui(file: UploadFile = File(...)):
 </body>
 </html>
 """
+
+# -------------------------------
+# NEW: SAVE LABOR + REFINISH
+# -------------------------------
+
+@router.post("/save-labor")
+async def save_labor(request: Request):
+    data = await request.json()
+    cur = conn.cursor()
+
+    cur.execute("""
+        INSERT INTO labor_assignments
+        (ro, vehicle, tech, assigned, unassigned, additional, total_labor, total_unassigned, timestamp)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+    """, (
+        data["ro"],
+        data["vehicle"],
+        data["tech"],
+        json.dumps(data["assigned"]),
+        json.dumps(data["unassigned"]),
+        json.dumps(data["additional"]),
+        data["totalLabor"],
+        data["totalUnassigned"],
+        data["timestamp"]
+    ))
+
+    conn.commit()
+    return {"status": "labor saved"}
+
+
+@router.post("/save-refinish")
+async def save_refinish(request: Request):
+    data = await request.json()
+    cur = conn.cursor()
+
+    cur.execute("""
+        INSERT INTO refinish_assignments
+        (ro, vehicle, tech, assigned, unassigned, additional, total_paint, total_unassigned, timestamp)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+    """, (
+        data["ro"],
+        data["vehicle"],
+        data["tech"],
+        json.dumps(data["assigned"]),
+        json.dumps(data["unassigned"]),
+        json.dumps(data["additional"]),
+        data["totalPaint"],
+        data["totalUnassigned"],
+        data["timestamp"]
+    ))
+
+    conn.commit()
+    return {"status": "refinish saved"}
