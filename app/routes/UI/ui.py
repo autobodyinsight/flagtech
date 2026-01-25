@@ -13,7 +13,7 @@ except ImportError:
     # Fallback if directory name has space
     import sys
     from pathlib import Path
-    upload_dir = Path(__file__).parent / "upload ui"
+    upload_dir = Path(__file__).parent / "upload_ui"
     sys.path.insert(0, str(upload_dir))
     from upload import get_upload_screen_html, get_upload_script
 

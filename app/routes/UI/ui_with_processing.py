@@ -8,11 +8,13 @@ from .ros import get_ros_screen_html
 from .techs import get_techs_screen_html
 try:
     from .upload_ui.upload import get_upload_screen_html, get_upload_script
+    from .upload_ui.labor import get_labor_modal_html, get_labor_modal_styles, get_labor_modal_script
+    from .upload_ui.paint import get_refinish_modal_html, get_refinish_modal_styles, get_refinish_modal_script, get_modal_close_handler
 except ImportError:
     # Fallback if directory name has space
     import sys
     from pathlib import Path
-    upload_dir = Path(__file__).parent / "upload ui"
+    upload_dir = Path(__file__).parent / "upload_ui"
     sys.path.insert(0, str(upload_dir))
     from upload import get_upload_screen_html, get_upload_script
     from labor import get_labor_modal_html, get_labor_modal_styles, get_labor_modal_script
