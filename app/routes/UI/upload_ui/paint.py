@@ -92,6 +92,7 @@ def get_refinish_modal_script(paint_items_json, total_paint, second_ro_line, veh
   // Refinish Modal Functions
   const paintItems = {paint_items_json};
   const initialPaintTotal = {total_paint};
+  let displayPaintItems = [];
   let paintAdditionalCounter = 0;
 
   function addPaintAdditionalHours() {{
@@ -234,35 +235,65 @@ def get_refinish_modal_script(paint_items_json, total_paint, second_ro_line, veh
   }}
   
   function saveRefinishModal() {{
-    const checkboxes = document.querySelectorAll('.paint-item-checkbox');
-    let selectedItems = [];
-    let deductedTotal = 0;
-    
-    checkboxes.forEach((checkbox, index) => {{
-      if (checkbox.checked) {{
-        selectedItems.push(paintItems[index]);
-        deductedTotal += paintItems[index].value;
-      }}
-    }});
-    
-    const newTotal = (initialPaintTotal - deductedTotal).toFixed(1);
-    
-    const data = {{
-      items: selectedItems,
-      totalRefinish: newTotal,
-      timestamp: new Date().toISOString()
-    }};
-    
-    // Create and download JSON file
-    const dataStr = JSON.stringify(data, null, 2);
-    const dataBlob = new Blob([dataStr], {{ type: 'application/json' }});
-    const url = URL.createObjectURL(dataBlob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = 'refinish-assignment-' + new Date().getTime() + '.json';
-    link.click();
-    URL.revokeObjectURL(url);
-  }}
+  const checkboxes = document.querySelectorAll('.paint-item-checkbox');
+
+  let assigned = [];
+  let unassigned = [];
+
+  checkboxes.forEach((checkbox, index) => {{
+    const item = displayPaintItems[index];
+    if (checkbox.checked) {{
+      unassigned.push(item);
+    }} else {{
+      assigned.push(item);
+    }}
+  }});
+
+  // Additional hours
+  let additional = [];
+  const descs = document.querySelectorAll('.paint-addl-desc');
+  const values = document.querySelectorAll('.paint-addl-value');
+
+  descs.forEach((descInput, i) => {{
+    const desc = descInput.value;
+    const val = parseFloat(values[i].value) || 0;
+    if (desc || val) {{
+      additional.push({{ description: desc, value: val }});
+    }}
+  }});
+
+  const tech = document.getElementById('refinishTechInput').value;
+
+  // 🔥 Only compute total unassigned
+  const totalUnassigned = unassigned.reduce((sum, item) => sum + item.value, 0);
+
+  // 🔥 Modal’s displayed total
+  const totalPaint = parseFloat(document.getElementById('totalPaint').innerText) || 0;
+
+  const data = {{
+    assigned,
+    unassigned,
+    additional,
+    totalUnassigned,
+    totalPaint,
+    tech,
+    ro: "{second_ro_line}",
+    vehicle: "{vehicle_info_line}",
+    timestamp: new Date().toISOString()
+  }};
+
+  fetch('/ui/save-refinish', {{
+    method: 'POST',
+    headers: {{ 'Content-Type': 'application/json' }},
+    body: JSON.stringify(data)
+  }})
+  .then(r => r.json())
+  .then(res => {{
+    console.log("Refinish saved:", res);
+    closeRefinishModal();
+  }})
+  .catch(err => console.error("Save refinish error:", err));
+}}
 """
 
 
