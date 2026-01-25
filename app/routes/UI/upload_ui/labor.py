@@ -299,7 +299,7 @@ function saveModal() {{
     timestamp: new Date().toISOString()
   }};
 
-  fetch('/ui/save-labor', {{
+  fetch('https://flagtech1.onrender.com/ui/save-labor', {{
     method: 'POST',
     headers: {{ 'Content-Type': 'application/json' }},
     body: JSON.stringify(data)
