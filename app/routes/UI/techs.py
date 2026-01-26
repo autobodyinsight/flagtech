@@ -10,7 +10,7 @@ def get_techs_screen_html():
         <!-- Add Tech Button -->
         <button onclick="openAddTechModal()" 
                 style="padding:10px 20px; font-size:14px; cursor:pointer; background-color:#505050; color:white; border:none; border-radius:4px; margin-top:10px;">
-            Add Tech
+            + Tech
         </button>
 
         <hr style="margin:20px 0;">
@@ -25,13 +25,13 @@ def get_techs_screen_html():
                 <span class="close" onclick="closeAddTechModal()">&times;</span>
                 <h3>Add Technician</h3>
 
-                <label>First Name:</label>
+                <label>First:</label>
                 <input type="text" id="techFirstName" style="width:100%; padding:6px; margin-bottom:10px;">
 
-                <label>Last Name:</label>
+                <label>Last:</label>
                 <input type="text" id="techLastName" style="width:100%; padding:6px; margin-bottom:10px;">
 
-                <label>Pay Rate (per hour):</label>
+                <label>Rate:</label>
                 <input type="number" step="0.01" id="techPayRate" style="width:100%; padding:6px; margin-bottom:10px;">
 
                 <button onclick="saveTech()" 
