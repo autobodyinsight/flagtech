@@ -307,6 +307,14 @@ function saveModal() {{
   .then(r => r.json())
   .then(res => {{
     console.log("Labor saved:", res);
+    // Refresh tech cards to show updated data
+    if (typeof window.loadTechCards === 'function') {{
+      window.loadTechCards();
+    }}
+    // Refresh RO cards to show updated data
+    if (typeof window.loadROCards === 'function') {{
+      window.loadROCards();
+    }}
     closeLaborModal();
   }})
   .catch(err => console.error("Save labor error:", err));

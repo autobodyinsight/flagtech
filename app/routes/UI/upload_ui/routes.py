@@ -325,3 +325,109 @@ async def tech_ro_lines(tech: str, ro: str):
             })
 
     return {"lines": lines}
+
+# ============================================================
+# RO MANAGEMENT ENDPOINTS
+# ============================================================
+
+@router.get("/ros/summary")
+async def ro_summary():
+    cur = conn.cursor()
+
+    # Get all ROs from labor assignments
+    cur.execute("""
+        SELECT ro, vehicle, COUNT(DISTINCT tech) AS tech_count, SUM(total_labor) AS total_hours
+        FROM labor_assignments
+        WHERE ro IS NOT NULL AND ro <> ''
+        GROUP BY ro, vehicle
+    """)
+    labor_rows = cur.fetchall()
+
+    # Get all ROs from refinish assignments
+    cur.execute("""
+        SELECT ro, vehicle, COUNT(DISTINCT tech) AS tech_count, SUM(total_paint) AS total_hours
+        FROM refinish_assignments
+        WHERE ro IS NOT NULL AND ro <> ''
+        GROUP BY ro, vehicle
+    """)
+    paint_rows = cur.fetchall()
+
+    summary = {}
+
+    # Combine labor
+    for ro, vehicle, tech_count, hours in labor_rows:
+        if ro not in summary:
+            summary[ro] = {"ro": ro, "vehicle": vehicle, "tech_count": set(), "total_hours": 0}
+        summary[ro]["total_hours"] += float(hours or 0)
+        # Will add tech names to set below
+
+    # Combine paint
+    for ro, vehicle, tech_count, hours in paint_rows:
+        if ro not in summary:
+            summary[ro] = {"ro": ro, "vehicle": vehicle, "tech_count": set(), "total_hours": 0}
+        summary[ro]["total_hours"] += float(hours or 0)
+
+    # Get unique tech counts per RO
+    for ro in summary:
+        cur.execute("""
+            SELECT DISTINCT tech FROM (
+                SELECT tech FROM labor_assignments WHERE ro = %s
+                UNION
+                SELECT tech FROM refinish_assignments WHERE ro = %s
+            ) AS combined_techs
+            WHERE tech IS NOT NULL AND tech <> ''
+        """, (ro, ro))
+        techs = cur.fetchall()
+        summary[ro]["tech_count"] = len(techs)
+
+    return {"summary": list(summary.values())}
+
+@router.get("/ros/{ro}/details")
+async def ro_details(ro: str):
+    cur = conn.cursor()
+
+    # Get labor assignments
+    cur.execute("""
+        SELECT tech, vehicle, assigned, unassigned, additional, total_labor, timestamp
+        FROM labor_assignments
+        WHERE ro = %s
+        ORDER BY timestamp DESC
+    """, (ro,))
+    labor_rows = cur.fetchall()
+
+    labor = [
+        {
+            "tech": row[0],
+            "vehicle": row[1],
+            "assigned": row[2],
+            "unassigned": row[3],
+            "additional": row[4],
+            "total_labor": float(row[5]),
+            "timestamp": row[6].isoformat() if row[6] else None
+        }
+        for row in labor_rows
+    ]
+
+    # Get refinish assignments
+    cur.execute("""
+        SELECT tech, vehicle, assigned, unassigned, additional, total_paint, timestamp
+        FROM refinish_assignments
+        WHERE ro = %s
+        ORDER BY timestamp DESC
+    """, (ro,))
+    paint_rows = cur.fetchall()
+
+    refinish = [
+        {
+            "tech": row[0],
+            "vehicle": row[1],
+            "assigned": row[2],
+            "unassigned": row[3],
+            "additional": row[4],
+            "total_paint": float(row[5]),
+            "timestamp": row[6].isoformat() if row[6] else None
+        }
+        for row in paint_rows
+    ]
+
+    return {"labor": labor, "refinish": refinish}

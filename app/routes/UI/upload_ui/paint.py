@@ -290,6 +290,14 @@ def get_refinish_modal_script(paint_items_json, total_paint, second_ro_line, veh
   .then(r => r.json())
   .then(res => {{
     console.log("Refinish saved:", res);
+    // Refresh tech cards to show updated data
+    if (typeof window.loadTechCards === 'function') {{
+      window.loadTechCards();
+    }}
+    // Refresh RO cards to show updated data
+    if (typeof window.loadROCards === 'function') {{
+      window.loadROCards();
+    }}
     closeRefinishModal();
   }})
   .catch(err => console.error("Save refinish error:", err));

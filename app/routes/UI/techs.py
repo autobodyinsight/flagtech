@@ -150,7 +150,7 @@ def get_techs_screen_html():
         // -----------------------------
         // Tech Summary Cards
         // -----------------------------
-        function loadTechCards() {
+        window.loadTechCards = function() {
             const container = document.getElementById('techCardsContainer');
             container.innerHTML = "<p style='color:#777;'>Loading...</p>";
 
@@ -311,7 +311,7 @@ def get_techs_screen_html():
         }
 
         // Load cards on startup
-        document.addEventListener("DOMContentLoaded", loadTechCards);
+        document.addEventListener("DOMContentLoaded", window.loadTechCards);
 
         </script>
 
