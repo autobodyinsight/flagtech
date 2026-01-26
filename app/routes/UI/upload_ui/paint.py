@@ -154,6 +154,9 @@ def get_refinish_modal_script(paint_items_json, total_paint, second_ro_line, veh
     const modal = document.getElementById('refinishModal');
     let html = '';
     
+    // Store EXACTLY what is displayed
+    displayPaintItems = paintItems.slice();
+    
     if (paintItems.length === 0) {{
       html = '<p>No refinish items found.</p>';
     }} else {{
