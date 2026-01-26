@@ -100,16 +100,6 @@ const laborItems = {labor_items_json};
 const initialTotal = {total_labor};
 let laborAdditionalCounter = 0;
 
-// Resolve backend base once so reads and writes hit the same host
-const BACKEND_BASE = window.BACKEND_BASE || (() => {{
-  const origin = window.location.origin;
-  const renderHost = "https://flagtech1.onrender.com";
-  if (origin.includes("localhost") || origin.includes("app.github.dev")) return origin;
-  if (origin.includes("github.io")) return renderHost;
-  return renderHost;
-}})();
-window.BACKEND_BASE = BACKEND_BASE;
-
 // This will store ONLY the items displayed in the modal
 let displayLaborItems = [];
 
@@ -309,7 +299,7 @@ function saveModal() {{
     timestamp: new Date().toISOString()
   }};
 
-  fetch(`${BACKEND_BASE}/ui/save-labor`, {{
+  fetch('https://flagtech1.onrender.com/ui/save-labor', {{
     method: 'POST',
     headers: {{ 'Content-Type': 'application/json' }},
     body: JSON.stringify(data)
@@ -317,14 +307,6 @@ function saveModal() {{
   .then(r => r.json())
   .then(res => {{
     console.log("Labor saved:", res);
-    // Refresh tech cards to show updated data
-    if (typeof window.loadTechCards === 'function') {{
-      window.loadTechCards();
-    }}
-    // Refresh RO cards to show updated data
-    if (typeof window.loadROCards === 'function') {{
-      window.loadROCards();
-    }}
     closeLaborModal();
   }})
   .catch(err => console.error("Save labor error:", err));

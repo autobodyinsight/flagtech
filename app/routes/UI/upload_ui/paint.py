@@ -95,16 +95,6 @@ def get_refinish_modal_script(paint_items_json, total_paint, second_ro_line, veh
   let displayPaintItems = [];
   let paintAdditionalCounter = 0;
 
-// Resolve backend base once so reads and writes hit the same host
-const BACKEND_BASE = window.BACKEND_BASE || (() => {{
-  const origin = window.location.origin;
-  const renderHost = "https://flagtech1.onrender.com";
-  if (origin.includes("localhost") || origin.includes("app.github.dev")) return origin;
-  if (origin.includes("github.io")) return renderHost;
-  return renderHost;
-}})();
-window.BACKEND_BASE = BACKEND_BASE;
-
   function addPaintAdditionalHours() {{
     const container = document.getElementById('paintAdditionalHours');
     const itemId = 'paint-addl-' + paintAdditionalCounter++;
@@ -292,7 +282,7 @@ window.BACKEND_BASE = BACKEND_BASE;
     timestamp: new Date().toISOString()
   }};
 
-  fetch(`${BACKEND_BASE}/ui/save-refinish`, {{
+  fetch('https://flagtech1.onrender.com/ui/save-refinish', {{
     method: 'POST',
     headers: {{ 'Content-Type': 'application/json' }},
     body: JSON.stringify(data)
@@ -300,14 +290,6 @@ window.BACKEND_BASE = BACKEND_BASE;
   .then(r => r.json())
   .then(res => {{
     console.log("Refinish saved:", res);
-    // Refresh tech cards to show updated data
-    if (typeof window.loadTechCards === 'function') {{
-      window.loadTechCards();
-    }}
-    // Refresh RO cards to show updated data
-    if (typeof window.loadROCards === 'function') {{
-      window.loadROCards();
-    }}
     closeRefinishModal();
   }})
   .catch(err => console.error("Save refinish error:", err));

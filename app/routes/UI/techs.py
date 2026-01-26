@@ -75,15 +75,7 @@ def get_techs_screen_html():
 
         <script>
 
-        const BACKEND_BASE = (() => {
-            const origin = window.location.origin;
-            // Primary Render host
-            const renderHost = "https://flagtech1.onrender.com";
-            if (origin.includes("localhost") || origin.includes("app.github.dev")) return origin;
-            if (origin.includes("github.io")) return renderHost;
-            return renderHost;
-        })();
-        window.BACKEND_BASE = BACKEND_BASE;
+        const BACKEND_BASE = "https://flagtech1.onrender.com";
 
         // -----------------------------
         // Add Tech Modal
@@ -158,7 +150,7 @@ def get_techs_screen_html():
         // -----------------------------
         // Tech Summary Cards
         // -----------------------------
-        window.loadTechCards = function() {
+        function loadTechCards() {
             const container = document.getElementById('techCardsContainer');
             container.innerHTML = "<p style='color:#777;'>Loading...</p>";
 
@@ -319,7 +311,7 @@ def get_techs_screen_html():
         }
 
         // Load cards on startup
-        document.addEventListener("DOMContentLoaded", window.loadTechCards);
+        document.addEventListener("DOMContentLoaded", loadTechCards);
 
         </script>
 
