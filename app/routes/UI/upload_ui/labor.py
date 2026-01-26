@@ -14,9 +14,7 @@ def get_labor_modal_html(second_ro_line, vehicle_info_line, total_labor):
 
     <div style="margin-bottom: 15px;">
       <label style="font-weight: bold; font-size: 14px;">TECH:</label>
-      <select id="techInput" style="padding: 8px; font-size: 14px; margin-left: 10px; width: 200px; border: 1px solid #ccc; border-radius: 3px;">
-        <option value="">-- Select Tech --</option>
-      </select>
+      <input type="text" id="techInput" style="padding: 8px; font-size: 14px; margin-left: 10px; width: 200px; border: 1px solid #ccc; border-radius: 3px;" placeholder="Enter technician name" />
     </div>
 
     <h2>Labor Assignment</h2>
@@ -102,39 +100,8 @@ const laborItems = {labor_items_json};
 const initialTotal = {total_labor};
 let laborAdditionalCounter = 0;
 
-// Resolve backend base once so reads and writes hit the same host
-const BACKEND_BASE = window.BACKEND_BASE || (() => {{
-  const origin = window.location.origin;
-  const renderHost = "https://flagtech1.onrender.com";
-  if (origin.includes("localhost") || origin.includes("app.github.dev")) return origin;
-  if (origin.includes("github.io")) return renderHost;
-  return renderHost;
-}})();
-window.BACKEND_BASE = BACKEND_BASE;
-
 // This will store ONLY the items displayed in the modal
 let displayLaborItems = [];
-
-// Load techs from backend and populate dropdown
-function loadTechsIntoDropdown(dropdownId) {{
-  fetch(`${{BACKEND_BASE}}/ui/techs/list`)
-    .then(r => r.json())
-    .then(res => {{
-      const dropdown = document.getElementById(dropdownId);
-      // Clear existing options except the first one
-      while (dropdown.options.length > 1) {{
-        dropdown.remove(1);
-      }}
-      // Add tech options
-      res.techs.forEach(tech => {{
-        const option = document.createElement('option');
-        option.value = tech.first_name + ' ' + tech.last_name;
-        option.textContent = tech.first_name + ' ' + tech.last_name;
-        dropdown.appendChild(option);
-      }});
-    }})
-    .catch(err => console.error("Error loading techs:", err));
-}}
 
 function addLaborAdditionalHours() {{
   const container = document.getElementById('laborAdditionalHours');
@@ -195,9 +162,6 @@ function toggleDeduction(index) {{
 function openLaborModal() {{
   const modal = document.getElementById('laborModal');
   let html = '';
-
-  // Load techs into dropdown
-  loadTechsIntoDropdown('techInput');
 
   // Store EXACTLY what is displayed
   displayLaborItems = laborItems.slice();

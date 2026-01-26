@@ -10,7 +10,7 @@ def get_techs_screen_html():
         <!-- Add Tech Button -->
         <button onclick="openAddTechModal()" 
                 style="padding:10px 20px; font-size:14px; cursor:pointer; background-color:#505050; color:white; border:none; border-radius:4px; margin-top:10px;">
-            + Tech
+            Add Tech
         </button>
 
         <hr style="margin:20px 0;">
@@ -25,13 +25,13 @@ def get_techs_screen_html():
                 <span class="close" onclick="closeAddTechModal()">&times;</span>
                 <h3>Add Technician</h3>
 
-                <label>First:</label>
+                <label>First Name:</label>
                 <input type="text" id="techFirstName" style="width:100%; padding:6px; margin-bottom:10px;">
 
-                <label>Last:</label>
+                <label>Last Name:</label>
                 <input type="text" id="techLastName" style="width:100%; padding:6px; margin-bottom:10px;">
 
-                <label>Rate:</label>
+                <label>Pay Rate (per hour):</label>
                 <input type="number" step="0.01" id="techPayRate" style="width:100%; padding:6px; margin-bottom:10px;">
 
                 <button onclick="saveTech()" 
@@ -154,16 +154,9 @@ def get_techs_screen_html():
             const container = document.getElementById('techCardsContainer');
             container.innerHTML = "<p style='color:#777;'>Loading...</p>";
 
-            console.log("loadTechCards called, BACKEND_BASE:", BACKEND_BASE);
-
             fetch(`${BACKEND_BASE}/ui/techs/summary`)
-                .then(r => {
-                    console.log("Summary response status:", r.status);
-                    if (!r.ok) throw new Error("HTTP " + r.status);
-                    return r.json();
-                })
+                .then(r => r.json())
                 .then(res => {
-                    console.log("Summary data received:", res);
                     container.innerHTML = "";
 
                     if (res.summary.length === 0) {
@@ -190,10 +183,6 @@ def get_techs_screen_html():
 
                         container.appendChild(card);
                     });
-                })
-                .catch(err => {
-                    console.error("Error loading tech cards:", err);
-                    container.innerHTML = "<p style='color:red;'>Error: " + err.message + "</p>";
                 });
         }
 
