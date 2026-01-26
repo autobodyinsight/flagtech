@@ -154,9 +154,16 @@ def get_techs_screen_html():
             const container = document.getElementById('techCardsContainer');
             container.innerHTML = "<p style='color:#777;'>Loading...</p>";
 
+            console.log("loadTechCards called, BACKEND_BASE:", BACKEND_BASE);
+
             fetch(`${BACKEND_BASE}/ui/techs/summary`)
-                .then(r => r.json())
+                .then(r => {
+                    console.log("Summary response status:", r.status);
+                    if (!r.ok) throw new Error("HTTP " + r.status);
+                    return r.json();
+                })
                 .then(res => {
+                    console.log("Summary data received:", res);
                     container.innerHTML = "";
 
                     if (res.summary.length === 0) {
@@ -183,6 +190,10 @@ def get_techs_screen_html():
 
                         container.appendChild(card);
                     });
+                })
+                .catch(err => {
+                    console.error("Error loading tech cards:", err);
+                    container.innerHTML = "<p style='color:red;'>Error: " + err.message + "</p>";
                 });
         }
 
