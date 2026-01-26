@@ -75,7 +75,15 @@ def get_techs_screen_html():
 
         <script>
 
-        const BACKEND_BASE = "https://flagtech1.onrender.com";
+        const BACKEND_BASE = (() => {
+            const origin = window.location.origin;
+            // Primary Render host
+            const renderHost = "https://flagtech1.onrender.com";
+            if (origin.includes("localhost") || origin.includes("app.github.dev")) return origin;
+            if (origin.includes("github.io")) return renderHost;
+            return renderHost;
+        })();
+        window.BACKEND_BASE = BACKEND_BASE;
 
         // -----------------------------
         // Add Tech Modal
