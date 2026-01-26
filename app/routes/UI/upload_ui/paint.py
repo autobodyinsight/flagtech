@@ -92,6 +92,7 @@ def get_refinish_modal_script(paint_items_json, total_paint, second_ro_line, veh
   // Refinish Modal Functions
   const paintItems = {paint_items_json};
   const initialPaintTotal = {total_paint};
+  // This will store ONLY the items displayed in the modal
   let displayPaintItems = [];
   let paintAdditionalCounter = 0;
 
@@ -128,7 +129,10 @@ def get_refinish_modal_script(paint_items_json, total_paint, second_ro_line, veh
     
     checkboxes.forEach((checkbox, index) => {{
       if (checkbox.checked) {{
-        deductedTotal += paintItems[index].value;
+        const item = displayPaintItems[index];
+        if (item) {
+          deductedTotal += item.value;
+        }
       }}
     }});
     
@@ -153,11 +157,14 @@ def get_refinish_modal_script(paint_items_json, total_paint, second_ro_line, veh
   function openRefinishModal() {{
     const modal = document.getElementById('refinishModal');
     let html = '';
+
+    // Store EXACTLY what is displayed
+    displayPaintItems = paintItems.slice();
     
-    if (paintItems.length === 0) {{
+    if (displayPaintItems.length === 0) {
       html = '<p>No refinish items found.</p>';
-    }} else {{
-      paintItems.forEach((item, index) => {{
+    } else {
+      displayPaintItems.forEach((item, index) => {
         html += '<div class="paint-item" id="paint-item-' + index + '">';
         html += '<input type="checkbox" class="paint-item-checkbox" onchange="togglePaintDeduction(' + index + ')" />';
         html += '<div style="flex: 1;"><strong>Line ' + item.line + '</strong> - ' + item.description + '</div>';
@@ -195,15 +202,19 @@ def get_refinish_modal_script(paint_items_json, total_paint, second_ro_line, veh
     
     let totalPaint = 0;
     checkboxes.forEach((checkbox, index) => {{
+      const item = displayPaintItems[index];
+      if (!item) {
+        return;
+      }
       if (!checkbox.checked) {{
         printContent += '<div style="padding: 12px 8px; border-bottom: 1px solid #ddd;">';
         printContent += '<input type="checkbox" disabled style="margin-right: 10px;" />';
-        printContent += '<strong>Line ' + paintItems[index].line + '</strong> - ' + paintItems[index].description;
-        printContent += ' <div style="display: inline; float: right;">' + formatHours(paintItems[index].value) + ' hrs</div>';
+        printContent += '<strong>Line ' + item.line + '</strong> - ' + item.description;
+        printContent += ' <div style="display: inline; float: right;">' + formatHours(item.value) + ' hrs</div>';
         printContent += '</div>';
-        totalPaint += paintItems[index].value;
+        totalPaint += item.value;
       }} else {{
-        deductedTotal += paintItems[index].value;
+        deductedTotal += item.value;
       }}
     }});
     
