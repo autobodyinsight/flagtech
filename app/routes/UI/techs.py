@@ -155,11 +155,15 @@ def get_techs_screen_html():
             container.innerHTML = "<p style='color:#777;'>Loading...</p>";
 
             fetch(`${BACKEND_BASE}/ui/techs/summary`)
-                .then(r => r.json())
+                .then(r => {
+                    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+                    return r.json();
+                })
                 .then(res => {
+                    console.log("Tech summary response:", res);
                     container.innerHTML = "";
 
-                    if (res.summary.length === 0) {
+                    if (!res.summary || res.summary.length === 0) {
                         container.innerHTML = "<p style='color:#777;'>No tech activity yet.</p>";
                         return;
                     }
@@ -183,6 +187,10 @@ def get_techs_screen_html():
 
                         container.appendChild(card);
                     });
+                })
+                .catch(err => {
+                    console.error("Error loading tech cards:", err);
+                    container.innerHTML = "<p style='color:red;'>Error loading techs: " + err.message + "</p>";
                 });
         }
 
@@ -194,12 +202,16 @@ def get_techs_screen_html():
             document.getElementById('techROModal').style.display = 'block';
 
             fetch(`${BACKEND_BASE}/ui/techs/${encodeURIComponent(techName)}/ros`)
-                .then(r => r.json())
+                .then(r => {
+                    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+                    return r.json();
+                })
                 .then(res => {
+                    console.log("Tech RO list response:", res);
                     const container = document.getElementById('techROList');
                     container.innerHTML = "";
 
-                    if (res.ros.length === 0) {
+                    if (!res.ros || res.ros.length === 0) {
                         container.innerHTML = "<p>No ROs assigned.</p>";
                         return;
                     }
@@ -220,6 +232,10 @@ def get_techs_screen_html():
 
                         container.appendChild(div);
                     });
+                })
+                .catch(err => {
+                    console.error("Error loading ROs:", err);
+                    document.getElementById('techROList').innerHTML = "<p style='color:red;'>Error loading ROs: " + err.message + "</p>";
                 });
         }
 
@@ -242,11 +258,20 @@ def get_techs_screen_html():
             document.getElementById('techRODetailModal').style.display = 'block';
 
             fetch(`${BACKEND_BASE}/ui/techs/${encodeURIComponent(techName)}/${encodeURIComponent(roNumber)}/lines`)
-                .then(r => r.json())
+                .then(r => {
+                    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+                    return r.json();
+                })
                 .then(res => {
+                    console.log("Tech RO lines response:", res);
                     const container = document.getElementById('techRODetailList');
                     container.innerHTML = "";
                     flaggedLines = [];
+
+                    if (!res.lines || res.lines.length === 0) {
+                        container.innerHTML = "<p>No lines found for this RO.</p>";
+                        return;
+                    }
 
                     res.lines.forEach((line, index) => {
                         const div = document.createElement('div');
@@ -269,6 +294,10 @@ def get_techs_screen_html():
 
                         container.appendChild(div);
                     });
+                })
+                .catch(err => {
+                    console.error("Error loading lines:", err);
+                    document.getElementById('techRODetailList').innerHTML = "<p style='color:red;'>Error loading lines: " + err.message + "</p>";
                 });
         }
 

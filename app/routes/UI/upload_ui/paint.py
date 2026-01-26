@@ -130,9 +130,9 @@ def get_refinish_modal_script(paint_items_json, total_paint, second_ro_line, veh
     checkboxes.forEach((checkbox, index) => {{
       if (checkbox.checked) {{
         const item = displayPaintItems[index];
-        if (item) {
+        if (item) {{
           deductedTotal += item.value;
-        }
+        }}
       }}
     }});
     
@@ -161,10 +161,10 @@ def get_refinish_modal_script(paint_items_json, total_paint, second_ro_line, veh
     // Store EXACTLY what is displayed
     displayPaintItems = paintItems.slice();
     
-    if (displayPaintItems.length === 0) {
+    if (displayPaintItems.length === 0) {{
       html = '<p>No refinish items found.</p>';
-    } else {
-      displayPaintItems.forEach((item, index) => {
+    }} else {{
+      displayPaintItems.forEach((item, index) => {{
         html += '<div class="paint-item" id="paint-item-' + index + '">';
         html += '<input type="checkbox" class="paint-item-checkbox" onchange="togglePaintDeduction(' + index + ')" />';
         html += '<div style="flex: 1;"><strong>Line ' + item.line + '</strong> - ' + item.description + '</div>';
@@ -203,9 +203,9 @@ def get_refinish_modal_script(paint_items_json, total_paint, second_ro_line, veh
     let totalPaint = 0;
     checkboxes.forEach((checkbox, index) => {{
       const item = displayPaintItems[index];
-      if (!item) {
+      if (!item) {{
         return;
-      }
+      }}
       if (!checkbox.checked) {{
         printContent += '<div style="padding: 12px 8px; border-bottom: 1px solid #ddd;">';
         printContent += '<input type="checkbox" disabled style="margin-right: 10px;" />';

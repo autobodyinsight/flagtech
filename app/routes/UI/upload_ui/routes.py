@@ -200,131 +200,164 @@ async def delete_tech(tech_id: int):
 
 @router.get("/techs/summary")
 async def tech_summary():
-    cur = conn.cursor()
+    try:
+        cur = conn.cursor()
 
-    # Labor hours
-    cur.execute("""
-        SELECT tech,
-               COUNT(DISTINCT ro) AS ro_count,
-               SUM(total_labor) AS total_hours
-        FROM labor_assignments
-        WHERE tech IS NOT NULL AND tech <> ''
-        GROUP BY tech
-    """)
-    labor_rows = cur.fetchall()
+        # Labor hours
+        cur.execute("""
+            SELECT tech,
+                   COUNT(DISTINCT ro) AS ro_count,
+                   SUM(total_labor) AS total_hours
+            FROM labor_assignments
+            WHERE tech IS NOT NULL AND tech <> ''
+            GROUP BY tech
+        """)
+        labor_rows = cur.fetchall()
 
-    # Paint hours
-    cur.execute("""
-        SELECT tech,
-               COUNT(DISTINCT ro) AS ro_count,
-               SUM(total_paint) AS total_hours
-        FROM refinish_assignments
-        WHERE tech IS NOT NULL AND tech <> ''
-        GROUP BY tech
-    """)
-    paint_rows = cur.fetchall()
+        # Paint hours
+        cur.execute("""
+            SELECT tech,
+                   COUNT(DISTINCT ro) AS ro_count,
+                   SUM(total_paint) AS total_hours
+            FROM refinish_assignments
+            WHERE tech IS NOT NULL AND tech <> ''
+            GROUP BY tech
+        """)
+        paint_rows = cur.fetchall()
 
-    summary = {}
+        summary = {}
 
-    # Combine labor
-    for tech, ro_count, hours in labor_rows:
-        if tech not in summary:
-            summary[tech] = {"tech": tech, "ro_count": 0, "hours": 0}
-        summary[tech]["ro_count"] += ro_count
-        summary[tech]["hours"] += float(hours or 0)
+        # Combine labor
+        for row in labor_rows:
+            tech = row[0]
+            ro_count = row[1]
+            hours = row[2]
+            if tech not in summary:
+                summary[tech] = {"tech": tech, "ro_count": 0, "hours": 0.0}
+            summary[tech]["ro_count"] += ro_count
+            summary[tech]["hours"] += float(hours or 0)
 
-    # Combine paint
-    for tech, ro_count, hours in paint_rows:
-        if tech not in summary:
-            summary[tech] = {"tech": tech, "ro_count": 0, "hours": 0}
-        summary[tech]["ro_count"] += ro_count
-        summary[tech]["hours"] += float(hours or 0)
+        # Combine paint
+        for row in paint_rows:
+            tech = row[0]
+            ro_count = row[1]
+            hours = row[2]
+            if tech not in summary:
+                summary[tech] = {"tech": tech, "ro_count": 0, "hours": 0.0}
+            summary[tech]["ro_count"] += ro_count
+            summary[tech]["hours"] += float(hours or 0)
 
-    return {"summary": list(summary.values())}
+        print(f"[tech_summary] Returning {len(summary)} techs: {list(summary.keys())}")
+        return {"summary": list(summary.values())}
+    except Exception as e:
+        print(f"[tech_summary] ERROR: {e}")
+        return {"summary": [], "error": str(e)}
 
 @router.get("/techs/{tech}/ros")
 async def tech_ro_list(tech: str):
-    cur = conn.cursor()
+    try:
+        cur = conn.cursor()
 
-    # Labor assignments
-    cur.execute("""
-        SELECT ro, vehicle, SUM(total_labor) AS hours
-        FROM labor_assignments
-        WHERE tech = %s
-        GROUP BY ro, vehicle
-    """, (tech,))
-    labor_rows = cur.fetchall()
+        # Labor assignments
+        cur.execute("""
+            SELECT ro, vehicle, SUM(total_labor) AS hours
+            FROM labor_assignments
+            WHERE tech = %s
+            GROUP BY ro, vehicle
+        """, (tech,))
+        labor_rows = cur.fetchall()
 
-    # Paint assignments
-    cur.execute("""
-        SELECT ro, vehicle, SUM(total_paint) AS hours
-        FROM refinish_assignments
-        WHERE tech = %s
-        GROUP BY ro, vehicle
-    """, (tech,))
-    paint_rows = cur.fetchall()
+        # Paint assignments
+        cur.execute("""
+            SELECT ro, vehicle, SUM(total_paint) AS hours
+            FROM refinish_assignments
+            WHERE tech = %s
+            GROUP BY ro, vehicle
+        """, (tech,))
+        paint_rows = cur.fetchall()
 
-    ros = {}
+        ros = {}
 
-    # Merge labor
-    for ro, vehicle, hours in labor_rows:
-        if ro not in ros:
-            ros[ro] = {"ro": ro, "vehicle": vehicle, "total_hours": 0}
-        ros[ro]["total_hours"] += float(hours or 0)
+        # Merge labor
+        for row in labor_rows:
+            ro = row[0]
+            vehicle = row[1]
+            hours = row[2]
+            if ro not in ros:
+                ros[ro] = {"ro": ro, "vehicle": vehicle, "total_hours": 0.0}
+            ros[ro]["total_hours"] += float(hours or 0)
 
-    # Merge paint
-    for ro, vehicle, hours in paint_rows:
-        if ro not in ros:
-            ros[ro] = {"ro": ro, "vehicle": vehicle, "total_hours": 0}
-        ros[ro]["total_hours"] += float(hours or 0)
+        # Merge paint
+        for row in paint_rows:
+            ro = row[0]
+            vehicle = row[1]
+            hours = row[2]
+            if ro not in ros:
+                ros[ro] = {"ro": ro, "vehicle": vehicle, "total_hours": 0.0}
+            ros[ro]["total_hours"] += float(hours or 0)
 
-    return {"ros": list(ros.values())}
+        print(f"[tech_ro_list] Tech: {tech}, ROs: {len(ros)}")
+        return {"ros": list(ros.values())}
+    except Exception as e:
+        print(f"[tech_ro_list] ERROR for tech {tech}: {e}")
+        return {"ros": [], "error": str(e)}
 
 @router.get("/techs/{tech}/{ro}/lines")
 async def tech_ro_lines(tech: str, ro: str):
-    cur = conn.cursor()
+    try:
+        cur = conn.cursor()
 
-    # Labor lines
-    cur.execute("""
-        SELECT assigned
-        FROM labor_assignments
-        WHERE tech = %s AND ro = %s
-    """, (tech, ro))
-    labor_rows = cur.fetchall()
+        # Labor lines
+        cur.execute("""
+            SELECT assigned
+            FROM labor_assignments
+            WHERE tech = %s AND ro = %s
+        """, (tech, ro))
+        labor_rows = cur.fetchall()
 
-    # Paint lines
-    cur.execute("""
-        SELECT assigned
-        FROM refinish_assignments
-        WHERE tech = %s AND ro = %s
-    """, (tech, ro))
-    paint_rows = cur.fetchall()
+        # Paint lines
+        cur.execute("""
+            SELECT assigned
+            FROM refinish_assignments
+            WHERE tech = %s AND ro = %s
+        """, (tech, ro))
+        paint_rows = cur.fetchall()
 
-    lines = []
+        lines = []
 
-    # Labor
-    for row in labor_rows:
-        assigned = json.loads(row[0])
-        for item in assigned:
-            lines.append({
-                "line": item["line"],
-                "description": item["description"],
-                "value": float(item["value"]),
-                "type": "labor"
-            })
+        # Labor
+        for row in labor_rows:
+            try:
+                assigned = json.loads(row[0])
+                for item in assigned:
+                    lines.append({
+                        "line": item.get("line"),
+                        "description": item.get("description"),
+                        "value": float(item.get("value", 0)),
+                        "type": "labor"
+                    })
+            except Exception as e:
+                print(f"[tech_ro_lines] Error parsing labor row: {e}")
 
-    # Paint
-    for row in paint_rows:
-        assigned = json.loads(row[0])
-        for item in assigned:
-            lines.append({
-                "line": item["line"],
-                "description": item["description"],
-                "value": float(item["value"]),
-                "type": "paint"
-            })
+        # Paint
+        for row in paint_rows:
+            try:
+                assigned = json.loads(row[0])
+                for item in assigned:
+                    lines.append({
+                        "line": item.get("line"),
+                        "description": item.get("description"),
+                        "value": float(item.get("value", 0)),
+                        "type": "paint"
+                    })
+            except Exception as e:
+                print(f"[tech_ro_lines] Error parsing paint row: {e}")
 
-    return {"lines": lines}
+        print(f"[tech_ro_lines] Tech: {tech}, RO: {ro}, Lines: {len(lines)}")
+        return {"lines": lines}
+    except Exception as e:
+        print(f"[tech_ro_lines] ERROR for tech {tech}, ro {ro}: {e}")
+        return {"lines": [], "error": str(e)}
 
 # ============================================================
 # RO MANAGEMENT ENDPOINTS
@@ -431,3 +464,38 @@ async def ro_details(ro: str):
     ]
 
     return {"labor": labor, "refinish": refinish}
+
+
+# ============================================================
+# DEBUG ENDPOINTS
+# ============================================================
+
+@router.get("/debug/check-data")
+async def check_data():
+    """Debug endpoint to check if data is being saved."""
+    try:
+        cur = conn.cursor()
+        
+        # Check labor assignments
+        cur.execute("SELECT COUNT(*) FROM labor_assignments")
+        labor_count = cur.fetchone()[0]
+        
+        # Check refinish assignments
+        cur.execute("SELECT COUNT(*) FROM refinish_assignments")
+        refinish_count = cur.fetchone()[0]
+        
+        # Get sample techs
+        cur.execute("SELECT DISTINCT tech FROM labor_assignments WHERE tech IS NOT NULL LIMIT 5")
+        labor_techs = [row[0] for row in cur.fetchall()]
+        
+        cur.execute("SELECT DISTINCT tech FROM refinish_assignments WHERE tech IS NOT NULL LIMIT 5")
+        refinish_techs = [row[0] for row in cur.fetchall()]
+        
+        return {
+            "labor_assignments_count": labor_count,
+            "refinish_assignments_count": refinish_count,
+            "sample_labor_techs": labor_techs,
+            "sample_refinish_techs": refinish_techs
+        }
+    except Exception as e:
+        return {"error": str(e)}
