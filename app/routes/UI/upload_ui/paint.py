@@ -186,28 +186,28 @@ def get_refinish_modal_script(paint_items_json, total_paint, second_ro_line, veh
     
     fetch(baseUrl + '/ui/techs/list')
       .then(r => r.json())
-      .then(res => {
-        if (res.techs && res.techs.length > 0) {
-          res.techs.forEach(tech => {
+      .then(res => {{
+        if (res.techs && res.techs.length > 0) {{
+          res.techs.forEach(tech => {{
             const option = document.createElement('option');
             option.value = tech.first_name + ' ' + tech.last_name;
             option.textContent = tech.first_name + ' ' + tech.last_name;
             techSelect.appendChild(option);
-          });
-        } else {
+          }});
+        }} else {{
           const option = document.createElement('option');
           option.value = '';
           option.textContent = 'No technicians available';
           techSelect.appendChild(option);
-        }
-      })
-      .catch(err => {
+        }}
+      }})
+      .catch(err => {{
         console.error('Error loading techs:', err);
         const option = document.createElement('option');
         option.value = '';
         option.textContent = 'Error loading technicians';
         techSelect.appendChild(option);
-      });
+      }});
     
     modal.style.display = 'block';
   }}
