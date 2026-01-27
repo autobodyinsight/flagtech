@@ -87,7 +87,8 @@ async def parse_ui(file: UploadFile = File(...)):
 @router.post("/save-labor")
 async def save_labor(request: Request):
     data = await request.json()
-    cur = get_conn().cursor()
+    conn = get_conn()
+    cur = conn.cursor()
 
     cur.execute("""
         INSERT INTO labor_assignments
@@ -106,13 +107,15 @@ async def save_labor(request: Request):
     ))
 
     conn.commit()
+    cur.close()
     return {"status": "labor saved"}
 
 
 @router.post("/save-refinish")
 async def save_refinish(request: Request):
     data = await request.json()
-    cur = get_conn().cursor()
+    conn = get_conn()
+    cur = conn.cursor()
 
     cur.execute("""
         INSERT INTO refinish_assignments
@@ -131,6 +134,7 @@ async def save_refinish(request: Request):
     ))
 
     conn.commit()
+    cur.close()
     return {"status": "refinish saved"}
 
 # ============================================================
