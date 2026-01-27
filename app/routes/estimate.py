@@ -91,7 +91,7 @@ async def list_techs():
 
 @router.get("/tech-assignments")
 async def tech_assignments():
-    """Get summary of tech assignments (total ROs and hours)."""
+    """Get detailed tech assignments showing each RO."""
     try:
         conn = get_conn()
         cur = conn.cursor()
@@ -132,33 +132,31 @@ async def tech_assignments():
         rows = cur.fetchall()
         cur.close()
         
-        # Build the response
-        tech_summary_map = {}
+        # Build the response with individual RO assignments
+        assignments_by_tech = {}
         
         for row in rows:
             tech = row["tech"]
+            ro = row["ro"]
             labor_hrs = float(row["total_labor"] or 0)
             refinish_hrs = float(row["total_refinish"] or 0)
             total_hrs = labor_hrs + refinish_hrs
             
-            if tech not in tech_summary_map:
-                tech_summary_map[tech] = {
-                    "tech": tech,
-                    "total_vehicles": 0,
-                    "total_hours": 0.0
-                }
+            if tech not in assignments_by_tech:
+                assignments_by_tech[tech] = []
             
-            tech_summary_map[tech]["total_vehicles"] += 1
-            tech_summary_map[tech]["total_hours"] += total_hrs
-        
-        tech_summary = list(tech_summary_map.values())
+            assignments_by_tech[tech].append({
+                "ro": ro,
+                "vehicle": row["vehicle"],
+                "total_hours": total_hrs
+            })
         
         return {
-            "tech_summary": tech_summary,
+            "assignments": assignments_by_tech,
             "error": "0"
         }
     except Exception as e:
         return {
-            "tech_summary": [],
+            "assignments": {},
             "error": str(e)
         }
