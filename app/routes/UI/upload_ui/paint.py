@@ -155,10 +155,34 @@ def get_refinish_modal_script(paint_items_json, total_paint, second_ro_line, veh
     item.classList.toggle('deducted');
     updatePaintTotal();
   }}
+
+  function loadTechsIntoRefinishDropdown() {{
+    fetch('https://flagtech1.onrender.com/api/techs/list')
+      .then(r => r.json())
+      .then(data => {{
+        const select = document.getElementById('refinishTechInput');
+        select.innerHTML = '<option value="">Select technician...</option>';
+        
+        if (data.techs && data.techs.length > 0) {{
+          data.techs.forEach(tech => {{
+            const option = document.createElement('option');
+            option.value = `${{tech.first_name}} ${{tech.last_name}}`;
+            option.textContent = `${{tech.first_name}} ${{tech.last_name}}`;
+            select.appendChild(option);
+          }});
+        }}
+      }})
+      .catch(err => {{
+        console.error('Error loading techs:', err);
+      }});
+  }}
   
   function openRefinishModal() {{
     const modal = document.getElementById('refinishModal');
     let html = '';
+
+    // Load techs into dropdown
+    loadTechsIntoRefinishDropdown();
 
     // Store EXACTLY what is displayed
     displayPaintItems = paintItems.slice();
@@ -176,47 +200,6 @@ def get_refinish_modal_script(paint_items_json, total_paint, second_ro_line, veh
     }}
     
     document.getElementById('paintList').innerHTML = html;
-    
-    // Populate tech dropdown
-    const techSelect = document.getElementById('refinishTechInput');
-    techSelect.innerHTML = '<option value="">Select technician...</option>';
-    
-    // Fetch techs list (try relative first, fallback to BACKEND_BASE/window origin)
-    const baseUrl = (typeof BACKEND_BASE !== 'undefined' && BACKEND_BASE) ? BACKEND_BASE : window.location.origin;
-
-    const loadTechOptions = (url) => {{
-      return fetch(url)
-        .then(r => {{
-          if (!r.ok) throw new Error('HTTP ' + r.status);
-          return r.json();
-        }})
-        .then(res => {{
-          if (res.techs && res.techs.length > 0) {{
-            res.techs.forEach(tech => {{
-              const option = document.createElement('option');
-              option.value = tech.first_name + ' ' + tech.last_name;
-              option.textContent = tech.first_name + ' ' + tech.last_name;
-              techSelect.appendChild(option);
-            }});
-          }} else {{
-            const option = document.createElement('option');
-            option.value = '';
-            option.textContent = 'No technicians available';
-            techSelect.appendChild(option);
-          }}
-        }});
-    }};
-
-    loadTechOptions('/api/techs/list')
-      .catch(() => loadTechOptions(baseUrl + '/api/techs/list'))
-      .catch(err => {{
-        console.error('Error loading techs:', err);
-        const option = document.createElement('option');
-        option.value = '';
-        option.textContent = 'Error loading technicians';
-        techSelect.appendChild(option);
-      }});
-    
     modal.style.display = 'block';
   }}
   
