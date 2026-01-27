@@ -54,11 +54,11 @@ def get_techs_screen_html():
             </div>
         </div>
 
-        <!-- Repair Line Modal -->
+        <!-- Labor/Refinish Assignment Modal -->
         <div id="techRODetailModal" class="modal" style="display:none;">
-          <div class="modal-content" style="max-width:700px;">
+          <div class="modal-content" style="max-width:800px; max-height:80vh; overflow-y:auto;">
             <span class="close" onclick="closeTechRODetailModal()">&times;</span>
-            <h3 id="techRODetailTitle">Repair Lines</h3>
+            <h3 id="techRODetailTitle">Assignment Details</h3>
 
             <div id="techRODetailList"></div>
 
@@ -154,21 +154,21 @@ def get_techs_screen_html():
             const container = document.getElementById('techCardsContainer');
             container.innerHTML = "<p style='color:#777;'>Loading...</p>";
 
-            fetch(`${BACKEND_BASE}/ui/techs/summary`)
+            fetch(`${BACKEND_BASE}/ui/tech-assignments`)
                 .then(r => {
                     if (!r.ok) throw new Error(`HTTP ${r.status}`);
                     return r.json();
                 })
                 .then(res => {
-                    console.log("Tech summary response:", res);
+                    console.log("Tech assignments response:", res);
                     container.innerHTML = "";
 
-                    if (!res.summary || res.summary.length === 0) {
+                    if (!res.tech_summary || res.tech_summary.length === 0) {
                         container.innerHTML = "<p style='color:#777;'>No tech activity yet.</p>";
                         return;
                     }
 
-                    res.summary.forEach(t => {
+                    res.tech_summary.forEach(t => {
                         const card = document.createElement('div');
                         card.style.border = "1px solid #ccc";
                         card.style.borderRadius = "6px";
@@ -181,8 +181,8 @@ def get_techs_screen_html():
 
                         card.innerHTML = `
                             <div style="font-size:16px; font-weight:bold;">${t.tech}</div>
-                            <div style="margin-top:6px;">ROs: ${t.ro_count}</div>
-                            <div style="margin-top:4px;">Unpaid Hours: ${t.hours.toFixed(1)}</div>
+                            <div style="margin-top:6px;">Total Vehicles: ${t.total_vehicles}</div>
+                            <div style="margin-top:4px;">Total Hours: ${t.total_hours.toFixed(1)}</div>
                         `;
 
                         container.appendChild(card);
@@ -244,7 +244,7 @@ def get_techs_screen_html():
         }
 
         // -----------------------------
-        // Repair Line Modal (Step 3)
+        // Assignment Detail Modal (Labor & Refinish)
         // -----------------------------
         let currentTech = null;
         let currentRO = null;
@@ -257,48 +257,154 @@ def get_techs_screen_html():
             document.getElementById('techRODetailTitle').innerText = techName + " — RO " + roNumber;
             document.getElementById('techRODetailModal').style.display = 'block';
 
-            fetch(`${BACKEND_BASE}/ui/techs/${encodeURIComponent(techName)}/${encodeURIComponent(roNumber)}/lines`)
-                .then(r => {
-                    if (!r.ok) throw new Error(`HTTP ${r.status}`);
-                    return r.json();
-                })
-                .then(res => {
-                    console.log("Tech RO lines response:", res);
-                    const container = document.getElementById('techRODetailList');
-                    container.innerHTML = "";
-                    flaggedLines = [];
+            const container = document.getElementById('techRODetailList');
+            container.innerHTML = "<p style='color:#777;'>Loading assignment details...</p>";
+            flaggedLines = [];
 
-                    if (!res.lines || res.lines.length === 0) {
-                        container.innerHTML = "<p>No lines found for this RO.</p>";
-                        return;
-                    }
+            // Fetch both labor and refinish assignments
+            Promise.all([
+                fetch(`${BACKEND_BASE}/ui/labor-assignments/${encodeURIComponent(roNumber)}?tech=${encodeURIComponent(techName)}`).then(r => r.json()),
+                fetch(`${BACKEND_BASE}/ui/refinish-assignments/${encodeURIComponent(roNumber)}?tech=${encodeURIComponent(techName)}`).then(r => r.json())
+            ])
+            .then(([laborRes, refinishRes]) => {
+                console.log("Labor assignments:", laborRes);
+                console.log("Refinish assignments:", refinishRes);
+                
+                container.innerHTML = "";
+                let itemIndex = 0;
 
-                    res.lines.forEach((line, index) => {
-                        const div = document.createElement('div');
-                        div.style.display = "flex";
-                        div.style.justifyContent = "space-between";
-                        div.style.alignItems = "center";
-                        div.style.padding = "10px";
-                        div.style.borderBottom = "1px solid #ddd";
+                // Display Labor Assignments
+                if (laborRes.assignments && laborRes.assignments.length > 0) {
+                    laborRes.assignments.forEach(assignment => {
+                        const sectionDiv = document.createElement('div');
+                        sectionDiv.style.marginBottom = "20px";
+                        sectionDiv.innerHTML = `<h4 style="background:#e8e8e8; padding:8px; margin:0;">Labor Assignment - ${assignment.tech}</h4>`;
+                        container.appendChild(sectionDiv);
 
-                        div.innerHTML = `
-                            <input type="checkbox" onchange="toggleFlag(${index}, ${line.value})">
-                            <div style="flex:1; margin-left:10px;">
-                                <strong>Line ${line.line}</strong> — ${line.description}
-                            </div>
-                            <div>${line.value.toFixed(1)} hrs</div>
-                            <div id="flag-${index}" style="width:80px; text-align:right; background:#fffacd; padding:5px;">
-                                0.0
-                            </div>
-                        `;
+                        // Assigned items
+                        if (assignment.assigned && assignment.assigned.length > 0) {
+                            const assignedHeader = document.createElement('div');
+                            assignedHeader.style.padding = "8px";
+                            assignedHeader.style.fontWeight = "bold";
+                            assignedHeader.style.background = "#f5f5f5";
+                            assignedHeader.innerHTML = "Assigned Items:";
+                            container.appendChild(assignedHeader);
 
-                        container.appendChild(div);
+                            assignment.assigned.forEach(item => {
+                                const div = createItemRow(item, itemIndex++, 'labor');
+                                container.appendChild(div);
+                            });
+                        }
+
+                        // Additional hours
+                        if (assignment.additional && assignment.additional.length > 0) {
+                            const addlHeader = document.createElement('div');
+                            addlHeader.style.padding = "8px";
+                            addlHeader.style.fontWeight = "bold";
+                            addlHeader.style.background = "#fffacd";
+                            addlHeader.innerHTML = "Additional Hours:";
+                            container.appendChild(addlHeader);
+
+                            assignment.additional.forEach(item => {
+                                const div = createItemRow(item, itemIndex++, 'labor');
+                                container.appendChild(div);
+                            });
+                        }
+
+                        // Total
+                        const totalDiv = document.createElement('div');
+                        totalDiv.style.padding = "10px";
+                        totalDiv.style.fontWeight = "bold";
+                        totalDiv.style.background = "#e8e8e8";
+                        totalDiv.style.textAlign = "right";
+                        totalDiv.innerHTML = `Total Labor: ${assignment.total_labor.toFixed(1)} hrs`;
+                        container.appendChild(totalDiv);
                     });
-                })
-                .catch(err => {
-                    console.error("Error loading lines:", err);
-                    document.getElementById('techRODetailList').innerHTML = "<p style='color:red;'>Error loading lines: " + err.message + "</p>";
-                });
+                }
+
+                // Display Refinish Assignments
+                if (refinishRes.assignments && refinishRes.assignments.length > 0) {
+                    refinishRes.assignments.forEach(assignment => {
+                        const sectionDiv = document.createElement('div');
+                        sectionDiv.style.marginBottom = "20px";
+                        sectionDiv.style.marginTop = "20px";
+                        sectionDiv.innerHTML = `<h4 style="background:#e8e8e8; padding:8px; margin:0;">Refinish Assignment - ${assignment.tech}</h4>`;
+                        container.appendChild(sectionDiv);
+
+                        // Assigned items
+                        if (assignment.assigned && assignment.assigned.length > 0) {
+                            const assignedHeader = document.createElement('div');
+                            assignedHeader.style.padding = "8px";
+                            assignedHeader.style.fontWeight = "bold";
+                            assignedHeader.style.background = "#f5f5f5";
+                            assignedHeader.innerHTML = "Assigned Items:";
+                            container.appendChild(assignedHeader);
+
+                            assignment.assigned.forEach(item => {
+                                const div = createItemRow(item, itemIndex++, 'refinish');
+                                container.appendChild(div);
+                            });
+                        }
+
+                        // Additional hours
+                        if (assignment.additional && assignment.additional.length > 0) {
+                            const addlHeader = document.createElement('div');
+                            addlHeader.style.padding = "8px";
+                            addlHeader.style.fontWeight = "bold";
+                            addlHeader.style.background = "#fffacd";
+                            addlHeader.innerHTML = "Additional Hours:";
+                            container.appendChild(addlHeader);
+
+                            assignment.additional.forEach(item => {
+                                const div = createItemRow(item, itemIndex++, 'refinish');
+                                container.appendChild(div);
+                            });
+                        }
+
+                        // Total
+                        const totalDiv = document.createElement('div');
+                        totalDiv.style.padding = "10px";
+                        totalDiv.style.fontWeight = "bold";
+                        totalDiv.style.background = "#e8e8e8";
+                        totalDiv.style.textAlign = "right";
+                        totalDiv.innerHTML = `Total Refinish: ${assignment.total_paint.toFixed(1)} hrs`;
+                        container.appendChild(totalDiv);
+                    });
+                }
+
+                if ((!laborRes.assignments || laborRes.assignments.length === 0) &&
+                    (!refinishRes.assignments || refinishRes.assignments.length === 0)) {
+                    container.innerHTML = "<p>No assignments found for this RO.</p>";
+                }
+            })
+            .catch(err => {
+                console.error("Error loading assignments:", err);
+                container.innerHTML = "<p style='color:red;'>Error loading assignments: " + err.message + "</p>";
+            });
+        }
+
+        function createItemRow(item, index, type) {
+            const div = document.createElement('div');
+            div.style.display = "flex";
+            div.style.justifyContent = "space-between";
+            div.style.alignItems = "center";
+            div.style.padding = "10px";
+            div.style.borderBottom = "1px solid #ddd";
+
+            const value = parseFloat(item.value || 0);
+            
+            div.innerHTML = `
+                <input type="checkbox" onchange="toggleFlag(${index}, ${value})" style="margin-right:10px;">
+                <div style="flex:1;">
+                    <strong>Line ${item.line || 'N/A'}</strong> — ${item.description || 'No description'}
+                </div>
+                <div style="margin-right:15px;">${value.toFixed(1)} hrs</div>
+                <div id="flag-${index}" style="width:80px; text-align:right; background:#fffacd; padding:5px;">
+                    0.0
+                </div>
+            `;
+
+            return div;
         }
 
         function toggleFlag(index, value) {

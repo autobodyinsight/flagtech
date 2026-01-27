@@ -467,6 +467,192 @@ async def ro_details(ro: str):
 
 
 # ============================================================
+# TECH-RO ASSIGNMENTS ENDPOINTS
+# ============================================================
+
+@router.get("/tech-assignments")
+async def get_tech_assignments():
+    """Get all tech-RO assignments with aggregated data for the tech window."""
+    try:
+        cur = conn.cursor()
+        
+        # Get all tech-RO combinations from both labor and refinish
+        cur.execute("""
+            SELECT 
+                tech,
+                ro,
+                vehicle,
+                SUM(labor_hours) AS total_labor,
+                SUM(refinish_hours) AS total_refinish
+            FROM (
+                SELECT 
+                    tech,
+                    ro,
+                    vehicle,
+                    total_labor AS labor_hours,
+                    0 AS refinish_hours
+                FROM labor_assignments
+                WHERE tech IS NOT NULL AND tech <> ''
+                
+                UNION ALL
+                
+                SELECT 
+                    tech,
+                    ro,
+                    vehicle,
+                    0 AS labor_hours,
+                    total_paint AS refinish_hours
+                FROM refinish_assignments
+                WHERE tech IS NOT NULL AND tech <> ''
+            ) AS combined
+            GROUP BY tech, ro, vehicle
+            ORDER BY tech, ro
+        """)
+        
+        rows = cur.fetchall()
+        
+        # Build the response
+        assignments = []
+        tech_summary = {}
+        
+        for row in rows:
+            tech = row[0]
+            ro = row[1]
+            vehicle = row[2]
+            labor_hrs = float(row[3] or 0)
+            refinish_hrs = float(row[4] or 0)
+            total_hrs = labor_hrs + refinish_hrs
+            
+            # Add to assignments list
+            assignments.append({
+                "tech": tech,
+                "ro": ro,
+                "vehicle": vehicle,
+                "labor_hours": labor_hrs,
+                "refinish_hours": refinish_hrs,
+                "total_hours": total_hrs
+            })
+            
+            # Aggregate by tech for summary
+            if tech not in tech_summary:
+                tech_summary[tech] = {
+                    "tech": tech,
+                    "total_ros": set(),
+                    "total_hours": 0
+                }
+            tech_summary[tech]["total_ros"].add(ro)
+            tech_summary[tech]["total_hours"] += total_hrs
+        
+        # Convert sets to counts
+        for tech in tech_summary:
+            tech_summary[tech]["total_vehicles"] = len(tech_summary[tech]["total_ros"])
+            del tech_summary[tech]["total_ros"]
+        
+        return {
+            "assignments": assignments,
+            "tech_summary": list(tech_summary.values())
+        }
+        
+    except Exception as e:
+        print(f"[get_tech_assignments] ERROR: {e}")
+        return {"assignments": [], "tech_summary": [], "error": str(e)}
+
+
+@router.get("/labor-assignments/{ro}")
+async def get_labor_assignments(ro: str, tech: str = None):
+    """Get labor assignment details for a specific RO, optionally filtered by tech."""
+    try:
+        cur = conn.cursor()
+        
+        if tech:
+            cur.execute("""
+                SELECT id, ro, vehicle, tech, assigned, unassigned, additional, 
+                       total_labor, total_unassigned, timestamp
+                FROM labor_assignments
+                WHERE ro = %s AND tech = %s
+                ORDER BY timestamp DESC
+            """, (ro, tech))
+        else:
+            cur.execute("""
+                SELECT id, ro, vehicle, tech, assigned, unassigned, additional, 
+                       total_labor, total_unassigned, timestamp
+                FROM labor_assignments
+                WHERE ro = %s
+                ORDER BY timestamp DESC
+            """, (ro,))
+        
+        rows = cur.fetchall()
+        
+        assignments = []
+        for row in rows:
+            assignments.append({
+                "id": row[0],
+                "ro": row[1],
+                "vehicle": row[2],
+                "tech": row[3],
+                "assigned": json.loads(row[4]) if row[4] else [],
+                "unassigned": json.loads(row[5]) if row[5] else [],
+                "additional": json.loads(row[6]) if row[6] else [],
+                "total_labor": float(row[7]),
+                "total_unassigned": float(row[8]),
+                "timestamp": row[9].isoformat() if row[9] else None
+            })
+        
+        return {"assignments": assignments}
+        
+    except Exception as e:
+        print(f"[get_labor_assignments] ERROR for RO {ro}: {e}")
+        return {"assignments": [], "error": str(e)}
+
+
+@router.get("/refinish-assignments/{ro}")
+async def get_refinish_assignments(ro: str, tech: str = None):
+    """Get refinish assignment details for a specific RO, optionally filtered by tech."""
+    try:
+        cur = conn.cursor()
+        
+        if tech:
+            cur.execute("""
+                SELECT id, ro, vehicle, tech, assigned, unassigned, additional, 
+                       total_paint, total_unassigned, timestamp
+                FROM refinish_assignments
+                WHERE ro = %s AND tech = %s
+                ORDER BY timestamp DESC
+            """, (ro, tech))
+        else:
+            cur.execute("""
+                SELECT id, ro, vehicle, tech, assigned, unassigned, additional, 
+                       total_paint, total_unassigned, timestamp
+                FROM refinish_assignments
+                WHERE ro = %s
+                ORDER BY timestamp DESC
+            """, (ro,))
+        
+        rows = cur.fetchall()
+        
+        assignments = []
+        for row in rows:
+            assignments.append({
+                "id": row[0],
+                "ro": row[1],
+                "vehicle": row[2],
+                "tech": row[3],
+                "assigned": json.loads(row[4]) if row[4] else [],
+                "unassigned": json.loads(row[5]) if row[5] else [],
+                "additional": json.loads(row[6]) if row[6] else [],
+                "total_paint": float(row[7]),
+                "total_unassigned": float(row[8]),
+                "timestamp": row[9].isoformat() if row[9] else None
+            })
+        
+        return {"assignments": assignments}
+        
+    except Exception as e:
+        print(f"[get_refinish_assignments] ERROR for RO {ro}: {e}")
+        return {"assignments": [], "error": str(e)}
+
+
+# ============================================================
 # DEBUG ENDPOINTS
 # ============================================================
 
