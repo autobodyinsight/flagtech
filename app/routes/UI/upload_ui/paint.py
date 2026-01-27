@@ -13,7 +13,9 @@ def get_refinish_modal_html(second_ro_line, vehicle_info_line, total_paint):
     </div>
     <div style="margin-bottom: 15px;">
       <label style="font-weight: bold; font-size: 14px;">TECH:</label>
-      <input type="text" id="refinishTechInput" style="padding: 8px; font-size: 14px; margin-left: 10px; width: 200px; border: 1px solid #ccc; border-radius: 3px;" placeholder="Enter technician name" />
+      <select id="refinishTechInput" style="padding: 8px; font-size: 14px; margin-left: 10px; width: 220px; border: 1px solid #ccc; border-radius: 3px;">
+        <option value="">Select technician...</option>
+      </select>
     </div>
     <h2>Refinish Assignment</h2>
     <div id="paintList"></div>
@@ -174,6 +176,30 @@ def get_refinish_modal_script(paint_items_json, total_paint, second_ro_line, veh
     }}
     
     document.getElementById('paintList').innerHTML = html;
+    
+    // Populate tech dropdown
+    const techSelect = document.getElementById('refinishTechInput');
+    techSelect.innerHTML = '<option value="">Select technician...</option>';
+    
+    // Fetch techs list
+    if (typeof BACKEND_BASE === 'undefined') {{
+      var BACKEND_BASE = "https://flagtech1.onrender.com";
+    }}
+    
+    fetch(BACKEND_BASE + '/ui/techs/list')
+      .then(r => r.json())
+      .then(res => {{
+        if (res.techs && res.techs.length > 0) {{
+          res.techs.forEach(tech => {{
+            const option = document.createElement('option');
+            option.value = tech.first_name + ' ' + tech.last_name;
+            option.textContent = tech.first_name + ' ' + tech.last_name;
+            techSelect.appendChild(option);
+          }});
+        }}
+      }})
+      .catch(err => console.error('Error loading techs:', err));
+    
     modal.style.display = 'block';
   }}
   

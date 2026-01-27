@@ -197,12 +197,42 @@ def get_techs_screen_html():
 
                     const row = document.createElement('tr');
                     row.style.borderBottom = "1px solid #eee";
-                    row.innerHTML = `
-                        <td style="padding:12px; text-align:left;"><span onclick="openTechDetailsModal('${fullName}')" style="cursor:pointer; color:#0066cc; text-decoration:underline;">${fullName}</span></td>
-                        <td style="padding:12px; text-align:center;">$${tech.pay_rate.toFixed(2)}/hr</td>
-                        <td style="padding:12px; text-align:center;">${assignments.total_vehicles}</td>
-                        <td style="padding:12px; text-align:right;">${assignments.total_hours.toFixed(1)}</td>
-                    `;
+                    
+                    const techNameCell = document.createElement('td');
+                    techNameCell.style.padding = "12px";
+                    techNameCell.style.textAlign = "left";
+                    
+                    const techLink = document.createElement('span');
+                    techLink.textContent = fullName;
+                    techLink.style.cursor = "pointer";
+                    techLink.style.color = "#0066cc";
+                    techLink.style.textDecoration = "underline";
+                    techLink.onclick = function(e) {
+                        e.stopPropagation();
+                        openTechDetailsModal(fullName);
+                    };
+                    techNameCell.appendChild(techLink);
+                    
+                    const rateCell = document.createElement('td');
+                    rateCell.style.padding = "12px";
+                    rateCell.style.textAlign = "center";
+                    rateCell.textContent = `$${tech.pay_rate.toFixed(2)}/hr`;
+                    
+                    const rosCell = document.createElement('td');
+                    rosCell.style.padding = "12px";
+                    rosCell.style.textAlign = "center";
+                    rosCell.textContent = assignments.total_vehicles;
+                    
+                    const hoursCell = document.createElement('td');
+                    hoursCell.style.padding = "12px";
+                    hoursCell.style.textAlign = "right";
+                    hoursCell.textContent = assignments.total_hours.toFixed(1);
+                    
+                    row.appendChild(techNameCell);
+                    row.appendChild(rateCell);
+                    row.appendChild(rosCell);
+                    row.appendChild(hoursCell);
+                    
                     row.onmouseover = function() { this.style.backgroundColor = "#f5f5f5"; };
                     row.onmouseout = function() { this.style.backgroundColor = "transparent"; };
 
