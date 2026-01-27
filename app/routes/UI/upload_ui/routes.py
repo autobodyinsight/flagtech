@@ -543,10 +543,22 @@ async def get_tech_assignments():
             tech_summary[tech]["total_ros"].add(ro)
             tech_summary[tech]["total_hours"] += total_hrs
         
-        # Convert sets to counts
+        # Convert sets to counts and build ros list
         for tech in tech_summary:
             tech_summary[tech]["total_vehicles"] = len(tech_summary[tech]["total_ros"])
+            tech_summary[tech]["ros"] = []
             del tech_summary[tech]["total_ros"]
+        
+        # Add RO details to tech summary
+        for assignment in assignments:
+            tech = assignment["tech"]
+            if tech in tech_summary:
+                ro_data = {
+                    "ro": assignment["ro"],
+                    "vehicle_info": assignment["vehicle"],
+                    "total_hours": assignment["total_hours"]
+                }
+                tech_summary[tech]["ros"].append(ro_data)
         
         return {
             "assignments": assignments,
@@ -685,3 +697,79 @@ async def check_data():
         }
     except Exception as e:
         return {"error": str(e)}
+
+
+@router.get("/tech-repair-lines")
+async def get_tech_repair_lines(tech: str, ro: str):
+    """Get repair lines assigned to a specific tech for a specific RO."""
+    try:
+        cur = get_conn().cursor()
+        
+        lines = []
+        
+        # Get labor lines for this tech and RO
+        cur.execute("""
+            SELECT assigned, unassigned, additional
+            FROM labor_assignments
+            WHERE tech = %s AND ro = %s
+            LIMIT 1
+        """, (tech, ro))
+        
+        labor_result = cur.fetchone()
+        if labor_result:
+            import json
+            assigned = json.loads(labor_result[0]) if labor_result[0] else []
+            unassigned = json.loads(labor_result[1]) if labor_result[1] else []
+            additional = json.loads(labor_result[2]) if labor_result[2] else []
+            
+            # Add assigned labor lines
+            for item in assigned:
+                lines.append({
+                    "type": "labor",
+                    "description": item.get("description", "N/A"),
+                    "hours": float(item.get("value", 0))
+                })
+            
+            # Add additional labor hours
+            for item in additional:
+                lines.append({
+                    "type": "labor_additional",
+                    "description": item.get("description", "Additional"),
+                    "hours": float(item.get("value", 0))
+                })
+        
+        # Get refinish lines for this tech and RO
+        cur.execute("""
+            SELECT assigned, unassigned, additional
+            FROM refinish_assignments
+            WHERE tech = %s AND ro = %s
+            LIMIT 1
+        """, (tech, ro))
+        
+        refinish_result = cur.fetchone()
+        if refinish_result:
+            import json
+            assigned = json.loads(refinish_result[0]) if refinish_result[0] else []
+            unassigned = json.loads(refinish_result[1]) if refinish_result[1] else []
+            additional = json.loads(refinish_result[2]) if refinish_result[2] else []
+            
+            # Add assigned refinish lines
+            for item in assigned:
+                lines.append({
+                    "type": "refinish",
+                    "description": item.get("description", "N/A"),
+                    "hours": float(item.get("value", 0))
+                })
+            
+            # Add additional refinish hours
+            for item in additional:
+                lines.append({
+                    "type": "refinish_additional",
+                    "description": item.get("description", "Additional"),
+                    "hours": float(item.get("value", 0))
+                })
+        
+        return {"lines": lines}
+    except Exception as e:
+        print(f"[get_tech_repair_lines] ERROR: {e}")
+        return {"lines": [], "error": str(e)}
