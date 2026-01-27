@@ -144,69 +144,84 @@ async def save_refinish(request: Request):
 @router.post("/techs/add")
 async def add_tech(request: Request):
     data = await request.json()
-    cur = get_conn().cursor()
+    conn = get_conn()
+    cur = conn.cursor()
 
-    cur.execute("""
-        INSERT INTO techs (first_name, last_name, pay_rate)
-        VALUES (%s, %s, %s)
-        RETURNING id, first_name, last_name, pay_rate, active
-    """, (
-        data["first_name"],
-        data["last_name"],
-        data["pay_rate"]
-    ))
+    try:
+        cur.execute("""
+            INSERT INTO techs (first_name, last_name, pay_rate)
+            VALUES (%s, %s, %s)
+            RETURNING id, first_name, last_name, pay_rate, active
+        """, (
+            data["first_name"],
+            data["last_name"],
+            data["pay_rate"]
+        ))
 
-    row = cur.fetchone()
-    conn.commit()
+        row = cur.fetchone()
+        conn.commit()
 
-    return {
-        "tech": {
-            "id": row[0],
-            "first_name": row[1],
-            "last_name": row[2],
-            "pay_rate": float(row[3]),
-            "active": row[4]
+        return {
+            "tech": {
+                "id": row["id"],
+                "first_name": row["first_name"],
+                "last_name": row["last_name"],
+                "pay_rate": float(row["pay_rate"]),
+                "active": row["active"]
+            }
         }
-    }
+    finally:
+        cur.close()
 
 
 @router.get("/techs/list")
 async def list_techs():
-    cur = get_conn().cursor()
-    cur.execute("""
-        SELECT id, first_name, last_name, pay_rate, active
-        FROM techs
-        WHERE active = TRUE
-        ORDER BY last_name, first_name
-    """)
+    conn = get_conn()
+    cur = conn.cursor()
 
-    rows = cur.fetchall()
-    techs = [
-        {
-            "id": r[0],
-            "first_name": r[1],
-            "last_name": r[2],
-            "pay_rate": float(r[3]),
-            "active": r[4]
-        }
-        for r in rows
-    ]
+    try:
+        cur.execute("""
+            SELECT id, first_name, last_name, pay_rate, active
+            FROM techs
+            WHERE active = TRUE
+            ORDER BY last_name, first_name
+        """)
 
-    return {"techs": techs}
+        rows = cur.fetchall()
+        techs = [
+            {
+                "id": r["id"],
+                "first_name": r["first_name"],
+                "last_name": r["last_name"],
+                "pay_rate": float(r["pay_rate"]),
+                "active": r["active"]
+            }
+            for r in rows
+        ]
+
+        return {"techs": techs}
+    finally:
+        cur.close()
 
 
 @router.delete("/techs/{tech_id}")
 async def delete_tech(tech_id: int):
-    cur = get_conn().cursor()
-    cur.execute("UPDATE techs SET active = FALSE WHERE id = %s", (tech_id,))
-    conn.commit()
-    return {"status": "deleted", "tech_id": tech_id}
+    conn = get_conn()
+    cur = conn.cursor()
+
+    try:
+        cur.execute("UPDATE techs SET active = FALSE WHERE id = %s", (tech_id,))
+        conn.commit()
+        return {"status": "deleted", "tech_id": tech_id}
+    finally:
+        cur.close()
 
 @router.get("/techs/summary")
 async def tech_summary():
-    try:
-        cur = get_conn().cursor()
+    conn = get_conn()
+    cur = conn.cursor()
 
+    try:
         # Labor hours
         cur.execute("""
             SELECT tech,
@@ -233,9 +248,9 @@ async def tech_summary():
 
         # Combine labor
         for row in labor_rows:
-            tech = row[0]
-            ro_count = row[1]
-            hours = row[2]
+            tech = row["tech"]
+            ro_count = row["ro_count"]
+            hours = row["total_hours"]
             if tech not in summary:
                 summary[tech] = {"tech": tech, "ro_count": 0, "hours": 0.0}
             summary[tech]["ro_count"] += ro_count
@@ -243,9 +258,9 @@ async def tech_summary():
 
         # Combine paint
         for row in paint_rows:
-            tech = row[0]
-            ro_count = row[1]
-            hours = row[2]
+            tech = row["tech"]
+            ro_count = row["ro_count"]
+            hours = row["total_hours"]
             if tech not in summary:
                 summary[tech] = {"tech": tech, "ro_count": 0, "hours": 0.0}
             summary[tech]["ro_count"] += ro_count
@@ -256,6 +271,8 @@ async def tech_summary():
     except Exception as e:
         print(f"[tech_summary] ERROR: {e}")
         return {"summary": [], "error": str(e)}
+    finally:
+        cur.close()
 
 @router.get("/techs/{tech}/ros")
 async def tech_ro_list(tech: str):
@@ -477,9 +494,10 @@ async def ro_details(ro: str):
 @router.get("/tech-assignments")
 async def get_tech_assignments():
     """Get all tech-RO assignments with aggregated data for the tech window."""
+    conn = get_conn()
+    cur = conn.cursor()
+
     try:
-        cur = get_conn().cursor()
-        
         # Get all tech-RO combinations from both labor and refinish
         cur.execute("""
             SELECT 
@@ -520,11 +538,11 @@ async def get_tech_assignments():
         tech_summary = {}
         
         for row in rows:
-            tech = row[0]
-            ro = row[1]
-            vehicle = row[2]
-            labor_hrs = float(row[3] or 0)
-            refinish_hrs = float(row[4] or 0)
+            tech = row["tech"]
+            ro = row["ro"]
+            vehicle = row["vehicle"]
+            labor_hrs = float(row["total_labor"] or 0)
+            refinish_hrs = float(row["total_refinish"] or 0)
             total_hrs = labor_hrs + refinish_hrs
             
             # Add to assignments list
@@ -560,6 +578,8 @@ async def get_tech_assignments():
     except Exception as e:
         print(f"[get_tech_assignments] ERROR: {e}")
         return {"assignments": [], "tech_summary": [], "error": str(e)}
+    finally:
+        cur.close()
 
 
 @router.get("/labor-assignments/{ro}")
