@@ -297,7 +297,7 @@
             }
             
             // Save to backend
-            fetch(`${API_BASE}/ui/techs/add`, {
+            fetch(`${API_BASE}/api/techs/add`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -323,8 +323,8 @@
             
             // Fetch techs and their assignments
             Promise.all([
-                fetch(`${API_BASE}/ui/techs/list`).then(r => r.json()),
-                fetch(`${API_BASE}/ui/tech-assignments`).then(r => r.json())
+                fetch(`${API_BASE}/api/techs/list`).then(r => r.json()),
+                fetch(`${API_BASE}/api/tech-assignments`).then(r => r.json())
             ])
             .then(([techsData, assignmentsData]) => {
                 container.innerHTML = '';
