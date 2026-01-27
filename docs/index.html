@@ -1,4 +1,4 @@
-<html><head>
+<<html><head>
     <title>FlagTech</title>
     <style>
         * {
@@ -57,6 +57,119 @@
         .screen.active {
             display: block;
         }
+        
+        /* Modal Styles */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.5);
+        }
+        .modal-content {
+            background-color: white;
+            margin: 10% auto;
+            padding: 30px;
+            border-radius: 8px;
+            width: 90%;
+            max-width: 500px;
+            position: relative;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+        }
+        .close {
+            position: absolute;
+            right: 15px;
+            top: 10px;
+            font-size: 28px;
+            font-weight: bold;
+            color: #aaa;
+            cursor: pointer;
+        }
+        .close:hover {
+            color: #000;
+        }
+        
+        /* Tech Window Styles */
+        .tech-header {
+            text-align: center;
+            font-size: 32px;
+            font-weight: bold;
+            margin-bottom: 30px;
+        }
+        .add-tech-btn-container {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .add-tech-btn {
+            padding: 12px 24px;
+            font-size: 16px;
+            cursor: pointer;
+            background-color: #505050;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            transition: background-color 0.3s;
+        }
+        .add-tech-btn:hover {
+            background-color: #707070;
+        }
+        .tech-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px;
+            border-bottom: 1px solid #ddd;
+            font-size: 14px;
+        }
+        .tech-row:hover {
+            background-color: #f9f9f9;
+        }
+        .tech-name {
+            flex: 1;
+            text-align: left;
+            font-weight: bold;
+        }
+        .tech-ros {
+            flex: 1;
+            text-align: center;
+        }
+        .tech-hours {
+            flex: 1;
+            text-align: right;
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        .form-group input {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+            box-sizing: border-box;
+        }
+        .btn-primary {
+            width: 100%;
+            padding: 12px;
+            background-color: #505050;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            margin-top: 10px;
+        }
+        .btn-primary:hover {
+            background-color: #707070;
+        }
     </style>
 </head>
 <body>
@@ -78,9 +191,16 @@
         </div>
     
         
+        <!-- TECH WINDOW -->
         <div id="tech" class="screen">
-            <div id="techContent">
-                <p style="text-align:center; color:#777;">Loading techs...</p>
+            <h1 class="tech-header">TECHS</h1>
+            
+            <div class="add-tech-btn-container">
+                <button class="add-tech-btn" onclick="openAddTechModal()">+ tech</button>
+            </div>
+            
+            <div id="techsList">
+                <!-- Tech rows will be dynamically loaded here -->
             </div>
         </div>
     
@@ -98,9 +218,35 @@
     
     </div>
     
+    <!-- Add Tech Modal -->
+    <div id="addTechModal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeAddTechModal()">&times;</span>
+            <h2>Add Technician</h2>
+            
+            <div class="form-group">
+                <label for="techFirst">First:</label>
+                <input type="text" id="techFirst" placeholder="Enter first name">
+            </div>
+            
+            <div class="form-group">
+                <label for="techLast">Last:</label>
+                <input type="text" id="techLast" placeholder="Enter last name">
+            </div>
+            
+            <div class="form-group">
+                <label for="techRate">Rate:</label>
+                <input type="number" id="techRate" step="0.01" placeholder="Enter hourly rate">
+            </div>
+            
+            <button class="btn-primary" onclick="saveTech()">Save</button>
+        </div>
+    </div>
+    
     <script>
 
-        /* ⭐ NEW: Global array to store the displayed grid rows */
+        const API_BASE = 'https://flagtech1.onrender.com';
+
         let displayedRows = [];
 
         /* ⭐ NEW: Called by backend-generated script for each row */
@@ -118,13 +264,120 @@
             document.getElementById(screenName).classList.add('active');
             event.target.classList.add('active');
             
-            // Load dynamic content for certain screens
+            // Load tech data when switching to tech screen
             if (screenName === 'tech') {
-                loadTechScreen();
+                loadTechs();
             }
         }
         
+        // ============================================
+        // TECH WINDOW FUNCTIONS
+        // ============================================
         
+        function openAddTechModal() {
+            document.getElementById('addTechModal').style.display = 'block';
+            // Clear form
+            document.getElementById('techFirst').value = '';
+            document.getElementById('techLast').value = '';
+            document.getElementById('techRate').value = '';
+        }
+        
+        function closeAddTechModal() {
+            document.getElementById('addTechModal').style.display = 'none';
+        }
+        
+        function saveTech() {
+            const firstName = document.getElementById('techFirst').value.trim();
+            const lastName = document.getElementById('techLast').value.trim();
+            const rate = parseFloat(document.getElementById('techRate').value);
+            
+            if (!firstName || !lastName || !rate) {
+                alert('Please fill in all fields');
+                return;
+            }
+            
+            // Save to backend
+            fetch(`${API_BASE}/ui/techs/add`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    first_name: firstName,
+                    last_name: lastName,
+                    pay_rate: rate
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                closeAddTechModal();
+                loadTechs(); // Reload the list
+            })
+            .catch(error => {
+                console.error('Error saving tech:', error);
+                alert('Error saving tech. Please try again.');
+            });
+        }
+        
+        function loadTechs() {
+            const container = document.getElementById('techsList');
+            container.innerHTML = '<p style="text-align:center; color:#777;">Loading...</p>';
+            
+            // Fetch techs and their assignments
+            Promise.all([
+                fetch(`${API_BASE}/ui/techs/list`).then(r => r.json()),
+                fetch(`${API_BASE}/ui/tech-assignments`).then(r => r.json())
+            ])
+            .then(([techsData, assignmentsData]) => {
+                container.innerHTML = '';
+                
+                if (!techsData.techs || techsData.techs.length === 0) {
+                    container.innerHTML = '<p style="text-align:center; color:#777;">No techs added yet.</p>';
+                    return;
+                }
+                
+                // Create a map of assignments by tech name
+                const assignmentsMap = {};
+                if (assignmentsData.tech_summary) {
+                    assignmentsData.tech_summary.forEach(summary => {
+                        assignmentsMap[summary.tech] = {
+                            total_vehicles: summary.total_vehicles || 0,
+                            total_hours: summary.total_hours || 0
+                        };
+                    });
+                }
+                
+                // Render each tech
+                techsData.techs.forEach(tech => {
+                    const fullName = `${tech.first_name} ${tech.last_name}`;
+                    const assignments = assignmentsMap[fullName] || { total_vehicles: 0, total_hours: 0 };
+                    
+                    const row = document.createElement('div');
+                    row.className = 'tech-row';
+                    row.innerHTML = `
+                        <div class="tech-name">${fullName}</div>
+                        <div class="tech-ros">Total RO's: ${assignments.total_vehicles}</div>
+                        <div class="tech-hours">Total Hours: ${assignments.total_hours.toFixed(1)}</div>
+                    `;
+                    container.appendChild(row);
+                });
+            })
+            .catch(error => {
+                console.error('Error loading techs:', error);
+                container.innerHTML = '<p style="text-align:center; color:red;">Error loading techs.</p>';
+            });
+        }
+        
+        // Close modal when clicking outside
+        window.onclick = function(event) {
+            const modal = document.getElementById('addTechModal');
+            if (event.target === modal) {
+                closeAddTechModal();
+            }
+        }
+        
+        // ============================================
+        // UPLOAD WINDOW FUNCTIONS
+        // ============================================
+
         function handleFileUpload() {
             const fileInput = document.getElementById('fileInput');
             const file = fileInput.files[0];
@@ -155,27 +408,6 @@
             .catch(error => {
                 statusDiv.innerHTML = '<p>Error: ' + error.message + '</p>';
             });
-        }
-        
-        function loadTechScreen() {
-            const techContent = document.getElementById('techContent');
-            
-            fetch('https://flagtech1.onrender.com/ui/tech-screen')
-                .then(response => response.text())
-                .then(html => {
-                    techContent.innerHTML = html;
-                    
-                    // Execute any scripts in the loaded content
-                    const scripts = techContent.querySelectorAll('script');
-                    scripts.forEach(oldScript => {
-                        const newScript = document.createElement('script');
-                        newScript.innerHTML = oldScript.innerHTML;
-                        document.body.appendChild(newScript);
-                    });
-                })
-                .catch(error => {
-                    techContent.innerHTML = '<p style="color:red; text-align:center;">Error loading techs: ' + error.message + '</p>';
-                });
         }
     
     </script>
