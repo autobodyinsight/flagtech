@@ -181,26 +181,34 @@ def get_refinish_modal_script(paint_items_json, total_paint, second_ro_line, veh
     const techSelect = document.getElementById('refinishTechInput');
     techSelect.innerHTML = '<option value="">Select technician...</option>';
     
-    // Fetch techs list (fallback to window location if BACKEND_BASE missing)
+    // Fetch techs list (try relative first, fallback to BACKEND_BASE/window origin)
     const baseUrl = (typeof BACKEND_BASE !== 'undefined' && BACKEND_BASE) ? BACKEND_BASE : window.location.origin;
-    
-    fetch(baseUrl + '/ui/techs/list')
-      .then(r => r.json())
-      .then(res => {{
-        if (res.techs && res.techs.length > 0) {{
-          res.techs.forEach(tech => {{
+
+    const loadTechOptions = (url) => {
+      return fetch(url)
+        .then(r => {
+          if (!r.ok) throw new Error('HTTP ' + r.status);
+          return r.json();
+        })
+        .then(res => {{
+          if (res.techs && res.techs.length > 0) {{
+            res.techs.forEach(tech => {{
+              const option = document.createElement('option');
+              option.value = tech.first_name + ' ' + tech.last_name;
+              option.textContent = tech.first_name + ' ' + tech.last_name;
+              techSelect.appendChild(option);
+            }});
+          }} else {{
             const option = document.createElement('option');
-            option.value = tech.first_name + ' ' + tech.last_name;
-            option.textContent = tech.first_name + ' ' + tech.last_name;
+            option.value = '';
+            option.textContent = 'No technicians available';
             techSelect.appendChild(option);
-          }});
-        }} else {{
-          const option = document.createElement('option');
-          option.value = '';
-          option.textContent = 'No technicians available';
-          techSelect.appendChild(option);
-        }}
-      }})
+          }}
+        }});
+    };
+
+    loadTechOptions('/ui/techs/list')
+      .catch(() => loadTechOptions(baseUrl + '/ui/techs/list'))
       .catch(err => {{
         console.error('Error loading techs:', err);
         const option = document.createElement('option');
