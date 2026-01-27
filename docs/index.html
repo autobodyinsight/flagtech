@@ -138,7 +138,7 @@
         }
         .tech-hours {
             flex: 1;
-            text-align: right;
+            text-align: center;
         }
         .form-group {
             margin-bottom: 20px;
@@ -349,7 +349,7 @@
                     techRow.innerHTML = `
                         <div class="tech-name">${fullName}</div>
                         <div class="tech-ros">$${tech.pay_rate.toFixed(2)}/hr</div>
-                        <div class="tech-hours">${totalROs} RO's</div>
+                        <div class="tech-ros">${totalROs} RO's</div>
                         <div class="tech-hours">${totalHours.toFixed(1)} hrs</div>
                     `;
                     container.appendChild(techRow);
