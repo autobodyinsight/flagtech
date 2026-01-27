@@ -321,49 +321,33 @@
             const container = document.getElementById('techsList');
             container.innerHTML = '<p style="text-align:center; color:#777;">Loading...</p>';
             
-            // Fetch techs and their assignments
-            Promise.all([
-                fetch(`${API_BASE}/api/techs/list`).then(r => r.json()),
-                fetch(`${API_BASE}/api/tech-assignments`).then(r => r.json())
-            ])
-            .then(([techsData, assignmentsData]) => {
-                container.innerHTML = '';
-                
-                if (!techsData.techs || techsData.techs.length === 0) {
-                    container.innerHTML = '<p style="text-align:center; color:#777;">No techs added yet.</p>';
-                    return;
-                }
-                
-                // Create a map of assignments by tech name
-                const assignmentsMap = {};
-                if (assignmentsData.tech_summary) {
-                    assignmentsData.tech_summary.forEach(summary => {
-                        assignmentsMap[summary.tech] = {
-                            total_vehicles: summary.total_vehicles || 0,
-                            total_hours: summary.total_hours || 0
-                        };
-                    });
-                }
-                
-                // Render each tech
-                techsData.techs.forEach(tech => {
-                    const fullName = `${tech.first_name} ${tech.last_name}`;
-                    const assignments = assignmentsMap[fullName] || { total_vehicles: 0, total_hours: 0 };
+            // Fetch techs list only
+            fetch(`${API_BASE}/api/techs/list`)
+                .then(r => r.json())
+                .then(techsData => {
+                    container.innerHTML = '';
                     
-                    const row = document.createElement('div');
-                    row.className = 'tech-row';
-                    row.innerHTML = `
-                        <div class="tech-name">${fullName}</div>
-                        <div class="tech-ros">Total RO's: ${assignments.total_vehicles}</div>
-                        <div class="tech-hours">Total Hours: ${assignments.total_hours.toFixed(1)}</div>
-                    `;
-                    container.appendChild(row);
+                    if (!techsData.techs || techsData.techs.length === 0) {
+                        container.innerHTML = '<p style="text-align:center; color:#777;">No techs added yet.</p>';
+                        return;
+                    }
+                    
+                    // Render each tech
+                    techsData.techs.forEach(tech => {
+                        const row = document.createElement('div');
+                        row.className = 'tech-row';
+                        row.innerHTML = `
+                            <div class="tech-name">${tech.first_name} ${tech.last_name}</div>
+                            <div class="tech-ros">Rate: $${tech.pay_rate.toFixed(2)}/hr</div>
+                            <div class="tech-hours"></div>
+                        `;
+                        container.appendChild(row);
+                    });
+                })
+                .catch(error => {
+                    console.error('Error loading techs:', error);
+                    container.innerHTML = '<p style="text-align:center; color:red;">Error loading techs.</p>';
                 });
-            })
-            .catch(error => {
-                console.error('Error loading techs:', error);
-                container.innerHTML = '<p style="text-align:center; color:red;">Error loading techs.</p>';
-            });
         }
         
         // Close modal when clicking outside
