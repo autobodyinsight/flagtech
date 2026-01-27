@@ -31,29 +31,31 @@ async def add_tech(request: Request):
     conn = get_conn()
     cur = conn.cursor()
 
-    cur.execute("""
-        INSERT INTO techs (first_name, last_name, pay_rate)
-        VALUES (%s, %s, %s)
-        RETURNING id, first_name, last_name, pay_rate, active
-    """, (
-        data["first_name"],
-        data["last_name"],
-        data["pay_rate"]
-    ))
+    try:
+        cur.execute("""
+            INSERT INTO techs (first_name, last_name, pay_rate)
+            VALUES (%s, %s, %s)
+            RETURNING id, first_name, last_name, pay_rate, active
+        """, (
+            data["first_name"],
+            data["last_name"],
+            data["pay_rate"]
+        ))
 
-    row = cur.fetchone()
-    conn.commit()
-    cur.close()
+        row = cur.fetchone()
+        conn.commit()
 
-    return {
-        "tech": {
-            "id": row[0],
-            "first_name": row[1],
-            "last_name": row[2],
-            "pay_rate": float(row[3]),
-            "active": row[4]
+        return {
+            "tech": {
+                "id": row[0],
+                "first_name": row[1],
+                "last_name": row[2],
+                "pay_rate": float(row[3]),
+                "active": row[4]
+            }
         }
-    }
+    finally:
+        cur.close()
 
 
 @router.get("/techs/list")
@@ -88,56 +90,73 @@ async def list_techs():
 @router.get("/tech-assignments")
 async def tech_assignments():
     """Get summary of tech assignments (total ROs and hours)."""
-    conn = get_conn()
-    cur = conn.cursor()
-    
-    # Get labor assignments summary
-    cur.execute("""
-        SELECT 
-            tech,
-            COUNT(DISTINCT ro) as total_vehicles,
-            SUM(CAST(value AS NUMERIC)) as total_hours
-        FROM labor_assignments
-        WHERE tech IS NOT NULL AND tech != ''
-        GROUP BY tech
-    """)
-    
-    labor_rows = cur.fetchall()
-    
-    # Get refinish assignments summary
-    cur.execute("""
-        SELECT 
-            tech,
-            COUNT(DISTINCT ro) as total_vehicles,
-            SUM(CAST(value AS NUMERIC)) as total_hours
-        FROM refinish_assignments
-        WHERE tech IS NOT NULL AND tech != ''
-        GROUP BY tech
-    """)
-    
-    refinish_rows = cur.fetchall()
-    cur.close()
-    
-    # Combine results
-    tech_summary_map = {}
-    
-    for row in labor_rows:
-        tech = row[0]
-        if tech not in tech_summary_map:
-            tech_summary_map[tech] = {"tech": tech, "total_vehicles": 0, "total_hours": 0.0}
-        tech_summary_map[tech]["total_vehicles"] += int(row[1])
-        tech_summary_map[tech]["total_hours"] += float(row[2] or 0)
-    
-    for row in refinish_rows:
-        tech = row[0]
-        if tech not in tech_summary_map:
-            tech_summary_map[tech] = {"tech": tech, "total_vehicles": 0, "total_hours": 0.0}
-        tech_summary_map[tech]["total_vehicles"] += int(row[1])
-        tech_summary_map[tech]["total_hours"] += float(row[2] or 0)
-    
-    tech_summary = list(tech_summary_map.values())
-    
-    return {
-        "tech_summary": tech_summary,
-        "error": "0"
-    }
+    try:
+        conn = get_conn()
+        cur = conn.cursor()
+        
+        # Get all tech-RO combinations from both labor and refinish
+        cur.execute("""
+            SELECT 
+                tech,
+                ro,
+                vehicle,
+                SUM(labor_hours) AS total_labor,
+                SUM(refinish_hours) AS total_refinish
+            FROM (
+                SELECT 
+                    tech,
+                    ro,
+                    vehicle,
+                    total_labor AS labor_hours,
+                    0 AS refinish_hours
+                FROM labor_assignments
+                WHERE tech IS NOT NULL AND tech <> ''
+                
+                UNION ALL
+                
+                SELECT 
+                    tech,
+                    ro,
+                    vehicle,
+                    0 AS labor_hours,
+                    total_paint AS refinish_hours
+                FROM refinish_assignments
+                WHERE tech IS NOT NULL AND tech <> ''
+            ) AS combined
+            GROUP BY tech, ro, vehicle
+            ORDER BY tech, ro
+        """)
+        
+        rows = cur.fetchall()
+        cur.close()
+        
+        # Build the response
+        tech_summary_map = {}
+        
+        for row in rows:
+            tech = row[0]
+            labor_hrs = float(row[3] or 0)
+            refinish_hrs = float(row[4] or 0)
+            total_hrs = labor_hrs + refinish_hrs
+            
+            if tech not in tech_summary_map:
+                tech_summary_map[tech] = {
+                    "tech": tech,
+                    "total_vehicles": 0,
+                    "total_hours": 0.0
+                }
+            
+            tech_summary_map[tech]["total_vehicles"] += 1
+            tech_summary_map[tech]["total_hours"] += total_hrs
+        
+        tech_summary = list(tech_summary_map.values())
+        
+        return {
+            "tech_summary": tech_summary,
+            "error": "0"
+        }
+    except Exception as e:
+        return {
+            "tech_summary": [],
+            "error": str(e)
+        }
