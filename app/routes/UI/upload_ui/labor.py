@@ -335,6 +335,9 @@ function saveModal() {{
     console.log("Labor saved:", res);
     closeLaborModal();
   }})
-  .catch(err => console.error("Save labor error:", err));
+  .catch(err => {{
+    console.error("Save labor error:", err);
+    closeLaborModal();
+  }});
 }}
 """

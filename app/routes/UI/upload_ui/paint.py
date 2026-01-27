@@ -303,7 +303,10 @@ def get_refinish_modal_script(paint_items_json, total_paint, second_ro_line, veh
     console.log("Refinish saved:", res);
     closeRefinishModal();
   }})
-  .catch(err => console.error("Save refinish error:", err));
+  .catch(err => {{
+    console.error("Save refinish error:", err);
+    closeRefinishModal();
+  }});
 }}
 """
 
