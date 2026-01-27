@@ -26,6 +26,7 @@ def get_techs_screen_html():
                 <thead>
                     <tr style="background-color:#f5f5f5; border-bottom:2px solid #ddd;">
                         <th style="padding:12px; text-align:left; font-weight:bold;">Tech Name</th>
+                        <th style="padding:12px; text-align:center; font-weight:bold;">Pay Rate</th>
                         <th style="padding:12px; text-align:center; font-weight:bold;">Total RO's</th>
                         <th style="padding:12px; text-align:right; font-weight:bold;">Total Hours</th>
                     </tr>
@@ -179,6 +180,7 @@ def get_techs_screen_html():
                     row.style.borderBottom = "1px solid #eee";
                     row.innerHTML = `
                         <td style="padding:12px; text-align:left;">${fullName}</td>
+                        <td style="padding:12px; text-align:center;">$${tech.pay_rate.toFixed(2)}/hr</td>
                         <td style="padding:12px; text-align:center;">${assignments.total_vehicles}</td>
                         <td style="padding:12px; text-align:right;">${assignments.total_hours.toFixed(1)}</td>
                     `;
