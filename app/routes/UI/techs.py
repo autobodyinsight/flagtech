@@ -22,18 +22,17 @@ def get_techs_screen_html():
         <!-- Techs Details Table -->
         <div style="margin-top:40px;">
             <h2 style="margin-bottom:20px;">Assignments</h2>
-            <table style="width:100%; border-collapse:collapse;">
-                <thead>
-                    <tr style="background-color:#f5f5f5; border-bottom:2px solid #ddd;">
-                        <th style="padding:12px; text-align:left; font-weight:bold;">Tech Name</th>
-                        <th style="padding:12px; text-align:center; font-weight:bold;">Pay Rate</th>
-                        <th style="padding:12px; text-align:center; font-weight:bold;">Total RO's</th>
-                        <th style="padding:12px; text-align:right; font-weight:bold;">Total Hours</th>
-                    </tr>
-                </thead>
-                <tbody id="techsListContainer">
-                </tbody>
-            </table>
+            <div id="techsTableContainer" style="width:100%; border:1px solid #ddd; border-radius:4px; overflow:hidden;">
+                <!-- Header -->
+                <div style="display:flex; justify-content:space-between; align-items:center; padding:12px; background-color:#f5f5f5; border-bottom:2px solid #ddd; font-weight:bold; position:sticky; top:0;">
+                    <div style="flex:1; text-align:left;">Tech Name</div>
+                    <div style="flex:1; text-align:center;">Pay Rate</div>
+                    <div style="flex:1; text-align:center;">Total RO's</div>
+                    <div style="flex:1; text-align:right;">Total Hours</div>
+                </div>
+                <!-- Tech rows will be inserted here -->
+                <div id="techsListContainer"></div>
+            </div>
         </div>
 
         <!-- Tech Details Modal -->
@@ -132,6 +131,139 @@ def get_techs_screen_html():
         }
 
         // -----------------------------
+        // Toggle Tech Details Inline
+        // -----------------------------
+        function toggleTechDetails(techName) {
+            const detailsId = `tech-details-${techName.replace(/\s+/g, '-')}`;
+            const detailsSection = document.getElementById(detailsId);
+            
+            if (detailsSection.style.display === 'none') {
+                // Load RO details when expanding
+                loadTechDetailsInline(techName);
+                detailsSection.style.display = 'block';
+            } else {
+                detailsSection.style.display = 'none';
+                // Clear repair lines when collapsing
+                const repairSection = document.getElementById(`repair-section-${techName.replace(/\s+/g, '-')}`);
+                if (repairSection) {
+                    repairSection.style.display = 'none';
+                }
+            }
+        }
+
+        function loadTechDetailsInline(techName) {
+            const rosList = document.getElementById(`ros-list-${techName.replace(/\s+/g, '-')}`);
+            
+            if (rosList.innerHTML) return; // Already loaded
+
+            // Use global variable that was set during loadTechsList
+            if (window.techAssignmentsData && window.techAssignmentsData.tech_summary) {
+                const res = window.techAssignmentsData;
+                rosList.innerHTML = '';
+
+                // Find the tech's assignments
+                const techData = res.tech_summary.find(t => t.tech === techName);
+                if (!techData || !techData.ros || techData.ros.length === 0) {
+                    rosList.innerHTML = "<p style='text-align:center; color:#777;'>No RO assignments found for this technician.</p>";
+                    return;
+                }
+
+                // Display each RO
+                techData.ros.forEach(ro => {
+                    const roDiv = document.createElement('div');
+                    roDiv.style.cssText = 'display:flex; justify-content:space-between; align-items:center; padding:12px; border-bottom:1px solid #eee; cursor:pointer;';
+                    roDiv.onmouseover = function() { this.style.backgroundColor = '#f0f0f0'; };
+                    roDiv.onmouseout = function() { this.style.backgroundColor = 'transparent'; };
+                    
+                    const roCell = document.createElement('div');
+                    roCell.style.flex = "1";
+                    roCell.style.textAlign = "left";
+                    roCell.style.color = "#0066cc";
+                    roCell.style.fontWeight = "bold";
+                    roCell.style.cursor = "pointer";
+                    roCell.textContent = ro.ro;
+                    roCell.addEventListener('click', function(e) {
+                        e.stopPropagation();
+                        loadRepairLinesInline(techName, ro.ro);
+                    });
+                    
+                    const vehicleCell = document.createElement('div');
+                    vehicleCell.style.flex = "2";
+                    vehicleCell.style.textAlign = "center";
+                    vehicleCell.textContent = ro.vehicle_info;
+                    
+                    const hoursCell = document.createElement('div');
+                    hoursCell.style.flex = "1";
+                    hoursCell.style.textAlign = "right";
+                    hoursCell.textContent = ro.total_hours.toFixed(1) + ' hrs';
+                    
+                    roDiv.appendChild(roCell);
+                    roDiv.appendChild(vehicleCell);
+                    roDiv.appendChild(hoursCell);
+                    
+                    rosList.appendChild(roDiv);
+                });
+            }
+        }
+
+        function loadRepairLinesInline(techName, roNumber) {
+            const repairSection = document.getElementById(`repair-section-${techName.replace(/\s+/g, '-')}`);
+            repairSection.innerHTML = '';
+            
+            const roHeader = document.createElement('div');
+            roHeader.style.cssText = 'font-size:14px; font-weight:bold; margin-bottom:10px;';
+            roHeader.textContent = `RO ${roNumber} - Repair Lines`;
+            repairSection.appendChild(roHeader);
+
+            fetch(`${BACKEND_BASE}/ui/tech-repair-lines?tech=${encodeURIComponent(techName)}&ro=${encodeURIComponent(roNumber)}`)
+                .then(res => res.json())
+                .then(data => {
+                    if (data.lines && data.lines.length > 0) {
+                        const linesDiv = document.createElement('div');
+                        linesDiv.style.marginLeft = "20px";
+                        
+                        data.lines.forEach(line => {
+                            const lineItem = document.createElement('div');
+                            lineItem.style.cssText = 'display:flex; justify-content:space-between; align-items:center; padding:10px; border-left:3px solid #0066cc; background-color:#f9f9f9; margin-bottom:8px;';
+                            
+                            const typeCell = document.createElement('span');
+                            typeCell.textContent = line.type;
+                            typeCell.style.fontWeight = "bold";
+                            typeCell.style.marginRight = "20px";
+                            
+                            const descCell = document.createElement('span');
+                            descCell.textContent = line.description;
+                            descCell.style.flex = "1";
+                            
+                            const hoursCell = document.createElement('span');
+                            hoursCell.textContent = line.hours.toFixed(1) + ' hrs';
+                            hoursCell.style.marginLeft = "20px";
+                            
+                            lineItem.appendChild(typeCell);
+                            lineItem.appendChild(descCell);
+                            lineItem.appendChild(hoursCell);
+                            linesDiv.appendChild(lineItem);
+                        });
+                        
+                        repairSection.appendChild(linesDiv);
+                    } else {
+                        const noLines = document.createElement('div');
+                        noLines.textContent = 'No repair lines found for this RO';
+                        noLines.style.color = '#999';
+                        repairSection.appendChild(noLines);
+                    }
+                })
+                .catch(err => {
+                    console.error('Error loading repair lines:', err);
+                    const error = document.createElement('div');
+                    error.textContent = 'Error loading repair lines';
+                    error.style.color = 'red';
+                    repairSection.appendChild(error);
+                });
+            
+            repairSection.style.display = 'block';
+        }
+
         // Load and Display Techs
         // -----------------------------
         function loadTechsList() {
@@ -148,6 +280,9 @@ def get_techs_screen_html():
             .then(([techsRes, assignmentsRes]) => {
                 cardsContainer.innerHTML = "";
                 tableContainer.innerHTML = "";
+
+                // Cache assignments data for inline use
+                window.techAssignmentsData = assignmentsRes;
 
                 if (!techsRes.techs || techsRes.techs.length === 0) {
                     cardsContainer.innerHTML = "<p style='color:#777; text-align:center; grid-column:1/-1;'>No techs added yet.</p>";
@@ -195,11 +330,13 @@ def get_techs_screen_html():
                     const fullName = `${tech.first_name} ${tech.last_name}`;
                     const assignments = assignmentsMap[fullName] || { total_vehicles: 0, total_hours: 0 };
 
-                    const row = document.createElement('tr');
-                    row.style.borderBottom = "1px solid #eee";
+                    // Main tech row
+                    const row = document.createElement('div');
+                    row.style.cssText = 'display:flex; justify-content:space-between; align-items:center; padding:12px; border-bottom:1px solid #eee;';
+                    row.className = 'tech-row';
                     
-                    const techNameCell = document.createElement('td');
-                    techNameCell.style.padding = "12px";
+                    const techNameCell = document.createElement('div');
+                    techNameCell.style.flex = "1";
                     techNameCell.style.textAlign = "left";
                     
                     const techLink = document.createElement('span');
@@ -207,24 +344,25 @@ def get_techs_screen_html():
                     techLink.style.cursor = "pointer";
                     techLink.style.color = "#0066cc";
                     techLink.style.textDecoration = "underline";
+                    techLink.style.fontWeight = "bold";
                     techLink.onclick = function(e) {
                         e.stopPropagation();
-                        openTechDetailsModal(fullName);
+                        toggleTechDetails(fullName);
                     };
                     techNameCell.appendChild(techLink);
                     
-                    const rateCell = document.createElement('td');
-                    rateCell.style.padding = "12px";
+                    const rateCell = document.createElement('div');
+                    rateCell.style.flex = "1";
                     rateCell.style.textAlign = "center";
                     rateCell.textContent = `$${tech.pay_rate.toFixed(2)}/hr`;
                     
-                    const rosCell = document.createElement('td');
-                    rosCell.style.padding = "12px";
+                    const rosCell = document.createElement('div');
+                    rosCell.style.flex = "1";
                     rosCell.style.textAlign = "center";
                     rosCell.textContent = assignments.total_vehicles;
                     
-                    const hoursCell = document.createElement('td');
-                    hoursCell.style.padding = "12px";
+                    const hoursCell = document.createElement('div');
+                    hoursCell.style.flex = "1";
                     hoursCell.style.textAlign = "right";
                     hoursCell.textContent = assignments.total_hours.toFixed(1);
                     
@@ -237,6 +375,32 @@ def get_techs_screen_html():
                     row.onmouseout = function() { this.style.backgroundColor = "transparent"; };
 
                     tableContainer.appendChild(row);
+
+                    // Details section (hidden by default)
+                    const detailsSection = document.createElement('div');
+                    detailsSection.id = `tech-details-${fullName.replace(/\s+/g, '-')}`;
+                    detailsSection.style.cssText = 'display:none; padding:20px; background-color:#f9f9f9; border-bottom:1px solid #eee;';
+                    
+                    const rosHeader = document.createElement('div');
+                    rosHeader.style.cssText = 'display:flex; justify-content:space-between; align-items:center; padding:12px; background-color:#f5f5f5; border-bottom:1px solid #ddd; font-weight:bold; margin-bottom:10px;';
+                    rosHeader.innerHTML = `
+                        <div style="flex:1; text-align:left;">RO Number</div>
+                        <div style="flex:2; text-align:center;">Vehicle Info</div>
+                        <div style="flex:1; text-align:right;">Total Hours</div>
+                    `;
+                    detailsSection.appendChild(rosHeader);
+
+                    const rosListDiv = document.createElement('div');
+                    rosListDiv.id = `ros-list-${fullName.replace(/\s+/g, '-')}`;
+                    rosListDiv.style.marginBottom = "20px";
+                    detailsSection.appendChild(rosListDiv);
+
+                    const repairLinesSection = document.createElement('div');
+                    repairLinesSection.id = `repair-section-${fullName.replace(/\s+/g, '-')}`;
+                    repairLinesSection.style.cssText = 'display:none; margin-top:20px; border-top:1px solid #ddd; padding-top:20px;';
+                    detailsSection.appendChild(repairLinesSection);
+
+                    tableContainer.appendChild(detailsSection);
                 });
             })
             .catch(err => {
