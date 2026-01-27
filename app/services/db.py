@@ -22,4 +22,12 @@ def _ensure_sslmode(dsn: str) -> str:
 
 dsn_with_ssl = _ensure_sslmode(DATABASE_URL)
 
-conn = psycopg2.connect(dsn_with_ssl, cursor_factory=psycopg2.extras.RealDictCursor)
+conn = None
+
+
+def get_conn():
+	"""Return a live DB connection, reconnecting if needed."""
+	global conn
+	if conn is None or conn.closed:
+		conn = psycopg2.connect(dsn_with_ssl, cursor_factory=psycopg2.extras.RealDictCursor)
+	return conn

@@ -5,7 +5,7 @@ from fastapi.responses import HTMLResponse
 from app.services.extractor import extract_text_from_pdf
 from app.services.parser import parse_estimate_text
 from app.services.grid_processor import kmeans_1d as _kmeans_1d, group_rows as _group_rows
-from app.services.db import conn
+from app.services.db import get_conn
 import json
 
 router = APIRouter()
@@ -87,7 +87,7 @@ async def parse_ui(file: UploadFile = File(...)):
 @router.post("/save-labor")
 async def save_labor(request: Request):
     data = await request.json()
-    cur = conn.cursor()
+    cur = get_conn().cursor()
 
     cur.execute("""
         INSERT INTO labor_assignments
@@ -112,7 +112,7 @@ async def save_labor(request: Request):
 @router.post("/save-refinish")
 async def save_refinish(request: Request):
     data = await request.json()
-    cur = conn.cursor()
+    cur = get_conn().cursor()
 
     cur.execute("""
         INSERT INTO refinish_assignments
@@ -140,7 +140,7 @@ async def save_refinish(request: Request):
 @router.post("/techs/add")
 async def add_tech(request: Request):
     data = await request.json()
-    cur = conn.cursor()
+    cur = get_conn().cursor()
 
     cur.execute("""
         INSERT INTO techs (first_name, last_name, pay_rate)
@@ -168,7 +168,7 @@ async def add_tech(request: Request):
 
 @router.get("/techs/list")
 async def list_techs():
-    cur = conn.cursor()
+    cur = get_conn().cursor()
     cur.execute("""
         SELECT id, first_name, last_name, pay_rate, active
         FROM techs
@@ -193,7 +193,7 @@ async def list_techs():
 
 @router.delete("/techs/{tech_id}")
 async def delete_tech(tech_id: int):
-    cur = conn.cursor()
+    cur = get_conn().cursor()
     cur.execute("UPDATE techs SET active = FALSE WHERE id = %s", (tech_id,))
     conn.commit()
     return {"status": "deleted", "tech_id": tech_id}
@@ -201,7 +201,7 @@ async def delete_tech(tech_id: int):
 @router.get("/techs/summary")
 async def tech_summary():
     try:
-        cur = conn.cursor()
+        cur = get_conn().cursor()
 
         # Labor hours
         cur.execute("""
@@ -256,7 +256,7 @@ async def tech_summary():
 @router.get("/techs/{tech}/ros")
 async def tech_ro_list(tech: str):
     try:
-        cur = conn.cursor()
+        cur = get_conn().cursor()
 
         # Labor assignments
         cur.execute("""
@@ -305,7 +305,7 @@ async def tech_ro_list(tech: str):
 @router.get("/techs/{tech}/{ro}/lines")
 async def tech_ro_lines(tech: str, ro: str):
     try:
-        cur = conn.cursor()
+        cur = get_conn().cursor()
 
         # Labor lines
         cur.execute("""
@@ -365,7 +365,7 @@ async def tech_ro_lines(tech: str, ro: str):
 
 @router.get("/ros/summary")
 async def ro_summary():
-    cur = conn.cursor()
+    cur = get_conn().cursor()
 
     # Get all ROs from labor assignments
     cur.execute("""
@@ -417,7 +417,7 @@ async def ro_summary():
 
 @router.get("/ros/{ro}/details")
 async def ro_details(ro: str):
-    cur = conn.cursor()
+    cur = get_conn().cursor()
 
     # Get labor assignments
     cur.execute("""
@@ -474,7 +474,7 @@ async def ro_details(ro: str):
 async def get_tech_assignments():
     """Get all tech-RO assignments with aggregated data for the tech window."""
     try:
-        cur = conn.cursor()
+        cur = get_conn().cursor()
         
         # Get all tech-RO combinations from both labor and refinish
         cur.execute("""
@@ -562,7 +562,7 @@ async def get_tech_assignments():
 async def get_labor_assignments(ro: str, tech: str = None):
     """Get labor assignment details for a specific RO, optionally filtered by tech."""
     try:
-        cur = conn.cursor()
+        cur = get_conn().cursor()
         
         if tech:
             cur.execute("""
@@ -609,7 +609,7 @@ async def get_labor_assignments(ro: str, tech: str = None):
 async def get_refinish_assignments(ro: str, tech: str = None):
     """Get refinish assignment details for a specific RO, optionally filtered by tech."""
     try:
-        cur = conn.cursor()
+        cur = get_conn().cursor()
         
         if tech:
             cur.execute("""
@@ -660,7 +660,7 @@ async def get_refinish_assignments(ro: str, tech: str = None):
 async def check_data():
     """Debug endpoint to check if data is being saved."""
     try:
-        cur = conn.cursor()
+        cur = get_conn().cursor()
         
         # Check labor assignments
         cur.execute("SELECT COUNT(*) FROM labor_assignments")
