@@ -334,68 +334,25 @@
                     return;
                 }
                 
-                // Render each tech
+                // Render each tech in single line
                 techsData.techs.forEach(tech => {
                     const fullName = `${tech.first_name} ${tech.last_name}`;
                     const techAssignments = assignmentsData.assignments[fullName] || [];
                     
-                    // Tech header row
-                    const techHeader = document.createElement('div');
-                    techHeader.className = 'tech-row';
-                    techHeader.style.backgroundColor = '#f5f5f5';
-                    techHeader.style.fontWeight = 'bold';
-                    techHeader.innerHTML = `
-                        <div class="tech-name">${fullName}</div>
-                        <div class="tech-ros">Rate: $${tech.pay_rate.toFixed(2)}/hr</div>
-                        <div class="tech-hours"></div>
-                    `;
-                    container.appendChild(techHeader);
+                    // Calculate totals
+                    const totalROs = techAssignments.length;
+                    const totalHours = techAssignments.reduce((sum, a) => sum + a.total_hours, 0);
                     
-                    // If tech has assignments, show them below a divider
-                    if (techAssignments.length > 0) {
-                        // Horizontal divider
-                        const divider = document.createElement('div');
-                        divider.style.borderBottom = '2px solid #333';
-                        divider.style.margin = '5px 15px';
-                        container.appendChild(divider);
-                        
-                        // Calculate totals
-                        const totalROs = techAssignments.length;
-                        const totalHours = techAssignments.reduce((sum, a) => sum + a.total_hours, 0);
-                        
-                        // Display each RO assignment
-                        techAssignments.forEach(assignment => {
-                            const assignmentRow = document.createElement('div');
-                            assignmentRow.style.padding = '8px 15px';
-                            assignmentRow.style.fontSize = '13px';
-                            assignmentRow.style.display = 'flex';
-                            assignmentRow.style.justifyContent = 'space-between';
-                            assignmentRow.style.backgroundColor = '#fafafa';
-                            assignmentRow.style.borderBottom = '1px solid #eee';
-                            assignmentRow.innerHTML = `
-                                <div style="flex:1;">${fullName}</div>
-                                <div style="flex:1; text-align:center;">${assignment.ro}</div>
-                                <div style="flex:1; text-align:right;">${assignment.total_hours.toFixed(1)} hrs</div>
-                            `;
-                            container.appendChild(assignmentRow);
-                        });
-                        
-                        // Summary row
-                        const summaryRow = document.createElement('div');
-                        summaryRow.style.padding = '8px 15px';
-                        summaryRow.style.fontSize = '13px';
-                        summaryRow.style.fontWeight = 'bold';
-                        summaryRow.style.display = 'flex';
-                        summaryRow.style.justifyContent = 'space-between';
-                        summaryRow.style.backgroundColor = '#e8f5e9';
-                        summaryRow.style.borderTop = '2px solid #333';
-                        summaryRow.innerHTML = `
-                            <div style="flex:1;">Total</div>
-                            <div style="flex:1; text-align:center;">${totalROs} RO's</div>
-                            <div style="flex:1; text-align:right;">${totalHours.toFixed(1)} hrs</div>
-                        `;
-                        container.appendChild(summaryRow);
-                    }
+                    // Single line tech row
+                    const techRow = document.createElement('div');
+                    techRow.className = 'tech-row';
+                    techRow.innerHTML = `
+                        <div class="tech-name">${fullName}</div>
+                        <div class="tech-ros">$${tech.pay_rate.toFixed(2)}/hr</div>
+                        <div class="tech-hours">${totalROs} RO's</div>
+                        <div class="tech-hours">${totalHours.toFixed(1)} hrs</div>
+                    `;
+                    container.appendChild(techRow);
                 });
             })
             .catch(error => {
