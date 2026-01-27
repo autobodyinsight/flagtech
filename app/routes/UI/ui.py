@@ -131,19 +131,4 @@ async def tech_screen():
     return get_techs_screen_html()
 
 
-# ---------------------------------------------------------
-# 🔥 NEW BACKEND ROUTES FOR LABOR & REFINISH SAVE BUTTONS
-# ---------------------------------------------------------
-
-@router.post("/save-labor")
-async def save_labor(request: Request):
-    data = await request.json()
-    print("Labor data received:", data)
-    return JSONResponse(content={"status": "ok"})
-
-
-@router.post("/save-refinish")
-async def save_refinish(request: Request):
-    data = await request.json()
-    print("Refinish data received:", data)
-    return JSONResponse(content={"status": "ok"})
+# Note: save-labor and save-refinish endpoints are now in upload_ui/routes.py
