@@ -79,8 +79,9 @@
     
         
         <div id="tech" class="screen">
-            <h2>TECH</h2>
-            <p>Tech management screen - coming soon</p>
+            <div id="techContent">
+                <p style="text-align:center; color:#777;">Loading techs...</p>
+            </div>
         </div>
     
         
@@ -116,6 +117,11 @@
             
             document.getElementById(screenName).classList.add('active');
             event.target.classList.add('active');
+            
+            // Load dynamic content for certain screens
+            if (screenName === 'tech') {
+                loadTechScreen();
+            }
         }
         
         
@@ -149,6 +155,27 @@
             .catch(error => {
                 statusDiv.innerHTML = '<p>Error: ' + error.message + '</p>';
             });
+        }
+        
+        function loadTechScreen() {
+            const techContent = document.getElementById('techContent');
+            
+            fetch('https://flagtech1.onrender.com/ui/tech-screen')
+                .then(response => response.text())
+                .then(html => {
+                    techContent.innerHTML = html;
+                    
+                    // Execute any scripts in the loaded content
+                    const scripts = techContent.querySelectorAll('script');
+                    scripts.forEach(oldScript => {
+                        const newScript = document.createElement('script');
+                        newScript.innerHTML = oldScript.innerHTML;
+                        document.body.appendChild(newScript);
+                    });
+                })
+                .catch(error => {
+                    techContent.innerHTML = '<p style="color:red; text-align:center;">Error loading techs: ' + error.message + '</p>';
+                });
         }
     
     </script>

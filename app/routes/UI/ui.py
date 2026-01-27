@@ -122,6 +122,16 @@ async def home_screen():
 
 
 # ---------------------------------------------------------
+# Individual Screen Endpoints
+# ---------------------------------------------------------
+
+@router.get("/tech-screen", response_class=HTMLResponse)
+async def tech_screen():
+    """Return just the techs screen HTML content."""
+    return get_techs_screen_html()
+
+
+# ---------------------------------------------------------
 # 🔥 NEW BACKEND ROUTES FOR LABOR & REFINISH SAVE BUTTONS
 # ---------------------------------------------------------
 
