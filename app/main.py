@@ -19,7 +19,9 @@ app = FastAPI(title="FlagTech Estimate Parser")
 ALLOWED_ORIGINS = [
     # GitHub Pages (public site)
     "https://autobodyinsight.github.io",
-    "https://autobodyinsight.github.io/flagtech",
+
+    # Wix domain (embedded iframe)
+    "https://www.autobodyinsight.com",
 
     # GitHub Codespaces (your dev environment)
     # IMPORTANT: Codespaces generates a NEW URL every time.
@@ -29,9 +31,6 @@ ALLOWED_ORIGINS = [
     # Local development (optional)
     "http://localhost:8000",
     "http://127.0.0.1:8000",
-
-    # Wix domain (add once published)
-    # "https://your-wix-domain.com",
 ]
 
 app.add_middleware(
