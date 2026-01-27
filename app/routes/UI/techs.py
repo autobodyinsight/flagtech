@@ -45,7 +45,10 @@ def get_techs_screen_html():
 
         <script>
 
-        const BACKEND_BASE = "https://flagtech1.onrender.com";
+        // Check if BACKEND_BASE is already defined, if not, define it
+        if (typeof BACKEND_BASE === 'undefined') {
+            var BACKEND_BASE = "https://flagtech1.onrender.com";
+        }
 
         // -----------------------------
         // Add Tech Modal
