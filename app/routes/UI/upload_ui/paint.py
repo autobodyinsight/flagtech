@@ -184,12 +184,12 @@ def get_refinish_modal_script(paint_items_json, total_paint, second_ro_line, veh
     // Fetch techs list (try relative first, fallback to BACKEND_BASE/window origin)
     const baseUrl = (typeof BACKEND_BASE !== 'undefined' && BACKEND_BASE) ? BACKEND_BASE : window.location.origin;
 
-    const loadTechOptions = (url) => {
+    const loadTechOptions = (url) => {{
       return fetch(url)
-        .then(r => {
+        .then(r => {{
           if (!r.ok) throw new Error('HTTP ' + r.status);
           return r.json();
-        })
+        }})
         .then(res => {{
           if (res.techs && res.techs.length > 0) {{
             res.techs.forEach(tech => {{
@@ -205,10 +205,10 @@ def get_refinish_modal_script(paint_items_json, total_paint, second_ro_line, veh
             techSelect.appendChild(option);
           }}
         }});
-    };
+    }};
 
-    loadTechOptions('/ui/techs/list')
-      .catch(() => loadTechOptions(baseUrl + '/ui/techs/list'))
+    loadTechOptions('/api/techs/list')
+      .catch(() => loadTechOptions(baseUrl + '/api/techs/list'))
       .catch(err => {{
         console.error('Error loading techs:', err);
         const option = document.createElement('option');
