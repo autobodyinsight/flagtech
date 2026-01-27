@@ -90,6 +90,8 @@ async def save_labor(request: Request):
     conn = get_conn()
     cur = conn.cursor()
 
+    print(f"[save-labor] Saving: tech='{data.get('tech')}', ro='{data.get('ro')}', totalLabor={data.get('totalLabor')}")
+
     cur.execute("""
         INSERT INTO labor_assignments
         (ro, vehicle, tech, assigned, unassigned, additional, total_labor, total_unassigned, timestamp)
@@ -108,6 +110,7 @@ async def save_labor(request: Request):
 
     conn.commit()
     cur.close()
+    print(f"[save-labor] Successfully committed to database")
     return {"status": "labor saved"}
 
 
@@ -116,6 +119,8 @@ async def save_refinish(request: Request):
     data = await request.json()
     conn = get_conn()
     cur = conn.cursor()
+
+    print(f"[save-refinish] Saving: tech='{data.get('tech')}', ro='{data.get('ro')}', totalPaint={data.get('totalPaint')}")
 
     cur.execute("""
         INSERT INTO refinish_assignments
@@ -135,6 +140,7 @@ async def save_refinish(request: Request):
 
     conn.commit()
     cur.close()
+    print(f"[save-refinish] Successfully committed to database")
     return {"status": "refinish saved"}
 
 # ============================================================
