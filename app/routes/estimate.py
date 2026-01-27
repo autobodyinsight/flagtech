@@ -47,11 +47,11 @@ async def add_tech(request: Request):
 
         return {
             "tech": {
-                "id": row['id'] if isinstance(row, dict) else row[0],
-                "first_name": row['first_name'] if isinstance(row, dict) else row[1],
-                "last_name": row['last_name'] if isinstance(row, dict) else row[2],
-                "pay_rate": float(row['pay_rate'] if isinstance(row, dict) else row[3]),
-                "active": row['active'] if isinstance(row, dict) else row[4]
+                "id": row["id"],
+                "first_name": row["first_name"],
+                "last_name": row["last_name"],
+                "pay_rate": float(row["pay_rate"]),
+                "active": row["active"]
             }
         }
     finally:
@@ -77,11 +77,11 @@ async def list_techs():
         techs = []
         for row in rows:
             techs.append({
-                "id": row['id'] if isinstance(row, dict) else row[0],
-                "first_name": row['first_name'] if isinstance(row, dict) else row[1],
-                "last_name": row['last_name'] if isinstance(row, dict) else row[2],
-                "pay_rate": float(row['pay_rate'] if isinstance(row, dict) else row[3]),
-                "active": row['active'] if isinstance(row, dict) else row[4]
+                "id": row["id"],
+                "first_name": row["first_name"],
+                "last_name": row["last_name"],
+                "pay_rate": float(row["pay_rate"]),
+                "active": row["active"]
             })
         
         return {"techs": techs}
@@ -136,9 +136,9 @@ async def tech_assignments():
         tech_summary_map = {}
         
         for row in rows:
-            tech = row[0]
-            labor_hrs = float(row[3] or 0)
-            refinish_hrs = float(row[4] or 0)
+            tech = row["tech"]
+            labor_hrs = float(row["total_labor"] or 0)
+            refinish_hrs = float(row["total_refinish"] or 0)
             total_hrs = labor_hrs + refinish_hrs
             
             if tech not in tech_summary_map:
