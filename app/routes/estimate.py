@@ -47,11 +47,11 @@ async def add_tech(request: Request):
 
         return {
             "tech": {
-                "id": row[0],
-                "first_name": row[1],
-                "last_name": row[2],
-                "pay_rate": float(row[3]),
-                "active": row[4]
+                "id": row['id'] if isinstance(row, dict) else row[0],
+                "first_name": row['first_name'] if isinstance(row, dict) else row[1],
+                "last_name": row['last_name'] if isinstance(row, dict) else row[2],
+                "pay_rate": float(row['pay_rate'] if isinstance(row, dict) else row[3]),
+                "active": row['active'] if isinstance(row, dict) else row[4]
             }
         }
     finally:
@@ -64,27 +64,29 @@ async def list_techs():
     conn = get_conn()
     cur = conn.cursor()
     
-    cur.execute("""
-        SELECT id, first_name, last_name, pay_rate, active
-        FROM techs
-        WHERE active = true
-        ORDER BY first_name, last_name
-    """)
-    
-    rows = cur.fetchall()
-    cur.close()
-    
-    techs = []
-    for row in rows:
-        techs.append({
-            "id": row[0],
-            "first_name": row[1],
-            "last_name": row[2],
-            "pay_rate": float(row[3]),
-            "active": row[4]
-        })
-    
-    return {"techs": techs}
+    try:
+        cur.execute("""
+            SELECT id, first_name, last_name, pay_rate, active
+            FROM techs
+            WHERE active = true
+            ORDER BY first_name, last_name
+        """)
+        
+        rows = cur.fetchall()
+        
+        techs = []
+        for row in rows:
+            techs.append({
+                "id": row['id'] if isinstance(row, dict) else row[0],
+                "first_name": row['first_name'] if isinstance(row, dict) else row[1],
+                "last_name": row['last_name'] if isinstance(row, dict) else row[2],
+                "pay_rate": float(row['pay_rate'] if isinstance(row, dict) else row[3]),
+                "active": row['active'] if isinstance(row, dict) else row[4]
+            })
+        
+        return {"techs": techs}
+    finally:
+        cur.close()
 
 
 @router.get("/tech-assignments")
