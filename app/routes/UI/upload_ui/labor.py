@@ -14,7 +14,9 @@ def get_labor_modal_html(second_ro_line, vehicle_info_line, total_labor):
 
     <div style="margin-bottom: 15px;">
       <label style="font-weight: bold; font-size: 14px;">TECH:</label>
-      <input type="text" id="techInput" style="padding: 8px; font-size: 14px; margin-left: 10px; width: 200px; border: 1px solid #ccc; border-radius: 3px;" placeholder="Enter technician name" />
+      <select id="techInput" style="padding: 8px; font-size: 14px; margin-left: 10px; width: 220px; border: 1px solid #ccc; border-radius: 3px;">
+        <option value="">Select technician...</option>
+      </select>
     </div>
 
     <h2>Labor Assignment</h2>
@@ -159,9 +161,33 @@ function toggleDeduction(index) {{
   updateTotal();
 }}
 
+function loadTechsIntoDropdown() {{
+  fetch('https://flagtech1.onrender.com/api/techs/list')
+    .then(r => r.json())
+    .then(data => {{
+      const select = document.getElementById('techInput');
+      select.innerHTML = '<option value="">Select technician...</option>';
+      
+      if (data.techs && data.techs.length > 0) {{
+        data.techs.forEach(tech => {{
+          const option = document.createElement('option');
+          option.value = `${{tech.first_name}} ${{tech.last_name}}`;
+          option.textContent = `${{tech.first_name}} ${{tech.last_name}}`;
+          select.appendChild(option);
+        }});
+      }}
+    }})
+    .catch(err => {{
+      console.error('Error loading techs:', err);
+    }});
+}}
+
 function openLaborModal() {{
   const modal = document.getElementById('laborModal');
   let html = '';
+
+  // Load techs into dropdown
+  loadTechsIntoDropdown();
 
   // Store EXACTLY what is displayed
   displayLaborItems = laborItems.slice();
