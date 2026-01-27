@@ -15,8 +15,24 @@ def get_techs_screen_html():
             </button>
         </div>
 
-        <!-- Techs List -->
-        <div id="techsListContainer">
+        <!-- Techs Cards Grid -->
+        <div id="techsCardsContainer" style="display:grid; grid-template-columns:repeat(auto-fill, minmax(150px, 1fr)); gap:15px; margin-bottom:40px;">
+        </div>
+
+        <!-- Techs Details Table -->
+        <div style="margin-top:40px;">
+            <h2 style="margin-bottom:20px;">Assignments</h2>
+            <table style="width:100%; border-collapse:collapse;">
+                <thead>
+                    <tr style="background-color:#f5f5f5; border-bottom:2px solid #ddd;">
+                        <th style="padding:12px; text-align:left; font-weight:bold;">Tech Name</th>
+                        <th style="padding:12px; text-align:center; font-weight:bold;">Total RO's</th>
+                        <th style="padding:12px; text-align:right; font-weight:bold;">Total Hours</th>
+                    </tr>
+                </thead>
+                <tbody id="techsListContainer">
+                </tbody>
+            </table>
         </div>
 
         <!-- Add Tech Modal -->
@@ -99,8 +115,10 @@ def get_techs_screen_html():
         // Load and Display Techs
         // -----------------------------
         function loadTechsList() {
-            const container = document.getElementById('techsListContainer');
-            container.innerHTML = "<p style='color:#777; text-align:center;'>Loading...</p>";
+            const cardsContainer = document.getElementById('techsCardsContainer');
+            const tableContainer = document.getElementById('techsListContainer');
+            cardsContainer.innerHTML = "<p style='color:#777; text-align:center; grid-column:1/-1;'>Loading...</p>";
+            tableContainer.innerHTML = "";
 
             // Fetch techs list and tech assignments to get total ROs and hours
             Promise.all([
@@ -108,10 +126,11 @@ def get_techs_screen_html():
                 fetch(`${BACKEND_BASE}/ui/tech-assignments`).then(r => r.json())
             ])
             .then(([techsRes, assignmentsRes]) => {
-                container.innerHTML = "";
+                cardsContainer.innerHTML = "";
+                tableContainer.innerHTML = "";
 
                 if (!techsRes.techs || techsRes.techs.length === 0) {
-                    container.innerHTML = "<p style='color:#777; text-align:center;'>No techs added yet.</p>";
+                    cardsContainer.innerHTML = "<p style='color:#777; text-align:center; grid-column:1/-1;'>No techs added yet.</p>";
                     return;
                 }
 
@@ -126,37 +145,52 @@ def get_techs_screen_html():
                     });
                 }
 
-                // Display each tech
+                // Display tech cards
                 techsRes.techs.forEach(tech => {
                     const fullName = `${tech.first_name} ${tech.last_name}`;
                     const assignments = assignmentsMap[fullName] || { total_vehicles: 0, total_hours: 0 };
 
-                    const techDiv = document.createElement('div');
-                    techDiv.style.display = "flex";
-                    techDiv.style.justifyContent = "space-between";
-                    techDiv.style.alignItems = "center";
-                    techDiv.style.padding = "15px";
-                    techDiv.style.borderBottom = "1px solid #ddd";
-                    techDiv.style.fontSize = "14px";
+                    const card = document.createElement('div');
+                    card.style.padding = "20px";
+                    card.style.border = "1px solid #ddd";
+                    card.style.borderRadius = "8px";
+                    card.style.backgroundColor = "#f9f9f9";
+                    card.style.textAlign = "center";
+                    card.style.boxShadow = "0 2px 4px rgba(0,0,0,0.1)";
 
-                    techDiv.innerHTML = `
-                        <div style="flex:1; text-align:left;">
-                            <strong>${tech.first_name} ${tech.last_name}</strong>
+                    card.innerHTML = `
+                        <div style="font-weight:bold; font-size:16px; margin-bottom:5px;">
+                            ${tech.first_name}
                         </div>
-                        <div style="flex:1; text-align:center;">
-                            Total RO's: ${assignments.total_vehicles}
-                        </div>
-                        <div style="flex:1; text-align:right;">
-                            Total Hours: ${assignments.total_hours.toFixed(1)}
+                        <div style="font-size:14px; color:#666;">
+                            ${tech.last_name}
                         </div>
                     `;
 
-                    container.appendChild(techDiv);
+                    cardsContainer.appendChild(card);
+                });
+
+                // Display tech details in table
+                techsRes.techs.forEach(tech => {
+                    const fullName = `${tech.first_name} ${tech.last_name}`;
+                    const assignments = assignmentsMap[fullName] || { total_vehicles: 0, total_hours: 0 };
+
+                    const row = document.createElement('tr');
+                    row.style.borderBottom = "1px solid #eee";
+                    row.innerHTML = `
+                        <td style="padding:12px; text-align:left;">${fullName}</td>
+                        <td style="padding:12px; text-align:center;">${assignments.total_vehicles}</td>
+                        <td style="padding:12px; text-align:right;">${assignments.total_hours.toFixed(1)}</td>
+                    `;
+                    row.onmouseover = function() { this.style.backgroundColor = "#f5f5f5"; };
+                    row.onmouseout = function() { this.style.backgroundColor = "transparent"; };
+
+                    tableContainer.appendChild(row);
                 });
             })
             .catch(err => {
                 console.error("Error loading techs:", err);
-                container.innerHTML = "<p style='color:red; text-align:center;'>Error loading techs.</p>";
+                cardsContainer.innerHTML = "<p style='color:red; text-align:center; grid-column:1/-1;'>Error loading techs.</p>";
             });
         }
 
