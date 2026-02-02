@@ -630,10 +630,15 @@
                 statusDiv.innerHTML = html;
                 fileInput.value = '';
                 
+                // Remove previously injected scripts to reduce conflicts
+                document.querySelectorAll('script[data-injected="grid"]')
+                    .forEach(s => s.remove());
+
                 const scripts = statusDiv.querySelectorAll('script');
                 scripts.forEach(oldScript => {
                     const newScript = document.createElement('script');
-                    newScript.innerHTML = oldScript.innerHTML;
+                    newScript.setAttribute('data-injected', 'grid');
+                    newScript.textContent = oldScript.textContent;
                     document.body.appendChild(newScript);
                 });
             })

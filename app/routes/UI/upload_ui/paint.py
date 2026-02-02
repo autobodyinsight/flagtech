@@ -92,13 +92,13 @@ def get_refinish_modal_script(paint_items_json, total_paint, second_ro_line, veh
     """Return the JavaScript for the refinish modal functionality."""
     return f"""
   // Refinish Modal Functions
-  const paintItems = {paint_items_json};
-  const initialPaintTotal = {total_paint};
+  var paintItems = {paint_items_json};
+  var initialPaintTotal = {total_paint};
   // This will store ONLY the items displayed in the modal
-  let displayPaintItems = [];
-  let paintAdditionalCounter = 0;
+  var displayPaintItems = [];
+  var paintAdditionalCounter = 0;
 
-  const apiBase = window.API_BASE || 'https://flagtech1.onrender.com';
+  var apiBase = window.API_BASE || 'https://flagtech1.onrender.com';
 
   function getAuthHeaders() {{
     const token = localStorage.getItem('auth_token');

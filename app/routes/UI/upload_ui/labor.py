@@ -98,11 +98,11 @@ def get_labor_modal_styles():
 def get_labor_modal_script(labor_items_json, total_labor, second_ro_line, vehicle_info_line):
     """Return the JavaScript for the labor modal functionality."""
     return f"""
-const laborItems = {labor_items_json};
-const initialTotal = {total_labor};
-let laborAdditionalCounter = 0;
+var laborItems = {labor_items_json};
+var initialTotal = {total_labor};
+var laborAdditionalCounter = 0;
 
-const apiBase = window.API_BASE || 'https://flagtech1.onrender.com';
+var apiBase = window.API_BASE || 'https://flagtech1.onrender.com';
 
 function getAuthHeaders() {{
   const token = localStorage.getItem('auth_token');
@@ -114,7 +114,7 @@ function getAuthHeaders() {{
 }}
 
 // This will store ONLY the items displayed in the modal
-let displayLaborItems = [];
+var displayLaborItems = [];
 
 function addLaborAdditionalHours() {{
   const container = document.getElementById('laborAdditionalHours');
