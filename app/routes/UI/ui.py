@@ -42,7 +42,7 @@ async def home_screen():
             background-color: #f5f5f5;
         }}
         .sidebar {{
-            width: 150px;
+            width: 180px;
             background-color: #505050;
             display: flex;
             flex-direction: column;
@@ -53,7 +53,7 @@ async def home_screen():
             overflow-y: auto;
         }}
         .nav-box {{
-            padding: 15px 10px;
+            padding: 15px 12px;
             background-color: #666666;
             color: white;
             text-align: center;
@@ -66,6 +66,7 @@ async def home_screen():
             display: flex;
             align-items: center;
             justify-content: center;
+            font-size: 14px;
         }}
         .nav-box:hover {{
             background-color: #707070;
@@ -80,7 +81,7 @@ async def home_screen():
             flex: 1;
             padding: 40px;
             overflow-y: auto;
-            margin-left: 150px;
+            margin-left: 180px;
             background-color: white;
             min-height: 100vh;
         }}
