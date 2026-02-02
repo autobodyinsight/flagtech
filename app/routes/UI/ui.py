@@ -1,12 +1,13 @@
 """Main UI display for FlagTech - simplified version with just the display screen."""
 
 from fastapi import APIRouter, Request
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 
 from .flagout import get_flagtech_screen_html
 from .ros import get_ros_screen_html
 from .techs import get_techs_screen_html
 from .dashboard import get_dashboard_screen_html
+from .auth_screen import get_auth_screen_html
 
 try:
     from .upload_ui.upload import get_upload_screen_html, get_upload_script
@@ -22,9 +23,22 @@ except ImportError:
 router = APIRouter()
 
 
+@router.get("/login", response_class=HTMLResponse)
+async def login_screen():
+    """Show the login/signup screen."""
+    return get_auth_screen_html()
+
+
 @router.get("/", response_class=HTMLResponse)
-async def home_screen():
+async def home_screen(request: Request):
     """Main UI screen with sidebar navigation."""
+    # Check if user is authenticated
+    token = request.cookies.get("session_token")
+    
+    if not token:
+        # Redirect to login if not authenticated
+        return RedirectResponse(url="/ui/login")
+    
     return f"""
 <html>
 <head>

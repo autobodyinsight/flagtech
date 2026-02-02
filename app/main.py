@@ -4,6 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 # Routers
 from app.routes.estimate import router as estimate_router
+from app.routes.auth import router as auth_router
 from app.routes.UI.ui import router as ui_router
 from app.routes.UI.ui_with_processing import router as processing_router
 from app.routes.UI.upload_ui.routes import router as ui_routes_router
@@ -44,6 +45,9 @@ app.add_middleware(
 # ---------------------------------------------------------
 # ROUTERS
 # ---------------------------------------------------------
+
+# Authentication endpoints
+app.include_router(auth_router, prefix="/api/auth")
 
 # API endpoints
 app.include_router(estimate_router, prefix="/api")

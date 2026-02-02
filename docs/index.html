@@ -20,6 +20,32 @@
             gap: 0;
             padding: 0;
             border-bottom: 3px solid #333;
+            justify-content: space-between;
+        }
+        .tab-group {
+            display: flex;
+            gap: 0;
+        }
+        .user-info {
+            display: flex;
+            align-items: center;
+            padding: 0 20px;
+            color: white;
+            font-size: 14px;
+            gap: 15px;
+        }
+        .logout-btn {
+            padding: 8px 16px;
+            background-color: #d32f2f;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 13px;
+            transition: background-color 0.3s ease;
+        }
+        .logout-btn:hover {
+            background-color: #b71c1c;
         }
         .nav-tab {
             padding: 18px 35px;
@@ -172,11 +198,17 @@
 </head>
 <body>
     <div class="tab-bar">
-        <div class="nav-tab active" onclick="switchScreen('dashboard')">DASHBOARD</div>
-        <div class="nav-tab" onclick="switchScreen('upload')">UPLOAD</div>
-        <div class="nav-tab" onclick="switchScreen('tech')">TECH'S</div>
-        <div class="nav-tab" onclick="switchScreen('ros')">RO'S</div>
-        <div class="nav-tab" onclick="switchScreen('flagtech')">FLAG TECH</div>
+        <div class="tab-group">
+            <div class="nav-tab active" onclick="switchScreen('dashboard')">DASHBOARD</div>
+            <div class="nav-tab" onclick="switchScreen('upload')">UPLOAD</div>
+            <div class="nav-tab" onclick="switchScreen('tech')">TECH'S</div>
+            <div class="nav-tab" onclick="switchScreen('ros')">RO'S</div>
+            <div class="nav-tab" onclick="switchScreen('flagtech')">FLAG TECH</div>
+        </div>
+        <div class="user-info">
+            <span id="companyNameDisplay"></span>
+            <button class="logout-btn" onclick="handleLogout()">Logout</button>
+        </div>
     </div>
     
     <div class="content-area">
@@ -334,6 +366,32 @@
     <script>
 
         const API_BASE = 'https://flagtech1.onrender.com';
+
+        // Check authentication on load
+        window.addEventListener('load', () => {
+            const authToken = localStorage.getItem('auth_token');
+            if (!authToken) {
+                window.location.href = 'login.html';
+                return;
+            }
+            
+            // Display user info if available
+            const companyName = localStorage.getItem('company_name');
+            if (companyName) {
+                document.title = 'FlagTech - ' + companyName;
+                document.getElementById('companyNameDisplay').textContent = companyName;
+            }
+        });
+        
+        function handleLogout() {
+            // Clear local storage
+            localStorage.removeItem('auth_token');
+            localStorage.removeItem('user_email');
+            localStorage.removeItem('company_name');
+            
+            // Redirect to login
+            window.location.href = 'login.html?logout=true';
+        }
 
         let displayedRows = [];
 
