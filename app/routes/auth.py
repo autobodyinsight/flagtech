@@ -90,6 +90,10 @@ async def login(request: Request, response: Response):
 async def logout(request: Request, response: Response):
     """Log out the current user."""
     token = request.cookies.get("session_token")
+    if not token:
+        auth_header = request.headers.get("Authorization", "")
+        if auth_header.lower().startswith("bearer "):
+            token = auth_header.split(" ", 1)[1].strip()
     if token:
         delete_session(token)
     response.delete_cookie("session_token")
@@ -100,6 +104,10 @@ async def logout(request: Request, response: Response):
 async def get_current_user(request: Request):
     """Get the currently logged-in user."""
     token = request.cookies.get("session_token")
+    if not token:
+        auth_header = request.headers.get("Authorization", "")
+        if auth_header.lower().startswith("bearer "):
+            token = auth_header.split(" ", 1)[1].strip()
     
     if not token:
         return JSONResponse(

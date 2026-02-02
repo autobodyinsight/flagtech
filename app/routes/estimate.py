@@ -8,6 +8,28 @@ from fastapi.responses import JSONResponse
 
 router = APIRouter()
 
+
+def _ensure_parts_vendors_table(cur) -> None:
+    """Create parts_vendors table if it doesn't exist (safety for older DBs)."""
+    cur.execute(
+        """
+        CREATE TABLE IF NOT EXISTS parts_vendors (
+            id SERIAL PRIMARY KEY,
+            name VARCHAR(255) NOT NULL,
+            email VARCHAR(255),
+            phone VARCHAR(50),
+            domain VARCHAR(255) NOT NULL,
+            active BOOLEAN DEFAULT TRUE,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+        """
+    )
+    cur.execute(
+        """
+        CREATE INDEX IF NOT EXISTS idx_parts_vendors_domain ON parts_vendors(domain)
+        """
+    )
+
 @router.post("/parse-labor", response_model=EstimateResponse)
 async def parse_labor(file: UploadFile = File(...)):
     doc = load_pdf(file)
@@ -122,6 +144,7 @@ async def add_vendor(request: Request):
     conn = get_conn()
     cur = conn.cursor()
     try:
+        _ensure_parts_vendors_table(cur)
         cur.execute(
             """
             INSERT INTO parts_vendors (name, email, phone, domain)
@@ -157,6 +180,7 @@ async def list_vendors(request: Request):
     conn = get_conn()
     cur = conn.cursor()
     try:
+        _ensure_parts_vendors_table(cur)
         cur.execute(
             """
             SELECT id, name, email, phone, active
