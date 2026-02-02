@@ -5,6 +5,7 @@ from fastapi.responses import HTMLResponse
 from .flagout import get_flagtech_screen_html
 from .ros import get_ros_screen_html
 from .techs import get_techs_screen_html
+from .dashboard import get_dashboard_screen_html
 try:
     from .upload_ui.upload import get_upload_screen_html, get_upload_script
 except ImportError:
@@ -88,6 +89,7 @@ async def home_screen():
 <body>
     <div class="sidebar">
         <div class="nav-box active" onclick="switchScreen('upload')">UPLOAD</div>
+        <div class="nav-box" onclick="switchScreen('dashboard')">DASHBOARD</div>
         <div class="nav-box" onclick="switchScreen('tech')">TECH'S</div>
         <div class="nav-box" onclick="switchScreen('ros')">RO'S</div>
         <div class="nav-box" onclick="switchScreen('flagtech')">FLAG TECH</div>
@@ -95,6 +97,7 @@ async def home_screen():
     
     <div class="content-area">
         {get_upload_screen_html()}
+        {get_dashboard_screen_html()}
         {get_techs_screen_html()}
         {get_ros_screen_html()}
         {get_flagtech_screen_html()}
@@ -115,6 +118,11 @@ async def home_screen():
             
             // Add active class to clicked nav box
             event.target.classList.add('active');
+            
+            // Load dashboard data if switching to dashboard
+            if (screenName === 'dashboard' && typeof loadDashboardDataIfNeeded === 'function') {{
+                loadDashboardDataIfNeeded();
+            }}
         }}
         
         {get_upload_script()}

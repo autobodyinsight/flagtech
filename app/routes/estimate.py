@@ -160,3 +160,140 @@ async def tech_assignments():
             "assignments": {},
             "error": str(e)
         }
+
+
+@router.get("/dashboard-data")
+async def dashboard_data():
+    """Get aggregated data for the dashboard."""
+    try:
+        conn = get_conn()
+        cur = conn.cursor()
+        
+        # Calculate total sales and pending payments from all ROs
+        # Assuming sales = labor hours * rate + parts cost (simplified calculation)
+        cur.execute("""
+            SELECT 
+                SUM(total_labor) as total_labor_hours,
+                SUM(total_paint) as total_refinish_hours
+            FROM (
+                SELECT SUM(total_labor) as total_labor, 0 as total_paint
+                FROM labor_assignments
+                UNION ALL
+                SELECT 0 as total_labor, SUM(total_paint) as total_paint
+                FROM refinish_assignments
+            ) AS combined
+        """)
+        
+        hours_row = cur.fetchone()
+        total_labor_hours = float(hours_row["total_labor_hours"] or 0)
+        total_refinish_hours = float(hours_row["total_refinish_hours"] or 0)
+        total_hours = total_labor_hours + total_refinish_hours
+        
+        # Calculate total sales (simplified: $100 per hour as base rate)
+        # In production, this should use actual pricing from ROs
+        total_sales = total_hours * 100.0
+        
+        # For pending payments, let's assume 30% of sales are pending (placeholder)
+        pending_payments = total_sales * 0.3
+        
+        # Get count of unique ROs
+        cur.execute("""
+            SELECT COUNT(DISTINCT ro) as ro_count
+            FROM (
+                SELECT ro FROM labor_assignments
+                UNION
+                SELECT ro FROM refinish_assignments
+            ) AS all_ros
+        """)
+        ro_count_row = cur.fetchone()
+        ro_count = int(ro_count_row["ro_count"] or 0)
+        
+        # Calculate average RO
+        average_ro = total_sales / ro_count if ro_count > 0 else 0
+        
+        # Calculate average hours per RO
+        average_hrs = total_hours / ro_count if ro_count > 0 else 0
+        
+        # Calculate current GP (Gross Profit percentage) - placeholder calculation
+        # Assuming 40% GP for now
+        current_gp = 40.0
+        
+        # Calculate parts cost - placeholder
+        # In production, this should come from actual parts data
+        parts_cost = total_sales * 0.3
+        
+        # Get hours per tech
+        cur.execute("""
+            SELECT 
+                tech,
+                SUM(total_hours) as total_hours
+            FROM (
+                SELECT tech, total_labor as total_hours
+                FROM labor_assignments
+                WHERE tech IS NOT NULL AND tech <> ''
+                UNION ALL
+                SELECT tech, total_paint as total_hours
+                FROM refinish_assignments
+                WHERE tech IS NOT NULL AND tech <> ''
+            ) AS combined
+            GROUP BY tech
+            ORDER BY total_hours DESC
+        """)
+        
+        hours_per_tech_rows = cur.fetchall()
+        hours_per_tech = []
+        for row in hours_per_tech_rows:
+            hours_per_tech.append({
+                "tech": row["tech"],
+                "hours": float(row["total_hours"] or 0)
+            })
+        
+        # Get RO count per tech
+        cur.execute("""
+            SELECT 
+                tech,
+                COUNT(DISTINCT ro) as ro_count
+            FROM (
+                SELECT tech, ro FROM labor_assignments
+                WHERE tech IS NOT NULL AND tech <> ''
+                UNION
+                SELECT tech, ro FROM refinish_assignments
+                WHERE tech IS NOT NULL AND tech <> ''
+            ) AS combined
+            GROUP BY tech
+            ORDER BY ro_count DESC
+        """)
+        
+        ros_per_tech_rows = cur.fetchall()
+        ros_per_tech = []
+        for row in ros_per_tech_rows:
+            ros_per_tech.append({
+                "tech": row["tech"],
+                "ros": int(row["ro_count"] or 0)
+            })
+        
+        cur.close()
+        
+        return {
+            "totalSales": round(total_sales, 2),
+            "pendingPayments": round(pending_payments, 2),
+            "currentGP": round(current_gp, 2),
+            "partsCost": round(parts_cost, 2),
+            "averageHrs": round(average_hrs, 2),
+            "averageRO": round(average_ro, 2),
+            "hoursPerTech": hours_per_tech,
+            "rosPerTech": ros_per_tech
+        }
+    except Exception as e:
+        # Return default values on error
+        return {
+            "totalSales": 0,
+            "pendingPayments": 0,
+            "currentGP": 0,
+            "partsCost": 0,
+            "averageHrs": 0,
+            "averageRO": 0,
+            "hoursPerTech": [],
+            "rosPerTech": [],
+            "error": str(e)
+        }
