@@ -114,6 +114,38 @@ def init_users_table():
         cur.execute("""
             CREATE INDEX IF NOT EXISTS idx_refinish_domain ON refinish_assignments(domain)
         """)
+
+        # Create parts vendors table
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS parts_vendors (
+                id SERIAL PRIMARY KEY,
+                name VARCHAR(255) NOT NULL,
+                email VARCHAR(255),
+                phone VARCHAR(50),
+                domain VARCHAR(255) NOT NULL,
+                active BOOLEAN DEFAULT TRUE,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        cur.execute("""
+            CREATE INDEX IF NOT EXISTS idx_parts_vendors_domain ON parts_vendors(domain)
+        """)
+
+        # Create sessions table for persistent logins
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS sessions (
+                token VARCHAR(255) PRIMARY KEY,
+                user_id INTEGER,
+                email VARCHAR(255),
+                domain VARCHAR(255),
+                company_name VARCHAR(255),
+                expires_at TIMESTAMP,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        cur.execute("""
+            CREATE INDEX IF NOT EXISTS idx_sessions_expires_at ON sessions(expires_at)
+        """)
         
         conn.commit()
         print("✓ Database schema updated successfully!")

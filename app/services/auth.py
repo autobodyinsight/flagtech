@@ -124,22 +124,85 @@ def get_user_by_token(token: str) -> Optional[Dict]:
     return None
 
 
-# In-memory session store (will be reset on server restart)
-# In production, use Redis or a database table
-_sessions = {}
+def store_session(token: str, user_data: Dict, ttl_days: int = 7) -> None:
+    """Store session data in the database."""
+    conn = get_conn()
+    cur = conn.cursor()
+    expires_at = datetime.utcnow() + timedelta(days=ttl_days)
 
-
-def store_session(token: str, user_data: Dict) -> None:
-    """Store session data."""
-    _sessions[token] = user_data
+    try:
+        cur.execute(
+            """
+            INSERT INTO sessions (token, user_id, email, domain, company_name, expires_at)
+            VALUES (%s, %s, %s, %s, %s, %s)
+            ON CONFLICT (token)
+            DO UPDATE SET
+                user_id = EXCLUDED.user_id,
+                email = EXCLUDED.email,
+                domain = EXCLUDED.domain,
+                company_name = EXCLUDED.company_name,
+                expires_at = EXCLUDED.expires_at
+            """,
+            (
+                token,
+                user_data.get("user_id"),
+                user_data.get("email"),
+                user_data.get("domain"),
+                user_data.get("company_name"),
+                expires_at,
+            ),
+        )
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        cur.close()
 
 
 def get_session(token: str) -> Optional[Dict]:
-    """Get session data by token."""
-    return _sessions.get(token)
+    """Get session data by token from the database."""
+    conn = get_conn()
+    cur = conn.cursor()
+    try:
+        cur.execute(
+            """
+            SELECT token, user_id, email, domain, company_name, expires_at
+            FROM sessions
+            WHERE token = %s
+            """,
+            (token,),
+        )
+        row = cur.fetchone()
+        if not row:
+            return None
+
+        expires_at = row.get("expires_at")
+        if expires_at and expires_at < datetime.utcnow():
+            cur.execute("DELETE FROM sessions WHERE token = %s", (token,))
+            conn.commit()
+            return None
+
+        return {
+            "token": row.get("token"),
+            "user_id": row.get("user_id"),
+            "email": row.get("email"),
+            "domain": row.get("domain"),
+            "company_name": row.get("company_name"),
+        }
+    finally:
+        cur.close()
 
 
 def delete_session(token: str) -> None:
-    """Delete session data."""
-    if token in _sessions:
-        del _sessions[token]
+    """Delete session data from the database."""
+    conn = get_conn()
+    cur = conn.cursor()
+    try:
+        cur.execute("DELETE FROM sessions WHERE token = %s", (token,))
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        cur.close()

@@ -100,81 +100,88 @@ async def list_techs(request: Request):
         cur.close()
 
 
-@router.get("/tech-assignments")
-async def tech_assignments(request: Request):
-    """Get detailed tech assignments showing each RO."""
+# ============================================
+# PARTS VENDORS ENDPOINTS (JSON API)
+# ============================================
+
+@router.post("/vendors/add")
+async def add_vendor(request: Request):
+    """Add a new parts vendor."""
     domain = get_user_domain(request)
     if not domain:
-        return JSONResponse(status_code=401, content={"error": "Not authenticated", "assignments": {}})
-    
+        return JSONResponse(status_code=401, content={"error": "Not authenticated"})
+
+    data = await request.json()
+    name = (data.get("name") or "").strip()
+    email = (data.get("email") or "").strip()
+    phone = (data.get("phone") or "").strip()
+
+    if not name:
+        return JSONResponse(status_code=400, content={"error": "Vendor name is required"})
+
+    conn = get_conn()
+    cur = conn.cursor()
     try:
-        conn = get_conn()
-        cur = conn.cursor()
-        
-        # Get all tech-RO combinations from both labor and refinish
-        cur.execute("""
-            SELECT 
-                tech,
-                ro,
-                vehicle,
-                SUM(labor_hours) AS total_labor,
-                SUM(refinish_hours) AS total_refinish
-            FROM (
-                SELECT 
-                    tech,
-                    ro,
-                    vehicle,
-                    total_labor AS labor_hours,
-                    0 AS refinish_hours
-                FROM labor_assignments
-                WHERE tech IS NOT NULL AND tech <> '' AND domain = %s
-                
-                UNION ALL
-                
-                SELECT 
-                    tech,
-                    ro,
-                    vehicle,
-                    0 AS labor_hours,
-                    total_paint AS refinish_hours
-                FROM refinish_assignments
-                WHERE tech IS NOT NULL AND tech <> '' AND domain = %s
-            ) AS combined
-            GROUP BY tech, ro, vehicle
-            ORDER BY tech, ro
-        """, (domain, domain))
-        
-        rows = cur.fetchall()
+        cur.execute(
+            """
+            INSERT INTO parts_vendors (name, email, phone, domain)
+            VALUES (%s, %s, %s, %s)
+            RETURNING id, name, email, phone, active
+            """,
+            (name, email or None, phone or None, domain),
+        )
+
+        row = cur.fetchone()
+        conn.commit()
+
+        return {
+            "vendor": {
+                "id": row["id"],
+                "name": row["name"],
+                "email": row["email"],
+                "phone": row["phone"],
+                "active": row["active"],
+            }
+        }
+    finally:
         cur.close()
-        
-        # Build the response with individual RO assignments
-        assignments_by_tech = {}
-        
-        for row in rows:
-            tech = row["tech"]
-            ro = row["ro"]
-            labor_hrs = float(row["total_labor"] or 0)
-            refinish_hrs = float(row["total_refinish"] or 0)
-            total_hrs = labor_hrs + refinish_hrs
-            
-            if tech not in assignments_by_tech:
-                assignments_by_tech[tech] = []
-            
-            assignments_by_tech[tech].append({
-                "ro": ro,
-                "vehicle": row["vehicle"],
-                "total_hours": total_hrs
-            })
-        
-        return {
-            "assignments": assignments_by_tech,
-            "error": "0"
-        }
-    except Exception as e:
-        return {
-            "assignments": {},
-            "error": str(e)
-        }
+
+
+@router.get("/vendors/list")
+async def list_vendors(request: Request):
+    """List active parts vendors for the user's domain."""
+    domain = get_user_domain(request)
+    if not domain:
+        return JSONResponse(status_code=401, content={"error": "Not authenticated", "vendors": []})
+
+    conn = get_conn()
+    cur = conn.cursor()
+    try:
+        cur.execute(
+            """
+            SELECT id, name, email, phone, active
+            FROM parts_vendors
+            WHERE active = TRUE AND domain = %s
+            ORDER BY name
+            """,
+            (domain,),
+        )
+
+        rows = cur.fetchall()
+        vendors = [
+            {
+                "id": row["id"],
+                "name": row["name"],
+                "email": row["email"],
+                "phone": row["phone"],
+                "active": row["active"],
+            }
+            for row in rows
+        ]
+
+        return {"vendors": vendors}
+    finally:
+        cur.close()
 
 
 @router.get("/dashboard-data")

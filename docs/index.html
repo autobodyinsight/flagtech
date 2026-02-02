@@ -119,54 +119,6 @@
             color: #000;
         }
         
-        /* Tech Window Styles */
-        .tech-header {
-            text-align: center;
-            font-size: 32px;
-            font-weight: bold;
-            margin-bottom: 30px;
-        }
-        .add-tech-btn-container {
-            text-align: center;
-            margin-bottom: 30px;
-        }
-        .add-tech-btn {
-            padding: 12px 24px;
-            font-size: 16px;
-            cursor: pointer;
-            background-color: #505050;
-            color: white;
-            border: none;
-            border-radius: 4px;
-            transition: background-color 0.3s;
-        }
-        .add-tech-btn:hover {
-            background-color: #707070;
-        }
-        .tech-row {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 15px;
-            border-bottom: 1px solid #ddd;
-            font-size: 14px;
-        }
-        .tech-row:hover {
-            background-color: #f9f9f9;
-        }
-        .tech-name {
-            flex: 1;
-            text-align: left;
-            font-weight: bold;
-        }
-        .tech-ros {
-            flex: 1;
-            text-align: center;
-        }
-        .tech-hours {
-            flex: 1;
-            text-align: right;
-        }
         .form-group {
             margin-bottom: 20px;
         }
@@ -204,8 +156,7 @@
         <div class="tab-group">
             <div class="nav-tab active" onclick="switchScreen('dashboard')">DASHBOARD</div>
             <div class="nav-tab" onclick="switchScreen('upload')">UPLOAD</div>
-            <div class="nav-tab" onclick="switchScreen('tech')">TECH'S</div>
-            <div class="nav-tab" onclick="switchScreen('ros')">RO'S</div>
+            <div class="nav-tab" onclick="switchScreen('setup')">SET UP</div>
             <div class="nav-tab" onclick="switchScreen('flagtech')">FLAG TECH</div>
         </div>
         <div class="user-info">
@@ -311,23 +262,43 @@
         </div>
     
         
-        <!-- TECH WINDOW -->
-        <div id="tech" class="screen">
-            <h1 class="tech-header">TECHS</h1>
+        <!-- SETUP WINDOW -->
+        <div id="setup" class="screen">
+            <h2 style="text-align:center; margin-bottom:30px;">SET UP</h2>
             
-            <div class="add-tech-btn-container">
-                <button class="add-tech-btn" onclick="openAddTechModal()">+ tech</button>
+            <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(280px, 1fr)); gap:20px;">
+                <div style="border:1px solid #ddd; border-radius:8px; padding:20px; background:#fafafa;">
+                    <h3 style="margin-bottom:15px;">Add Technician</h3>
+                    <label>First:</label>
+                    <input type="text" id="setupTechFirst" style="width:100%; padding:8px; margin-bottom:10px; box-sizing:border-box;">
+
+                    <label>Last:</label>
+                    <input type="text" id="setupTechLast" style="width:100%; padding:8px; margin-bottom:10px; box-sizing:border-box;">
+
+                    <label>Rate:</label>
+                    <input type="number" step="0.01" id="setupTechRate" style="width:100%; padding:8px; margin-bottom:15px; box-sizing:border-box;">
+
+                    <button onclick="setupAddTech()" style="padding:10px 16px; background-color:#505050; color:white; border:none; border-radius:4px; cursor:pointer; font-size:14px;">Add Tech</button>
+
+                    <div id="setupTechsList" style="margin-top:15px;"></div>
+                </div>
+
+                <div style="border:1px solid #ddd; border-radius:8px; padding:20px; background:#fafafa;">
+                    <h3 style="margin-bottom:15px;">Add Parts Vendor</h3>
+                    <label>Name:</label>
+                    <input type="text" id="setupVendorName" style="width:100%; padding:8px; margin-bottom:10px; box-sizing:border-box;">
+
+                    <label>Email:</label>
+                    <input type="email" id="setupVendorEmail" style="width:100%; padding:8px; margin-bottom:10px; box-sizing:border-box;">
+
+                    <label>Phone:</label>
+                    <input type="text" id="setupVendorPhone" style="width:100%; padding:8px; margin-bottom:15px; box-sizing:border-box;">
+
+                    <button onclick="setupAddVendor()" style="padding:10px 16px; background-color:#505050; color:white; border:none; border-radius:4px; cursor:pointer; font-size:14px;">Add Vendor</button>
+
+                    <div id="setupVendorsList" style="margin-top:15px;"></div>
+                </div>
             </div>
-            
-            <div id="techsList">
-                <!-- Tech rows will be dynamically loaded here -->
-            </div>
-        </div>
-    
-        
-        <div id="ros" class="screen">
-            <h2>RO'S</h2>
-            <p>RO's management screen - coming soon</p>
         </div>
     
         
@@ -338,30 +309,7 @@
     
     </div>
     
-    <!-- Add Tech Modal -->
-    <div id="addTechModal" class="modal">
-        <div class="modal-content">
-            <span class="close" onclick="closeAddTechModal()">&times;</span>
-            <h2>Add Technician</h2>
-            
-            <div class="form-group">
-                <label for="techFirst">First:</label>
-                <input type="text" id="techFirst" placeholder="Enter first name">
-            </div>
-            
-            <div class="form-group">
-                <label for="techLast">Last:</label>
-                <input type="text" id="techLast" placeholder="Enter last name">
-            </div>
-            
-            <div class="form-group">
-                <label for="techRate">Rate:</label>
-                <input type="number" id="techRate" step="0.01" placeholder="Enter hourly rate">
-            </div>
-            
-            <button class="btn-primary" onclick="saveTech()">Save</button>
-        </div>
-    </div>
+    
     
     <!-- Include Chart.js for pie chart -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -451,9 +399,10 @@
             document.getElementById(screenName).classList.add('active');
             event.target.classList.add('active');
             
-            // Load tech data when switching to tech screen
-            if (screenName === 'tech') {
-                loadTechs();
+            // Load setup data when switching to setup screen
+            if (screenName === 'setup') {
+                setupLoadTechs();
+                setupLoadVendors();
             }
             
             // Load dashboard data when switching to dashboard
@@ -463,32 +412,19 @@
         }
         
         // ============================================
-        // TECH WINDOW FUNCTIONS
+        // SETUP WINDOW FUNCTIONS
         // ============================================
-        
-        function openAddTechModal() {
-            document.getElementById('addTechModal').style.display = 'block';
-            // Clear form
-            document.getElementById('techFirst').value = '';
-            document.getElementById('techLast').value = '';
-            document.getElementById('techRate').value = '';
-        }
-        
-        function closeAddTechModal() {
-            document.getElementById('addTechModal').style.display = 'none';
-        }
-        
-        function saveTech() {
-            const firstName = document.getElementById('techFirst').value.trim();
-            const lastName = document.getElementById('techLast').value.trim();
-            const rate = parseFloat(document.getElementById('techRate').value);
-            
+
+        function setupAddTech() {
+            const firstName = document.getElementById('setupTechFirst').value.trim();
+            const lastName = document.getElementById('setupTechLast').value.trim();
+            const rate = parseFloat(document.getElementById('setupTechRate').value);
+
             if (!firstName || !lastName || !rate) {
                 alert('Please fill in all fields');
                 return;
             }
-            
-            // Save to backend
+
             authFetch(`${API_BASE}/api/techs/add`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -500,110 +436,98 @@
             })
             .then(response => response.json())
             .then(data => {
-                closeAddTechModal();
-                loadTechs(); // Reload the list
+                if (data.error) {
+                    throw new Error(data.error);
+                }
+                document.getElementById('setupTechFirst').value = '';
+                document.getElementById('setupTechLast').value = '';
+                document.getElementById('setupTechRate').value = '';
+                setupLoadTechs();
             })
             .catch(error => {
                 console.error('Error saving tech:', error);
                 alert('Error saving tech. Please try again.');
             });
         }
-        
-        function loadTechs() {
-            const container = document.getElementById('techsList');
-            container.innerHTML = '<p style="text-align:center; color:#777;">Loading...</p>';
-            
-            // Fetch techs and their assignments
-            Promise.all([
-                authFetch(`${API_BASE}/api/techs/list`).then(r => r.json()),
-                authFetch(`${API_BASE}/api/tech-assignments`).then(r => r.json())
-            ])
-            .then(([techsData, assignmentsData]) => {
-                container.innerHTML = '';
-                
-                if (!techsData.techs || techsData.techs.length === 0) {
-                    container.innerHTML = '<p style="text-align:center; color:#777;">No techs added yet.</p>';
-                    return;
-                }
-                
-                // Render each tech
-                const assignmentsByTech = assignmentsData && assignmentsData.assignments ? assignmentsData.assignments : {};
 
-                techsData.techs.forEach(tech => {
-                    const fullName = `${tech.first_name} ${tech.last_name}`;
-                    const techAssignments = assignmentsByTech[fullName] || [];
-                    
-                    // Tech header row
-                    const techHeader = document.createElement('div');
-                    techHeader.className = 'tech-row';
-                    techHeader.style.backgroundColor = '#f5f5f5';
-                    techHeader.style.fontWeight = 'bold';
-                    techHeader.innerHTML = `
-                        <div class="tech-name">${fullName}</div>
-                        <div class="tech-ros">Rate: $${tech.pay_rate.toFixed(2)}/hr</div>
-                        <div class="tech-hours"></div>
-                    `;
-                    container.appendChild(techHeader);
-                    
-                    // If tech has assignments, show them below a divider
-                    if (techAssignments.length > 0) {
-                        // Horizontal divider
-                        const divider = document.createElement('div');
-                        divider.style.borderBottom = '2px solid #333';
-                        divider.style.margin = '5px 15px';
-                        container.appendChild(divider);
-                        
-                        // Calculate totals
-                        const totalROs = techAssignments.length;
-                        const totalHours = techAssignments.reduce((sum, a) => sum + a.total_hours, 0);
-                        
-                        // Display each RO assignment
-                        techAssignments.forEach(assignment => {
-                            const assignmentRow = document.createElement('div');
-                            assignmentRow.style.padding = '8px 15px';
-                            assignmentRow.style.fontSize = '13px';
-                            assignmentRow.style.display = 'flex';
-                            assignmentRow.style.justifyContent = 'space-between';
-                            assignmentRow.style.backgroundColor = '#fafafa';
-                            assignmentRow.style.borderBottom = '1px solid #eee';
-                            assignmentRow.innerHTML = `
-                                <div style="flex:1;">${fullName}</div>
-                                <div style="flex:1; text-align:center;">${assignment.ro}</div>
-                                <div style="flex:1; text-align:right;">${assignment.total_hours.toFixed(1)} hrs</div>
-                            `;
-                            container.appendChild(assignmentRow);
-                        });
-                        
-                        // Summary row
-                        const summaryRow = document.createElement('div');
-                        summaryRow.style.padding = '8px 15px';
-                        summaryRow.style.fontSize = '13px';
-                        summaryRow.style.fontWeight = 'bold';
-                        summaryRow.style.display = 'flex';
-                        summaryRow.style.justifyContent = 'space-between';
-                        summaryRow.style.backgroundColor = '#e8f5e9';
-                        summaryRow.style.borderTop = '2px solid #333';
-                        summaryRow.innerHTML = `
-                            <div style="flex:1;">Total</div>
-                            <div style="flex:1; text-align:center;">${totalROs} RO's</div>
-                            <div style="flex:1; text-align:right;">${totalHours.toFixed(1)} hrs</div>
-                        `;
-                        container.appendChild(summaryRow);
+        function setupLoadTechs() {
+            const container = document.getElementById('setupTechsList');
+            if (!container) return;
+
+            container.innerHTML = '<p style="text-align:center; color:#777;">Loading...</p>';
+            authFetch(`${API_BASE}/api/techs/list`)
+                .then(r => r.json())
+                .then(res => {
+                    if (!res.techs || res.techs.length === 0) {
+                        container.innerHTML = '<p style="text-align:center; color:#777;">No techs added yet.</p>';
+                        return;
                     }
+
+                    container.innerHTML = res.techs.map(tech => {
+                        return `<div style="padding:8px 0; border-bottom:1px solid #eee;">${tech.first_name} ${tech.last_name} - $${tech.pay_rate.toFixed(2)}/hr</div>`;
+                    }).join('');
+                })
+                .catch(error => {
+                    console.error('Error loading techs:', error);
+                    container.innerHTML = '<p style="text-align:center; color:red;">Error loading techs.</p>';
                 });
+        }
+
+        function setupAddVendor() {
+            const name = document.getElementById('setupVendorName').value.trim();
+            const email = document.getElementById('setupVendorEmail').value.trim();
+            const phone = document.getElementById('setupVendorPhone').value.trim();
+
+            if (!name) {
+                alert('Please enter a vendor name');
+                return;
+            }
+
+            authFetch(`${API_BASE}/api/vendors/add`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name, email, phone })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.error) {
+                    throw new Error(data.error);
+                }
+                document.getElementById('setupVendorName').value = '';
+                document.getElementById('setupVendorEmail').value = '';
+                document.getElementById('setupVendorPhone').value = '';
+                setupLoadVendors();
             })
             .catch(error => {
-                console.error('Error loading techs:', error);
-                container.innerHTML = '<p style="text-align:center; color:red;">Error loading techs.</p>';
+                console.error('Error saving vendor:', error);
+                alert('Error saving vendor. Please try again.');
             });
         }
-        
-        // Close modal when clicking outside
-        window.onclick = function(event) {
-            const modal = document.getElementById('addTechModal');
-            if (event.target === modal) {
-                closeAddTechModal();
-            }
+
+        function setupLoadVendors() {
+            const container = document.getElementById('setupVendorsList');
+            if (!container) return;
+
+            container.innerHTML = '<p style="text-align:center; color:#777;">Loading...</p>';
+            authFetch(`${API_BASE}/api/vendors/list`)
+                .then(r => r.json())
+                .then(res => {
+                    if (!res.vendors || res.vendors.length === 0) {
+                        container.innerHTML = '<p style="text-align:center; color:#777;">No vendors added yet.</p>';
+                        return;
+                    }
+
+                    container.innerHTML = res.vendors.map(vendor => {
+                        const parts = [vendor.name];
+                        if (vendor.email) parts.push(vendor.email);
+                        if (vendor.phone) parts.push(vendor.phone);
+                        return `<div style="padding:8px 0; border-bottom:1px solid #eee;">${parts.join(' • ')}</div>`;
+                    }).join('');
+                })
+                .catch(error => {
+                    console.error('Error loading vendors:', error);
+                    container.innerHTML = '<p style="text-align:center; color:red;">Error loading vendors.</p>';
+                });
         }
         
         // ============================================

@@ -3,8 +3,7 @@
 from fastapi import APIRouter
 from fastapi.responses import HTMLResponse
 from .flagout import get_flagtech_screen_html
-from .ros import get_ros_screen_html
-from .techs import get_techs_screen_html
+from .setup import get_setup_screen_html, get_setup_script
 from .dashboard import get_dashboard_screen_html
 try:
     from .upload_ui.upload import get_upload_screen_html, get_upload_script
@@ -90,16 +89,14 @@ async def home_screen():
     <div class="sidebar">
         <div class="nav-box active" onclick="switchScreen('upload')">UPLOAD</div>
         <div class="nav-box" onclick="switchScreen('dashboard')">DASHBOARD</div>
-        <div class="nav-box" onclick="switchScreen('tech')">TECH'S</div>
-        <div class="nav-box" onclick="switchScreen('ros')">RO'S</div>
+        <div class="nav-box" onclick="switchScreen('setup')">SETUP</div>
         <div class="nav-box" onclick="switchScreen('flagtech')">FLAG TECH</div>
     </div>
     
     <div class="content-area">
         {get_upload_screen_html()}
         {get_dashboard_screen_html()}
-        {get_techs_screen_html()}
-        {get_ros_screen_html()}
+        {get_setup_screen_html()}
         {get_flagtech_screen_html()}
     </div>
     
@@ -118,6 +115,11 @@ async def home_screen():
             
             // Add active class to clicked nav box
             event.target.classList.add('active');
+
+            if (screenName === 'setup' && typeof setupLoadTechs === 'function') {
+                setupLoadTechs();
+                setupLoadVendors();
+            }
             
             // Load dashboard data if switching to dashboard
             if (screenName === 'dashboard' && typeof loadDashboardDataIfNeeded === 'function') {{
@@ -126,6 +128,7 @@ async def home_screen():
         }}
         
         {get_upload_script()}
+        {get_setup_script()}
     </script>
 </body>
 </html>

@@ -4,8 +4,7 @@ from app.services.extractor import extract_text_from_pdf, extract_words_from_pdf
 from app.services.parser import parse_estimate_text
 from app.services.grid_processor import process_pdf_grid, generate_pages_html
 from .flagout import get_flagtech_screen_html
-from .ros import get_ros_screen_html
-from .techs import get_techs_screen_html
+from .setup import get_setup_screen_html, get_setup_script
 try:
     from .upload_ui.upload import get_upload_screen_html, get_upload_script
     from .upload_ui.labor import get_labor_modal_html, get_labor_modal_styles, get_labor_modal_script
@@ -93,15 +92,13 @@ async def home_screen():
 <body>
     <div class="sidebar">
         <div class="nav-box active" onclick="switchScreen('upload')">UPLOAD</div>
-        <div class="nav-box" onclick="switchScreen('tech')">TECH'S</div>
-        <div class="nav-box" onclick="switchScreen('ros')">RO'S</div>
+        <div class="nav-box" onclick="switchScreen('setup')">SETUP</div>
         <div class="nav-box" onclick="switchScreen('flagtech')">FLAG TECH</div>
     </div>
     
     <div class="content-area">
         {get_upload_screen_html()}
-        {get_techs_screen_html()}
-        {get_ros_screen_html()}
+        {get_setup_screen_html()}
         {get_flagtech_screen_html()}
     </div>
     
@@ -120,9 +117,15 @@ async def home_screen():
             
             // Add active class to clicked nav box
             event.target.classList.add('active');
+
+            if (screenName === 'setup' && typeof setupLoadTechs === 'function') {
+                setupLoadTechs();
+                setupLoadVendors();
+            }
         }}
         
         {get_upload_script()}
+        {get_setup_script()}
     </script>
 </body>
 </html>
