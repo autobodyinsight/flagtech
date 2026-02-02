@@ -88,16 +88,16 @@ async def home_screen():
 </head>
 <body>
     <div class="tab-bar">
-        <div class="nav-tab active" onclick="switchScreen('upload')">UPLOAD</div>
-        <div class="nav-tab" onclick="switchScreen('dashboard')">DASHBOARD</div>
+        <div class="nav-tab active" onclick="switchScreen('dashboard')">DASHBOARD</div>
+        <div class="nav-tab" onclick="switchScreen('upload')">UPLOAD</div>
         <div class="nav-tab" onclick="switchScreen('tech')">TECH'S</div>
         <div class="nav-tab" onclick="switchScreen('ros')">RO'S</div>
         <div class="nav-tab" onclick="switchScreen('flagtech')">FLAG TECH</div>
     </div>
     
     <div class="content-area">
-        {get_upload_screen_html()}
         {get_dashboard_screen_html()}
+        {get_upload_screen_html()}
         {get_techs_screen_html()}
         {get_ros_screen_html()}
         {get_flagtech_screen_html()}
