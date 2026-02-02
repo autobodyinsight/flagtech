@@ -118,10 +118,10 @@ async def home_screen():
             // Add active class to clicked nav box
             event.target.classList.add('active');
 
-            if (screenName === 'setup' && typeof setupLoadTechs === 'function') {
+            if (screenName === 'setup' && typeof setupLoadTechs === 'function') {{
                 setupLoadTechs();
                 setupLoadVendors();
-            }
+            }}
         }}
         
         {get_upload_script()}
