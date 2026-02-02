@@ -38,52 +38,45 @@ async def home_screen():
         body {{
             font-family: Arial, sans-serif;
             display: flex;
+            flex-direction: column;
             height: 100vh;
             background-color: #f5f5f5;
+            margin: 0;
         }}
-        .sidebar {{
-            width: 180px;
+        .tab-bar {{
             background-color: #505050;
             display: flex;
-            flex-direction: column;
-            gap: 10px;
-            padding: 20px;
-            position: fixed;
-            height: 100vh;
-            overflow-y: auto;
+            gap: 0;
+            padding: 0;
+            border-bottom: 3px solid #333;
         }}
-        .nav-box {{
-            padding: 15px 12px;
+        .nav-tab {{
+            padding: 18px 35px;
             background-color: #666666;
             color: white;
             text-align: center;
             cursor: pointer;
-            border-radius: 5px;
             font-weight: bold;
-            border: 2px solid transparent;
+            border-right: 1px solid #555;
             transition: all 0.3s ease;
-            min-height: 50px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
             font-size: 14px;
+            flex: 1;
+            max-width: 200px;
         }}
-        .nav-box:hover {{
+        .nav-tab:hover {{
             background-color: #707070;
-            border: 2px solid white;
         }}
-        .nav-box.active {{
+        .nav-tab.active {{
             background-color: #d32f2f;
             color: white;
-            border: 2px solid #d32f2f;
+            border-bottom: 3px solid #d32f2f;
+            margin-bottom: -3px;
         }}
         .content-area {{
             flex: 1;
             padding: 40px;
             overflow-y: auto;
-            margin-left: 180px;
             background-color: white;
-            min-height: 100vh;
         }}
         .screen {{
             display: none;
@@ -94,12 +87,12 @@ async def home_screen():
     </style>
 </head>
 <body>
-    <div class="sidebar">
-        <div class="nav-box active" onclick="switchScreen('upload')">UPLOAD</div>
-        <div class="nav-box" onclick="switchScreen('dashboard')">DASHBOARD</div>
-        <div class="nav-box" onclick="switchScreen('tech')">TECH'S</div>
-        <div class="nav-box" onclick="switchScreen('ros')">RO'S</div>
-        <div class="nav-box" onclick="switchScreen('flagtech')">FLAG TECH</div>
+    <div class="tab-bar">
+        <div class="nav-tab active" onclick="switchScreen('upload')">UPLOAD</div>
+        <div class="nav-tab" onclick="switchScreen('dashboard')">DASHBOARD</div>
+        <div class="nav-tab" onclick="switchScreen('tech')">TECH'S</div>
+        <div class="nav-tab" onclick="switchScreen('ros')">RO'S</div>
+        <div class="nav-tab" onclick="switchScreen('flagtech')">FLAG TECH</div>
     </div>
     
     <div class="content-area">
@@ -115,8 +108,8 @@ async def home_screen():
             const screens = document.querySelectorAll('.screen');
             screens.forEach(screen => screen.classList.remove('active'));
             
-            const navBoxes = document.querySelectorAll('.nav-box');
-            navBoxes.forEach(box => box.classList.remove('active'));
+            const navTabs = document.querySelectorAll('.nav-tab');
+            navTabs.forEach(tab => tab.classList.remove('active'));
             
             document.getElementById(screenName).classList.add('active');
             event.target.classList.add('active');            

@@ -7,29 +7,29 @@ def get_dashboard_screen_html():
         <div id="dashboard" class="screen" style="padding:20px;">
             <h1 style="text-align:center; margin-bottom:30px;">DASHBOARD</h1>
             
-            <div style="display:flex; gap:20px; align-items:stretch;">
+            <div style="display:flex; gap:20px;">
                 <!-- Left Side: Vertical Bars -->
-                <div style="flex:0 0 300px; display:flex; flex-direction:column; gap:20px; height:100%;">
+                <div style="flex:0 0 300px; display:flex; flex-direction:column; gap:20px;">
                     <!-- Total Sales Bar -->
-                    <div style="background:#f9f9f9; padding:20px; border-radius:8px; border:1px solid #ddd; flex:1; display:flex; flex-direction:column;">
+                    <div style="background:#f9f9f9; padding:20px; border-radius:8px; border:1px solid #ddd; flex:1; display:flex; flex-direction:column; height:calc((100% - 20px) / 2);">
                         <h3 style="margin:0 0 10px 0; text-align:center; color:#333;">Total Sales</h3>
-                        <div style="position:relative; flex:1; min-height:300px; background:#e0e0e0; border-radius:4px; overflow:hidden;">
+                        <div style="position:relative; flex:1; background:#e0e0e0; border-radius:4px; overflow:hidden;">
                             <div id="totalSalesBar" style="position:absolute; bottom:0; width:100%; background:linear-gradient(to top, #4caf50, #81c784); transition:height 0.5s ease;">
                             </div>
                         </div>
-                        <div id="totalSalesValue" style="text-align:center; font-size:24px; font-weight:bold; color:#4caf50; margin-top:10px;">
+                        <div id="totalSalesValue" style="text-align:center; font-size:20px; font-weight:bold; color:#4caf50; margin-top:10px;">
                             $0
                         </div>
                     </div>
                     
                     <!-- Pending Payments Bar -->
-                    <div style="background:#f9f9f9; padding:20px; border-radius:8px; border:1px solid #ddd; flex:1; display:flex; flex-direction:column;">
+                    <div style="background:#f9f9f9; padding:20px; border-radius:8px; border:1px solid #ddd; flex:1; display:flex; flex-direction:column; height:calc((100% - 20px) / 2);">
                         <h3 style="margin:0 0 10px 0; text-align:center; color:#333;">Pending Payments</h3>
-                        <div style="position:relative; flex:1; min-height:300px; background:#e0e0e0; border-radius:4px; overflow:hidden;">
+                        <div style="position:relative; flex:1; background:#e0e0e0; border-radius:4px; overflow:hidden;">
                             <div id="pendingPaymentsBar" style="position:absolute; bottom:0; width:100%; background:linear-gradient(to top, #ff9800, #ffb74d); transition:height 0.5s ease;">
                             </div>
                         </div>
-                        <div id="pendingPaymentsValue" style="text-align:center; font-size:24px; font-weight:bold; color:#ff9800; margin-top:10px;">
+                        <div id="pendingPaymentsValue" style="text-align:center; font-size:20px; font-weight:bold; color:#ff9800; margin-top:10px;">
                             $0
                         </div>
                     </div>
