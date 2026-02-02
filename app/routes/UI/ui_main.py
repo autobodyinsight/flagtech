@@ -32,11 +32,11 @@ async def home_screen():
             padding: 0;
             box-sizing: border-box;
         }}
-        body {{
+        body {
             font-family: Arial, sans-serif;
             display: flex;
             height: 100vh;
-            background-color: #f5f5f5;
+            background-color: #f2f2f2;
         }}
         .sidebar {{
             width: 150px;
@@ -69,12 +69,12 @@ async def home_screen():
             color: white;
             border: 2px solid #d32f2f;
         }}
-        .content-area {{
+        .content-area {
             flex: 1;
             padding: 40px;
             overflow-y: auto;
             margin-left: 150px;
-            background-color: white;
+            background-color: #f2f2f2;
             min-height: 100vh;
         }}
         .screen {{

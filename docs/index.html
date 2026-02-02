@@ -1,4 +1,4 @@
-<<html><head>
+<html><head>
     <title>FlagTech</title>
     <style>
         * {
@@ -10,7 +10,7 @@
             font-family: Arial, sans-serif;
             display: flex;
             height: 100vh;
-            background-color: #f5f5f5;
+            background-color: #f2f2f2;
         }
         .sidebar {
             width: 150px;
@@ -48,7 +48,7 @@
             padding: 40px;
             overflow-y: auto;
             margin-left: 150px;
-            background-color: white;
+            background-color: #f2f2f2;
             min-height: 100vh;
         }
         .screen {
@@ -70,7 +70,7 @@
             background-color: rgba(0,0,0,0.5);
         }
         .modal-content {
-            background-color: white;
+            background-color: #f2f2f2;
             margin: 10% auto;
             padding: 30px;
             border-radius: 8px;
@@ -316,7 +316,7 @@
             }
             
             // Save to backend
-            fetch(`${API_BASE}/api/techs/add`, {
+            fetch(`${API_BASE}/ui/techs/add`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -344,8 +344,8 @@
 
             // Fetch techs list and tech assignments to get total ROs and hours
             Promise.all([
-                fetch(`${API_BASE}/api/techs/list`).then(r => r.json()),
-                fetch(`${API_BASE}/api/tech-assignments`).then(r => r.json())
+                fetch(`${API_BASE}/ui/techs/list`).then(r => r.json()),
+                fetch(`${API_BASE}/ui/tech-assignments`).then(r => r.json())
             ])
             .then(([techsRes, assignmentsRes]) => {
                 cardsContainer.innerHTML = "";
@@ -635,7 +635,7 @@
             const statusDiv = document.getElementById('uploadStatus');
             statusDiv.innerHTML = '<p>Processing...</p>';
             
-            fetch('https://flagtech1.onrender.com/ui/grid?ajax=true', {
+            fetch(`${API_BASE}/ui/grid?ajax=true`, {
                 method: 'POST',
                 body: formData
             })

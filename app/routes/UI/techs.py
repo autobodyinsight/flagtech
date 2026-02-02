@@ -37,7 +37,7 @@ def get_techs_screen_html():
 
         <!-- Tech Details Modal -->
         <div id="techDetailsModal" class="modal" style="display:none;">
-            <div class="modal-content" style="max-width:900px; max-height:90vh; overflow-y:auto;">
+            <div class="modal-content" style="max-width:900px; max-height:90vh; overflow-y:auto; background-color:#f2f2f2;">
                 <span class="close" onclick="closeTechDetailsModal()">&times;</span>
                 <h2 id="techDetailsTitle" style="margin-bottom:20px;"></h2>
 
@@ -56,7 +56,7 @@ def get_techs_screen_html():
 
         <!-- Add Tech Modal -->
         <div id="addTechModal" class="modal" style="display:none;">
-            <div class="modal-content" style="max-width:400px;">
+            <div class="modal-content" style="max-width:400px; background-color:#f2f2f2;">
                 <span class="close" onclick="closeAddTechModal()">&times;</span>
                 <h3>Add Technician</h3>
 

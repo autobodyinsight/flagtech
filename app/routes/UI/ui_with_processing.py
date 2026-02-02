@@ -36,11 +36,11 @@ async def home_screen():
             padding: 0;
             box-sizing: border-box;
         }}
-        body {{
+        body {
             font-family: Arial, sans-serif;
             display: flex;
             height: 100vh;
-            background-color: #f5f5f5;
+            background-color: #f2f2f2;
         }}
         .sidebar {{
             width: 150px;
@@ -73,12 +73,12 @@ async def home_screen():
             color: white;
             border: 2px solid #d32f2f;
         }}
-        .content-area {{
+        .content-area {
             flex: 1;
             padding: 40px;
             overflow-y: auto;
             margin-left: 150px;
-            background-color: white;
+            background-color: #f2f2f2;
             min-height: 100vh;
         }}
         .screen {{
@@ -138,7 +138,7 @@ async def upload_form():
 <head>
     <title>FlagTech Estimate Parser</title>
 </head>
-<body style="font-family: Arial; padding: 40px;">
+<body style="font-family: Arial; padding: 40px; background-color: #f2f2f2;">
     <h2>Upload an Estimate PDF</h2>
     <form id="uploadForm" action="/ui/grid" method="post" enctype="multipart/form-data">
         <input type="file" name="file" accept="application/pdf" onchange="this.form.submit()" />
@@ -181,7 +181,7 @@ async def parse_ui(file: UploadFile = File(...)):
 <head>
     <title>Parsed Estimate</title>
 </head>
-<body style="font-family: Arial; padding: 40px;">
+<body style="font-family: Arial; padding: 40px; background-color: #f2f2f2;">
     <h2>Parsed Line Items</h2>
     <table border="1" cellpadding="6" cellspacing="0">
         <tr>
@@ -265,8 +265,8 @@ async def grid_ui(file: UploadFile = File(...), ajax: str = None):
     height: 100%;
     background-color: rgba(0,0,0,0.4);
   }}
-  .modal-content {{
-    background-color: #fefefe;
+    .modal-content {
+        background-color: #f2f2f2;
     margin: 2% auto;
     padding: 20px;
     border: 1px solid #888;
