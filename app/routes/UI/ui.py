@@ -53,7 +53,7 @@ async def home_screen():
             overflow-y: auto;
         }}
         .nav-box {{
-            padding: 15px;
+            padding: 15px 10px;
             background-color: #666666;
             color: white;
             text-align: center;
@@ -62,6 +62,10 @@ async def home_screen():
             font-weight: bold;
             border: 2px solid transparent;
             transition: all 0.3s ease;
+            min-height: 50px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }}
         .nav-box:hover {{
             background-color: #707070;
