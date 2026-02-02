@@ -21,7 +21,6 @@ def get_setup_screen_html():
 
                 <button onclick="setupAddTech()" style="padding:10px 16px; background-color:#505050; color:white; border:none; border-radius:4px; cursor:pointer; font-size:14px;">Add Tech</button>
 
-                <div id="setupTechsList" style="margin-top:15px;"></div>
             </div>
 
             <div style="border:1px solid #ddd; border-radius:8px; padding:20px; background:#fafafa;">
@@ -37,7 +36,20 @@ def get_setup_screen_html():
 
                 <button onclick="setupAddVendor()" style="padding:10px 16px; background-color:#505050; color:white; border:none; border-radius:4px; cursor:pointer; font-size:14px;">Add Vendor</button>
 
-                <div id="setupVendorsList" style="margin-top:15px;"></div>
+            </div>
+        </div>
+
+        <hr style="margin:30px 0; border:none; border-top:1px solid #ddd;">
+
+        <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(280px, 1fr)); gap:20px;">
+            <div style="border:1px solid #ddd; border-radius:8px; padding:20px; background:#fff;">
+                <h3 style="margin-bottom:15px;">Technicians</h3>
+                <div id="setupTechsList"></div>
+            </div>
+
+            <div style="border:1px solid #ddd; border-radius:8px; padding:20px; background:#fff;">
+                <h3 style="margin-bottom:15px;">Parts Vendors</h3>
+                <div id="setupVendorsList"></div>
             </div>
         </div>
     </div>
