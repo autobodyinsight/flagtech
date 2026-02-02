@@ -102,6 +102,17 @@ const laborItems = {labor_items_json};
 const initialTotal = {total_labor};
 let laborAdditionalCounter = 0;
 
+const apiBase = window.API_BASE || 'https://flagtech1.onrender.com';
+
+function getAuthHeaders() {{
+  const token = localStorage.getItem('auth_token');
+  const headers = {{}};
+  if (token) {{
+    headers['Authorization'] = `Bearer ${{token}}`;
+  }}
+  return headers;
+}}
+
 // This will store ONLY the items displayed in the modal
 let displayLaborItems = [];
 
@@ -162,7 +173,10 @@ function toggleDeduction(index) {{
 }}
 
 function loadTechsIntoDropdown() {{
-  fetch('https://flagtech1.onrender.com/api/techs/list')
+  fetch(`${{apiBase}}/api/techs/list`, {{
+    headers: getAuthHeaders(),
+    credentials: 'include'
+  }})
     .then(r => r.json())
     .then(data => {{
       const select = document.getElementById('techInput');
@@ -325,9 +339,10 @@ function saveModal() {{
     timestamp: new Date().toISOString()
   }};
 
-  fetch('https://flagtech1.onrender.com/ui/save-labor', {{
+  fetch(`${{apiBase}}/ui/save-labor`, {{
     method: 'POST',
-    headers: {{ 'Content-Type': 'application/json' }},
+    headers: {{ 'Content-Type': 'application/json', ...getAuthHeaders() }},
+    credentials: 'include',
     body: JSON.stringify(data)
   }})
   .then(r => r.json())

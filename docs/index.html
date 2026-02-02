@@ -1,4 +1,6 @@
-<<html><head>
+<!DOCTYPE html>
+<html>
+<head>
     <title>FlagTech</title>
     <style>
         * {
@@ -366,6 +368,29 @@
     <script>
 
         const API_BASE = 'https://flagtech1.onrender.com';
+        window.API_BASE = API_BASE;
+
+        function getAuthHeaders() {
+            const token = localStorage.getItem('auth_token');
+            const headers = {};
+            if (token) {
+                headers['Authorization'] = `Bearer ${token}`;
+            }
+            return headers;
+        }
+
+        function authFetch(url, options = {}) {
+            const mergedHeaders = {
+                ...(options.headers || {}),
+                ...getAuthHeaders()
+            };
+
+            return fetch(url, {
+                ...options,
+                headers: mergedHeaders,
+                credentials: 'include'
+            });
+        }
 
         // Check authentication on load
         window.addEventListener('load', () => {
@@ -374,13 +399,28 @@
                 window.location.href = 'login.html';
                 return;
             }
-            
+
             // Display user info if available
             const companyName = localStorage.getItem('company_name');
             if (companyName) {
                 document.title = 'FlagTech - ' + companyName;
                 document.getElementById('companyNameDisplay').textContent = companyName;
             }
+
+            // Validate session with backend
+            authFetch(`${API_BASE}/api/auth/me`)
+                .then(r => {
+                    if (!r.ok) {
+                        throw new Error('Not authenticated');
+                    }
+                    return r.json();
+                })
+                .catch(() => {
+                    localStorage.removeItem('auth_token');
+                    localStorage.removeItem('user_email');
+                    localStorage.removeItem('company_name');
+                    window.location.href = 'login.html';
+                });
         });
         
         function handleLogout() {
@@ -448,7 +488,7 @@
             }
             
             // Save to backend
-            fetch(`${API_BASE}/api/techs/add`, {
+            authFetch(`${API_BASE}/api/techs/add`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -474,8 +514,8 @@
             
             // Fetch techs and their assignments
             Promise.all([
-                fetch(`${API_BASE}/api/techs/list`).then(r => r.json()),
-                fetch(`${API_BASE}/api/tech-assignments`).then(r => r.json())
+                authFetch(`${API_BASE}/api/techs/list`).then(r => r.json()),
+                authFetch(`${API_BASE}/api/tech-assignments`).then(r => r.json())
             ])
             .then(([techsData, assignmentsData]) => {
                 container.innerHTML = '';
@@ -486,9 +526,11 @@
                 }
                 
                 // Render each tech
+                const assignmentsByTech = assignmentsData && assignmentsData.assignments ? assignmentsData.assignments : {};
+
                 techsData.techs.forEach(tech => {
                     const fullName = `${tech.first_name} ${tech.last_name}`;
-                    const techAssignments = assignmentsData.assignments[fullName] || [];
+                    const techAssignments = assignmentsByTech[fullName] || [];
                     
                     // Tech header row
                     const techHeader = document.createElement('div');
@@ -578,7 +620,7 @@
             const statusDiv = document.getElementById('uploadStatus');
             statusDiv.innerHTML = '<p>Processing...</p>';
             
-            fetch('https://flagtech1.onrender.com/ui/grid?ajax=true', {
+            authFetch(`${API_BASE}/ui/grid?ajax=true`, {
                 method: 'POST',
                 body: formData
             })
@@ -606,7 +648,7 @@
         let hoursPerTechChartInstance = null;
         
         function loadDashboardData() {
-            fetch(`${API_BASE}/api/dashboard-data`)
+            authFetch(`${API_BASE}/api/dashboard-data`)
                 .then(response => response.json())
                 .then(data => {
                     updateDashboard(data);

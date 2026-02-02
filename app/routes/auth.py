@@ -1,7 +1,7 @@
 """Authentication routes for login and signup."""
 from fastapi import APIRouter, Request, Response
 from fastapi.responses import JSONResponse
-from app.services.auth import create_user, authenticate_user
+from app.services.auth import create_user, authenticate_user, store_session, get_session, delete_session
 
 router = APIRouter()
 
@@ -64,21 +64,34 @@ async def login(request: Request, response: Response):
             content=result
         )
     
-    # Set session cookie
-    response.set_cookie(
+    # Store session with domain info
+    store_session(result["token"], {
+        "user_id": result["user"]["id"],
+        "email": result["user"]["email"],
+        "domain": result["user"]["domain"],
+        "company_name": result["user"]["company_name"]
+    })
+    
+    # Set session cookie on the response being returned
+    json_response = JSONResponse(content=result)
+    json_response.set_cookie(
         key="session_token",
         value=result["token"],
         httponly=True,
         max_age=86400 * 7,  # 7 days
-        samesite="lax"
+        samesite="none",
+        secure=True
     )
     
-    return JSONResponse(content=result)
+    return json_response
 
 
 @router.post("/logout")
-async def logout(response: Response):
+async def logout(request: Request, response: Response):
     """Log out the current user."""
+    token = request.cookies.get("session_token")
+    if token:
+        delete_session(token)
     response.delete_cookie("session_token")
     return JSONResponse(content={"success": True})
 
@@ -94,11 +107,19 @@ async def get_current_user(request: Request):
             content={"success": False, "error": "Not authenticated"}
         )
     
-    # In a real app, validate the token and get user info
+    # Get user from session
+    session_data = get_session(token)
+    if not session_data:
+        return JSONResponse(
+            status_code=401,
+            content={"success": False, "error": "Session expired"}
+        )
+    
     return JSONResponse(content={
         "success": True,
         "user": {
-            "email": "user@example.com",
-            "company_name": "Example Company"
+            "email": session_data["email"],
+            "domain": session_data["domain"],
+            "company_name": session_data["company_name"]
         }
     })

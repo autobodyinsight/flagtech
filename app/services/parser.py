@@ -8,6 +8,7 @@ EXPECTED_HEADERS = [
 ]
 
 LABOR_PATTERN = re.compile(r"^\d+(\.\d+)?$|^incl$", re.IGNORECASE)
+PAINT_PATTERN = re.compile(r"^\d+(\.\d+)?$|^incl$", re.IGNORECASE)
 
 
 def find_headers(page):
@@ -75,14 +76,22 @@ def filter_labor_lines(lines):
     ]
 
 
+def filter_paint_lines(lines):
+    return [
+        row for row in lines
+        if PAINT_PATTERN.match(row.get("paint", ""))
+    ]
+
+
 def parse_estimate_pdf(doc):
     page = doc[0]  # CCC repair lines are on page 1
 
     headers = find_headers(page)
     repair_lines = extract_repair_lines(page, headers)
     labor_lines = filter_labor_lines(repair_lines)
+    paint_lines = filter_paint_lines(repair_lines)
 
-    return labor_lines
+    return {"labor": labor_lines, "paint": paint_lines}
 
 
 def parse_estimate_text(text: str) -> List[LineItem]:

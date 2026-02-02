@@ -98,6 +98,17 @@ def get_refinish_modal_script(paint_items_json, total_paint, second_ro_line, veh
   let displayPaintItems = [];
   let paintAdditionalCounter = 0;
 
+  const apiBase = window.API_BASE || 'https://flagtech1.onrender.com';
+
+  function getAuthHeaders() {{
+    const token = localStorage.getItem('auth_token');
+    const headers = {{}};
+    if (token) {{
+      headers['Authorization'] = `Bearer ${{token}}`;
+    }}
+    return headers;
+  }}
+
   function addPaintAdditionalHours() {{
     const container = document.getElementById('paintAdditionalHours');
     const itemId = 'paint-addl-' + paintAdditionalCounter++;
@@ -157,7 +168,10 @@ def get_refinish_modal_script(paint_items_json, total_paint, second_ro_line, veh
   }}
 
   function loadTechsIntoRefinishDropdown() {{
-    fetch('https://flagtech1.onrender.com/api/techs/list')
+    fetch(`${{apiBase}}/api/techs/list`, {{
+      headers: getAuthHeaders(),
+      credentials: 'include'
+    }})
       .then(r => r.json())
       .then(data => {{
         const select = document.getElementById('refinishTechInput');
@@ -319,9 +333,10 @@ def get_refinish_modal_script(paint_items_json, total_paint, second_ro_line, veh
     timestamp: new Date().toISOString()
   }};
 
-  fetch('https://flagtech1.onrender.com/ui/save-refinish', {{
+  fetch(`${{apiBase}}/ui/save-refinish`, {{
     method: 'POST',
-    headers: {{ 'Content-Type': 'application/json' }},
+    headers: {{ 'Content-Type': 'application/json', ...getAuthHeaders() }},
+    credentials: 'include',
     body: JSON.stringify(data)
   }})
   .then(r => r.json())

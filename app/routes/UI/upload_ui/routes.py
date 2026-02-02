@@ -6,6 +6,7 @@ from app.services.extractor import extract_text_from_pdf
 from app.services.parser import parse_estimate_text
 from app.services.grid_processor import kmeans_1d as _kmeans_1d, group_rows as _group_rows
 from app.services.db import get_conn
+from app.services.middleware import get_user_domain
 import json
 
 router = APIRouter()
@@ -87,6 +88,9 @@ async def parse_ui(file: UploadFile = File(...)):
 @router.post("/save-labor")
 async def save_labor(request: Request):
     data = await request.json()
+    domain = get_user_domain(request)
+    if not domain:
+        return {"error": "Not authenticated"}
     conn = get_conn()
     cur = conn.cursor()
 
@@ -94,8 +98,8 @@ async def save_labor(request: Request):
 
     cur.execute("""
         INSERT INTO labor_assignments
-        (ro, vehicle, tech, assigned, unassigned, additional, total_labor, total_unassigned, timestamp)
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+        (ro, vehicle, tech, assigned, unassigned, additional, total_labor, total_unassigned, timestamp, domain)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
     """, (
         data["ro"],
         data["vehicle"],
@@ -105,7 +109,8 @@ async def save_labor(request: Request):
         json.dumps(data["additional"]),
         data["totalLabor"],
         data["totalUnassigned"],
-        data["timestamp"]
+        data["timestamp"],
+        domain
     ))
 
     conn.commit()
@@ -117,6 +122,9 @@ async def save_labor(request: Request):
 @router.post("/save-refinish")
 async def save_refinish(request: Request):
     data = await request.json()
+    domain = get_user_domain(request)
+    if not domain:
+        return {"error": "Not authenticated"}
     conn = get_conn()
     cur = conn.cursor()
 
@@ -124,8 +132,8 @@ async def save_refinish(request: Request):
 
     cur.execute("""
         INSERT INTO refinish_assignments
-        (ro, vehicle, tech, assigned, unassigned, additional, total_paint, total_unassigned, timestamp)
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+        (ro, vehicle, tech, assigned, unassigned, additional, total_paint, total_unassigned, timestamp, domain)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
     """, (
         data["ro"],
         data["vehicle"],
@@ -135,7 +143,8 @@ async def save_refinish(request: Request):
         json.dumps(data["additional"]),
         data["totalPaint"],
         data["totalUnassigned"],
-        data["timestamp"]
+        data["timestamp"],
+        domain
     ))
 
     conn.commit()
@@ -150,18 +159,22 @@ async def save_refinish(request: Request):
 @router.post("/techs/add")
 async def add_tech(request: Request):
     data = await request.json()
+    domain = get_user_domain(request)
+    if not domain:
+        return {"error": "Not authenticated"}
     conn = get_conn()
     cur = conn.cursor()
 
     try:
         cur.execute("""
-            INSERT INTO techs (first_name, last_name, pay_rate)
-            VALUES (%s, %s, %s)
+            INSERT INTO techs (first_name, last_name, pay_rate, domain)
+            VALUES (%s, %s, %s, %s)
             RETURNING id, first_name, last_name, pay_rate, active
         """, (
             data["first_name"],
             data["last_name"],
-            data["pay_rate"]
+            data["pay_rate"],
+            domain
         ))
 
         row = cur.fetchone()
@@ -181,7 +194,10 @@ async def add_tech(request: Request):
 
 
 @router.get("/techs/list")
-async def list_techs():
+async def list_techs(request: Request):
+    domain = get_user_domain(request)
+    if not domain:
+        return {"error": "Not authenticated", "techs": []}
     conn = get_conn()
     cur = conn.cursor()
 
@@ -189,9 +205,9 @@ async def list_techs():
         cur.execute("""
             SELECT id, first_name, last_name, pay_rate, active
             FROM techs
-            WHERE active = TRUE
+            WHERE active = TRUE AND domain = %s
             ORDER BY last_name, first_name
-        """)
+        """, (domain,))
 
         rows = cur.fetchall()
         techs = [
@@ -212,6 +228,7 @@ async def list_techs():
 
 @router.delete("/techs/{tech_id}")
 async def delete_tech(tech_id: int):
+    # NOTE: This endpoint is unused in the public UI. Consider adding auth if used.
     conn = get_conn()
     cur = conn.cursor()
 
@@ -223,7 +240,10 @@ async def delete_tech(tech_id: int):
         cur.close()
 
 @router.get("/techs/summary")
-async def tech_summary():
+async def tech_summary(request: Request):
+    domain = get_user_domain(request)
+    if not domain:
+        return {"summary": [], "error": "Not authenticated"}
     conn = get_conn()
     cur = conn.cursor()
 
@@ -234,9 +254,9 @@ async def tech_summary():
                    COUNT(DISTINCT ro) AS ro_count,
                    SUM(total_labor) AS total_hours
             FROM labor_assignments
-            WHERE tech IS NOT NULL AND tech <> ''
+            WHERE tech IS NOT NULL AND tech <> '' AND domain = %s
             GROUP BY tech
-        """)
+        """, (domain,))
         labor_rows = cur.fetchall()
 
         # Paint hours
@@ -245,9 +265,9 @@ async def tech_summary():
                    COUNT(DISTINCT ro) AS ro_count,
                    SUM(total_paint) AS total_hours
             FROM refinish_assignments
-            WHERE tech IS NOT NULL AND tech <> ''
+            WHERE tech IS NOT NULL AND tech <> '' AND domain = %s
             GROUP BY tech
-        """)
+        """, (domain,))
         paint_rows = cur.fetchall()
 
         summary = {}
@@ -281,7 +301,10 @@ async def tech_summary():
         cur.close()
 
 @router.get("/techs/{tech}/ros")
-async def tech_ro_list(tech: str):
+async def tech_ro_list(tech: str, request: Request):
+    domain = get_user_domain(request)
+    if not domain:
+        return {"ros": [], "error": "Not authenticated"}
     try:
         cur = get_conn().cursor()
 
@@ -289,36 +312,36 @@ async def tech_ro_list(tech: str):
         cur.execute("""
             SELECT ro, vehicle, SUM(total_labor) AS hours
             FROM labor_assignments
-            WHERE tech = %s
+            WHERE tech = %s AND domain = %s
             GROUP BY ro, vehicle
-        """, (tech,))
+        """, (tech, domain))
         labor_rows = cur.fetchall()
 
         # Paint assignments
         cur.execute("""
             SELECT ro, vehicle, SUM(total_paint) AS hours
             FROM refinish_assignments
-            WHERE tech = %s
+            WHERE tech = %s AND domain = %s
             GROUP BY ro, vehicle
-        """, (tech,))
+        """, (tech, domain))
         paint_rows = cur.fetchall()
 
         ros = {}
 
         # Merge labor
         for row in labor_rows:
-            ro = row[0]
-            vehicle = row[1]
-            hours = row[2]
+            ro = row["ro"]
+            vehicle = row["vehicle"]
+            hours = row["hours"]
             if ro not in ros:
                 ros[ro] = {"ro": ro, "vehicle": vehicle, "total_hours": 0.0}
             ros[ro]["total_hours"] += float(hours or 0)
 
         # Merge paint
         for row in paint_rows:
-            ro = row[0]
-            vehicle = row[1]
-            hours = row[2]
+            ro = row["ro"]
+            vehicle = row["vehicle"]
+            hours = row["hours"]
             if ro not in ros:
                 ros[ro] = {"ro": ro, "vehicle": vehicle, "total_hours": 0.0}
             ros[ro]["total_hours"] += float(hours or 0)
@@ -330,7 +353,10 @@ async def tech_ro_list(tech: str):
         return {"ros": [], "error": str(e)}
 
 @router.get("/techs/{tech}/{ro}/lines")
-async def tech_ro_lines(tech: str, ro: str):
+async def tech_ro_lines(tech: str, ro: str, request: Request):
+    domain = get_user_domain(request)
+    if not domain:
+        return {"lines": [], "error": "Not authenticated"}
     try:
         cur = get_conn().cursor()
 
@@ -338,16 +364,16 @@ async def tech_ro_lines(tech: str, ro: str):
         cur.execute("""
             SELECT assigned
             FROM labor_assignments
-            WHERE tech = %s AND ro = %s
-        """, (tech, ro))
+            WHERE tech = %s AND ro = %s AND domain = %s
+        """, (tech, ro, domain))
         labor_rows = cur.fetchall()
 
         # Paint lines
         cur.execute("""
             SELECT assigned
             FROM refinish_assignments
-            WHERE tech = %s AND ro = %s
-        """, (tech, ro))
+            WHERE tech = %s AND ro = %s AND domain = %s
+        """, (tech, ro, domain))
         paint_rows = cur.fetchall()
 
         lines = []
@@ -355,7 +381,7 @@ async def tech_ro_lines(tech: str, ro: str):
         # Labor
         for row in labor_rows:
             try:
-                assigned = json.loads(row[0])
+                assigned = json.loads(row["assigned"])
                 for item in assigned:
                     lines.append({
                         "line": item.get("line"),
@@ -369,7 +395,7 @@ async def tech_ro_lines(tech: str, ro: str):
         # Paint
         for row in paint_rows:
             try:
-                assigned = json.loads(row[0])
+                assigned = json.loads(row["assigned"])
                 for item in assigned:
                     lines.append({
                         "line": item.get("line"),
@@ -391,38 +417,47 @@ async def tech_ro_lines(tech: str, ro: str):
 # ============================================================
 
 @router.get("/ros/summary")
-async def ro_summary():
+async def ro_summary(request: Request):
+    domain = get_user_domain(request)
+    if not domain:
+        return {"summary": [], "error": "Not authenticated"}
     cur = get_conn().cursor()
 
     # Get all ROs from labor assignments
     cur.execute("""
         SELECT ro, vehicle, COUNT(DISTINCT tech) AS tech_count, SUM(total_labor) AS total_hours
         FROM labor_assignments
-        WHERE ro IS NOT NULL AND ro <> ''
+        WHERE ro IS NOT NULL AND ro <> '' AND domain = %s
         GROUP BY ro, vehicle
-    """)
+    """, (domain,))
     labor_rows = cur.fetchall()
 
     # Get all ROs from refinish assignments
     cur.execute("""
         SELECT ro, vehicle, COUNT(DISTINCT tech) AS tech_count, SUM(total_paint) AS total_hours
         FROM refinish_assignments
-        WHERE ro IS NOT NULL AND ro <> ''
+        WHERE ro IS NOT NULL AND ro <> '' AND domain = %s
         GROUP BY ro, vehicle
-    """)
+    """, (domain,))
     paint_rows = cur.fetchall()
 
     summary = {}
 
     # Combine labor
-    for ro, vehicle, tech_count, hours in labor_rows:
+    for row in labor_rows:
+        ro = row["ro"]
+        vehicle = row["vehicle"]
+        hours = row["total_hours"]
         if ro not in summary:
             summary[ro] = {"ro": ro, "vehicle": vehicle, "tech_count": set(), "total_hours": 0}
         summary[ro]["total_hours"] += float(hours or 0)
         # Will add tech names to set below
 
     # Combine paint
-    for ro, vehicle, tech_count, hours in paint_rows:
+    for row in paint_rows:
+        ro = row["ro"]
+        vehicle = row["vehicle"]
+        hours = row["total_hours"]
         if ro not in summary:
             summary[ro] = {"ro": ro, "vehicle": vehicle, "tech_count": set(), "total_hours": 0}
         summary[ro]["total_hours"] += float(hours or 0)
@@ -431,39 +466,42 @@ async def ro_summary():
     for ro in summary:
         cur.execute("""
             SELECT DISTINCT tech FROM (
-                SELECT tech FROM labor_assignments WHERE ro = %s
+                SELECT tech FROM labor_assignments WHERE ro = %s AND domain = %s
                 UNION
-                SELECT tech FROM refinish_assignments WHERE ro = %s
+                SELECT tech FROM refinish_assignments WHERE ro = %s AND domain = %s
             ) AS combined_techs
             WHERE tech IS NOT NULL AND tech <> ''
-        """, (ro, ro))
+        """, (ro, domain, ro, domain))
         techs = cur.fetchall()
         summary[ro]["tech_count"] = len(techs)
 
     return {"summary": list(summary.values())}
 
 @router.get("/ros/{ro}/details")
-async def ro_details(ro: str):
+async def ro_details(ro: str, request: Request):
+    domain = get_user_domain(request)
+    if not domain:
+        return {"labor": [], "refinish": [], "error": "Not authenticated"}
     cur = get_conn().cursor()
 
     # Get labor assignments
     cur.execute("""
         SELECT tech, vehicle, assigned, unassigned, additional, total_labor, timestamp
         FROM labor_assignments
-        WHERE ro = %s
+        WHERE ro = %s AND domain = %s
         ORDER BY timestamp DESC
-    """, (ro,))
+    """, (ro, domain))
     labor_rows = cur.fetchall()
 
     labor = [
         {
-            "tech": row[0],
-            "vehicle": row[1],
-            "assigned": row[2],
-            "unassigned": row[3],
-            "additional": row[4],
-            "total_labor": float(row[5]),
-            "timestamp": row[6].isoformat() if row[6] else None
+            "tech": row["tech"],
+            "vehicle": row["vehicle"],
+            "assigned": row["assigned"],
+            "unassigned": row["unassigned"],
+            "additional": row["additional"],
+            "total_labor": float(row["total_labor"]),
+            "timestamp": row["timestamp"].isoformat() if row["timestamp"] else None
         }
         for row in labor_rows
     ]
@@ -472,20 +510,20 @@ async def ro_details(ro: str):
     cur.execute("""
         SELECT tech, vehicle, assigned, unassigned, additional, total_paint, timestamp
         FROM refinish_assignments
-        WHERE ro = %s
+        WHERE ro = %s AND domain = %s
         ORDER BY timestamp DESC
-    """, (ro,))
+    """, (ro, domain))
     paint_rows = cur.fetchall()
 
     refinish = [
         {
-            "tech": row[0],
-            "vehicle": row[1],
-            "assigned": row[2],
-            "unassigned": row[3],
-            "additional": row[4],
-            "total_paint": float(row[5]),
-            "timestamp": row[6].isoformat() if row[6] else None
+            "tech": row["tech"],
+            "vehicle": row["vehicle"],
+            "assigned": row["assigned"],
+            "unassigned": row["unassigned"],
+            "additional": row["additional"],
+            "total_paint": float(row["total_paint"]),
+            "timestamp": row["timestamp"].isoformat() if row["timestamp"] else None
         }
         for row in paint_rows
     ]
@@ -498,8 +536,11 @@ async def ro_details(ro: str):
 # ============================================================
 
 @router.get("/tech-assignments")
-async def get_tech_assignments():
+async def get_tech_assignments(request: Request):
     """Get all tech-RO assignments with aggregated data for the tech window."""
+    domain = get_user_domain(request)
+    if not domain:
+        return {"assignments": [], "tech_summary": [], "error": "Not authenticated"}
     conn = get_conn()
     cur = conn.cursor()
 
@@ -520,7 +561,7 @@ async def get_tech_assignments():
                     total_labor AS labor_hours,
                     0 AS refinish_hours
                 FROM labor_assignments
-                WHERE tech IS NOT NULL AND tech <> ''
+                WHERE tech IS NOT NULL AND tech <> '' AND domain = %s
                 
                 UNION ALL
                 
@@ -531,11 +572,11 @@ async def get_tech_assignments():
                     0 AS labor_hours,
                     total_paint AS refinish_hours
                 FROM refinish_assignments
-                WHERE tech IS NOT NULL AND tech <> ''
+                WHERE tech IS NOT NULL AND tech <> '' AND domain = %s
             ) AS combined
             GROUP BY tech, ro, vehicle
             ORDER BY tech, ro
-        """)
+            """, (domain, domain))
         
         rows = cur.fetchall()
         
@@ -589,9 +630,12 @@ async def get_tech_assignments():
 
 
 @router.get("/labor-assignments/{ro}")
-async def get_labor_assignments(ro: str, tech: str = None):
+async def get_labor_assignments(ro: str, request: Request, tech: str = None):
     """Get labor assignment details for a specific RO, optionally filtered by tech."""
     try:
+        domain = get_user_domain(request)
+        if not domain:
+            return {"assignments": [], "error": "Not authenticated"}
         cur = get_conn().cursor()
         
         if tech:
@@ -599,33 +643,33 @@ async def get_labor_assignments(ro: str, tech: str = None):
                 SELECT id, ro, vehicle, tech, assigned, unassigned, additional, 
                        total_labor, total_unassigned, timestamp
                 FROM labor_assignments
-                WHERE ro = %s AND tech = %s
+                WHERE ro = %s AND tech = %s AND domain = %s
                 ORDER BY timestamp DESC
-            """, (ro, tech))
+            """, (ro, tech, domain))
         else:
             cur.execute("""
                 SELECT id, ro, vehicle, tech, assigned, unassigned, additional, 
                        total_labor, total_unassigned, timestamp
                 FROM labor_assignments
-                WHERE ro = %s
+                WHERE ro = %s AND domain = %s
                 ORDER BY timestamp DESC
-            """, (ro,))
+            """, (ro, domain))
         
         rows = cur.fetchall()
         
         assignments = []
         for row in rows:
             assignments.append({
-                "id": row[0],
-                "ro": row[1],
-                "vehicle": row[2],
-                "tech": row[3],
-                "assigned": json.loads(row[4]) if row[4] else [],
-                "unassigned": json.loads(row[5]) if row[5] else [],
-                "additional": json.loads(row[6]) if row[6] else [],
-                "total_labor": float(row[7]),
-                "total_unassigned": float(row[8]),
-                "timestamp": row[9].isoformat() if row[9] else None
+                "id": row["id"],
+                "ro": row["ro"],
+                "vehicle": row["vehicle"],
+                "tech": row["tech"],
+                "assigned": json.loads(row["assigned"]) if row["assigned"] else [],
+                "unassigned": json.loads(row["unassigned"]) if row["unassigned"] else [],
+                "additional": json.loads(row["additional"]) if row["additional"] else [],
+                "total_labor": float(row["total_labor"]),
+                "total_unassigned": float(row["total_unassigned"]),
+                "timestamp": row["timestamp"].isoformat() if row["timestamp"] else None
             })
         
         return {"assignments": assignments}
@@ -636,9 +680,12 @@ async def get_labor_assignments(ro: str, tech: str = None):
 
 
 @router.get("/refinish-assignments/{ro}")
-async def get_refinish_assignments(ro: str, tech: str = None):
+async def get_refinish_assignments(ro: str, request: Request, tech: str = None):
     """Get refinish assignment details for a specific RO, optionally filtered by tech."""
     try:
+        domain = get_user_domain(request)
+        if not domain:
+            return {"assignments": [], "error": "Not authenticated"}
         cur = get_conn().cursor()
         
         if tech:
@@ -646,33 +693,33 @@ async def get_refinish_assignments(ro: str, tech: str = None):
                 SELECT id, ro, vehicle, tech, assigned, unassigned, additional, 
                        total_paint, total_unassigned, timestamp
                 FROM refinish_assignments
-                WHERE ro = %s AND tech = %s
+                WHERE ro = %s AND tech = %s AND domain = %s
                 ORDER BY timestamp DESC
-            """, (ro, tech))
+            """, (ro, tech, domain))
         else:
             cur.execute("""
                 SELECT id, ro, vehicle, tech, assigned, unassigned, additional, 
                        total_paint, total_unassigned, timestamp
                 FROM refinish_assignments
-                WHERE ro = %s
+                WHERE ro = %s AND domain = %s
                 ORDER BY timestamp DESC
-            """, (ro,))
+            """, (ro, domain))
         
         rows = cur.fetchall()
         
         assignments = []
         for row in rows:
             assignments.append({
-                "id": row[0],
-                "ro": row[1],
-                "vehicle": row[2],
-                "tech": row[3],
-                "assigned": json.loads(row[4]) if row[4] else [],
-                "unassigned": json.loads(row[5]) if row[5] else [],
-                "additional": json.loads(row[6]) if row[6] else [],
-                "total_paint": float(row[7]),
-                "total_unassigned": float(row[8]),
-                "timestamp": row[9].isoformat() if row[9] else None
+                "id": row["id"],
+                "ro": row["ro"],
+                "vehicle": row["vehicle"],
+                "tech": row["tech"],
+                "assigned": json.loads(row["assigned"]) if row["assigned"] else [],
+                "unassigned": json.loads(row["unassigned"]) if row["unassigned"] else [],
+                "additional": json.loads(row["additional"]) if row["additional"] else [],
+                "total_paint": float(row["total_paint"]),
+                "total_unassigned": float(row["total_unassigned"]),
+                "timestamp": row["timestamp"].isoformat() if row["timestamp"] else None
             })
         
         return {"assignments": assignments}
@@ -694,18 +741,18 @@ async def check_data():
         
         # Check labor assignments
         cur.execute("SELECT COUNT(*) FROM labor_assignments")
-        labor_count = cur.fetchone()[0]
+        labor_count = cur.fetchone()["count"]
         
         # Check refinish assignments
         cur.execute("SELECT COUNT(*) FROM refinish_assignments")
-        refinish_count = cur.fetchone()[0]
+        refinish_count = cur.fetchone()["count"]
         
         # Get sample techs
         cur.execute("SELECT DISTINCT tech FROM labor_assignments WHERE tech IS NOT NULL LIMIT 5")
-        labor_techs = [row[0] for row in cur.fetchall()]
+        labor_techs = [row["tech"] for row in cur.fetchall()]
         
         cur.execute("SELECT DISTINCT tech FROM refinish_assignments WHERE tech IS NOT NULL LIMIT 5")
-        refinish_techs = [row[0] for row in cur.fetchall()]
+        refinish_techs = [row["tech"] for row in cur.fetchall()]
         
         return {
             "labor_assignments_count": labor_count,

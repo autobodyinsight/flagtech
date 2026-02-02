@@ -6,6 +6,11 @@ from typing import Optional, Dict
 from app.services.db import get_conn
 
 
+def extract_domain(email: str) -> str:
+    """Extract domain from email address."""
+    return email.split('@')[1].lower() if '@' in email else ''
+
+
 def hash_password(password: str) -> str:
     """Hash a password using SHA-256."""
     return hashlib.sha256(password.encode()).hexdigest()
@@ -22,6 +27,11 @@ def create_user(email: str, company_name: str, password: str) -> Dict:
     cur = conn.cursor()
     
     try:
+        # Extract domain from email
+        domain = extract_domain(email)
+        if not domain:
+            return {"success": False, "error": "Invalid email address"}
+        
         # Check if user already exists
         cur.execute("SELECT id FROM users WHERE email = %s", (email,))
         if cur.fetchone():
@@ -30,10 +40,10 @@ def create_user(email: str, company_name: str, password: str) -> Dict:
         # Hash password and create user
         password_hash = hash_password(password)
         cur.execute("""
-            INSERT INTO users (email, company_name, password_hash)
-            VALUES (%s, %s, %s)
-            RETURNING id, email, company_name, created_at
-        """, (email, company_name, password_hash))
+            INSERT INTO users (email, domain, company_name, password_hash)
+            VALUES (%s, %s, %s, %s)
+            RETURNING id, email, domain, company_name, created_at
+        """, (email, domain, company_name, password_hash))
         
         user = cur.fetchone()
         conn.commit()
@@ -43,6 +53,7 @@ def create_user(email: str, company_name: str, password: str) -> Dict:
             "user": {
                 "id": user["id"],
                 "email": user["email"],
+                "domain": user["domain"],
                 "company_name": user["company_name"],
                 "created_at": str(user["created_at"])
             }
@@ -61,7 +72,7 @@ def authenticate_user(email: str, password: str) -> Dict:
     
     try:
         cur.execute("""
-            SELECT id, email, company_name, password_hash, active
+            SELECT id, email, domain, company_name, password_hash, active
             FROM users
             WHERE email = %s
         """, (email,))
@@ -93,6 +104,7 @@ def authenticate_user(email: str, password: str) -> Dict:
             "user": {
                 "id": user["id"],
                 "email": user["email"],
+                "domain": user["domain"],
                 "company_name": user["company_name"]
             },
             "token": token
@@ -110,3 +122,24 @@ def get_user_by_token(token: str) -> Optional[Dict]:
     # For now, we'll store sessions in memory (this will reset on server restart)
     # In production, you should use a proper session store
     return None
+
+
+# In-memory session store (will be reset on server restart)
+# In production, use Redis or a database table
+_sessions = {}
+
+
+def store_session(token: str, user_data: Dict) -> None:
+    """Store session data."""
+    _sessions[token] = user_data
+
+
+def get_session(token: str) -> Optional[Dict]:
+    """Get session data by token."""
+    return _sessions.get(token)
+
+
+def delete_session(token: str) -> None:
+    """Delete session data."""
+    if token in _sessions:
+        del _sessions[token]

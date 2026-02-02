@@ -3,6 +3,8 @@ from app.services.extractor import load_pdf
 from app.services.parser import parse_estimate_pdf
 from app.models.estimate import EstimateResponse
 from app.services.db import get_conn
+from app.services.middleware import get_user_domain
+from fastapi.responses import JSONResponse
 
 router = APIRouter()
 
@@ -27,19 +29,24 @@ async def parse_paint(file: UploadFile = File(...)):
 @router.post("/techs/add")
 async def add_tech(request: Request):
     """Add a new technician."""
+    domain = get_user_domain(request)
+    if not domain:
+        return JSONResponse(status_code=401, content={"error": "Not authenticated"})
+    
     data = await request.json()
     conn = get_conn()
     cur = conn.cursor()
 
     try:
         cur.execute("""
-            INSERT INTO techs (first_name, last_name, pay_rate)
-            VALUES (%s, %s, %s)
-            RETURNING id, first_name, last_name, pay_rate, active
+            INSERT INTO techs (first_name, last_name, pay_rate, domain)
+            VALUES (%s, %s, %s, %s)
+            RETURNING id, first_name, last_name, pay_rate, active, domain
         """, (
             data["first_name"],
             data["last_name"],
-            data["pay_rate"]
+            data["pay_rate"],
+            domain
         ))
 
         row = cur.fetchone()
@@ -59,8 +66,12 @@ async def add_tech(request: Request):
 
 
 @router.get("/techs/list")
-async def list_techs():
+async def list_techs(request: Request):
     """Get list of all active technicians."""
+    domain = get_user_domain(request)
+    if not domain:
+        return JSONResponse(status_code=401, content={"error": "Not authenticated", "techs": []})
+    
     conn = get_conn()
     cur = conn.cursor()
     
@@ -68,9 +79,9 @@ async def list_techs():
         cur.execute("""
             SELECT id, first_name, last_name, pay_rate, active
             FROM techs
-            WHERE active = true
+            WHERE active = true AND domain = %s
             ORDER BY first_name, last_name
-        """)
+        """, (domain,))
         
         rows = cur.fetchall()
         
@@ -90,8 +101,12 @@ async def list_techs():
 
 
 @router.get("/tech-assignments")
-async def tech_assignments():
+async def tech_assignments(request: Request):
     """Get detailed tech assignments showing each RO."""
+    domain = get_user_domain(request)
+    if not domain:
+        return JSONResponse(status_code=401, content={"error": "Not authenticated", "assignments": {}})
+    
     try:
         conn = get_conn()
         cur = conn.cursor()
@@ -112,7 +127,7 @@ async def tech_assignments():
                     total_labor AS labor_hours,
                     0 AS refinish_hours
                 FROM labor_assignments
-                WHERE tech IS NOT NULL AND tech <> ''
+                WHERE tech IS NOT NULL AND tech <> '' AND domain = %s
                 
                 UNION ALL
                 
@@ -123,11 +138,11 @@ async def tech_assignments():
                     0 AS labor_hours,
                     total_paint AS refinish_hours
                 FROM refinish_assignments
-                WHERE tech IS NOT NULL AND tech <> ''
+                WHERE tech IS NOT NULL AND tech <> '' AND domain = %s
             ) AS combined
             GROUP BY tech, ro, vehicle
             ORDER BY tech, ro
-        """)
+        """, (domain, domain))
         
         rows = cur.fetchall()
         cur.close()
@@ -163,9 +178,12 @@ async def tech_assignments():
 
 
 @router.get("/dashboard-data")
-async def dashboard_data():
+async def dashboard_data(request: Request):
     """Get aggregated data for the dashboard."""
     try:
+        domain = get_user_domain(request)
+        if not domain:
+            return JSONResponse(status_code=401, content={"error": "Not authenticated"})
         conn = get_conn()
         cur = conn.cursor()
         
@@ -178,11 +196,13 @@ async def dashboard_data():
             FROM (
                 SELECT SUM(total_labor) as total_labor, 0 as total_paint
                 FROM labor_assignments
+                WHERE domain = %s
                 UNION ALL
                 SELECT 0 as total_labor, SUM(total_paint) as total_paint
                 FROM refinish_assignments
+                WHERE domain = %s
             ) AS combined
-        """)
+        """, (domain, domain))
         
         hours_row = cur.fetchone()
         total_labor_hours = float(hours_row["total_labor_hours"] or 0)
@@ -200,11 +220,11 @@ async def dashboard_data():
         cur.execute("""
             SELECT COUNT(DISTINCT ro) as ro_count
             FROM (
-                SELECT ro FROM labor_assignments
+                SELECT ro FROM labor_assignments WHERE domain = %s
                 UNION
-                SELECT ro FROM refinish_assignments
+                SELECT ro FROM refinish_assignments WHERE domain = %s
             ) AS all_ros
-        """)
+        """, (domain, domain))
         ro_count_row = cur.fetchone()
         ro_count = int(ro_count_row["ro_count"] or 0)
         
@@ -230,15 +250,15 @@ async def dashboard_data():
             FROM (
                 SELECT tech, total_labor as total_hours
                 FROM labor_assignments
-                WHERE tech IS NOT NULL AND tech <> ''
+                WHERE tech IS NOT NULL AND tech <> '' AND domain = %s
                 UNION ALL
                 SELECT tech, total_paint as total_hours
                 FROM refinish_assignments
-                WHERE tech IS NOT NULL AND tech <> ''
+                WHERE tech IS NOT NULL AND tech <> '' AND domain = %s
             ) AS combined
             GROUP BY tech
             ORDER BY total_hours DESC
-        """)
+        """, (domain, domain))
         
         hours_per_tech_rows = cur.fetchall()
         hours_per_tech = []
@@ -255,14 +275,14 @@ async def dashboard_data():
                 COUNT(DISTINCT ro) as ro_count
             FROM (
                 SELECT tech, ro FROM labor_assignments
-                WHERE tech IS NOT NULL AND tech <> ''
+                WHERE tech IS NOT NULL AND tech <> '' AND domain = %s
                 UNION
                 SELECT tech, ro FROM refinish_assignments
-                WHERE tech IS NOT NULL AND tech <> ''
+                WHERE tech IS NOT NULL AND tech <> '' AND domain = %s
             ) AS combined
             GROUP BY tech
             ORDER BY ro_count DESC
-        """)
+        """, (domain, domain))
         
         ros_per_tech_rows = cur.fetchall()
         ros_per_tech = []
