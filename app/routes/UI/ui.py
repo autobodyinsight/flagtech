@@ -6,7 +6,6 @@ from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from .flagout import get_flagtech_screen_html
 from .setup import get_setup_screen_html, get_setup_script
 from .dashboard import get_dashboard_screen_html
-from .auth_screen import get_auth_screen_html
 
 try:
     from .upload_ui.upload import get_upload_screen_html, get_upload_script
@@ -22,21 +21,9 @@ except ImportError:
 router = APIRouter()
 
 
-@router.get("/login", response_class=HTMLResponse)
-async def login_screen():
-    """Show the login/signup screen."""
-    return get_auth_screen_html()
-
-
 @router.get("/", response_class=HTMLResponse)
 async def home_screen(request: Request):
     """Main UI screen with sidebar navigation."""
-    # Check if user is authenticated
-    token = request.cookies.get("session_token")
-    
-    if not token:
-        # Redirect to login if not authenticated
-        return RedirectResponse(url="/ui/login")
     
     return f"""
 <html>

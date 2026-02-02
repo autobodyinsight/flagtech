@@ -1,6 +1,4 @@
-<!DOCTYPE html>
-<html>
-<head>
+<<html><head>
     <title>FlagTech</title>
     <style>
         * {
@@ -11,72 +9,47 @@
         body {
             font-family: Arial, sans-serif;
             display: flex;
-            flex-direction: column;
             height: 100vh;
             background-color: #f5f5f5;
-            margin: 0;
         }
-        .tab-bar {
+        .sidebar {
+            width: 150px;
             background-color: #505050;
             display: flex;
-            gap: 0;
-            padding: 0;
-            border-bottom: 3px solid #333;
-            justify-content: space-between;
+            flex-direction: column;
+            gap: 10px;
+            padding: 20px;
+            position: fixed;
+            height: 100vh;
+            overflow-y: auto;
         }
-        .tab-group {
-            display: flex;
-            gap: 0;
-        }
-        .user-info {
-            display: flex;
-            align-items: center;
-            padding: 0 20px;
-            color: white;
-            font-size: 14px;
-            gap: 15px;
-        }
-        .logout-btn {
-            padding: 8px 16px;
-            background-color: #d32f2f;
-            color: white;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-            font-size: 13px;
-            transition: background-color 0.3s ease;
-        }
-        .logout-btn:hover {
-            background-color: #b71c1c;
-        }
-        .nav-tab {
-            padding: 14px 22px;
+        .nav-box {
+            padding: 15px;
             background-color: #666666;
             color: white;
             text-align: center;
             cursor: pointer;
+            border-radius: 5px;
             font-weight: bold;
-            border-right: 1px solid #555;
+            border: 2px solid transparent;
             transition: all 0.3s ease;
-            font-size: 14px;
-            flex: 0 0 auto;
-            width: auto;
-            white-space: nowrap;
         }
-        .nav-tab:hover {
+        .nav-box:hover {
             background-color: #707070;
+            border: 2px solid white;
         }
-        .nav-tab.active {
+        .nav-box.active {
             background-color: #d32f2f;
             color: white;
-            border-bottom: 3px solid #d32f2f;
-            margin-bottom: -3px;
+            border: 2px solid #d32f2f;
         }
         .content-area {
             flex: 1;
             padding: 40px;
             overflow-y: auto;
+            margin-left: 150px;
             background-color: white;
+            min-height: 100vh;
         }
         .screen {
             display: none;
@@ -119,6 +92,54 @@
             color: #000;
         }
         
+        /* Tech Window Styles */
+        .tech-header {
+            text-align: center;
+            font-size: 32px;
+            font-weight: bold;
+            margin-bottom: 30px;
+        }
+        .add-tech-btn-container {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .add-tech-btn {
+            padding: 12px 24px;
+            font-size: 16px;
+            cursor: pointer;
+            background-color: #505050;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            transition: background-color 0.3s;
+        }
+        .add-tech-btn:hover {
+            background-color: #707070;
+        }
+        .tech-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px;
+            border-bottom: 1px solid #ddd;
+            font-size: 14px;
+        }
+        .tech-row:hover {
+            background-color: #f9f9f9;
+        }
+        .tech-name {
+            flex: 1;
+            text-align: left;
+            font-weight: bold;
+        }
+        .tech-ros {
+            flex: 1;
+            text-align: center;
+        }
+        .tech-hours {
+            flex: 1;
+            text-align: center;
+        }
         .form-group {
             margin-bottom: 20px;
         }
@@ -152,108 +173,16 @@
     </style>
 </head>
 <body>
-    <div class="tab-bar">
-        <div class="tab-group">
-            <div class="nav-tab active" onclick="switchScreen('dashboard')">DASHBOARD</div>
-            <div class="nav-tab" onclick="switchScreen('upload')">UPLOAD</div>
-            <div class="nav-tab" onclick="switchScreen('setup')">SET UP</div>
-            <div class="nav-tab" onclick="switchScreen('flagtech')">FLAG TECH</div>
-        </div>
-        <div class="user-info">
-            <span id="companyNameDisplay"></span>
-            <button class="logout-btn" onclick="handleLogout()">Logout</button>
-        </div>
+    <div class="sidebar">
+        <div class="nav-box active" onclick="switchScreen('upload')">UPLOAD</div>
+        <div class="nav-box" onclick="switchScreen('tech')">TECH'S</div>
+        <div class="nav-box" onclick="switchScreen('ros')">RO'S</div>
+        <div class="nav-box" onclick="switchScreen('flagtech')">FLAG TECH</div>
     </div>
     
     <div class="content-area">
         
-        <!-- DASHBOARD WINDOW -->
-        <!-- DASHBOARD WINDOW -->
-        <div id="dashboard" class="screen active" style="padding:20px;">
-            <h1 style="text-align:center; margin-bottom:30px;">DASHBOARD</h1>
-            
-            <div style="display:flex; gap:20px;">
-                <!-- Left Side: Vertical Bars -->
-                <div style="flex:0 0 300px; display:flex; flex-direction:column; gap:20px;">
-                    <!-- Total Sales Bar -->
-                    <div style="background:#f9f9f9; padding:20px; border-radius:8px; border:1px solid #ddd; flex:1; display:flex; flex-direction:column; height:calc((100% - 20px) / 2);">
-                        <h3 style="margin:0 0 10px 0; text-align:center; color:#333;">Total Sales</h3>
-                        <div style="position:relative; flex:1; background:#e0e0e0; border-radius:4px; overflow:hidden;">
-                            <div id="totalSalesBar" style="position:absolute; bottom:0; width:100%; background:linear-gradient(to top, #4caf50, #81c784); transition:height 0.5s ease;">
-                            </div>
-                        </div>
-                        <div id="totalSalesValue" style="text-align:center; font-size:20px; font-weight:bold; color:#4caf50; margin-top:10px;">
-                            $0
-                        </div>
-                    </div>
-                    
-                    <!-- Pending Payments Bar -->
-                    <div style="background:#f9f9f9; padding:20px; border-radius:8px; border:1px solid #ddd; flex:1; display:flex; flex-direction:column; height:calc((100% - 20px) / 2);">
-                        <h3 style="margin:0 0 10px 0; text-align:center; color:#333;">Pending Payments</h3>
-                        <div style="position:relative; flex:1; background:#e0e0e0; border-radius:4px; overflow:hidden;">
-                            <div id="pendingPaymentsBar" style="position:absolute; bottom:0; width:100%; background:linear-gradient(to top, #ff9800, #ffb74d); transition:height 0.5s ease;">
-                            </div>
-                        </div>
-                        <div id="pendingPaymentsValue" style="text-align:center; font-size:20px; font-weight:bold; color:#ff9800; margin-top:10px;">
-                            $0
-                        </div>
-                    </div>
-                </div>
-                
-                <!-- Right Side: 6 Display Cards in 2 Columns -->
-                <div style="flex:1; display:grid; grid-template-columns:1fr 1fr; gap:20px; align-content:start;">
-                    <!-- Current GP Card -->
-                    <div style="background:#fff; padding:20px; border-radius:8px; border:2px solid #2196f3; box-shadow:0 2px 4px rgba(0,0,0,0.1);">
-                        <h4 style="margin:0 0 15px 0; color:#666; font-size:14px;">Current GP</h4>
-                        <div id="currentGP" style="font-size:32px; font-weight:bold; color:#2196f3;">
-                            0%
-                        </div>
-                    </div>
-                    
-                    <!-- Parts Cost Card -->
-                    <div style="background:#fff; padding:20px; border-radius:8px; border:2px solid #e91e63; box-shadow:0 2px 4px rgba(0,0,0,0.1);">
-                        <h4 style="margin:0 0 15px 0; color:#666; font-size:14px;">Parts Cost</h4>
-                        <div id="partsCost" style="font-size:32px; font-weight:bold; color:#e91e63;">
-                            $0
-                        </div>
-                    </div>
-                    
-                    <!-- Average Hours Card -->
-                    <div style="background:#fff; padding:20px; border-radius:8px; border:2px solid #9c27b0; box-shadow:0 2px 4px rgba(0,0,0,0.1);">
-                        <h4 style="margin:0 0 15px 0; color:#666; font-size:14px;">Average Hrs</h4>
-                        <div id="averageHrs" style="font-size:32px; font-weight:bold; color:#9c27b0;">
-                            0.0
-                        </div>
-                    </div>
-                    
-                    <!-- Average RO Card -->
-                    <div style="background:#fff; padding:20px; border-radius:8px; border:2px solid #ff5722; box-shadow:0 2px 4px rgba(0,0,0,0.1);">
-                        <h4 style="margin:0 0 15px 0; color:#666; font-size:14px;">Average RO</h4>
-                        <div id="averageRO" style="font-size:32px; font-weight:bold; color:#ff5722;">
-                            $0
-                        </div>
-                    </div>
-                    
-                    <!-- Total Hrs per Tech - Pie Chart -->
-                    <div style="background:#fff; padding:20px; border-radius:8px; border:2px solid #00bcd4; box-shadow:0 2px 4px rgba(0,0,0,0.1);">
-                        <h4 style="margin:0 0 15px 0; color:#666; font-size:14px;">Total Hrs per Tech</h4>
-                        <canvas id="hoursPerTechChart" style="max-height:150px;"></canvas>
-                    </div>
-                    
-                    <!-- Total ROs per Tech - List View -->
-                    <div style="background:#fff; padding:20px; border-radius:8px; border:2px solid #795548; box-shadow:0 2px 4px rgba(0,0,0,0.1);">
-                        <h4 style="margin:0 0 15px 0; color:#666; font-size:14px;">Total ROs per Tech</h4>
-                        <div id="rosPerTechList" style="max-height:150px; overflow-y:auto; font-size:14px;">
-                            <div style="color:#999; text-align:center;">Loading...</div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    
-        
-        <!-- UPLOAD WINDOW -->
-        <div id="upload" class="screen">
+        <div id="upload" class="screen active">
             <h2>Upload an Estimate PDF</h2>
             <form id="uploadForm" enctype="multipart/form-data">
                 <input type="file" id="fileInput" name="file" accept="application/pdf" onchange="handleFileUpload()" style="padding: 10px; cursor: pointer;">
@@ -262,55 +191,42 @@
         </div>
     
         
-        <!-- SETUP WINDOW -->
-        <div id="setup" class="screen">
-            <h2 style="text-align:center; margin-bottom:30px;">SET UP</h2>
+        <!-- TECH WINDOW -->
+        <div id="tech" class="screen">
+            <h1 class="tech-header">TECHS</h1>
             
-            <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(280px, 1fr)); gap:20px;">
-                <div style="border:1px solid #ddd; border-radius:8px; padding:20px; background:#fafafa;">
-                    <h3 style="margin-bottom:15px;">Add Technician</h3>
-                    <label>First:</label>
-                    <input type="text" id="setupTechFirst" style="width:100%; padding:8px; margin-bottom:10px; box-sizing:border-box;">
-
-                    <label>Last:</label>
-                    <input type="text" id="setupTechLast" style="width:100%; padding:8px; margin-bottom:10px; box-sizing:border-box;">
-
-                    <label>Rate:</label>
-                    <input type="number" step="0.01" id="setupTechRate" style="width:100%; padding:8px; margin-bottom:15px; box-sizing:border-box;">
-
-                    <button onclick="setupAddTech()" style="padding:10px 16px; background-color:#505050; color:white; border:none; border-radius:4px; cursor:pointer; font-size:14px;">Add Tech</button>
-
-                </div>
-
-                <div style="border:1px solid #ddd; border-radius:8px; padding:20px; background:#fafafa;">
-                    <h3 style="margin-bottom:15px;">Add Parts Vendor</h3>
-                    <label>Name:</label>
-                    <input type="text" id="setupVendorName" style="width:100%; padding:8px; margin-bottom:10px; box-sizing:border-box;">
-
-                    <label>Email:</label>
-                    <input type="email" id="setupVendorEmail" style="width:100%; padding:8px; margin-bottom:10px; box-sizing:border-box;">
-
-                    <label>Phone:</label>
-                    <input type="text" id="setupVendorPhone" style="width:100%; padding:8px; margin-bottom:15px; box-sizing:border-box;">
-
-                    <button onclick="setupAddVendor()" style="padding:10px 16px; background-color:#505050; color:white; border:none; border-radius:4px; cursor:pointer; font-size:14px;">Add Vendor</button>
-
-                </div>
+            <div style="text-align:center; margin-bottom:30px;">
+                <button onclick="openAddTechModal()" 
+                        style="padding:12px 24px; font-size:16px; cursor:pointer; background-color:#505050; color:white; border:none; border-radius:4px;">
+                    + tech
+                </button>
             </div>
 
-            <hr style="margin:30px 0; border:none; border-top:1px solid #ddd;">
+            <!-- Techs Cards Grid -->
+            <div id="techsCardsContainer" style="display:grid; grid-template-columns:repeat(auto-fill, minmax(150px, 1fr)); gap:15px; margin-bottom:40px;">
+            </div>
 
-            <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(280px, 1fr)); gap:20px;">
-                <div style="border:1px solid #ddd; border-radius:8px; padding:20px; background:#fff;">
-                    <h3 style="margin-bottom:15px;">Technicians</h3>
-                    <div id="setupTechsList"></div>
-                </div>
-
-                <div style="border:1px solid #ddd; border-radius:8px; padding:20px; background:#fff;">
-                    <h3 style="margin-bottom:15px;">Parts Vendors</h3>
-                    <div id="setupVendorsList"></div>
+            <!-- Techs Details Table -->
+            <div style="margin-top:40px;">
+                <h2 style="margin-bottom:20px;">Assignments</h2>
+                <div id="techsTableContainer" style="width:100%; border:1px solid #ddd; border-radius:4px; overflow:hidden;">
+                    <!-- Header -->
+                    <div style="display:flex; justify-content:space-between; align-items:center; padding:12px; background-color:#f5f5f5; border-bottom:2px solid #ddd; font-weight:bold; position:sticky; top:0;">
+                        <div style="flex:1; text-align:left;">Tech Name</div>
+                        <div style="flex:1; text-align:center;">Pay Rate</div>
+                        <div style="flex:1; text-align:center;">Total RO's</div>
+                        <div style="flex:1; text-align:right;">Total Hours</div>
+                    </div>
+                    <!-- Tech rows will be inserted here -->
+                    <div id="techsList"></div>
                 </div>
             </div>
+        </div>
+    
+        
+        <div id="ros" class="screen">
+            <h2>RO'S</h2>
+            <p>RO's management screen - coming soon</p>
         </div>
     
         
@@ -321,78 +237,34 @@
     
     </div>
     
-    
-    
-    <!-- Include Chart.js for pie chart -->
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Add Tech Modal -->
+    <div id="addTechModal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeAddTechModal()">&times;</span>
+            <h2>Add Technician</h2>
+            
+            <div class="form-group">
+                <label for="techFirst">First:</label>
+                <input type="text" id="techFirst" placeholder="Enter first name">
+            </div>
+            
+            <div class="form-group">
+                <label for="techLast">Last:</label>
+                <input type="text" id="techLast" placeholder="Enter last name">
+            </div>
+            
+            <div class="form-group">
+                <label for="techRate">Rate:</label>
+                <input type="number" id="techRate" step="0.01" placeholder="Enter hourly rate">
+            </div>
+            
+            <button class="btn-primary" onclick="saveTech()">Save</button>
+        </div>
+    </div>
     
     <script>
 
         const API_BASE = 'https://flagtech1.onrender.com';
-        window.API_BASE = API_BASE;
-
-        function getAuthHeaders() {
-            const token = localStorage.getItem('auth_token');
-            const headers = {};
-            if (token) {
-                headers['Authorization'] = `Bearer ${token}`;
-            }
-            return headers;
-        }
-
-        function authFetch(url, options = {}) {
-            const mergedHeaders = {
-                ...(options.headers || {}),
-                ...getAuthHeaders()
-            };
-
-            return fetch(url, {
-                ...options,
-                headers: mergedHeaders,
-                credentials: 'include'
-            });
-        }
-
-        // Check authentication on load
-        window.addEventListener('load', () => {
-            const authToken = localStorage.getItem('auth_token');
-            if (!authToken) {
-                window.location.href = 'login.html';
-                return;
-            }
-
-            // Display user info if available
-            const companyName = localStorage.getItem('company_name');
-            if (companyName) {
-                document.title = 'FlagTech - ' + companyName;
-                document.getElementById('companyNameDisplay').textContent = companyName;
-            }
-
-            // Validate session with backend
-            authFetch(`${API_BASE}/api/auth/me`)
-                .then(r => {
-                    if (!r.ok) {
-                        throw new Error('Not authenticated');
-                    }
-                    return r.json();
-                })
-                .catch(() => {
-                    localStorage.removeItem('auth_token');
-                    localStorage.removeItem('user_email');
-                    localStorage.removeItem('company_name');
-                    window.location.href = 'login.html';
-                });
-        });
-        
-        function handleLogout() {
-            // Clear local storage
-            localStorage.removeItem('auth_token');
-            localStorage.removeItem('user_email');
-            localStorage.removeItem('company_name');
-            
-            // Redirect to login
-            window.location.href = 'login.html?logout=true';
-        }
 
         let displayedRows = [];
 
@@ -405,39 +277,46 @@
             const screens = document.querySelectorAll('.screen');
             screens.forEach(screen => screen.classList.remove('active'));
             
-            const navTabs = document.querySelectorAll('.nav-tab');
-            navTabs.forEach(tab => tab.classList.remove('active'));
+            const navBoxes = document.querySelectorAll('.nav-box');
+            navBoxes.forEach(box => box.classList.remove('active'));
             
             document.getElementById(screenName).classList.add('active');
             event.target.classList.add('active');
             
-            // Load setup data when switching to setup screen
-            if (screenName === 'setup') {
-                setupLoadTechs();
-                setupLoadVendors();
-            }
-            
-            // Load dashboard data when switching to dashboard
-            if (screenName === 'dashboard') {
-                loadDashboardData();
+            // Load tech data when switching to tech screen
+            if (screenName === 'tech') {
+                loadTechs();
             }
         }
         
         // ============================================
-        // SETUP WINDOW FUNCTIONS
+        // TECH WINDOW FUNCTIONS
         // ============================================
-
-        function setupAddTech() {
-            const firstName = document.getElementById('setupTechFirst').value.trim();
-            const lastName = document.getElementById('setupTechLast').value.trim();
-            const rate = parseFloat(document.getElementById('setupTechRate').value);
-
+        
+        function openAddTechModal() {
+            document.getElementById('addTechModal').style.display = 'block';
+            // Clear form
+            document.getElementById('techFirst').value = '';
+            document.getElementById('techLast').value = '';
+            document.getElementById('techRate').value = '';
+        }
+        
+        function closeAddTechModal() {
+            document.getElementById('addTechModal').style.display = 'none';
+        }
+        
+        function saveTech() {
+            const firstName = document.getElementById('techFirst').value.trim();
+            const lastName = document.getElementById('techLast').value.trim();
+            const rate = parseFloat(document.getElementById('techRate').value);
+            
             if (!firstName || !lastName || !rate) {
                 alert('Please fill in all fields');
                 return;
             }
-
-            authFetch(`${API_BASE}/api/techs/add`, {
+            
+            // Save to backend
+            fetch(`${API_BASE}/api/techs/add`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -448,98 +327,297 @@
             })
             .then(response => response.json())
             .then(data => {
-                if (data.error) {
-                    throw new Error(data.error);
-                }
-                document.getElementById('setupTechFirst').value = '';
-                document.getElementById('setupTechLast').value = '';
-                document.getElementById('setupTechRate').value = '';
-                setupLoadTechs();
+                closeAddTechModal();
+                loadTechs(); // Reload the list
             })
             .catch(error => {
                 console.error('Error saving tech:', error);
                 alert('Error saving tech. Please try again.');
             });
         }
+        
+        function loadTechs() {
+            const cardsContainer = document.getElementById('techsCardsContainer');
+            const tableContainer = document.getElementById('techsList');
+            cardsContainer.innerHTML = "<p style='color:#777; text-align:center; grid-column:1/-1;'>Loading...</p>";
+            tableContainer.innerHTML = "";
 
-        function setupLoadTechs() {
-            const container = document.getElementById('setupTechsList');
-            if (!container) return;
+            // Fetch techs list and tech assignments to get total ROs and hours
+            Promise.all([
+                fetch(`${API_BASE}/api/techs/list`).then(r => r.json()),
+                fetch(`${API_BASE}/api/tech-assignments`).then(r => r.json())
+            ])
+            .then(([techsRes, assignmentsRes]) => {
+                cardsContainer.innerHTML = "";
+                tableContainer.innerHTML = "";
 
-            container.innerHTML = '<p style="text-align:center; color:#777;">Loading...</p>';
-            authFetch(`${API_BASE}/api/techs/list`)
-                .then(r => r.json())
-                .then(res => {
-                    if (!res.techs || res.techs.length === 0) {
-                        container.innerHTML = '<p style="text-align:center; color:#777;">No techs added yet.</p>';
-                        return;
-                    }
+                // Cache assignments data for inline use
+                window.techAssignmentsData = assignmentsRes;
 
-                    container.innerHTML = res.techs.map(tech => {
-                        return `<div style="padding:8px 0; border-bottom:1px solid #eee;">${tech.first_name} ${tech.last_name} - $${tech.pay_rate.toFixed(2)}/hr</div>`;
-                    }).join('');
-                })
-                .catch(error => {
-                    console.error('Error loading techs:', error);
-                    container.innerHTML = '<p style="text-align:center; color:red;">Error loading techs.</p>';
-                });
-        }
-
-        function setupAddVendor() {
-            const name = document.getElementById('setupVendorName').value.trim();
-            const email = document.getElementById('setupVendorEmail').value.trim();
-            const phone = document.getElementById('setupVendorPhone').value.trim();
-
-            if (!name) {
-                alert('Please enter a vendor name');
-                return;
-            }
-
-            authFetch(`${API_BASE}/api/vendors/add`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ name, email, phone })
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.error) {
-                    throw new Error(data.error);
+                if (!techsRes.techs || techsRes.techs.length === 0) {
+                    cardsContainer.innerHTML = "<p style='color:#777; text-align:center; grid-column:1/-1;'>No techs added yet.</p>";
+                    return;
                 }
-                document.getElementById('setupVendorName').value = '';
-                document.getElementById('setupVendorEmail').value = '';
-                document.getElementById('setupVendorPhone').value = '';
-                setupLoadVendors();
+
+                // Create a map of tech assignments by full name
+                const assignmentsMap = {};
+                if (assignmentsRes.tech_summary) {
+                    assignmentsRes.tech_summary.forEach(t => {
+                        assignmentsMap[t.tech] = {
+                            total_vehicles: t.total_vehicles || 0,
+                            total_hours: t.total_hours || 0,
+                            ros: t.ros || []
+                        };
+                    });
+                }
+
+                // Display tech cards
+                techsRes.techs.forEach(tech => {
+                    const fullName = `${tech.first_name} ${tech.last_name}`;
+                    const assignments = assignmentsMap[fullName] || { total_vehicles: 0, total_hours: 0 };
+
+                    const card = document.createElement('div');
+                    card.style.padding = "20px";
+                    card.style.border = "1px solid #ddd";
+                    card.style.borderRadius = "8px";
+                    card.style.backgroundColor = "#f9f9f9";
+                    card.style.textAlign = "center";
+                    card.style.boxShadow = "0 2px 4px rgba(0,0,0,0.1)";
+
+                    card.innerHTML = `
+                        <div style="font-weight:bold; font-size:16px; margin-bottom:5px;">
+                            ${tech.first_name}
+                        </div>
+                        <div style="font-size:14px; color:#666;">
+                            ${tech.last_name}
+                        </div>
+                    `;
+
+                    cardsContainer.appendChild(card);
+                });
+
+                // Display tech details in table
+                techsRes.techs.forEach(tech => {
+                    const fullName = `${tech.first_name} ${tech.last_name}`;
+                    const assignments = assignmentsMap[fullName] || { total_vehicles: 0, total_hours: 0 };
+
+                    // Main tech row
+                    const row = document.createElement('div');
+                    row.style.cssText = 'display:flex; justify-content:space-between; align-items:center; padding:12px; border-bottom:1px solid #eee;';
+                    row.className = 'tech-row';
+                    
+                    const techNameCell = document.createElement('div');
+                    techNameCell.style.flex = "1";
+                    techNameCell.style.textAlign = "left";
+                    
+                    const techLink = document.createElement('span');
+                    techLink.textContent = fullName;
+                    techLink.style.cursor = "pointer";
+                    techLink.style.color = "#0066cc";
+                    techLink.style.textDecoration = "underline";
+                    techLink.style.fontWeight = "bold";
+                    techLink.addEventListener('click', function(e) {
+                        e.stopPropagation();
+                        toggleTechDetails(fullName);
+                    });
+                    techNameCell.appendChild(techLink);
+                    
+                    const rateCell = document.createElement('div');
+                    rateCell.style.flex = "1";
+                    rateCell.style.textAlign = "center";
+                    rateCell.textContent = `$${tech.pay_rate.toFixed(2)}/hr`;
+                    
+                    const rosCell = document.createElement('div');
+                    rosCell.style.flex = "1";
+                    rosCell.style.textAlign = "center";
+                    rosCell.textContent = assignments.total_vehicles;
+                    
+                    const hoursCell = document.createElement('div');
+                    hoursCell.style.flex = "1";
+                    hoursCell.style.textAlign = "right";
+                    hoursCell.textContent = assignments.total_hours.toFixed(1);
+                    
+                    row.appendChild(techNameCell);
+                    row.appendChild(rateCell);
+                    row.appendChild(rosCell);
+                    row.appendChild(hoursCell);
+                    
+                    row.onmouseover = function() { this.style.backgroundColor = "#f5f5f5"; };
+                    row.onmouseout = function() { this.style.backgroundColor = "transparent"; };
+
+                    tableContainer.appendChild(row);
+
+                    // Details section (hidden by default)
+                    const detailsSection = document.createElement('div');
+                    detailsSection.id = `tech-details-${fullName.replace(/\s+/g, '-')}`;
+                    detailsSection.style.cssText = 'display:none; padding:20px; background-color:#f9f9f9; border-bottom:1px solid #eee;';
+                    
+                    const rosHeader = document.createElement('div');
+                    rosHeader.style.cssText = 'display:flex; justify-content:space-between; align-items:center; padding:12px; background-color:#f5f5f5; border-bottom:1px solid #ddd; font-weight:bold; margin-bottom:10px;';
+                    rosHeader.innerHTML = `
+                        <div style="flex:1; text-align:left;">RO Number</div>
+                        <div style="flex:2; text-align:center;">Vehicle Info</div>
+                        <div style="flex:1; text-align:right;">Total Hours</div>
+                    `;
+                    detailsSection.appendChild(rosHeader);
+
+                    const rosListDiv = document.createElement('div');
+                    rosListDiv.id = `ros-list-${fullName.replace(/\s+/g, '-')}`;
+                    rosListDiv.style.marginBottom = "20px";
+                    detailsSection.appendChild(rosListDiv);
+
+                    const repairLinesSection = document.createElement('div');
+                    repairLinesSection.id = `repair-section-${fullName.replace(/\s+/g, '-')}`;
+                    repairLinesSection.style.cssText = 'display:none; margin-top:20px; border-top:1px solid #ddd; padding-top:20px;';
+                    detailsSection.appendChild(repairLinesSection);
+
+                    tableContainer.appendChild(detailsSection);
+                });
             })
-            .catch(error => {
-                console.error('Error saving vendor:', error);
-                alert('Error saving vendor. Please try again.');
+            .catch(err => {
+                console.error("Error loading techs:", err);
+                cardsContainer.innerHTML = "<p style='color:red; text-align:center; grid-column:1/-1;'>Error loading techs.</p>";
             });
         }
 
-        function setupLoadVendors() {
-            const container = document.getElementById('setupVendorsList');
-            if (!container) return;
+        // Toggle Tech Details Inline
+        function toggleTechDetails(techName) {
+            const detailsId = `tech-details-${techName.replace(/\s+/g, '-')}`;
+            const detailsSection = document.getElementById(detailsId);
+            
+            if (detailsSection.style.display === 'none') {
+                // Load RO details when expanding
+                loadTechDetailsInline(techName);
+                detailsSection.style.display = 'block';
+            } else {
+                detailsSection.style.display = 'none';
+                // Clear repair lines when collapsing
+                const repairSection = document.getElementById(`repair-section-${techName.replace(/\s+/g, '-')}`);
+                if (repairSection) {
+                    repairSection.style.display = 'none';
+                }
+            }
+        }
 
-            container.innerHTML = '<p style="text-align:center; color:#777;">Loading...</p>';
-            authFetch(`${API_BASE}/api/vendors/list`)
-                .then(r => r.json())
-                .then(res => {
-                    if (!res.vendors || res.vendors.length === 0) {
-                        container.innerHTML = '<p style="text-align:center; color:#777;">No vendors added yet.</p>';
-                        return;
-                    }
+        function loadTechDetailsInline(techName) {
+            const rosList = document.getElementById(`ros-list-${techName.replace(/\s+/g, '-')}`);
+            
+            if (rosList.innerHTML) return; // Already loaded
 
-                    container.innerHTML = res.vendors.map(vendor => {
-                        const parts = [vendor.name];
-                        if (vendor.email) parts.push(vendor.email);
-                        if (vendor.phone) parts.push(vendor.phone);
-                        return `<div style="padding:8px 0; border-bottom:1px solid #eee;">${parts.join(' • ')}</div>`;
-                    }).join('');
-                })
-                .catch(error => {
-                    console.error('Error loading vendors:', error);
-                    container.innerHTML = '<p style="text-align:center; color:red;">Error loading vendors.</p>';
+            // Use global variable that was set during loadTechs
+            if (window.techAssignmentsData && window.techAssignmentsData.tech_summary) {
+                const res = window.techAssignmentsData;
+                rosList.innerHTML = '';
+
+                // Find the tech's assignments
+                const techData = res.tech_summary.find(t => t.tech === techName);
+                if (!techData || !techData.ros || techData.ros.length === 0) {
+                    rosList.innerHTML = "<p style='text-align:center; color:#777;'>No RO assignments found for this technician.</p>";
+                    return;
+                }
+
+                // Display each RO
+                techData.ros.forEach(ro => {
+                    const roDiv = document.createElement('div');
+                    roDiv.style.cssText = 'display:flex; justify-content:space-between; align-items:center; padding:12px; border-bottom:1px solid #eee; cursor:pointer;';
+                    roDiv.onmouseover = function() { this.style.backgroundColor = '#f0f0f0'; };
+                    roDiv.onmouseout = function() { this.style.backgroundColor = 'transparent'; };
+                    
+                    const roCell = document.createElement('div');
+                    roCell.style.flex = "1";
+                    roCell.style.textAlign = "left";
+                    roCell.style.color = "#0066cc";
+                    roCell.style.fontWeight = "bold";
+                    roCell.style.cursor = "pointer";
+                    roCell.textContent = ro.ro;
+                    roCell.addEventListener('click', function(e) {
+                        e.stopPropagation();
+                        loadRepairLinesInline(techName, ro.ro);
+                    });
+                    
+                    const vehicleCell = document.createElement('div');
+                    vehicleCell.style.flex = "2";
+                    vehicleCell.style.textAlign = "center";
+                    vehicleCell.textContent = ro.vehicle_info;
+                    
+                    const hoursCell = document.createElement('div');
+                    hoursCell.style.flex = "1";
+                    hoursCell.style.textAlign = "right";
+                    hoursCell.textContent = ro.total_hours.toFixed(1) + ' hrs';
+                    
+                    roDiv.appendChild(roCell);
+                    roDiv.appendChild(vehicleCell);
+                    roDiv.appendChild(hoursCell);
+                    
+                    rosList.appendChild(roDiv);
                 });
+            }
+        }
+
+        function loadRepairLinesInline(techName, roNumber) {
+            const repairSection = document.getElementById(`repair-section-${techName.replace(/\s+/g, '-')}`);
+            repairSection.innerHTML = '';
+            
+            const roHeader = document.createElement('div');
+            roHeader.style.cssText = 'font-size:14px; font-weight:bold; margin-bottom:10px;';
+            roHeader.textContent = `RO ${roNumber} - Repair Lines`;
+            repairSection.appendChild(roHeader);
+
+            fetch(`${API_BASE}/ui/tech-repair-lines?tech=${encodeURIComponent(techName)}&ro=${encodeURIComponent(roNumber)}`)
+                .then(res => res.json())
+                .then(data => {
+                    if (data.lines && data.lines.length > 0) {
+                        const linesDiv = document.createElement('div');
+                        linesDiv.style.marginLeft = "20px";
+                        
+                        data.lines.forEach(line => {
+                            const lineItem = document.createElement('div');
+                            lineItem.style.cssText = 'display:flex; justify-content:space-between; align-items:center; padding:10px; border-left:3px solid #0066cc; background-color:#f9f9f9; margin-bottom:8px;';
+                            
+                            const typeCell = document.createElement('span');
+                            typeCell.textContent = line.type;
+                            typeCell.style.fontWeight = "bold";
+                            typeCell.style.marginRight = "20px";
+                            
+                            const descCell = document.createElement('span');
+                            descCell.textContent = line.description;
+                            descCell.style.flex = "1";
+                            
+                            const hoursCell = document.createElement('span');
+                            hoursCell.textContent = line.hours.toFixed(1) + ' hrs';
+                            hoursCell.style.marginLeft = "20px";
+                            
+                            lineItem.appendChild(typeCell);
+                            lineItem.appendChild(descCell);
+                            lineItem.appendChild(hoursCell);
+                            linesDiv.appendChild(lineItem);
+                        });
+                        
+                        repairSection.appendChild(linesDiv);
+                    } else {
+                        const noLines = document.createElement('div');
+                        noLines.textContent = 'No repair lines found for this RO';
+                        noLines.style.color = '#999';
+                        repairSection.appendChild(noLines);
+                    }
+                })
+                .catch(err => {
+                    console.error('Error loading repair lines:', err);
+                    const error = document.createElement('div');
+                    error.textContent = 'Error loading repair lines';
+                    error.style.color = 'red';
+                    repairSection.appendChild(error);
+                });
+            
+            repairSection.style.display = 'block';
+        }
+        
+        // Close modal when clicking outside
+        window.onclick = function(event) {
+            const modal = document.getElementById('addTechModal');
+            if (event.target === modal) {
+                closeAddTechModal();
+            }
         }
         
         // ============================================
@@ -557,7 +635,7 @@
             const statusDiv = document.getElementById('uploadStatus');
             statusDiv.innerHTML = '<p>Processing...</p>';
             
-            authFetch(`${API_BASE}/ui/grid?ajax=true`, {
+            fetch('https://flagtech1.onrender.com/ui/grid?ajax=true', {
                 method: 'POST',
                 body: formData
             })
@@ -566,145 +644,16 @@
                 statusDiv.innerHTML = html;
                 fileInput.value = '';
                 
-                // Remove previously injected scripts to reduce conflicts
-                document.querySelectorAll('script[data-injected="grid"]')
-                    .forEach(s => s.remove());
-
                 const scripts = statusDiv.querySelectorAll('script');
                 scripts.forEach(oldScript => {
                     const newScript = document.createElement('script');
-                    newScript.setAttribute('data-injected', 'grid');
-                    newScript.textContent = oldScript.textContent;
+                    newScript.innerHTML = oldScript.innerHTML;
                     document.body.appendChild(newScript);
                 });
             })
             .catch(error => {
                 statusDiv.innerHTML = '<p>Error: ' + error.message + '</p>';
             });
-        }
-        
-        // ============================================
-        // DASHBOARD FUNCTIONS
-        // ============================================
-        
-        let hoursPerTechChartInstance = null;
-        
-        function loadDashboardData() {
-            authFetch(`${API_BASE}/api/dashboard-data`)
-                .then(response => response.json())
-                .then(data => {
-                    updateDashboard(data);
-                })
-                .catch(error => {
-                    console.error('Error loading dashboard data:', error);
-                });
-        }
-        
-        function updateDashboard(data) {
-            // Update Total Sales bar and value
-            const maxSales = Math.max(data.totalSales, data.pendingPayments, 10000); // minimum scale
-            const salesPercent = (data.totalSales / maxSales) * 100;
-            document.getElementById('totalSalesBar').style.height = salesPercent + '%';
-            document.getElementById('totalSalesValue').innerText = '$' + data.totalSales.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
-            
-            // Update Pending Payments bar and value
-            const pendingPercent = (data.pendingPayments / maxSales) * 100;
-            document.getElementById('pendingPaymentsBar').style.height = pendingPercent + '%';
-            document.getElementById('pendingPaymentsValue').innerText = '$' + data.pendingPayments.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
-            
-            // Update Current GP
-            document.getElementById('currentGP').innerText = data.currentGP.toFixed(1) + '%';
-            
-            // Update Parts Cost
-            document.getElementById('partsCost').innerText = '$' + data.partsCost.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
-            
-            // Update Average Hours
-            document.getElementById('averageHrs').innerText = data.averageHrs.toFixed(1);
-            
-            // Update Average RO
-            document.getElementById('averageRO').innerText = '$' + data.averageRO.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
-            
-            // Update Total Hrs per Tech - Pie Chart
-            updateHoursPerTechChart(data.hoursPerTech);
-            
-            // Update Total ROs per Tech - List
-            updateRosPerTechList(data.rosPerTech);
-        }
-        
-        function updateHoursPerTechChart(hoursPerTech) {
-            const ctx = document.getElementById('hoursPerTechChart');
-            
-            if (!ctx) return;
-            
-            const labels = hoursPerTech.map(item => item.tech);
-            const dataValues = hoursPerTech.map(item => item.hours);
-            
-            // Generate colors for each tech
-            const colors = [
-                '#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', 
-                '#9966FF', '#FF9F40', '#FF6384', '#C9CBCF'
-            ];
-            
-            // Destroy existing chart if it exists
-            if (hoursPerTechChartInstance) {
-                hoursPerTechChartInstance.destroy();
-            }
-            
-            hoursPerTechChartInstance = new Chart(ctx, {
-                type: 'pie',
-                data: {
-                    labels: labels,
-                    datasets: [{
-                        data: dataValues,
-                        backgroundColor: colors.slice(0, labels.length),
-                        borderWidth: 2,
-                        borderColor: '#fff'
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: true,
-                    plugins: {
-                        legend: {
-                            position: 'bottom',
-                            labels: {
-                                font: {
-                                    size: 10
-                                },
-                                padding: 8
-                            }
-                        },
-                        tooltip: {
-                            callbacks: {
-                                label: function(context) {
-                                    return context.label + ': ' + context.parsed.toFixed(1) + ' hrs';
-                                }
-                            }
-                        }
-                    }
-                }
-            });
-        }
-        
-        function updateRosPerTechList(rosPerTech) {
-            const container = document.getElementById('rosPerTechList');
-            
-            if (rosPerTech.length === 0) {
-                container.innerHTML = '<div style="color:#999; text-align:center;">No data</div>';
-                return;
-            }
-            
-            let html = '';
-            rosPerTech.forEach(item => {
-                html += `
-                    <div style="display:flex; justify-content:space-between; padding:6px 0; border-bottom:1px solid #eee;">
-                        <span style="color:#333;">${item.tech}</span>
-                        <span style="font-weight:bold; color:#795548;">${item.ros}</span>
-                    </div>
-                `;
-            });
-            
-            container.innerHTML = html;
         }
     
     </script>

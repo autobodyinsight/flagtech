@@ -3,7 +3,6 @@ from app.services.extractor import load_pdf
 from app.services.parser import parse_estimate_pdf
 from app.models.estimate import EstimateResponse
 from app.services.db import get_conn
-from app.services.middleware import get_user_domain
 from fastapi.responses import JSONResponse
 
 router = APIRouter()
@@ -51,24 +50,19 @@ async def parse_paint(file: UploadFile = File(...)):
 @router.post("/techs/add")
 async def add_tech(request: Request):
     """Add a new technician."""
-    domain = get_user_domain(request)
-    if not domain:
-        return JSONResponse(status_code=401, content={"error": "Not authenticated"})
-    
     data = await request.json()
     conn = get_conn()
     cur = conn.cursor()
 
     try:
         cur.execute("""
-            INSERT INTO techs (first_name, last_name, pay_rate, domain)
-            VALUES (%s, %s, %s, %s)
-            RETURNING id, first_name, last_name, pay_rate, active, domain
+            INSERT INTO techs (first_name, last_name, pay_rate)
+            VALUES (%s, %s, %s)
+            RETURNING id, first_name, last_name, pay_rate, active
         """, (
             data["first_name"],
             data["last_name"],
-            data["pay_rate"],
-            domain
+            data["pay_rate"]
         ))
 
         row = cur.fetchone()
@@ -90,10 +84,6 @@ async def add_tech(request: Request):
 @router.get("/techs/list")
 async def list_techs(request: Request):
     """Get list of all active technicians."""
-    domain = get_user_domain(request)
-    if not domain:
-        return JSONResponse(status_code=401, content={"error": "Not authenticated", "techs": []})
-    
     conn = get_conn()
     cur = conn.cursor()
     
@@ -101,9 +91,9 @@ async def list_techs(request: Request):
         cur.execute("""
             SELECT id, first_name, last_name, pay_rate, active
             FROM techs
-            WHERE active = true AND domain = %s
+            WHERE active = true
             ORDER BY first_name, last_name
-        """, (domain,))
+        """)
         
         rows = cur.fetchall()
         
@@ -129,10 +119,6 @@ async def list_techs(request: Request):
 @router.post("/vendors/add")
 async def add_vendor(request: Request):
     """Add a new parts vendor."""
-    domain = get_user_domain(request)
-    if not domain:
-        return JSONResponse(status_code=401, content={"error": "Not authenticated"})
-
     data = await request.json()
     name = (data.get("name") or "").strip()
     email = (data.get("email") or "").strip()
@@ -147,11 +133,11 @@ async def add_vendor(request: Request):
         _ensure_parts_vendors_table(cur)
         cur.execute(
             """
-            INSERT INTO parts_vendors (name, email, phone, domain)
-            VALUES (%s, %s, %s, %s)
+            INSERT INTO parts_vendors (name, email, phone)
+            VALUES (%s, %s, %s)
             RETURNING id, name, email, phone, active
             """,
-            (name, email or None, phone or None, domain),
+            (name, email or None, phone or None),
         )
 
         row = cur.fetchone()
@@ -172,11 +158,7 @@ async def add_vendor(request: Request):
 
 @router.get("/vendors/list")
 async def list_vendors(request: Request):
-    """List active parts vendors for the user's domain."""
-    domain = get_user_domain(request)
-    if not domain:
-        return JSONResponse(status_code=401, content={"error": "Not authenticated", "vendors": []})
-
+    """List active parts vendors."""
     conn = get_conn()
     cur = conn.cursor()
     try:
@@ -185,10 +167,9 @@ async def list_vendors(request: Request):
             """
             SELECT id, name, email, phone, active
             FROM parts_vendors
-            WHERE active = TRUE AND domain = %s
+            WHERE active = TRUE
             ORDER BY name
-            """,
-            (domain,),
+            """
         )
 
         rows = cur.fetchall()
@@ -212,9 +193,6 @@ async def list_vendors(request: Request):
 async def dashboard_data(request: Request):
     """Get aggregated data for the dashboard."""
     try:
-        domain = get_user_domain(request)
-        if not domain:
-            return JSONResponse(status_code=401, content={"error": "Not authenticated"})
         conn = get_conn()
         cur = conn.cursor()
         
@@ -227,13 +205,11 @@ async def dashboard_data(request: Request):
             FROM (
                 SELECT SUM(total_labor) as total_labor, 0 as total_paint
                 FROM labor_assignments
-                WHERE domain = %s
                 UNION ALL
                 SELECT 0 as total_labor, SUM(total_paint) as total_paint
                 FROM refinish_assignments
-                WHERE domain = %s
             ) AS combined
-        """, (domain, domain))
+        """)
         
         hours_row = cur.fetchone()
         total_labor_hours = float(hours_row["total_labor_hours"] or 0)
@@ -251,11 +227,11 @@ async def dashboard_data(request: Request):
         cur.execute("""
             SELECT COUNT(DISTINCT ro) as ro_count
             FROM (
-                SELECT ro FROM labor_assignments WHERE domain = %s
+                SELECT ro FROM labor_assignments
                 UNION
-                SELECT ro FROM refinish_assignments WHERE domain = %s
+                SELECT ro FROM refinish_assignments
             ) AS all_ros
-        """, (domain, domain))
+        """)
         ro_count_row = cur.fetchone()
         ro_count = int(ro_count_row["ro_count"] or 0)
         
@@ -281,15 +257,15 @@ async def dashboard_data(request: Request):
             FROM (
                 SELECT tech, total_labor as total_hours
                 FROM labor_assignments
-                WHERE tech IS NOT NULL AND tech <> '' AND domain = %s
+                WHERE tech IS NOT NULL AND tech <> ''
                 UNION ALL
                 SELECT tech, total_paint as total_hours
                 FROM refinish_assignments
-                WHERE tech IS NOT NULL AND tech <> '' AND domain = %s
+                WHERE tech IS NOT NULL AND tech <> ''
             ) AS combined
             GROUP BY tech
             ORDER BY total_hours DESC
-        """, (domain, domain))
+        """)
         
         hours_per_tech_rows = cur.fetchall()
         hours_per_tech = []
@@ -306,14 +282,14 @@ async def dashboard_data(request: Request):
                 COUNT(DISTINCT ro) as ro_count
             FROM (
                 SELECT tech, ro FROM labor_assignments
-                WHERE tech IS NOT NULL AND tech <> '' AND domain = %s
+                WHERE tech IS NOT NULL AND tech <> ''
                 UNION
                 SELECT tech, ro FROM refinish_assignments
-                WHERE tech IS NOT NULL AND tech <> '' AND domain = %s
+                WHERE tech IS NOT NULL AND tech <> ''
             ) AS combined
             GROUP BY tech
             ORDER BY ro_count DESC
-        """, (domain, domain))
+        """)
         
         ros_per_tech_rows = cur.fetchall()
         ros_per_tech = []

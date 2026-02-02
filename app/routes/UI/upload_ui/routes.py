@@ -7,7 +7,6 @@ import json
 from app.services.extractor import extract_text_from_pdf
 from app.services.parser import parse_estimate_text
 from app.services.db import get_conn
-from app.services.middleware import get_user_domain
 
 router = APIRouter()
 
@@ -88,9 +87,6 @@ async def parse_ui(file: UploadFile = File(...)):
 @router.post("/save-labor")
 async def save_labor(request: Request):
     data = await request.json()
-    domain = get_user_domain(request)
-    if not domain:
-        return {"error": "Not authenticated"}
     conn = get_conn()
     cur = conn.cursor()
 
@@ -98,8 +94,8 @@ async def save_labor(request: Request):
 
     cur.execute("""
         INSERT INTO labor_assignments
-        (ro, vehicle, tech, assigned, unassigned, additional, total_labor, total_unassigned, timestamp, domain)
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+        (ro, vehicle, tech, assigned, unassigned, additional, total_labor, total_unassigned, timestamp)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
     """, (
         data["ro"],
         data["vehicle"],
@@ -109,8 +105,7 @@ async def save_labor(request: Request):
         json.dumps(data["additional"]),
         data["totalLabor"],
         data["totalUnassigned"],
-        data["timestamp"],
-        domain
+        data["timestamp"]
     ))
 
     conn.commit()
@@ -122,9 +117,6 @@ async def save_labor(request: Request):
 @router.post("/save-refinish")
 async def save_refinish(request: Request):
     data = await request.json()
-    domain = get_user_domain(request)
-    if not domain:
-        return {"error": "Not authenticated"}
     conn = get_conn()
     cur = conn.cursor()
 
@@ -132,8 +124,8 @@ async def save_refinish(request: Request):
 
     cur.execute("""
         INSERT INTO refinish_assignments
-        (ro, vehicle, tech, assigned, unassigned, additional, total_paint, total_unassigned, timestamp, domain)
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+        (ro, vehicle, tech, assigned, unassigned, additional, total_paint, total_unassigned, timestamp)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
     """, (
         data["ro"],
         data["vehicle"],
@@ -143,8 +135,7 @@ async def save_refinish(request: Request):
         json.dumps(data["additional"]),
         data["totalPaint"],
         data["totalUnassigned"],
-        data["timestamp"],
-        domain
+        data["timestamp"]
     ))
 
     conn.commit()
