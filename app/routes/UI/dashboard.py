@@ -84,6 +84,29 @@ def get_dashboard_screen_html():
                     </div>
                 </div>
             </div>
+            
+            <!-- RO List Table -->
+            <div style="margin-top:30px; background:#fff; padding:20px; border-radius:8px; box-shadow:0 2px 4px rgba(0,0,0,0.1);">
+                <h3 style="margin:0 0 20px 0; color:#333;">Repair Orders</h3>
+                <div style="overflow-x:auto;">
+                    <table id="roListTable" style="width:100%; border-collapse:collapse;">
+                        <thead>
+                            <tr style="background:#f5f5f5; text-align:left;">
+                                <th style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold; color:#555;">RO#</th>
+                                <th style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold; color:#555;">Vehicle</th>
+                                <th style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold; color:#555;">Tech</th>
+                                <th style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold; color:#555; text-align:right;">HRS</th>
+                                <th style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold; color:#555; text-align:right;">Total</th>
+                            </tr>
+                        </thead>
+                        <tbody id="roListBody">
+                            <tr>
+                                <td colspan="5" style="padding:20px; text-align:center; color:#999;">Loading...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
         </div>
         
         <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -139,6 +162,9 @@ def get_dashboard_screen_html():
                 
                 // Update Total ROs per Tech - List
                 updateRosPerTechList(data.rosPerTech);
+                
+                // Update RO List Table
+                updateRoListTable(data.roList);
             }
             
             // Update pie chart for hours per tech
@@ -217,6 +243,32 @@ def get_dashboard_screen_html():
                 });
                 
                 container.innerHTML = html;
+            }
+            
+            // Update RO list table
+            function updateRoListTable(roList) {
+                const tbody = document.getElementById('roListBody');
+                
+                if (!roList || roList.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="5" style="padding:20px; text-align:center; color:#999;">No repair orders found</td></tr>';
+                    return;
+                }
+                
+                let html = '';
+                roList.forEach((ro, index) => {
+                    const rowBg = index % 2 === 0 ? '#fff' : '#f9f9f9';
+                    html += `
+                        <tr style="background:${rowBg};">
+                            <td style="padding:12px; border-bottom:1px solid #eee; color:#333;">${ro.ro}</td>
+                            <td style="padding:12px; border-bottom:1px solid #eee; color:#333;">${ro.vehicle || 'N/A'}</td>
+                            <td style="padding:12px; border-bottom:1px solid #eee; color:#333;">${ro.tech || 'Unassigned'}</td>
+                            <td style="padding:12px; border-bottom:1px solid #eee; color:#333; text-align:right;">${ro.hours.toFixed(1)}</td>
+                            <td style="padding:12px; border-bottom:1px solid #eee; color:#333; text-align:right; font-weight:bold;">$${ro.total.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                        </tr>
+                    `;
+                });
+                
+                tbody.innerHTML = html;
             }
             
             // Load dashboard data when dashboard screen is shown

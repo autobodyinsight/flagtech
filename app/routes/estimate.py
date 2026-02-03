@@ -508,6 +508,50 @@ async def dashboard_data(request: Request):
                 "ros": int(row["ro_count"] or 0)
             })
         
+        # Get detailed RO list
+        cur.execute("""
+            SELECT 
+                ro,
+                vehicle,
+                tech,
+                total_hours,
+                total_amount
+            FROM (
+                SELECT 
+                    l.ro,
+                    l.vehicle,
+                    l.tech,
+                    COALESCE(l.total_labor, 0) + COALESCE(r.total_paint, 0) as total_hours,
+                    (COALESCE(l.total_labor, 0) + COALESCE(r.total_paint, 0)) * 100 as total_amount
+                FROM labor_assignments l
+                LEFT JOIN refinish_assignments r ON l.ro = r.ro
+                WHERE l.tech IS NOT NULL AND l.tech <> ''
+                UNION
+                SELECT 
+                    r.ro,
+                    r.vehicle,
+                    r.tech,
+                    COALESCE(l.total_labor, 0) + COALESCE(r.total_paint, 0) as total_hours,
+                    (COALESCE(l.total_labor, 0) + COALESCE(r.total_paint, 0)) * 100 as total_amount
+                FROM refinish_assignments r
+                LEFT JOIN labor_assignments l ON r.ro = l.ro
+                WHERE r.tech IS NOT NULL AND r.tech <> ''
+                AND NOT EXISTS (SELECT 1 FROM labor_assignments WHERE ro = r.ro)
+            ) AS combined
+            ORDER BY ro DESC
+        """)
+        
+        ro_list_rows = cur.fetchall()
+        ro_list = []
+        for row in ro_list_rows:
+            ro_list.append({
+                "ro": row["ro"],
+                "vehicle": row["vehicle"],
+                "tech": row["tech"],
+                "hours": round(float(row["total_hours"] or 0), 2),
+                "total": round(float(row["total_amount"] or 0), 2)
+            })
+        
         cur.close()
         
         return {
@@ -518,7 +562,8 @@ async def dashboard_data(request: Request):
             "averageHrs": round(average_hrs, 2),
             "averageRO": round(average_ro, 2),
             "hoursPerTech": hours_per_tech,
-            "rosPerTech": ros_per_tech
+            "rosPerTech": ros_per_tech,
+            "roList": ro_list
         }
     except Exception as e:
         # Return default values on error
@@ -531,5 +576,6 @@ async def dashboard_data(request: Request):
             "averageRO": 0,
             "hoursPerTech": [],
             "rosPerTech": [],
+            "roList": [],
             "error": str(e)
         }
