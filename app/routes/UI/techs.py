@@ -110,7 +110,7 @@ def get_techs_screen_html():
                 return;
             }
 
-            fetch(`${BACKEND_BASE}/ui/techs/add`, {
+            fetch(`${BACKEND_BASE}/api/techs/add`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
@@ -215,7 +215,7 @@ def get_techs_screen_html():
             roHeader.textContent = `RO ${roNumber} - Repair Lines`;
             repairSection.appendChild(roHeader);
 
-            fetch(`${BACKEND_BASE}/ui/tech-repair-lines?tech=${encodeURIComponent(techName)}&ro=${encodeURIComponent(roNumber)}`)
+            fetch(`${BACKEND_BASE}/api/tech-repair-lines?tech=${encodeURIComponent(techName)}&ro=${encodeURIComponent(roNumber)}`)
                 .then(res => res.json())
                 .then(data => {
                     if (data.lines && data.lines.length > 0) {
@@ -274,8 +274,8 @@ def get_techs_screen_html():
 
             // Fetch techs list and tech assignments to get total ROs and hours
             Promise.all([
-                fetch(`${BACKEND_BASE}/ui/techs/list`).then(r => r.json()),
-                fetch(`${BACKEND_BASE}/ui/tech-assignments`).then(r => r.json())
+                fetch(`${BACKEND_BASE}/api/techs/list`).then(r => r.json()),
+                fetch(`${BACKEND_BASE}/api/tech-assignments`).then(r => r.json())
             ])
             .then(([techsRes, assignmentsRes]) => {
                 cardsContainer.innerHTML = "";
@@ -422,7 +422,7 @@ def get_techs_screen_html():
             modal.style.display = 'block';
 
             // Fetch tech assignment details
-            fetch(`${BACKEND_BASE}/ui/tech-assignments`)
+            fetch(`${BACKEND_BASE}/api/tech-assignments`)
                 .then(r => r.json())
                 .then(res => {
                     const rosListContainer = document.getElementById('rosListContainer');
@@ -484,7 +484,7 @@ def get_techs_screen_html():
             repairLinesContainer.style.display = 'block';
 
             // Fetch repair lines for this tech and RO
-            fetch(`${BACKEND_BASE}/ui/tech-repair-lines?tech=${encodeURIComponent(techName)}&ro=${encodeURIComponent(roNumber)}`)
+            fetch(`${BACKEND_BASE}/api/tech-repair-lines?tech=${encodeURIComponent(techName)}&ro=${encodeURIComponent(roNumber)}`)
                 .then(r => r.json())
                 .then(res => {
                     repairLinesList.innerHTML = '';

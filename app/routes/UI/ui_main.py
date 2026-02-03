@@ -32,7 +32,7 @@ async def home_screen():
             padding: 0;
             box-sizing: border-box;
         }}
-        body {
+        body {{
             font-family: Arial, sans-serif;
             display: flex;
             height: 100vh;
@@ -69,7 +69,7 @@ async def home_screen():
             color: white;
             border: 2px solid #d32f2f;
         }}
-        .content-area {
+        .content-area {{
             flex: 1;
             padding: 40px;
             overflow-y: auto;
@@ -116,10 +116,10 @@ async def home_screen():
             // Add active class to clicked nav box
             event.target.classList.add('active');
 
-            if (screenName === 'setup' && typeof setupLoadTechs === 'function') {
+            if (screenName === 'setup' && typeof setupLoadTechs === 'function') {{
                 setupLoadTechs();
                 setupLoadVendors();
-            }
+            }}
             
             // Load dashboard data if switching to dashboard
             if (screenName === 'dashboard' && typeof loadDashboardDataIfNeeded === 'function') {{

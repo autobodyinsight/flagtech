@@ -1,4 +1,5 @@
 from fastapi import APIRouter, UploadFile, File, Request
+import json
 from app.services.extractor import load_pdf
 from app.services.parser import parse_estimate_pdf
 from app.models.estimate import EstimateResponse
@@ -28,6 +29,30 @@ def _ensure_parts_vendors_table(cur) -> None:
         CREATE INDEX IF NOT EXISTS idx_parts_vendors_domain ON parts_vendors(domain)
         """
     )
+
+
+def _parse_json_field(value):
+    if value is None:
+        return []
+    if isinstance(value, (list, dict)):
+        return value
+    try:
+        return json.loads(value)
+    except Exception:
+        return []
+
+
+def _extract_hours(item):
+    if not isinstance(item, dict):
+        return 0.0
+    for key in ("value", "labor", "paint", "hours"):
+        val = item.get(key)
+        if val is not None:
+            try:
+                return float(val)
+            except Exception:
+                return 0.0
+    return 0.0
 
 @router.post("/parse-labor", response_model=EstimateResponse)
 async def parse_labor(file: UploadFile = File(...)):
@@ -108,6 +133,157 @@ async def list_techs(request: Request):
             })
         
         return {"techs": techs}
+    finally:
+        cur.close()
+
+
+@router.get("/tech-assignments")
+async def tech_assignments(request: Request):
+    """Aggregate labor/refinish assignments by tech and RO."""
+    conn = get_conn()
+    cur = conn.cursor()
+
+    try:
+        cur.execute(
+            """
+            SELECT tech, ro, vehicle, total_labor AS total_hours
+            FROM labor_assignments
+            WHERE tech IS NOT NULL AND tech <> ''
+            UNION ALL
+            SELECT tech, ro, vehicle, total_paint AS total_hours
+            FROM refinish_assignments
+            WHERE tech IS NOT NULL AND tech <> ''
+            """
+        )
+
+        rows = cur.fetchall()
+
+        tech_map = {}
+        for row in rows:
+            tech = row.get("tech")
+            if not tech:
+                continue
+            ro = row.get("ro") or ""
+            vehicle = row.get("vehicle") or ""
+            hours = float(row.get("total_hours") or 0)
+
+            tech_entry = tech_map.setdefault(
+                tech,
+                {
+                    "tech": tech,
+                    "total_hours": 0.0,
+                    "total_vehicles": 0,
+                    "ros": {},
+                },
+            )
+
+            tech_entry["total_hours"] += hours
+
+            if ro not in tech_entry["ros"]:
+                tech_entry["ros"][ro] = {
+                    "ro": ro,
+                    "vehicle_info": vehicle,
+                    "total_hours": 0.0,
+                }
+
+            tech_entry["ros"][ro]["total_hours"] += hours
+
+        tech_summary = []
+        for tech_entry in tech_map.values():
+            ros_list = list(tech_entry["ros"].values())
+            ros_list.sort(key=lambda r: r["ro"])
+            tech_summary.append(
+                {
+                    "tech": tech_entry["tech"],
+                    "total_hours": round(tech_entry["total_hours"], 2),
+                    "total_vehicles": len(ros_list),
+                    "ros": ros_list,
+                }
+            )
+
+        tech_summary.sort(key=lambda t: t["tech"])
+        return {"tech_summary": tech_summary}
+    finally:
+        cur.close()
+
+
+@router.get("/tech-repair-lines")
+async def tech_repair_lines(tech: str, ro: str):
+    """Return repair lines for a given tech and RO."""
+    conn = get_conn()
+    cur = conn.cursor()
+    lines = []
+
+    try:
+        cur.execute(
+            """
+            SELECT assigned, additional
+            FROM labor_assignments
+            WHERE tech = %s AND ro = %s
+            """,
+            (tech, ro),
+        )
+        for row in cur.fetchall():
+            assigned = _parse_json_field(row.get("assigned"))
+            additional = _parse_json_field(row.get("additional"))
+
+            if isinstance(assigned, list):
+                for item in assigned:
+                    desc = (item.get("description") if isinstance(item, dict) else None) or "Labor"
+                    lines.append(
+                        {
+                            "type": "Labor",
+                            "description": desc,
+                            "hours": _extract_hours(item),
+                        }
+                    )
+
+            if isinstance(additional, list):
+                for item in additional:
+                    desc = (item.get("description") if isinstance(item, dict) else None) or "Additional Labor"
+                    lines.append(
+                        {
+                            "type": "Labor",
+                            "description": desc,
+                            "hours": _extract_hours(item),
+                        }
+                    )
+
+        cur.execute(
+            """
+            SELECT assigned, additional
+            FROM refinish_assignments
+            WHERE tech = %s AND ro = %s
+            """,
+            (tech, ro),
+        )
+        for row in cur.fetchall():
+            assigned = _parse_json_field(row.get("assigned"))
+            additional = _parse_json_field(row.get("additional"))
+
+            if isinstance(assigned, list):
+                for item in assigned:
+                    desc = (item.get("description") if isinstance(item, dict) else None) or "Refinish"
+                    lines.append(
+                        {
+                            "type": "Refinish",
+                            "description": desc,
+                            "hours": _extract_hours(item),
+                        }
+                    )
+
+            if isinstance(additional, list):
+                for item in additional:
+                    desc = (item.get("description") if isinstance(item, dict) else None) or "Additional Refinish"
+                    lines.append(
+                        {
+                            "type": "Refinish",
+                            "description": desc,
+                            "hours": _extract_hours(item),
+                        }
+                    )
+
+        return {"lines": lines}
     finally:
         cur.close()
 

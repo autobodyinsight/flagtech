@@ -316,7 +316,7 @@
             }
             
             // Save to backend
-            fetch(`${API_BASE}/ui/techs/add`, {
+            fetch(`${API_BASE}/api/techs/add`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -344,8 +344,8 @@
 
             // Fetch techs list and tech assignments to get total ROs and hours
             Promise.all([
-                fetch(`${API_BASE}/ui/techs/list`).then(r => r.json()),
-                fetch(`${API_BASE}/ui/tech-assignments`).then(r => r.json())
+                fetch(`${API_BASE}/api/techs/list`).then(r => r.json()),
+                fetch(`${API_BASE}/api/tech-assignments`).then(r => r.json())
             ])
             .then(([techsRes, assignmentsRes]) => {
                 cardsContainer.innerHTML = "";
@@ -563,7 +563,7 @@
             roHeader.textContent = `RO ${roNumber} - Repair Lines`;
             repairSection.appendChild(roHeader);
 
-            fetch(`${API_BASE}/ui/tech-repair-lines?tech=${encodeURIComponent(techName)}&ro=${encodeURIComponent(roNumber)}`)
+            fetch(`${API_BASE}/api/tech-repair-lines?tech=${encodeURIComponent(techName)}&ro=${encodeURIComponent(roNumber)}`)
                 .then(res => res.json())
                 .then(data => {
                     if (data.lines && data.lines.length > 0) {
