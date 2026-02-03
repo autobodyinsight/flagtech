@@ -265,7 +265,7 @@ async def grid_ui(file: UploadFile = File(...), ajax: str = None):
     height: 100%;
     background-color: rgba(0,0,0,0.4);
   }}
-    .modal-content {
+    .modal-content {{
         background-color: #f2f2f2;
     margin: 2% auto;
     padding: 20px;
