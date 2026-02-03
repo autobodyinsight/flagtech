@@ -35,7 +35,7 @@ async def home_screen(request: Request):
             padding: 0;
             box-sizing: border-box;
         }}
-        body {
+        body {{
             font-family: Arial, sans-serif;
             display: flex;
             flex-direction: column;
@@ -72,7 +72,7 @@ async def home_screen(request: Request):
             border-bottom: 3px solid #d32f2f;
             margin-bottom: -3px;
         }}
-        .content-area {
+        .content-area {{
             flex: 1;
             padding: 40px;
             overflow-y: auto;
