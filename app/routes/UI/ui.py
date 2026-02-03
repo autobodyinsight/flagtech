@@ -90,8 +90,8 @@ async def home_screen(request: Request):
     <div class="tab-bar">
         <div class="nav-tab active" onclick="switchScreen('dashboard')">DASHBOARD</div>
         <div class="nav-tab" onclick="switchScreen('upload')">UPLOAD</div>
-        <div class="nav-tab" onclick="switchScreen('setup')">SETUP</div>
         <div class="nav-tab" onclick="switchScreen('flagtech')">FLAG TECH</div>
+        <div class="nav-tab" onclick="switchScreen('setup')">SETUP</div>
     </div>
     
     <div class="content-area">
