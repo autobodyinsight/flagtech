@@ -137,6 +137,39 @@ async def list_techs(request: Request):
         cur.close()
 
 
+@router.post("/techs/delete")
+async def delete_tech(request: Request):
+    """Soft delete a technician (set active=false)."""
+    data = await request.json()
+    tech_id = data.get("id")
+
+    if not tech_id:
+        return JSONResponse(status_code=400, content={"error": "Tech id is required"})
+
+    conn = get_conn()
+    cur = conn.cursor()
+
+    try:
+        cur.execute(
+            """
+            UPDATE techs
+            SET active = false
+            WHERE id = %s
+            RETURNING id
+            """,
+            (tech_id,),
+        )
+        row = cur.fetchone()
+        conn.commit()
+
+        if not row:
+            return JSONResponse(status_code=404, content={"error": "Tech not found"})
+
+        return {"status": "ok", "id": row["id"]}
+    finally:
+        cur.close()
+
+
 @router.get("/tech-assignments")
 async def tech_assignments(request: Request):
     """Aggregate labor/refinish assignments by tech and RO."""

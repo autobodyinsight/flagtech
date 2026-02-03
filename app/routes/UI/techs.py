@@ -15,10 +15,6 @@ def get_techs_screen_html():
             </button>
         </div>
 
-        <!-- Techs Cards Grid -->
-        <div id="techsCardsContainer" style="display:grid; grid-template-columns:repeat(auto-fill, minmax(150px, 1fr)); gap:15px; margin-bottom:40px;">
-        </div>
-
         <!-- Techs Details Table -->
         <div style="margin-top:40px;">
             <h2 style="margin-bottom:20px;">Assignments</h2>
@@ -267,10 +263,8 @@ def get_techs_screen_html():
         // Load and Display Techs
         // -----------------------------
         function loadTechsList() {
-            const cardsContainer = document.getElementById('techsCardsContainer');
             const tableContainer = document.getElementById('techsListContainer');
-            cardsContainer.innerHTML = "<p style='color:#777; text-align:center; grid-column:1/-1;'>Loading...</p>";
-            tableContainer.innerHTML = "";
+            tableContainer.innerHTML = "<p style='color:#777; text-align:center; padding:12px;'>Loading...</p>";
 
             // Fetch techs list and tech assignments to get total ROs and hours
             Promise.all([
@@ -278,14 +272,13 @@ def get_techs_screen_html():
                 fetch(`${BACKEND_BASE}/api/tech-assignments`).then(r => r.json())
             ])
             .then(([techsRes, assignmentsRes]) => {
-                cardsContainer.innerHTML = "";
                 tableContainer.innerHTML = "";
 
                 // Cache assignments data for inline use
                 window.techAssignmentsData = assignmentsRes;
 
                 if (!techsRes.techs || techsRes.techs.length === 0) {
-                    cardsContainer.innerHTML = "<p style='color:#777; text-align:center; grid-column:1/-1;'>No techs added yet.</p>";
+                    tableContainer.innerHTML = "<p style='color:#777; text-align:center; padding:12px;'>No techs added yet.</p>";
                     return;
                 }
 
@@ -300,31 +293,6 @@ def get_techs_screen_html():
                     });
                 }
 
-                // Display tech cards
-                techsRes.techs.forEach(tech => {
-                    const fullName = `${tech.first_name} ${tech.last_name}`;
-                    const assignments = assignmentsMap[fullName] || { total_vehicles: 0, total_hours: 0 };
-
-                    const card = document.createElement('div');
-                    card.style.padding = "20px";
-                    card.style.border = "1px solid #ddd";
-                    card.style.borderRadius = "8px";
-                    card.style.backgroundColor = "#f9f9f9";
-                    card.style.textAlign = "center";
-                    card.style.boxShadow = "0 2px 4px rgba(0,0,0,0.1)";
-
-                    card.innerHTML = `
-                        <div style="font-weight:bold; font-size:16px; margin-bottom:5px;">
-                            ${tech.first_name}
-                        </div>
-                        <div style="font-size:14px; color:#666;">
-                            ${tech.last_name}
-                        </div>
-                    `;
-
-                    cardsContainer.appendChild(card);
-                });
-
                 // Display tech details in table
                 techsRes.techs.forEach(tech => {
                     const fullName = `${tech.first_name} ${tech.last_name}`;
@@ -338,6 +306,29 @@ def get_techs_screen_html():
                     const techNameCell = document.createElement('div');
                     techNameCell.style.flex = "1";
                     techNameCell.style.textAlign = "left";
+                    techNameCell.style.display = "flex";
+                    techNameCell.style.alignItems = "center";
+                    techNameCell.style.gap = "10px";
+
+                    const deleteBtn = document.createElement('button');
+                    deleteBtn.textContent = "−";
+                    deleteBtn.title = `Delete ${fullName}`;
+                    deleteBtn.setAttribute('aria-label', `Delete ${fullName}`);
+                    deleteBtn.style.width = "20px";
+                    deleteBtn.style.height = "20px";
+                    deleteBtn.style.borderRadius = "50%";
+                    deleteBtn.style.border = "none";
+                    deleteBtn.style.backgroundColor = "#d32f2f";
+                    deleteBtn.style.color = "#fff";
+                    deleteBtn.style.fontWeight = "bold";
+                    deleteBtn.style.cursor = "pointer";
+                    deleteBtn.style.display = "inline-flex";
+                    deleteBtn.style.alignItems = "center";
+                    deleteBtn.style.justifyContent = "center";
+                    deleteBtn.onclick = function(e) {
+                        e.stopPropagation();
+                        deleteTech(tech.id, fullName);
+                    };
                     
                     const techLink = document.createElement('span');
                     techLink.textContent = fullName;
@@ -349,6 +340,7 @@ def get_techs_screen_html():
                         e.stopPropagation();
                         toggleTechDetails(fullName);
                     };
+                    techNameCell.appendChild(deleteBtn);
                     techNameCell.appendChild(techLink);
                     
                     const rateCell = document.createElement('div');
@@ -405,7 +397,27 @@ def get_techs_screen_html():
             })
             .catch(err => {
                 console.error("Error loading techs:", err);
-                cardsContainer.innerHTML = "<p style='color:red; text-align:center; grid-column:1/-1;'>Error loading techs.</p>";
+                tableContainer.innerHTML = "<p style='color:red; text-align:center; padding:12px;'>Error loading techs.</p>";
+            });
+        }
+
+        function deleteTech(techId, techName) {
+            if (!confirm(`Delete ${techName}?`)) {
+                return;
+            }
+
+            fetch(`${BACKEND_BASE}/api/techs/delete`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ id: techId })
+            })
+            .then(r => r.json())
+            .then(() => {
+                loadTechsList();
+            })
+            .catch(err => {
+                console.error("Error deleting tech:", err);
+                alert("Error deleting tech. Please try again.");
             });
         }
 
