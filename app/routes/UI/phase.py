@@ -9,39 +9,39 @@ def get_phase_screen_html():
 
         <div style="display:grid; grid-template-columns:repeat(9, minmax(140px, 1fr)); gap:12px; align-items:start;">
             <div class="phase-column">
-                <div class="phase-header">Teardown</div>
+                <div class="phase-header">Teardown <span class="phase-count" id="phase-count-teardown">0</span></div>
                 <div id="phase-teardown" class="phase-cards"></div>
             </div>
             <div class="phase-column">
-                <div class="phase-header">Auth</div>
+                <div class="phase-header">Auth <span class="phase-count" id="phase-count-auth">0</span></div>
                 <div id="phase-auth" class="phase-cards"></div>
             </div>
             <div class="phase-column">
-                <div class="phase-header">Parts</div>
+                <div class="phase-header">Parts <span class="phase-count" id="phase-count-parts">0</span></div>
                 <div id="phase-parts" class="phase-cards"></div>
             </div>
             <div class="phase-column">
-                <div class="phase-header">Body</div>
+                <div class="phase-header">Body <span class="phase-count" id="phase-count-body">0</span></div>
                 <div id="phase-body" class="phase-cards"></div>
             </div>
             <div class="phase-column">
-                <div class="phase-header">Refinish</div>
+                <div class="phase-header">Refinish <span class="phase-count" id="phase-count-refinish">0</span></div>
                 <div id="phase-refinish" class="phase-cards"></div>
             </div>
             <div class="phase-column">
-                <div class="phase-header">Reassy</div>
+                <div class="phase-header">Reassy <span class="phase-count" id="phase-count-reassy">0</span></div>
                 <div id="phase-reassy" class="phase-cards"></div>
             </div>
             <div class="phase-column">
-                <div class="phase-header">Sublet</div>
+                <div class="phase-header">Sublet <span class="phase-count" id="phase-count-sublet">0</span></div>
                 <div id="phase-sublet" class="phase-cards"></div>
             </div>
             <div class="phase-column">
-                <div class="phase-header">Wash/QC</div>
+                <div class="phase-header">Wash/QC <span class="phase-count" id="phase-count-washqc">0</span></div>
                 <div id="phase-washqc" class="phase-cards"></div>
             </div>
             <div class="phase-column">
-                <div class="phase-header">Complete/Finish</div>
+                <div class="phase-header">Complete/Finish <span class="phase-count" id="phase-count-complete">0</span></div>
                 <div id="phase-complete" class="phase-cards"></div>
             </div>
         </div>
@@ -62,6 +62,15 @@ def get_phase_screen_html():
                 text-align: center;
                 background: #f7f7f7;
                 border-radius: 6px;
+            }
+            .phase-count {
+                display: inline-block;
+                margin-left: 6px;
+                padding: 2px 6px;
+                font-size: 11px;
+                border-radius: 10px;
+                background: #e0e0e0;
+                color: #333;
             }
             .phase-card {
                 border: 1px solid #e0e0e0;
@@ -108,6 +117,16 @@ def get_phase_screen_html():
                     const el = document.getElementById(id);
                     if (el) el.innerHTML = '';
                 });
+
+                const counts = [
+                    'phase-count-teardown', 'phase-count-auth', 'phase-count-parts', 'phase-count-body',
+                    'phase-count-refinish', 'phase-count-reassy', 'phase-count-sublet',
+                    'phase-count-washqc', 'phase-count-complete'
+                ];
+                counts.forEach(id => {
+                    const el = document.getElementById(id);
+                    if (el) el.textContent = '0';
+                });
             }
 
             function phaseColumnFor(phase) {
@@ -134,10 +153,27 @@ def get_phase_screen_html():
                     return;
                 }
 
+                const tally = {
+                    teardown: 0,
+                    auth: 0,
+                    parts: 0,
+                    body: 0,
+                    refinish: 0,
+                    reassy: 0,
+                    sublet: 0,
+                    washqc: 0,
+                    complete: 0
+                };
+
                 items.forEach(item => {
                     const colId = phaseColumnFor(item.phase);
                     const col = document.getElementById(colId);
                     if (!col) return;
+
+                    const phaseKey = colId.replace('phase-', '');
+                    if (tally[phaseKey] !== undefined) {
+                        tally[phaseKey] += 1;
+                    }
 
                     const card = document.createElement('div');
                     card.className = 'phase-card';
@@ -162,6 +198,13 @@ def get_phase_screen_html():
                         }));
                     });
                     col.appendChild(card);
+                });
+
+                Object.keys(tally).forEach(key => {
+                    const countEl = document.getElementById(`phase-count-${key}`);
+                    if (countEl) {
+                        countEl.textContent = String(tally[key]);
+                    }
                 });
 
                 wirePhaseDropZones();
