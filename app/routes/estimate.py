@@ -76,6 +76,21 @@ def _ensure_parts_orders_table(cur) -> None:
     cur.execute("CREATE INDEX IF NOT EXISTS idx_parts_orders_ro ON parts_orders(ro)")
 
 
+def _ensure_ro_phases_table(cur) -> None:
+    cur.execute(
+        """
+        CREATE TABLE IF NOT EXISTS ro_phases (
+            id SERIAL PRIMARY KEY,
+            ro VARCHAR(255) NOT NULL,
+            phase VARCHAR(50) NOT NULL,
+            domain VARCHAR(255) NOT NULL,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+        """
+    )
+    cur.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_ro_phases_ro_domain ON ro_phases(ro, domain)")
+
+
 def _parse_json_field(value):
     if value is None:
         return []
@@ -655,10 +670,12 @@ async def dashboard_data(request: Request):
 @router.get("/phase-data")
 async def phase_data(request: Request):
     """Get RO cards for the Phase board."""
+    domain = get_user_domain(request) or "default"
     conn = get_conn()
     cur = conn.cursor()
 
     try:
+        _ensure_ro_phases_table(cur)
         cur.execute(
             """
             SELECT ro,
@@ -683,6 +700,17 @@ async def phase_data(request: Request):
             """
         )
         refinish_rows = cur.fetchall()
+
+        cur.execute(
+            """
+            SELECT ro, phase
+            FROM ro_phases
+            WHERE domain = %s
+            """,
+            (domain,),
+        )
+        phase_rows = cur.fetchall()
+        phase_map = {row["ro"]: row["phase"] for row in phase_rows}
 
         labor_map = {row["ro"]: row for row in labor_rows}
         refinish_map = {row["ro"]: row for row in refinish_rows}
@@ -742,11 +770,40 @@ async def phase_data(request: Request):
                     "total_hours": round(total_hours, 2),
                     "days_in": days_in,
                     "ecd": ecd_date.isoformat(),
-                    "phase": "teardown",
+                    "phase": phase_map.get(ro, "teardown"),
                 }
             )
 
         return {"items": items}
+    finally:
+        cur.close()
+
+
+@router.post("/phase/update")
+async def phase_update(request: Request):
+    domain = get_user_domain(request) or "default"
+    data = await request.json()
+    ro = (data.get("ro") or "").strip()
+    phase = (data.get("phase") or "").strip().lower()
+
+    if not ro or not phase:
+        return JSONResponse(status_code=400, content={"error": "ro and phase are required"})
+
+    conn = get_conn()
+    cur = conn.cursor()
+    try:
+        _ensure_ro_phases_table(cur)
+        cur.execute(
+            """
+            INSERT INTO ro_phases (ro, phase, domain)
+            VALUES (%s, %s, %s)
+            ON CONFLICT (ro, domain)
+            DO UPDATE SET phase = EXCLUDED.phase, updated_at = CURRENT_TIMESTAMP
+            """,
+            (ro, phase, domain),
+        )
+        conn.commit()
+        return {"status": "ok"}
     finally:
         cur.close()
 

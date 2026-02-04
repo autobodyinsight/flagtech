@@ -89,6 +89,12 @@ def get_phase_screen_html():
             }
             .phase-cards {
                 min-height: 140px;
+                padding-bottom: 10px;
+            }
+            .phase-cards.drag-over {
+                outline: 2px dashed #4caf50;
+                outline-offset: 4px;
+                background: #f3fff3;
             }
         </style>
 
@@ -135,6 +141,9 @@ def get_phase_screen_html():
 
                     const card = document.createElement('div');
                     card.className = 'phase-card';
+                    card.setAttribute('draggable', 'true');
+                    card.dataset.ro = item.ro || '';
+                    card.dataset.phase = item.phase || 'teardown';
                     card.innerHTML = `
                         <div class="ro">RO# ${item.ro || '—'}</div>
                         <div class="vehicle">${item.vehicle || '—'}</div>
@@ -146,7 +155,64 @@ def get_phase_screen_html():
                             <div><strong>ECD:</strong> ${item.ecd || '—'}</div>
                         </div>
                     `;
+                    card.addEventListener('dragstart', (event) => {
+                        event.dataTransfer.setData('text/plain', JSON.stringify({
+                            ro: card.dataset.ro,
+                            from: card.dataset.phase
+                        }));
+                    });
                     col.appendChild(card);
+                });
+
+                wirePhaseDropZones();
+            }
+
+            function wirePhaseDropZones() {
+                const zones = document.querySelectorAll('.phase-cards');
+                zones.forEach(zone => {
+                    zone.addEventListener('dragover', (event) => {
+                        event.preventDefault();
+                        zone.classList.add('drag-over');
+                    });
+                    zone.addEventListener('dragleave', () => {
+                        zone.classList.remove('drag-over');
+                    });
+                    zone.addEventListener('drop', (event) => {
+                        event.preventDefault();
+                        zone.classList.remove('drag-over');
+                        const payload = event.dataTransfer.getData('text/plain');
+                        if (!payload) return;
+                        let data;
+                        try {
+                            data = JSON.parse(payload);
+                        } catch (e) {
+                            return;
+                        }
+                        const ro = data.ro;
+                        if (!ro) return;
+                        const targetPhase = zone.id.replace('phase-', '');
+                        updatePhase(ro, targetPhase);
+                    });
+                });
+            }
+
+            function updatePhase(ro, phaseKey) {
+                fetch('/api/phase/update', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'include',
+                    body: JSON.stringify({ ro, phase: phaseKey })
+                })
+                .then(r => r.json())
+                .then(res => {
+                    if (res.error) {
+                        throw new Error(res.error);
+                    }
+                    loadPhaseData();
+                })
+                .catch(err => {
+                    console.error('Error updating phase:', err);
+                    loadPhaseData();
                 });
             }
 

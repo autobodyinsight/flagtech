@@ -1,1 +1,0 @@
-"""Deprecated: Setup screen replaced by Parts."""
