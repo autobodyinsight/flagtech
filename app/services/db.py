@@ -30,4 +30,5 @@ def get_conn():
 	global conn
 	if conn is None or conn.closed:
 		conn = psycopg2.connect(dsn_with_ssl, cursor_factory=psycopg2.extras.RealDictCursor)
+		conn.autocommit = True
 	return conn
