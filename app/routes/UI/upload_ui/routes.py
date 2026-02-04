@@ -3,6 +3,7 @@
 from fastapi import APIRouter, UploadFile, File, Request
 from fastapi.responses import HTMLResponse
 import json
+import re
 
 from app.services.extractor import extract_text_from_pdf
 from app.services.parser import parse_estimate_text
@@ -90,14 +91,19 @@ async def save_labor(request: Request):
     conn = get_conn()
     cur = conn.cursor()
 
-    print(f"[save-labor] Saving: tech='{data.get('tech')}', ro='{data.get('ro')}', totalLabor={data.get('totalLabor')}")
+    ro_value = (data.get("ro_number") or data.get("ro") or "").strip()
+    match = re.search(r"\bRO\b\s*[:#-]*\s*([A-Za-z0-9-]+)", ro_value)
+    if match:
+        ro_value = match.group(1)
+
+    print(f"[save-labor] Saving: tech='{data.get('tech')}', ro='{ro_value}', totalLabor={data.get('totalLabor')}")
 
     cur.execute("""
         INSERT INTO labor_assignments
         (ro, vehicle, tech, assigned, unassigned, additional, total_labor, total_unassigned, timestamp)
         VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
     """, (
-        data["ro"],
+        ro_value,
         data["vehicle"],
         data["tech"],
         json.dumps(data["assigned"]),
@@ -120,14 +126,19 @@ async def save_refinish(request: Request):
     conn = get_conn()
     cur = conn.cursor()
 
-    print(f"[save-refinish] Saving: tech='{data.get('tech')}', ro='{data.get('ro')}', totalPaint={data.get('totalPaint')}")
+    ro_value = (data.get("ro_number") or data.get("ro") or "").strip()
+    match = re.search(r"\bRO\b\s*[:#-]*\s*([A-Za-z0-9-]+)", ro_value)
+    if match:
+        ro_value = match.group(1)
+
+    print(f"[save-refinish] Saving: tech='{data.get('tech')}', ro='{ro_value}', totalPaint={data.get('totalPaint')}")
 
     cur.execute("""
         INSERT INTO refinish_assignments
         (ro, vehicle, tech, assigned, unassigned, additional, total_paint, total_unassigned, timestamp)
         VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
     """, (
-        data["ro"],
+        ro_value,
         data["vehicle"],
         data["tech"],
         json.dumps(data["assigned"]),

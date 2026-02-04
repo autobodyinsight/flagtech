@@ -1,5 +1,7 @@
 """Labor assignment modal and functions."""
 
+import json
+
 def get_labor_modal_html(second_ro_line, vehicle_info_line, total_labor):
     """Return the HTML for the labor assignment modal."""
     return f"""
@@ -95,12 +97,14 @@ def get_labor_modal_styles():
 """
 
 
-def get_labor_modal_script(labor_items_json, total_labor, second_ro_line, vehicle_info_line):
+def get_labor_modal_script(labor_items_json, total_labor, second_ro_line, vehicle_info_line, ro_number):
     """Return the JavaScript for the labor modal functionality."""
     return f"""
 var laborItems = {labor_items_json};
 var initialTotal = {total_labor};
 var laborAdditionalCounter = 0;
+var laborRoNumber = {json.dumps(ro_number or '')};
+var laborRoDisplay = {json.dumps(second_ro_line or '')};
 
 var apiBase = window.API_BASE || 'https://flagtech1.onrender.com';
 
@@ -327,6 +331,8 @@ function saveModal() {{
   // Already displayed in modal
   const totalLabor = parseFloat(document.getElementById('totalLabor').innerText) || 0;
 
+  const roValue = laborRoNumber || laborRoDisplay;
+
   const data = {{
     assigned,
     unassigned,
@@ -334,7 +340,7 @@ function saveModal() {{
     totalUnassigned,   // 🔥 the only total you need
     totalLabor,        // already correct
     tech,
-    ro: "{second_ro_line}",
+    ro: roValue,
     vehicle: "{vehicle_info_line}",
     timestamp: new Date().toISOString()
   }};

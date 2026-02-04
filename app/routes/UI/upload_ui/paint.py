@@ -1,5 +1,7 @@
 """Refinish (paint) assignment modal and functions."""
 
+import json
+
 
 def get_refinish_modal_html(second_ro_line, vehicle_info_line, total_paint):
     """Return the HTML for the refinish assignment modal."""
@@ -88,7 +90,7 @@ def get_refinish_modal_styles():
 """
 
 
-def get_refinish_modal_script(paint_items_json, total_paint, second_ro_line, vehicle_info_line):
+def get_refinish_modal_script(paint_items_json, total_paint, second_ro_line, vehicle_info_line, ro_number):
     """Return the JavaScript for the refinish modal functionality."""
     return f"""
   // Refinish Modal Functions
@@ -97,6 +99,8 @@ def get_refinish_modal_script(paint_items_json, total_paint, second_ro_line, veh
   // This will store ONLY the items displayed in the modal
   var displayPaintItems = [];
   var paintAdditionalCounter = 0;
+  var paintRoNumber = {json.dumps(ro_number or '')};
+  var paintRoDisplay = {json.dumps(second_ro_line or '')};
 
   var apiBase = window.API_BASE || 'https://flagtech1.onrender.com';
 
@@ -321,6 +325,8 @@ def get_refinish_modal_script(paint_items_json, total_paint, second_ro_line, veh
   // 🔥 Modal’s displayed total
   const totalPaint = parseFloat(document.getElementById('totalPaint').innerText) || 0;
 
+  const roValue = paintRoNumber || paintRoDisplay;
+
   const data = {{
     assigned,
     unassigned,
@@ -328,7 +334,7 @@ def get_refinish_modal_script(paint_items_json, total_paint, second_ro_line, veh
     totalUnassigned,
     totalPaint,
     tech,
-    ro: "{second_ro_line}",
+    ro: roValue,
     vehicle: "{vehicle_info_line}",
     timestamp: new Date().toISOString()
   }};
