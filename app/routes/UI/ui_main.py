@@ -92,17 +92,17 @@ async def home_screen():
         <div class="nav-box active" onclick="switchScreen('upload')">UPLOAD</div>
         <div class="nav-box" onclick="switchScreen('dashboard')">DASHBOARD</div>
         <div class="nav-box" onclick="switchScreen('parts')">PARTS</div>
-            <div class="nav-box" onclick="switchScreen('tech')">TECHS</div>
-            <div class="nav-box" onclick="switchScreen('phase')">PHASE</div>
-            <div class="nav-box" onclick="switchScreen('parts')">PARTS</div>
+        <div class="nav-box" onclick="switchScreen('tech')">TECHS</div>
+        <div class="nav-box" onclick="switchScreen('phase')">PHASE</div>
+        <div class="nav-box" onclick="switchScreen('flagtech')">FLAGOUT</div>
     </div>
     
     <div class="content-area">
         {get_upload_screen_html()}
         {get_dashboard_screen_html()}
-            {get_techs_screen_html()}
-            {get_phase_screen_html()}
-            {get_parts_screen_html()}
+        {get_techs_screen_html()}
+        {get_phase_screen_html()}
+        {get_parts_screen_html()}
         {get_flagtech_screen_html()}
     </div>
     

@@ -120,7 +120,7 @@ async def home_screen():
         <div class="nav-box" onclick="switchScreen('tech')">TECHS</div>
         <div class="nav-box" onclick="switchScreen('phase')">PHASE</div>
         <div class="nav-box" onclick="switchScreen('parts')">PARTS</div>
-        <div class="nav-box" onclick="switchScreen('flagtech')">FLAG TECH</div>
+        <div class="nav-box" onclick="switchScreen('flagtech')">FLAGOUT</div>
     </div>
     
     <div class="content-area">
