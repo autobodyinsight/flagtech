@@ -6,6 +6,8 @@ from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from .flagout import get_flagtech_screen_html
 from .parts import get_parts_screen_html, get_parts_script
 from .dashboard import get_dashboard_screen_html
+from .techs import get_techs_screen_html
+from .phase import get_phase_screen_html
 
 try:
     from .upload_ui.upload import get_upload_screen_html, get_upload_script
@@ -90,6 +92,8 @@ async def home_screen(request: Request):
     <div class="tab-bar">
         <div class="nav-tab active" onclick="switchScreen('dashboard')">DASHBOARD</div>
         <div class="nav-tab" onclick="switchScreen('upload')">UPLOAD</div>
+        <div class="nav-tab" onclick="switchScreen('tech')">TECHS</div>
+        <div class="nav-tab" onclick="switchScreen('phase')">PHASE</div>
         <div class="nav-tab" onclick="switchScreen('flagtech')">FLAG TECH</div>
         <div class="nav-tab" onclick="switchScreen('parts')">PARTS</div>
     </div>
@@ -97,6 +101,8 @@ async def home_screen(request: Request):
     <div class="content-area">
         {get_dashboard_screen_html()}
         {get_upload_screen_html()}
+        {get_techs_screen_html()}
+        {get_phase_screen_html()}
         {get_parts_screen_html()}
         {get_flagtech_screen_html()}
     </div>
@@ -119,6 +125,14 @@ async def home_screen(request: Request):
             if (screenName === 'parts' && typeof partsLoadRos === 'function') {{
                 partsLoadRos();
                 partsLoadVendors();
+            }}
+
+            if (screenName === 'tech' && typeof loadTechsList === 'function') {{
+                loadTechsList();
+            }}
+
+            if (screenName === 'phase' && typeof loadPhaseData === 'function') {{
+                loadPhaseData();
             }}
         }}
         

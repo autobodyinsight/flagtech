@@ -4,6 +4,8 @@ from fastapi import APIRouter
 from fastapi.responses import HTMLResponse
 from .flagout import get_flagtech_screen_html
 from .parts import get_parts_screen_html, get_parts_script
+from .techs import get_techs_screen_html
+from .phase import get_phase_screen_html
 from .dashboard import get_dashboard_screen_html
 try:
     from .upload_ui.upload import get_upload_screen_html, get_upload_script
@@ -90,13 +92,17 @@ async def home_screen():
         <div class="nav-box active" onclick="switchScreen('upload')">UPLOAD</div>
         <div class="nav-box" onclick="switchScreen('dashboard')">DASHBOARD</div>
         <div class="nav-box" onclick="switchScreen('parts')">PARTS</div>
-        <div class="nav-box" onclick="switchScreen('flagtech')">FLAG TECH</div>
+            <div class="nav-box" onclick="switchScreen('tech')">TECHS</div>
+            <div class="nav-box" onclick="switchScreen('phase')">PHASE</div>
+            <div class="nav-box" onclick="switchScreen('parts')">PARTS</div>
     </div>
     
     <div class="content-area">
         {get_upload_screen_html()}
         {get_dashboard_screen_html()}
-        {get_parts_screen_html()}
+            {get_techs_screen_html()}
+            {get_phase_screen_html()}
+            {get_parts_screen_html()}
         {get_flagtech_screen_html()}
     </div>
     
@@ -116,10 +122,18 @@ async def home_screen():
             // Add active class to clicked nav box
             event.target.classList.add('active');
 
-            if (screenName === 'parts' && typeof partsLoadRos === 'function') {{
-                partsLoadRos();
-                partsLoadVendors();
-            }}
+                if (screenName === 'parts' && typeof partsLoadRos === 'function') {{
+                    partsLoadRos();
+                    partsLoadVendors();
+                }}
+
+                if (screenName === 'tech' && typeof loadTechsList === 'function') {{
+                    loadTechsList();
+                }}
+
+                if (screenName === 'phase' && typeof loadPhaseData === 'function') {{
+                    loadPhaseData();
+                }}
             
             // Load dashboard data if switching to dashboard
             if (screenName === 'dashboard' && typeof loadDashboardDataIfNeeded === 'function') {{
@@ -128,7 +142,7 @@ async def home_screen():
         }}
         
         {get_upload_script()}
-        {get_parts_script()}
+            {get_parts_script()}
     </script>
 </body>
 </html>

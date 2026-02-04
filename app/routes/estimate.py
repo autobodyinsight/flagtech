@@ -1,5 +1,7 @@
 from fastapi import APIRouter, UploadFile, File, Request
 import json
+from datetime import datetime, date, timedelta
+import math
 from app.services.extractor import load_pdf
 from app.services.parser import parse_estimate_pdf
 from app.models.estimate import EstimateResponse
@@ -81,6 +83,23 @@ def _parse_json_field(value):
         return value
     try:
         return json.loads(value)
+
+
+    def _parse_iso_date(value: str) -> date | None:
+        try:
+            return datetime.fromisoformat(value.replace("Z", "+00:00")).date()
+        except Exception:
+            return None
+
+
+    def _add_business_days(start_date: date, days: int) -> date:
+        current = start_date
+        added = 0
+        while added < days:
+            current += timedelta(days=1)
+            if current.weekday() < 5:
+                added += 1
+        return current
     except Exception:
         return []
 
@@ -631,6 +650,105 @@ async def dashboard_data(request: Request):
             "roList": [],
             "error": str(e)
         }
+
+
+@router.get("/phase-data")
+async def phase_data(request: Request):
+    """Get RO cards for the Phase board."""
+    conn = get_conn()
+    cur = conn.cursor()
+
+    try:
+        cur.execute(
+            """
+            SELECT ro,
+                   MAX(vehicle) AS vehicle,
+                   MAX(tech) AS labor_tech,
+                   SUM(COALESCE(total_labor, 0)) AS total_labor,
+                   MIN(timestamp) AS first_timestamp
+            FROM labor_assignments
+            GROUP BY ro
+            """
+        )
+        labor_rows = cur.fetchall()
+
+        cur.execute(
+            """
+            SELECT ro,
+                   MAX(vehicle) AS vehicle,
+                   SUM(COALESCE(total_paint, 0)) AS total_paint,
+                   MIN(timestamp) AS first_timestamp
+            FROM refinish_assignments
+            GROUP BY ro
+            """
+        )
+        refinish_rows = cur.fetchall()
+
+        labor_map = {row["ro"]: row for row in labor_rows}
+        refinish_map = {row["ro"]: row for row in refinish_rows}
+
+        ro_keys = set(labor_map.keys()) | set(refinish_map.keys())
+        today = date.today()
+        items = []
+
+        for ro in sorted(ro_keys):
+            labor = labor_map.get(ro)
+            refinish = refinish_map.get(ro)
+
+            vehicle = None
+            tech = None
+            labor_hours = 0.0
+            refinish_hours = 0.0
+            first_timestamp = None
+
+            if labor:
+                vehicle = labor.get("vehicle")
+                tech = labor.get("labor_tech")
+                labor_hours = float(labor.get("total_labor") or 0)
+                if labor.get("first_timestamp"):
+                    first_timestamp = labor.get("first_timestamp")
+
+            if refinish:
+                if not vehicle:
+                    vehicle = refinish.get("vehicle")
+                refinish_hours = float(refinish.get("total_paint") or 0)
+                refinish_ts = refinish.get("first_timestamp")
+                if refinish_ts and (not first_timestamp or str(refinish_ts) < str(first_timestamp)):
+                    first_timestamp = refinish_ts
+
+            total_hours = labor_hours + refinish_hours
+            ecd_days = int(math.ceil(total_hours / 4.0)) + 3
+            ecd_date = _add_business_days(today, ecd_days)
+
+            days_in = None
+            if first_timestamp:
+                if isinstance(first_timestamp, str):
+                    parsed = _parse_iso_date(first_timestamp)
+                else:
+                    try:
+                        parsed = first_timestamp.date()
+                    except Exception:
+                        parsed = None
+                if parsed:
+                    delta = (today - parsed).days
+                    days_in = max(delta, 0)
+
+            items.append(
+                {
+                    "ro": ro,
+                    "vehicle": vehicle,
+                    "tech": tech,
+                    "labor_hours": round(labor_hours, 2),
+                    "total_hours": round(total_hours, 2),
+                    "days_in": days_in,
+                    "ecd": ecd_date.isoformat(),
+                    "phase": "teardown",
+                }
+            )
+
+        return {"items": items}
+    finally:
+        cur.close()
 
 
 # ============================================

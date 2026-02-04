@@ -1,139 +1,32 @@
-<html><head>
-    <title>FlagTech</title>
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-        body {
-            font-family: Arial, sans-serif;
-            display: flex;
-            flex-direction: column;
-            height: 100vh;
-            <!DOCTYPE html>
-            <html>
-              <head>
-                <meta charset="utf-8" />
-                <title>FlagTech</title>
-                <style>
-                  html, body {
-                    margin: 0;
-                    padding: 0;
-                    height: 100%;
-                    width: 100%;
-                    background: #f2f2f2;
-                    font-family: Arial, sans-serif;
-                  }
-                  .frame-wrap {
-                    position: fixed;
-                    inset: 0;
-                  }
-                  iframe {
-                    width: 100%;
-                    height: 100%;
-                    border: none;
-                    background: #f2f2f2;
-                  }
-                </style>
-              </head>
-              <body>
-                <div class="frame-wrap">
-                  <iframe src="https://flagtech1.onrender.com/ui/" title="FlagTech UI"></iframe>
-                </div>
-              </body>
-            </html>
-                .then(data => {
-                    if (data.lines && data.lines.length > 0) {
-                        const linesDiv = document.createElement('div');
-                        linesDiv.style.marginLeft = "20px";
-                        
-                        data.lines.forEach(line => {
-                            const lineItem = document.createElement('div');
-                            lineItem.style.cssText = 'display:flex; justify-content:space-between; align-items:center; padding:10px; border-left:3px solid #0066cc; background-color:#f9f9f9; margin-bottom:8px;';
-                            
-                            const typeCell = document.createElement('span');
-                            typeCell.textContent = line.type;
-                            typeCell.style.fontWeight = "bold";
-                            typeCell.style.marginRight = "20px";
-                            
-                            const descCell = document.createElement('span');
-                            descCell.textContent = line.description;
-                            descCell.style.flex = "1";
-                            
-                            const hoursCell = document.createElement('span');
-                            hoursCell.textContent = line.hours.toFixed(1) + ' hrs';
-                            hoursCell.style.marginLeft = "20px";
-                            
-                            lineItem.appendChild(typeCell);
-                            lineItem.appendChild(descCell);
-                            lineItem.appendChild(hoursCell);
-                            linesDiv.appendChild(lineItem);
-                        });
-                        
-                        repairSection.appendChild(linesDiv);
-                    } else {
-                        const noLines = document.createElement('div');
-                        noLines.textContent = 'No repair lines found for this RO';
-                        noLines.style.color = '#999';
-                        repairSection.appendChild(noLines);
-                    }
-                })
-                .catch(err => {
-                    console.error('Error loading repair lines:', err);
-                    const error = document.createElement('div');
-                    error.textContent = 'Error loading repair lines';
-                    error.style.color = 'red';
-                    repairSection.appendChild(error);
-                });
-            
-            repairSection.style.display = 'block';
-        }
-        
-        // Close modal when clicking outside
-        window.onclick = function(event) {
-            const modal = document.getElementById('addTechModal');
-            if (event.target === modal) {
-                closeAddTechModal();
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta charset="utf-8" />
+        <title>FlagTech</title>
+        <style>
+            html, body {
+                margin: 0;
+                padding: 0;
+                height: 100%;
+                width: 100%;
+                background: #f2f2f2;
+                font-family: Arial, sans-serif;
             }
-        }
-        
-        // ============================================
-        // UPLOAD WINDOW FUNCTIONS
-        // ============================================
-
-        function handleFileUpload() {
-            const fileInput = document.getElementById('fileInput');
-            const file = fileInput.files[0];
-            if (!file) return;
-            
-            const formData = new FormData();
-            formData.append('file', file);
-            
-            const statusDiv = document.getElementById('uploadStatus');
-            statusDiv.innerHTML = '<p>Processing...</p>';
-            
-            fetch(`${API_BASE}/ui/grid?ajax=true`, {
-                method: 'POST',
-                body: formData
-            })
-            .then(response => response.text())
-            .then(html => {
-                statusDiv.innerHTML = html;
-                fileInput.value = '';
-                
-                const scripts = statusDiv.querySelectorAll('script');
-                scripts.forEach(oldScript => {
-                    const newScript = document.createElement('script');
-                    newScript.innerHTML = oldScript.innerHTML;
-                    document.body.appendChild(newScript);
-                });
-            })
-            .catch(error => {
-                statusDiv.innerHTML = '<p>Error: ' + error.message + '</p>';
-            });
-        }
-    
-    </script>
-
-</body></html>
+            .frame-wrap {
+                position: fixed;
+                inset: 0;
+            }
+            iframe {
+                width: 100%;
+                height: 100%;
+                border: none;
+                background: #f2f2f2;
+            }
+        </style>
+    </head>
+    <body>
+        <div class="frame-wrap">
+            <iframe src="https://flagtech1.onrender.com/ui/" title="FlagTech UI"></iframe>
+        </div>
+    </body>
+</html>
