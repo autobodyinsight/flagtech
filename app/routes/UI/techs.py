@@ -203,7 +203,7 @@ def get_techs_screen_html():
         }
 
         function loadRepairLinesInline(techName, roNumber) {
-            const repairSection = document.getElementById(`repair-section-${techName.replace(/\s+/g, '-')}`);
+            const repairSection = document.getElementById(`repair-section-${techName.replace(/\\s+/g, '-')}`);
             repairSection.innerHTML = '';
             
             const roHeader = document.createElement('div');

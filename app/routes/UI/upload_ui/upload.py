@@ -154,3 +154,6 @@ def get_upload_script():
                 saveStatus.textContent = 'Error: ' + error.message;
                 saveStatus.style.color = 'red';
                 saveBtn.disabled = false;
+            });
+        }
+    """
