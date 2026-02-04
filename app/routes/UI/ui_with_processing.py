@@ -10,7 +10,7 @@ from .parts import get_parts_screen_html, get_parts_script
 from .techs import get_techs_screen_html
 from .phase import get_phase_screen_html
 try:
-    from .upload_ui.upload import get_upload_screen_html, get_upload_script
+    from .upload_ui.upload import get_upload_screen_html, get_upload_script, get_estimate_summary_html
     from .upload_ui.labor import get_labor_modal_html, get_labor_modal_styles, get_labor_modal_script
     from .upload_ui.paint import get_refinish_modal_html, get_refinish_modal_styles, get_refinish_modal_script, get_modal_close_handler
 except ImportError:
@@ -19,7 +19,7 @@ except ImportError:
     from pathlib import Path
     upload_dir = Path(__file__).parent / "upload_ui"
     sys.path.insert(0, str(upload_dir))
-    from upload import get_upload_screen_html, get_upload_script
+    from upload import get_upload_screen_html, get_upload_script, get_estimate_summary_html
     from labor import get_labor_modal_html, get_labor_modal_styles, get_labor_modal_script
     from paint import get_refinish_modal_html, get_refinish_modal_styles, get_refinish_modal_script, get_modal_close_handler
 import math
@@ -43,6 +43,28 @@ def _ensure_estimate_uploads_table(cur) -> None:
         """
     )
     cur.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_estimate_uploads_ro_domain ON estimate_uploads(ro, domain)")
+
+
+def _ensure_estimate_totals_table(cur) -> None:
+    cur.execute(
+        """
+        CREATE TABLE IF NOT EXISTS estimate_totals (
+            id SERIAL PRIMARY KEY,
+            ro VARCHAR(255) NOT NULL,
+            vehicle VARCHAR(255),
+            grand_total NUMERIC,
+            deductible NUMERIC,
+            customer_pay NUMERIC,
+            insurance_pay NUMERIC,
+            domain VARCHAR(255) NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+        """
+    )
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_estimate_totals_domain ON estimate_totals(domain)")
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_estimate_totals_ro ON estimate_totals(ro)")
+    cur.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_estimate_totals_ro_domain ON estimate_totals(ro, domain)")
 
 
 def _estimate_hash(payload: dict) -> str:
@@ -125,6 +147,7 @@ async def home_screen():
     
     <div class="content-area">
         {get_upload_screen_html()}
+        {get_estimate_summary_html()}
         {get_parts_screen_html()}
         {get_techs_screen_html()}
         {get_phase_screen_html()}
@@ -253,6 +276,7 @@ async def grid_ui(request: Request, file: UploadFile = File(...), ajax: str = No
     parts_items = result.get("parts_items", [])
     total_labor = result["total_labor"]
     total_paint = result["total_paint"]
+    estimate_totals = result.get("estimate_totals", {})
     second_ro_line = result["second_ro_line"]
     vehicle_info_line = result["vehicle_info_line"]
     anchor_page = result["anchor_page"]
@@ -434,9 +458,77 @@ async def grid_ui(request: Request, file: UploadFile = File(...), ajax: str = No
 {labor_script}
 {refinish_script}
 {close_handler}
+
+// Display estimate summary with totals
+const estimateTotals = {json.dumps(estimate_totals)};
+const roNumber = {json.dumps(ro_number)};
+const vehicleInfo = {json.dumps(vehicle_info_line)};
+if (typeof displayEstimateSummary === 'function') {{
+    displayEstimateSummary(estimateTotals, roNumber, vehicleInfo);
+}}
 </script>
         """
         return content
+
+
+@router.post("/save-estimate-totals")
+async def save_estimate_totals(request: Request):
+    """Save estimate totals to database."""
+    try:
+        data = await request.json()
+        domain = get_user_domain(request)
+        
+        if not domain:
+            return {"status": "error", "message": "Domain not found"}
+        
+        ro = data.get("ro", "").strip()
+        if not ro:
+            return {"status": "error", "message": "RO number not provided"}
+        
+        conn = get_conn()
+        cur = conn.cursor()
+        
+        try:
+            _ensure_estimate_totals_table(cur)
+            
+            # Insert or update the estimate totals
+            cur.execute(
+                """
+                INSERT INTO estimate_totals (ro, vehicle, grand_total, deductible, customer_pay, insurance_pay, domain)
+                VALUES (%s, %s, %s, %s, %s, %s, %s)
+                ON CONFLICT (ro, domain)
+                DO UPDATE SET 
+                    vehicle = EXCLUDED.vehicle,
+                    grand_total = EXCLUDED.grand_total,
+                    deductible = EXCLUDED.deductible,
+                    customer_pay = EXCLUDED.customer_pay,
+                    insurance_pay = EXCLUDED.insurance_pay,
+                    updated_at = CURRENT_TIMESTAMP
+                """,
+                (
+                    ro,
+                    data.get("vehicle"),
+                    data.get("grand_total"),
+                    data.get("deductible"),
+                    data.get("customer_pay"),
+                    data.get("insurance_pay"),
+                    domain,
+                ),
+            )
+            
+            conn.commit()
+            return {"status": "success", "message": "Estimate totals saved successfully"}
+        
+        except Exception as e:
+            print(f"[save-estimate-totals] Error: {str(e)}")
+            return {"status": "error", "message": f"Database error: {str(e)}"}
+        
+        finally:
+            cur.close()
+    
+    except Exception as e:
+        print(f"[save-estimate-totals] Request error: {str(e)}")
+        return {"status": "error", "message": f"Request error: {str(e)}"}
 
 
 @router.post("/aligned", response_class=HTMLResponse)
