@@ -4,7 +4,7 @@
 def get_dashboard_screen_html():
     """Return the HTML content for the Dashboard screen."""
     return """
-        <div id="dashboard" class="screen" style="padding:20px;">
+        <div id="dashboard" class="screen active" style="padding:20px;">
             <h1 style="text-align:center; margin-bottom:30px;">DASHBOARD</h1>
             
             <div style="display:flex; gap:20px;">
@@ -245,6 +245,77 @@ def get_dashboard_screen_html():
                 container.innerHTML = html;
             }
             
+            function safeId(value) {
+                return String(value || '')
+                    .replace(/[^a-zA-Z0-9_-]/g, '-')
+                    .replace(/-+/g, '-')
+                    .toLowerCase();
+            }
+
+            function toggleRoNotes(roNumber) {
+                const notesRow = document.getElementById(`notes-row-${safeId(roNumber)}`);
+                if (!notesRow) return;
+                const isHidden = notesRow.style.display === 'none' || notesRow.style.display === '';
+                notesRow.style.display = isHidden ? 'table-row' : 'none';
+                if (isHidden) {
+                    loadRoNotes(roNumber);
+                }
+            }
+
+            function loadRoNotes(roNumber) {
+                const listEl = document.getElementById(`notes-list-${safeId(roNumber)}`);
+                if (!listEl) return;
+                listEl.innerHTML = '<div style="color:#777;">Loading...</div>';
+
+                fetch(`/api/ro-notes?ro=${encodeURIComponent(roNumber)}`, { credentials: 'include' })
+                    .then(r => r.json())
+                    .then(res => {
+                        if (!res.notes || res.notes.length === 0) {
+                            listEl.innerHTML = '<div style="color:#999;">No notes yet.</div>';
+                            return;
+                        }
+                        listEl.innerHTML = res.notes.map(note => {
+                            const when = note.created_at ? new Date(note.created_at).toLocaleString() : '';
+                            return `
+                                <div style="padding:6px 0; border-bottom:1px solid #eee;">
+                                    <div style="font-size:12px; color:#777;">${when}</div>
+                                    <div style="white-space:pre-wrap;">${note.note || ''}</div>
+                                </div>
+                            `;
+                        }).join('');
+                    })
+                    .catch(err => {
+                        console.error('Error loading notes:', err);
+                        listEl.innerHTML = '<div style="color:red;">Error loading notes.</div>';
+                    });
+            }
+
+            function saveRoNote(roNumber) {
+                const input = document.getElementById(`notes-input-${safeId(roNumber)}`);
+                if (!input) return;
+                const text = (input.value || '').trim();
+                if (!text) return;
+
+                fetch('/api/ro-notes', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'include',
+                    body: JSON.stringify({ ro: roNumber, note: text })
+                })
+                .then(r => r.json())
+                .then(res => {
+                    if (res.error) {
+                        throw new Error(res.error);
+                    }
+                    input.value = '';
+                    loadRoNotes(roNumber);
+                })
+                .catch(err => {
+                    console.error('Error saving note:', err);
+                    alert('Error saving note.');
+                });
+            }
+
             // Update RO list table
             function updateRoListTable(roList) {
                 const tbody = document.getElementById('roListBody');
@@ -257,13 +328,26 @@ def get_dashboard_screen_html():
                 let html = '';
                 roList.forEach((ro, index) => {
                     const rowBg = index % 2 === 0 ? '#fff' : '#f9f9f9';
+                    const rowId = safeId(ro.ro);
                     html += `
-                        <tr style="background:${rowBg};">
-                            <td style="padding:12px; border-bottom:1px solid #eee; color:#333;">${ro.ro}</td>
+                        <tr style="background:${rowBg}; cursor:pointer;" onclick="toggleRoNotes('${ro.ro}')">
+                            <td style="padding:12px; border-bottom:1px solid #eee; color:#0066cc; text-decoration:underline;">${ro.ro}</td>
                             <td style="padding:12px; border-bottom:1px solid #eee; color:#333;">${ro.vehicle || 'N/A'}</td>
                             <td style="padding:12px; border-bottom:1px solid #eee; color:#333;">${ro.tech || 'Unassigned'}</td>
                             <td style="padding:12px; border-bottom:1px solid #eee; color:#333; text-align:right;">${ro.hours.toFixed(1)}</td>
                             <td style="padding:12px; border-bottom:1px solid #eee; color:#333; text-align:right; font-weight:bold;">$${ro.total.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                        </tr>
+                        <tr id="notes-row-${rowId}" style="display:none; background:${rowBg};">
+                            <td colspan="5" style="padding:12px 16px; border-bottom:1px solid #eee;">
+                                <div style="background:#fafafa; border:1px solid #ddd; border-radius:6px; padding:12px;">
+                                    <div style="font-weight:bold; margin-bottom:8px;">Notes</div>
+                                    <div id="notes-list-${rowId}" style="max-height:180px; overflow-y:auto; margin-bottom:10px;"></div>
+                                    <div style="display:flex; gap:10px;">
+                                        <textarea id="notes-input-${rowId}" rows="2" style="flex:1; padding:8px; resize:vertical;" placeholder="Add note..."></textarea>
+                                        <button onclick="saveRoNote('${ro.ro}')" style="padding:8px 14px; background:#505050; color:#fff; border:none; border-radius:4px; cursor:pointer;">Save</button>
+                                    </div>
+                                </div>
+                            </td>
                         </tr>
                     `;
                 });

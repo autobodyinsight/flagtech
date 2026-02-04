@@ -91,6 +91,21 @@ def _ensure_ro_phases_table(cur) -> None:
     cur.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_ro_phases_ro_domain ON ro_phases(ro, domain)")
 
 
+def _ensure_ro_notes_table(cur) -> None:
+    cur.execute(
+        """
+        CREATE TABLE IF NOT EXISTS ro_notes (
+            id SERIAL PRIMARY KEY,
+            ro VARCHAR(255) NOT NULL,
+            note TEXT NOT NULL,
+            domain VARCHAR(255) NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+        """
+    )
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_ro_notes_ro_domain ON ro_notes(ro, domain)")
+
+
 def _parse_json_field(value):
     if value is None:
         return []
@@ -801,6 +816,58 @@ async def phase_update(request: Request):
             DO UPDATE SET phase = EXCLUDED.phase, updated_at = CURRENT_TIMESTAMP
             """,
             (ro, phase, domain),
+        )
+        conn.commit()
+        return {"status": "ok"}
+    finally:
+        cur.close()
+
+
+@router.get("/ro-notes")
+async def list_ro_notes(request: Request, ro: str):
+    domain = get_user_domain(request) or "default"
+    conn = get_conn()
+    cur = conn.cursor()
+    try:
+        _ensure_ro_notes_table(cur)
+        cur.execute(
+            """
+            SELECT note, created_at
+            FROM ro_notes
+            WHERE ro = %s AND domain = %s
+            ORDER BY created_at DESC
+            """,
+            (ro, domain),
+        )
+        rows = cur.fetchall()
+        notes = [
+            {"note": row.get("note"), "created_at": row.get("created_at")}
+            for row in rows
+        ]
+        return {"notes": notes}
+    finally:
+        cur.close()
+
+
+@router.post("/ro-notes")
+async def add_ro_note(request: Request):
+    domain = get_user_domain(request) or "default"
+    data = await request.json()
+    ro = (data.get("ro") or "").strip()
+    note = (data.get("note") or "").strip()
+    if not ro or not note:
+        return JSONResponse(status_code=400, content={"error": "ro and note are required"})
+
+    conn = get_conn()
+    cur = conn.cursor()
+    try:
+        _ensure_ro_notes_table(cur)
+        cur.execute(
+            """
+            INSERT INTO ro_notes (ro, note, domain)
+            VALUES (%s, %s, %s)
+            """,
+            (ro, note, domain),
         )
         conn.commit()
         return {"status": "ok"}

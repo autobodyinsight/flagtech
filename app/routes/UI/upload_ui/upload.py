@@ -4,7 +4,7 @@
 def get_upload_screen_html():
     """Return the HTML content for the upload screen."""
     return """
-        <div id="upload" class="screen active">
+        <div id="upload" class="screen">
             <h2>Upload an Estimate PDF</h2>
             <form id="uploadForm" enctype="multipart/form-data">
                 <input type="file" id="fileInput" name="file" accept="application/pdf" onchange="handleFileUpload()" style="padding: 10px; cursor: pointer;" />
