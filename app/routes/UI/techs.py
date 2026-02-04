@@ -130,7 +130,7 @@ def get_techs_screen_html():
         // Toggle Tech Details Inline
         // -----------------------------
         function toggleTechDetails(techName) {
-            const detailsId = `tech-details-${techName.replace(/\s+/g, '-')}`;
+            const detailsId = `tech-details-${techName.replace(/\\s+/g, '-')}`;
             const detailsSection = document.getElementById(detailsId);
             
             if (detailsSection.style.display === 'none') {
@@ -140,7 +140,7 @@ def get_techs_screen_html():
             } else {
                 detailsSection.style.display = 'none';
                 // Clear repair lines when collapsing
-                const repairSection = document.getElementById(`repair-section-${techName.replace(/\s+/g, '-')}`);
+                const repairSection = document.getElementById(`repair-section-${techName.replace(/\\s+/g, '-')}`);
                 if (repairSection) {
                     repairSection.style.display = 'none';
                 }
@@ -148,7 +148,7 @@ def get_techs_screen_html():
         }
 
         function loadTechDetailsInline(techName) {
-            const rosList = document.getElementById(`ros-list-${techName.replace(/\s+/g, '-')}`);
+            const rosList = document.getElementById(`ros-list-${techName.replace(/\\s+/g, '-')}`);
             
             if (rosList.innerHTML) return; // Already loaded
 
