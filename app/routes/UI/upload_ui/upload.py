@@ -37,8 +37,6 @@ def get_estimate_summary_html():
                     <div id="summaryInsurancePay" style="font-size: 18px; font-weight: bold;">-</div>
                 </div>
             </div>
-            <button id="saveSummaryBtn" onclick="saveEstimateSummary()" style="padding: 10px 20px; font-size: 14px; cursor: pointer; background-color: #4CAF50; color: white; border: none; border-radius: 3px; margin-right: 10px;">Save</button>
-            <span id="saveStatus" style="margin-left: 10px; color: green;"></span>
         </div>
     """
 
