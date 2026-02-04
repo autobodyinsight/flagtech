@@ -25,8 +25,29 @@ except ImportError:
 import math
 import re
 import json
+import hashlib
 
 router = APIRouter()
+
+
+def _ensure_estimate_uploads_table(cur) -> None:
+    cur.execute(
+        """
+        CREATE TABLE IF NOT EXISTS estimate_uploads (
+            id SERIAL PRIMARY KEY,
+            ro VARCHAR(255) NOT NULL,
+            estimate_hash VARCHAR(64) NOT NULL,
+            domain VARCHAR(255) NOT NULL,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+        """
+    )
+    cur.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_estimate_uploads_ro_domain ON estimate_uploads(ro, domain)")
+
+
+def _estimate_hash(payload: dict) -> str:
+    normalized = json.dumps(payload, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(normalized.encode("utf-8")).hexdigest()
 
 @router.get("/", response_class=HTMLResponse)
 async def home_screen():
@@ -240,10 +261,60 @@ async def grid_ui(request: Request, file: UploadFile = File(...), ajax: str = No
     subtotals_ymid = result["subtotals_ymid"]
 
     domain = get_user_domain(request)
-    if domain and parts_items:
+    ro_number = None
+    if domain:
         ro_match = re.search(r"\bRO\b\s*[:#-]*\s*([A-Za-z0-9-]+)", second_ro_line)
         ro_number = ro_match.group(1) if ro_match else None
-        if ro_number:
+
+    duplicate_estimate = False
+
+    if domain and ro_number:
+        estimate_payload = {
+            "labor_items": labor_items,
+            "paint_items": paint_items,
+            "parts_items": parts_items,
+            "total_labor": total_labor,
+            "total_paint": total_paint,
+            "vehicle": vehicle_info_line,
+        }
+        estimate_hash = _estimate_hash(estimate_payload)
+
+        conn = get_conn()
+        cur = conn.cursor()
+        try:
+            _ensure_estimate_uploads_table(cur)
+            cur.execute(
+                """
+                SELECT estimate_hash
+                FROM estimate_uploads
+                WHERE ro = %s AND domain = %s
+                """,
+                (ro_number, domain),
+            )
+            row = cur.fetchone()
+            if row and row.get("estimate_hash") == estimate_hash:
+                duplicate_estimate = True
+            else:
+                cur.execute(
+                    """
+                    INSERT INTO estimate_uploads (ro, estimate_hash, domain)
+                    VALUES (%s, %s, %s)
+                    ON CONFLICT (ro, domain)
+                    DO UPDATE SET estimate_hash = EXCLUDED.estimate_hash, updated_at = CURRENT_TIMESTAMP
+                    """,
+                    (ro_number, estimate_hash, domain),
+                )
+            conn.commit()
+        finally:
+            cur.close()
+
+    if duplicate_estimate:
+        message = "<p style='color:#777;'>Duplicate estimate detected. No changes applied.</p>"
+        if ajax:
+            return message
+        return f"<html><body>{message}<br><a href='/ui'>Back</a></body></html>"
+
+    if domain and parts_items and ro_number:
             conn = get_conn()
             cur = conn.cursor()
             try:
