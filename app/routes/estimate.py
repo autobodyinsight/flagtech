@@ -83,25 +83,25 @@ def _parse_json_field(value):
         return value
     try:
         return json.loads(value)
-
-
-    def _parse_iso_date(value: str) -> date | None:
-        try:
-            return datetime.fromisoformat(value.replace("Z", "+00:00")).date()
-        except Exception:
-            return None
-
-
-    def _add_business_days(start_date: date, days: int) -> date:
-        current = start_date
-        added = 0
-        while added < days:
-            current += timedelta(days=1)
-            if current.weekday() < 5:
-                added += 1
-        return current
     except Exception:
         return []
+
+
+def _parse_iso_date(value: str) -> date | None:
+    try:
+        return datetime.fromisoformat(value.replace("Z", "+00:00")).date()
+    except Exception:
+        return None
+
+
+def _add_business_days(start_date: date, days: int) -> date:
+    current = start_date
+    added = 0
+    while added < days:
+        current += timedelta(days=1)
+        if current.weekday() < 5:
+            added += 1
+    return current
 
 
 def _extract_hours(item):
