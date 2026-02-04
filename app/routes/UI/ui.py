@@ -10,14 +10,14 @@ from .techs import get_techs_screen_html
 from .phase import get_phase_screen_html
 
 try:
-    from .upload_ui.upload import get_upload_screen_html, get_upload_script
+    from .upload_ui.upload import get_upload_screen_html, get_upload_script, get_estimate_summary_html
 except ImportError:
     # Fallback if directory name has space
     import sys
     from pathlib import Path
     upload_dir = Path(__file__).parent / "upload_ui"
     sys.path.insert(0, str(upload_dir))
-    from upload import get_upload_screen_html, get_upload_script
+    from upload import get_upload_screen_html, get_upload_script, get_estimate_summary_html
 
 
 router = APIRouter()
@@ -101,6 +101,7 @@ async def home_screen(request: Request):
     <div class="content-area">
         {get_dashboard_screen_html()}
         {get_upload_screen_html()}
+        {get_estimate_summary_html()}
         {get_techs_screen_html()}
         {get_phase_screen_html()}
         {get_parts_screen_html()}
