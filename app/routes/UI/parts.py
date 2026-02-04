@@ -227,6 +227,7 @@ def get_parts_script():
 
                     tbody.innerHTML = res.ros.map((ro, idx) => {
                         const rowBg = idx % 2 === 0 ? '#fff' : '#f9f9f9';
+                        const rowId = String(ro.ro || '').replace(/[^a-zA-Z0-9_-]/g, '-').replace(/-+/g, '-').toLowerCase();
                         const arrival = ro.arrival_date ? new Date(ro.arrival_date).toLocaleDateString() : '—';
                         return `
                             <tr style="background:${rowBg};">
@@ -237,10 +238,32 @@ def get_parts_script():
                                         ${ro.parts_qty || 0}
                                     </button>
                                 </td>
-                                <td style="padding:12px; border-bottom:1px solid #eee; color:#333;">${ro.on_order || 0}</td>
+                                <td style="padding:12px; border-bottom:1px solid #eee; color:#333;">
+                                    <button onclick="togglePartsReceived('${ro.ro}')" style="background:none; border:none; color:#0066cc; text-decoration:underline; cursor:pointer; padding:0;">
+                                        ${ro.on_order || 0}
+                                    </button>
+                                </td>
                                 <td style="padding:12px; border-bottom:1px solid #eee; color:#333;">${arrival}</td>
                                 <td style="padding:12px; border-bottom:1px solid #eee; color:#333;">${ro.arrived || 0}</td>
                                 <td style="padding:12px; border-bottom:1px solid #eee; color:#333;">${ro.returned || 0}</td>
+                            </tr>
+                            <tr id="parts-recv-row-${rowId}" style="display:none; background:${rowBg};">
+                                <td colspan="7" style="padding:12px 16px; border-bottom:1px solid #eee;">
+                                    <div style="background:#fafafa; border:1px solid #ddd; border-radius:6px; padding:12px;">
+                                        <div style="font-weight:bold; margin-bottom:8px;">Received Parts</div>
+                                        <div style="display:flex; font-weight:bold; padding:8px 0; border-bottom:1px solid #ddd;">
+                                            <div style="width:40px;"></div>
+                                            <div style="width:80px;">Line</div>
+                                            <div style="flex:2;">Description</div>
+                                            <div style="flex:1;">Vendor</div>
+                                            <div style="width:120px; text-align:right;">Cost</div>
+                                        </div>
+                                        <div id="parts-recv-body-${rowId}"></div>
+                                        <div style="margin-top:12px; text-align:right;">
+                                            <button onclick="savePartsReceived('${ro.ro}')" style="padding:8px 14px; background:#505050; color:#fff; border:none; border-radius:4px; cursor:pointer;">Save</button>
+                                        </div>
+                                    </div>
+                                </td>
                             </tr>
                         `;
                     }).join('');
@@ -249,6 +272,112 @@ def get_parts_script():
                     console.error('Error loading parts ROs:', err);
                     tbody.innerHTML = '<tr><td colspan="7" style="padding:20px; text-align:center; color:red;">Error loading repair orders.</td></tr>';
                 });
+        }
+
+        function togglePartsReceived(ro) {
+            const rowId = String(ro || '').replace(/[^a-zA-Z0-9_-]/g, '-').replace(/-+/g, '-').toLowerCase();
+            const row = document.getElementById(`parts-recv-row-${rowId}`);
+            const body = document.getElementById(`parts-recv-body-${rowId}`);
+            if (!row || !body) return;
+
+            const isHidden = row.style.display === 'none' || row.style.display === '';
+            row.style.display = isHidden ? 'table-row' : 'none';
+            if (isHidden) {
+                loadPartsReceived(ro);
+            }
+        }
+
+        function loadPartsReceived(ro) {
+            const rowId = String(ro || '').replace(/[^a-zA-Z0-9_-]/g, '-').replace(/-+/g, '-').toLowerCase();
+            const body = document.getElementById(`parts-recv-body-${rowId}`);
+            if (!body) return;
+
+            body.innerHTML = '<div style="padding:8px; color:#777;">Loading...</div>';
+
+            Promise.all([
+                fetch(`/api/parts/ro-lines?ro=${encodeURIComponent(ro)}`, { credentials: 'include' }).then(r => r.json()),
+                fetch(`/api/parts/received?ro=${encodeURIComponent(ro)}`, { credentials: 'include' }).then(r => r.json())
+            ])
+            .then(([linesRes, receivedRes]) => {
+                const lines = linesRes.lines || [];
+                const received = receivedRes.items || [];
+                const receivedMap = {};
+                received.forEach(item => {
+                    receivedMap[item.line_id] = item;
+                });
+
+                if (lines.length === 0) {
+                    body.innerHTML = '<div style="padding:8px; color:#777;">No parts found.</div>';
+                    return;
+                }
+
+                body.innerHTML = lines.map(line => {
+                    const existing = receivedMap[line.id] || {};
+                    const checked = existing.line_id ? 'checked' : '';
+                    const vendorVal = existing.vendor ? existing.vendor.replace(/"/g, '&quot;') : '';
+                    const costVal = existing.cost ? Number(existing.cost).toFixed(2) : '';
+                    return `
+                        <div style="display:flex; align-items:center; padding:8px 0; border-bottom:1px solid #eee;">
+                            <div style="width:40px;"><input type="checkbox" class="parts-recv-check" data-id="${line.id}" ${checked} /></div>
+                            <div style="width:80px;">${line.line || '—'}</div>
+                            <div style="flex:2;">${line.description || ''}</div>
+                            <div style="flex:1;"><input type="text" class="parts-recv-vendor" data-id="${line.id}" value="${vendorVal}" style="width:100%; padding:6px;" placeholder="Vendor" /></div>
+                            <div style="width:120px; text-align:right;"><input type="number" step="0.01" class="parts-recv-cost" data-id="${line.id}" value="${costVal}" style="width:100px; padding:6px;" placeholder="0.00" /></div>
+                        </div>
+                    `;
+                }).join('');
+            })
+            .catch(err => {
+                console.error('Error loading received parts:', err);
+                body.innerHTML = '<div style="padding:8px; color:red;">Error loading parts.</div>';
+            });
+        }
+
+        function savePartsReceived(ro) {
+            const rowId = String(ro || '').replace(/[^a-zA-Z0-9_-]/g, '-').replace(/-+/g, '-').toLowerCase();
+            const checks = Array.from(document.querySelectorAll(`#parts-recv-body-${rowId} .parts-recv-check`));
+            const items = [];
+
+            checks.forEach(check => {
+                if (!check.checked) return;
+                const lineId = parseInt(check.dataset.id, 10);
+                const vendorInput = document.querySelector(`#parts-recv-body-${rowId} .parts-recv-vendor[data-id="${lineId}"]`);
+                const costInput = document.querySelector(`#parts-recv-body-${rowId} .parts-recv-cost[data-id="${lineId}"]`);
+                const vendor = (vendorInput?.value || '').trim();
+                const costVal = costInput?.value ? parseFloat(costInput.value) : null;
+                if (!vendor) {
+                    return;
+                }
+                items.push({
+                    line_id: lineId,
+                    vendor,
+                    cost: Number.isFinite(costVal) ? costVal : null
+                });
+            });
+
+            if (items.length === 0) {
+                alert('Please select at least one part and enter vendor.');
+                return;
+            }
+
+            fetch('/api/parts/receive', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
+                body: JSON.stringify({ ro, items })
+            })
+            .then(r => r.json())
+            .then(res => {
+                if (res.error) {
+                    throw new Error(res.error);
+                }
+                partsLoadRos();
+                loadPartsReceived(ro);
+            })
+            .catch(err => {
+                console.error('Error saving received parts:', err);
+                alert('Error saving received parts.');
+            });
         }
 
         function openPartsOrderModal(ro) {

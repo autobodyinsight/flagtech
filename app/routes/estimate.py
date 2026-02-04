@@ -76,6 +76,24 @@ def _ensure_parts_orders_table(cur) -> None:
     cur.execute("CREATE INDEX IF NOT EXISTS idx_parts_orders_ro ON parts_orders(ro)")
 
 
+def _ensure_parts_received_table(cur) -> None:
+    cur.execute(
+        """
+        CREATE TABLE IF NOT EXISTS parts_received (
+            id SERIAL PRIMARY KEY,
+            ro VARCHAR(255) NOT NULL,
+            line_id INTEGER NOT NULL,
+            vendor VARCHAR(255) NOT NULL,
+            cost NUMERIC,
+            domain VARCHAR(255) NOT NULL,
+            received_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+        """
+    )
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_parts_received_ro_domain ON parts_received(ro, domain)")
+    cur.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_parts_received_unique ON parts_received(ro, line_id, domain)")
+
+
 def _ensure_ro_phases_table(cur) -> None:
     cur.execute(
         """
@@ -891,6 +909,7 @@ async def list_parts_ros(request: Request):
     try:
         _ensure_parts_lines_table(cur)
         _ensure_parts_orders_table(cur)
+        _ensure_parts_received_table(cur)
 
         cur.execute(
             """
@@ -917,6 +936,18 @@ async def list_parts_ros(request: Request):
             (domain,),
         )
         orders = cur.fetchall()
+
+        cur.execute(
+            """
+            SELECT ro, COUNT(*) as arrived
+            FROM parts_received
+            WHERE domain = %s
+            GROUP BY ro
+            """,
+            (domain,),
+        )
+        received_rows = cur.fetchall()
+        received_map = {row["ro"]: int(row.get("arrived") or 0) for row in received_rows}
 
         order_summary = {}
         for order in orders:
@@ -950,7 +981,7 @@ async def list_parts_ros(request: Request):
                     "parts_qty": float(row.get("parts_qty") or row.get("line_count") or 0),
                     "on_order": summary.get("on_order", 0),
                     "arrival_date": summary.get("arrival_date"),
-                    "arrived": summary.get("arrived", 0),
+                    "arrived": received_map.get(ro, 0),
                     "returned": summary.get("returned", 0),
                 }
             )
@@ -1045,5 +1076,80 @@ async def save_parts_order(request: Request):
         )
         conn.commit()
         return {"status": "saved"}
+    finally:
+        cur.close()
+
+
+@router.get("/parts/received")
+async def list_parts_received(request: Request, ro: str):
+    domain = get_user_domain(request)
+    if not domain:
+        return JSONResponse(status_code=401, content={"error": "Not authenticated", "items": []})
+
+    conn = get_conn()
+    cur = conn.cursor()
+    try:
+        _ensure_parts_received_table(cur)
+        cur.execute(
+            """
+            SELECT line_id, vendor, cost, received_at
+            FROM parts_received
+            WHERE ro = %s AND domain = %s
+            ORDER BY received_at DESC
+            """,
+            (ro, domain),
+        )
+        rows = cur.fetchall()
+        items = [
+            {
+                "line_id": row.get("line_id"),
+                "vendor": row.get("vendor"),
+                "cost": float(row.get("cost") or 0),
+                "received_at": row.get("received_at"),
+            }
+            for row in rows
+        ]
+        return {"items": items}
+    finally:
+        cur.close()
+
+
+@router.post("/parts/receive")
+async def save_parts_received(request: Request):
+    domain = get_user_domain(request)
+    if not domain:
+        return JSONResponse(status_code=401, content={"error": "Not authenticated"})
+
+    data = await request.json()
+    ro = (data.get("ro") or "").strip()
+    items = data.get("items") or []
+
+    if not ro:
+        return JSONResponse(status_code=400, content={"error": "RO is required"})
+    if not items:
+        return JSONResponse(status_code=400, content={"error": "No parts selected"})
+
+    conn = get_conn()
+    cur = conn.cursor()
+    try:
+        _ensure_parts_received_table(cur)
+        cur.execute("DELETE FROM parts_received WHERE ro = %s AND domain = %s", (ro, domain))
+
+        for item in items:
+            line_id = item.get("line_id")
+            vendor = (item.get("vendor") or "").strip()
+            cost = item.get("cost")
+            if not line_id or not vendor:
+                continue
+            cur.execute(
+                """
+                INSERT INTO parts_received (ro, line_id, vendor, cost, domain)
+                VALUES (%s, %s, %s, %s, %s)
+                """,
+                (ro, line_id, vendor, cost, domain),
+            )
+
+        conn.commit()
+        return {"status": "ok"}
     finally:
         cur.close()
