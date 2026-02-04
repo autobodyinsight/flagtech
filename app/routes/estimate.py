@@ -4,6 +4,7 @@ from app.services.extractor import load_pdf
 from app.services.parser import parse_estimate_pdf
 from app.models.estimate import EstimateResponse
 from app.services.db import get_conn
+from app.services.middleware import get_user_domain
 from fastapi.responses import JSONResponse
 
 router = APIRouter()
@@ -29,6 +30,48 @@ def _ensure_parts_vendors_table(cur) -> None:
         CREATE INDEX IF NOT EXISTS idx_parts_vendors_domain ON parts_vendors(domain)
         """
     )
+
+
+def _ensure_parts_lines_table(cur) -> None:
+    cur.execute(
+        """
+        CREATE TABLE IF NOT EXISTS parts_lines (
+            id SERIAL PRIMARY KEY,
+            ro VARCHAR(255) NOT NULL,
+            vehicle VARCHAR(255),
+            line_number INTEGER,
+            description TEXT,
+            part_type VARCHAR(50),
+            price NUMERIC,
+            qty NUMERIC,
+            domain VARCHAR(255) NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+        """
+    )
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_parts_lines_domain ON parts_lines(domain)")
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_parts_lines_ro ON parts_lines(ro)")
+
+
+def _ensure_parts_orders_table(cur) -> None:
+    cur.execute(
+        """
+        CREATE TABLE IF NOT EXISTS parts_orders (
+            id SERIAL PRIMARY KEY,
+            ro VARCHAR(255) NOT NULL,
+            vendor_id INTEGER,
+            vendor_name VARCHAR(255),
+            arrival_date DATE,
+            ordered_lines JSONB,
+            arrived_count INTEGER DEFAULT 0,
+            returned_count INTEGER DEFAULT 0,
+            domain VARCHAR(255) NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+        """
+    )
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_parts_orders_domain ON parts_orders(domain)")
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_parts_orders_ro ON parts_orders(ro)")
 
 
 def _parse_json_field(value):
@@ -328,6 +371,10 @@ async def tech_repair_lines(tech: str, ro: str):
 @router.post("/vendors/add")
 async def add_vendor(request: Request):
     """Add a new parts vendor."""
+    domain = get_user_domain(request)
+    if not domain:
+        return JSONResponse(status_code=401, content={"error": "Not authenticated"})
+
     data = await request.json()
     name = (data.get("name") or "").strip()
     email = (data.get("email") or "").strip()
@@ -342,11 +389,11 @@ async def add_vendor(request: Request):
         _ensure_parts_vendors_table(cur)
         cur.execute(
             """
-            INSERT INTO parts_vendors (name, email, phone)
-            VALUES (%s, %s, %s)
+            INSERT INTO parts_vendors (name, email, phone, domain)
+            VALUES (%s, %s, %s, %s)
             RETURNING id, name, email, phone, active
             """,
-            (name, email or None, phone or None),
+            (name, email or None, phone or None, domain),
         )
 
         row = cur.fetchone()
@@ -368,6 +415,10 @@ async def add_vendor(request: Request):
 @router.get("/vendors/list")
 async def list_vendors(request: Request):
     """List active parts vendors."""
+    domain = get_user_domain(request)
+    if not domain:
+        return JSONResponse(status_code=401, content={"error": "Not authenticated", "vendors": []})
+
     conn = get_conn()
     cur = conn.cursor()
     try:
@@ -376,9 +427,10 @@ async def list_vendors(request: Request):
             """
             SELECT id, name, email, phone, active
             FROM parts_vendors
-            WHERE active = TRUE
+            WHERE active = TRUE AND domain = %s
             ORDER BY name
-            """
+            """,
+            (domain,),
         )
 
         rows = cur.fetchall()
@@ -579,3 +631,177 @@ async def dashboard_data(request: Request):
             "roList": [],
             "error": str(e)
         }
+
+
+# ============================================
+# PARTS MANAGEMENT ENDPOINTS (JSON API)
+# ============================================
+
+@router.get("/parts/ros")
+async def list_parts_ros(request: Request):
+    domain = get_user_domain(request)
+    if not domain:
+        return JSONResponse(status_code=401, content={"error": "Not authenticated", "ros": []})
+
+    conn = get_conn()
+    cur = conn.cursor()
+
+    try:
+        _ensure_parts_lines_table(cur)
+        _ensure_parts_orders_table(cur)
+
+        cur.execute(
+            """
+            SELECT ro,
+                   MAX(vehicle) as vehicle,
+                   SUM(COALESCE(qty, 1)) as parts_qty,
+                   COUNT(*) as line_count
+            FROM parts_lines
+            WHERE domain = %s
+            GROUP BY ro
+            ORDER BY ro
+            """,
+            (domain,),
+        )
+        rows = cur.fetchall()
+
+        cur.execute(
+            """
+            SELECT ro, arrival_date, ordered_lines, arrived_count, returned_count, created_at
+            FROM parts_orders
+            WHERE domain = %s
+            ORDER BY created_at DESC
+            """,
+            (domain,),
+        )
+        orders = cur.fetchall()
+
+        order_summary = {}
+        for order in orders:
+            ro = order["ro"]
+            if ro not in order_summary:
+                order_summary[ro] = {
+                    "on_order": 0,
+                    "arrival_date": order.get("arrival_date"),
+                    "arrived": 0,
+                    "returned": 0,
+                }
+
+            ordered_lines = order.get("ordered_lines") or []
+            try:
+                ordered_count = len(ordered_lines)
+            except Exception:
+                ordered_count = 0
+
+            order_summary[ro]["on_order"] += ordered_count
+            order_summary[ro]["arrived"] += int(order.get("arrived_count") or 0)
+            order_summary[ro]["returned"] += int(order.get("returned_count") or 0)
+
+        ros = []
+        for row in rows:
+            ro = row["ro"]
+            summary = order_summary.get(ro, {})
+            ros.append(
+                {
+                    "ro": ro,
+                    "vehicle": row.get("vehicle"),
+                    "parts_qty": float(row.get("parts_qty") or row.get("line_count") or 0),
+                    "on_order": summary.get("on_order", 0),
+                    "arrival_date": summary.get("arrival_date"),
+                    "arrived": summary.get("arrived", 0),
+                    "returned": summary.get("returned", 0),
+                }
+            )
+
+        return {"ros": ros}
+    finally:
+        cur.close()
+
+
+@router.get("/parts/ro-lines")
+async def list_parts_lines(request: Request, ro: str):
+    domain = get_user_domain(request)
+    if not domain:
+        return JSONResponse(status_code=401, content={"error": "Not authenticated", "lines": []})
+
+    conn = get_conn()
+    cur = conn.cursor()
+    try:
+        _ensure_parts_lines_table(cur)
+        cur.execute(
+            """
+            SELECT id, line_number, description, part_type, price, qty
+            FROM parts_lines
+            WHERE domain = %s AND ro = %s
+            ORDER BY line_number NULLS LAST, id
+            """,
+            (domain, ro),
+        )
+        rows = cur.fetchall()
+        lines = [
+            {
+                "id": row["id"],
+                "line": row.get("line_number"),
+                "description": row.get("description"),
+                "part_type": row.get("part_type"),
+                "price": float(row.get("price") or 0),
+                "qty": float(row.get("qty") or 0),
+            }
+            for row in rows
+        ]
+        return {"lines": lines}
+    finally:
+        cur.close()
+
+
+@router.post("/parts/order")
+async def save_parts_order(request: Request):
+    domain = get_user_domain(request)
+    if not domain:
+        return JSONResponse(status_code=401, content={"error": "Not authenticated"})
+
+    data = await request.json()
+    ro = data.get("ro")
+    vendor_id = data.get("vendor_id")
+    vendor_name = data.get("vendor_name")
+    arrival_date = data.get("arrival_date")
+    ordered_lines = data.get("ordered_lines") or []
+
+    if not ro:
+        return JSONResponse(status_code=400, content={"error": "RO is required"})
+    if not ordered_lines:
+        return JSONResponse(status_code=400, content={"error": "No parts selected"})
+
+    conn = get_conn()
+    cur = conn.cursor()
+    try:
+        _ensure_parts_orders_table(cur)
+
+        if vendor_id and not vendor_name:
+            _ensure_parts_vendors_table(cur)
+            cur.execute(
+                "SELECT name FROM parts_vendors WHERE id = %s AND domain = %s",
+                (vendor_id, domain),
+            )
+            row = cur.fetchone()
+            vendor_name = row["name"] if row else None
+
+        cur.execute(
+            """
+            INSERT INTO parts_orders
+            (ro, vendor_id, vendor_name, arrival_date, ordered_lines, domain)
+            VALUES (%s, %s, %s, %s, %s, %s)
+            """,
+            (
+                ro,
+                vendor_id,
+                vendor_name,
+                arrival_date,
+                json.dumps(ordered_lines),
+                domain,
+            ),
+        )
+        conn.commit()
+        return {"status": "saved"}
+    finally:
+        cur.close()

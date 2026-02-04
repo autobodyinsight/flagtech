@@ -312,6 +312,126 @@ def extract_labor_paint_items(
     return labor_items, paint_items
 
 
+def _parse_int(text: str) -> Optional[int]:
+    t = text.strip().replace(",", "")
+    if not t:
+        return None
+    if re.match(r"^\d+$", t):
+        try:
+            return int(t)
+        except Exception:
+            return None
+    return None
+
+
+def _parse_float(text: str) -> Optional[float]:
+    t = text.strip().replace(",", "")
+    if not t:
+        return None
+    if re.match(r"^-?\d+(?:\.\d+)?$", t):
+        try:
+            return float(t)
+        except Exception:
+            return None
+    return None
+
+
+def _parse_part_type(text: str) -> str:
+    t = text.upper()
+    if "LKQ" in t:
+        return "LKQ"
+    if "A/M" in t or "A M" in t or "AFTERMARKET" in t:
+        return "A/M"
+    if "OEM" in t:
+        return "OEM"
+    return ""
+
+
+def extract_parts_items(
+    pages: List[Dict],
+    columns: Dict[str, Optional[float]],
+    anchor_page: Optional[int],
+    anchor_ymid: Optional[float],
+    subtotals_page: Optional[int],
+    subtotals_ymid: Optional[float],
+) -> List[Dict]:
+    """Extract parts lines using detected columns."""
+    parts_items: List[Dict] = []
+    col_tol = 25.0
+
+    for pi, page in enumerate(pages, start=1):
+        if anchor_page and pi < anchor_page:
+            continue
+        if subtotals_page and pi > subtotals_page:
+            continue
+
+        page_words = []
+        for wd in page.get("words", []):
+            if anchor_page and pi == anchor_page and anchor_ymid is not None:
+                if wd["ymid"] < (anchor_ymid - 3.0):
+                    continue
+            if subtotals_page and pi == subtotals_page and subtotals_ymid is not None:
+                if wd["ymid"] >= (subtotals_ymid - 3.0):
+                    continue
+            page_words.append(wd)
+
+        rows = group_rows(page_words, y_thresh=6.0)
+
+        for row in rows:
+            row_words = sorted(row["words"], key=lambda x: x["xmid"])
+            row_text_upper = " ".join(w.get("text", "") for w in row_words).upper()
+
+            if all(token in row_text_upper for token in ["LINE", "OPER", "DESCRIPTION"]):
+                continue
+
+            line_text = ""
+            desc_text = ""
+            part_text = ""
+            qty_text = ""
+            ext_text = ""
+
+            for w in row_words:
+                if columns.get("line") is not None and abs(w["xmid"] - columns["line"]) <= col_tol:
+                    line_text += (w["text"] + " ")
+                    continue
+                if columns.get("part_number") is not None and abs(w["xmid"] - columns["part_number"]) <= col_tol:
+                    part_text += (w["text"] + " ")
+                    continue
+                if columns.get("qty") is not None and abs(w["xmid"] - columns["qty"]) <= col_tol:
+                    qty_text += (w["text"] + " ")
+                    continue
+                if columns.get("ext_price") is not None and abs(w["xmid"] - columns["ext_price"]) <= col_tol:
+                    ext_text += (w["text"] + " ")
+                    continue
+                if columns.get("description") is not None and abs(w["xmid"] - columns["description"]) <= col_tol:
+                    desc_text += (w["text"] + " ")
+
+            line_text = line_text.strip()
+            desc_text = desc_text.strip()
+            part_text = part_text.strip()
+            qty_text = qty_text.strip()
+            ext_text = ext_text.strip()
+
+            if not part_text and not qty_text and not ext_text:
+                continue
+
+            line_num = _parse_int(line_text) if line_text else None
+            qty_val = _parse_float(qty_text) if qty_text else None
+            price_val = _parse_float(ext_text) if ext_text else None
+
+            part_type = _parse_part_type(" ".join([desc_text, part_text]))
+
+            parts_items.append({
+                "line": line_num,
+                "description": desc_text or part_text,
+                "part_type": part_type,
+                "price": price_val if price_val is not None else 0.0,
+                "qty": qty_val if qty_val is not None else 1,
+            })
+
+    return parts_items
+
+
 def process_pdf_grid(pages: List[Dict]) -> Dict[str, Any]:
     """Main entry point."""
     for pi, page in enumerate(pages, start=1):
@@ -331,12 +451,17 @@ def process_pdf_grid(pages: List[Dict]) -> Dict[str, Any]:
         pages, columns, anchor_page, anchor_ymid, subtotals_page, subtotals_ymid
     )
 
+    parts_items = extract_parts_items(
+        pages, columns, anchor_page, anchor_ymid, subtotals_page, subtotals_ymid
+    )
+
     total_labor = sum(item["value"] for item in labor_items)
     total_paint = sum(item["value"] for item in paint_items)
 
     return {
         "labor_items": labor_items,
         "paint_items": paint_items,
+        "parts_items": parts_items,
         "total_labor": total_labor,
         "total_paint": total_paint,
         "second_ro_line": second_ro_line,

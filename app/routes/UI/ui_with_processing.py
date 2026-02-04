@@ -1,8 +1,10 @@
-from fastapi import APIRouter, UploadFile, File
+from fastapi import APIRouter, UploadFile, File, Request
 from fastapi.responses import HTMLResponse
 from app.services.extractor import extract_text_from_pdf, extract_words_from_pdf
 from app.services.parser import parse_estimate_text
 from app.services.grid_processor import process_pdf_grid, generate_pages_html
+from app.services.db import get_conn
+from app.services.middleware import get_user_domain
 from .flagout import get_flagtech_screen_html
 from .setup import get_setup_screen_html, get_setup_script
 try:
@@ -202,7 +204,7 @@ async def parse_ui(file: UploadFile = File(...)):
 
 
 @router.post("/grid", response_class=HTMLResponse)
-async def grid_ui(file: UploadFile = File(...), ajax: str = None):
+async def grid_ui(request: Request, file: UploadFile = File(...), ajax: str = None):
     pages = extract_words_from_pdf(file)
     if not pages:
         return "<html><body><p>No words found in PDF.</p><a href='/ui'>Back</a></body></html>"
@@ -213,6 +215,7 @@ async def grid_ui(file: UploadFile = File(...), ajax: str = None):
     # Extract results from service
     labor_items = result["labor_items"]
     paint_items = result["paint_items"]
+    parts_items = result.get("parts_items", [])
     total_labor = result["total_labor"]
     total_paint = result["total_paint"]
     second_ro_line = result["second_ro_line"]
@@ -221,6 +224,58 @@ async def grid_ui(file: UploadFile = File(...), ajax: str = None):
     anchor_ymid = result["anchor_ymid"]
     subtotals_page = result["subtotals_page"]
     subtotals_ymid = result["subtotals_ymid"]
+
+    domain = get_user_domain(request)
+    if domain and parts_items:
+        ro_match = re.search(r"\bRO\b\s*[:#-]*\s*([A-Za-z0-9-]+)", second_ro_line)
+        ro_number = ro_match.group(1) if ro_match else None
+        if ro_number:
+            conn = get_conn()
+            cur = conn.cursor()
+            try:
+                cur.execute(
+                    """
+                    CREATE TABLE IF NOT EXISTS parts_lines (
+                        id SERIAL PRIMARY KEY,
+                        ro VARCHAR(255) NOT NULL,
+                        vehicle VARCHAR(255),
+                        line_number INTEGER,
+                        description TEXT,
+                        part_type VARCHAR(50),
+                        price NUMERIC,
+                        qty NUMERIC,
+                        domain VARCHAR(255) NOT NULL,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    )
+                    """
+                )
+                cur.execute("CREATE INDEX IF NOT EXISTS idx_parts_lines_domain ON parts_lines(domain)")
+                cur.execute("CREATE INDEX IF NOT EXISTS idx_parts_lines_ro ON parts_lines(ro)")
+
+                cur.execute("DELETE FROM parts_lines WHERE ro = %s AND domain = %s", (ro_number, domain))
+
+                for item in parts_items:
+                    cur.execute(
+                        """
+                        INSERT INTO parts_lines
+                        (ro, vehicle, line_number, description, part_type, price, qty, domain)
+                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                        """,
+                        (
+                            ro_number,
+                            vehicle_info_line,
+                            item.get("line"),
+                            item.get("description"),
+                            item.get("part_type"),
+                            item.get("price"),
+                            item.get("qty"),
+                            domain,
+                        ),
+                    )
+
+                conn.commit()
+            finally:
+                cur.close()
     
     # Generate pages HTML visualization
     pages_html = generate_pages_html(pages, anchor_page, anchor_ymid, subtotals_page, subtotals_ymid)

@@ -4,7 +4,7 @@ from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 
 from .flagout import get_flagtech_screen_html
-from .setup import get_setup_screen_html, get_setup_script
+from .parts import get_parts_screen_html, get_parts_script
 from .dashboard import get_dashboard_screen_html
 
 try:
@@ -91,13 +91,13 @@ async def home_screen(request: Request):
         <div class="nav-tab active" onclick="switchScreen('dashboard')">DASHBOARD</div>
         <div class="nav-tab" onclick="switchScreen('upload')">UPLOAD</div>
         <div class="nav-tab" onclick="switchScreen('flagtech')">FLAG TECH</div>
-        <div class="nav-tab" onclick="switchScreen('setup')">SETUP</div>
+        <div class="nav-tab" onclick="switchScreen('parts')">PARTS</div>
     </div>
     
     <div class="content-area">
         {get_dashboard_screen_html()}
         {get_upload_screen_html()}
-        {get_setup_screen_html()}
+        {get_parts_screen_html()}
         {get_flagtech_screen_html()}
     </div>
     
@@ -116,14 +116,14 @@ async def home_screen(request: Request):
                 loadDashboardDataIfNeeded();
             }}
 
-            if (screenName === 'setup' && typeof setupLoadTechs === 'function') {{
-                setupLoadTechs();
-                setupLoadVendors();
+            if (screenName === 'parts' && typeof partsLoadRos === 'function') {{
+                partsLoadRos();
+                partsLoadVendors();
             }}
         }}
         
         {get_upload_script()}
-        {get_setup_script()}
+        {get_parts_script()}
     </script>
 </body>
 </html>
