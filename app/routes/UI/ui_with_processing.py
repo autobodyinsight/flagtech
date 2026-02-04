@@ -410,7 +410,9 @@ async def grid_ui(request: Request, file: UploadFile = File(...), ajax: str = No
         content = f"""
 <h2>Document Visual Grid</h2>
 <button onclick="openLaborModal()" style='padding:10px 20px; font-size:14px; cursor:pointer; background-color:#505050; color:white; border:none; border-radius:3px; margin-right:10px;'>Assign Labor</button>
-<button onclick="openRefinishModal()" style='padding:10px 20px; font-size:14px; cursor:pointer; background-color:#505050; color:white; border:none; border-radius:3px;'>Assign Refinish</button>
+<button onclick="openRefinishModal()" style='padding:10px 20px; font-size:14px; cursor:pointer; background-color:#505050; color:white; border:none; border-radius:3px; margin-right:10px;'>Assign Refinish</button>
+<button id="saveSummaryBtn" onclick="saveEstimateSummary()" style='padding:10px 20px; font-size:14px; cursor:pointer; background-color:#4CAF50; color:white; border:none; border-radius:3px;'>Save</button>
+<span id="saveStatus" style="margin-left: 10px; color: green;"></span>
 <br><br>
 {pages_html}
 <br><a href='/ui'>Back</a>
