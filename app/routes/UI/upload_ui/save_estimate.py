@@ -266,7 +266,8 @@ function formatPartPrice(value) {{
   if (value === null || value === undefined || value === '') return '-';
   const parsed = parseFloat(value);
   if (!Number.isFinite(parsed)) return value;
-  return parsed.toFixed(2);
+  const fixed = parsed.toFixed(2);
+  return fixed.endsWith('.00') ? String(parseInt(fixed, 10)) : fixed;
 }}
 
 function formatEstimateValue(value) {{
@@ -380,12 +381,16 @@ function openSaveEstimateModal(estimateTotals) {{
       if (!Number.isFinite(priceVal) || priceVal <= 0) {{
         return;
       }}
+      const descText = String(item.description || '').trim();
+      if (!descText.toLowerCase().includes('repl')) {{
+        return;
+      }}
       const partType = resolvePartType(item);
       const lineText = item.line ? ('Line ' + item.line + ' - ') : '';
-      const descText = item.description || 'Part';
+      const priceText = '$' + formatPartPrice(priceVal);
       partsHtml += '<div class="repair-item" id="part-item-' + partsCount + '">';
-      partsHtml += '<div class="repair-item-label"><strong>' + lineText + '</strong>' + descText + ' (' + partType + ')</div>';
-      partsHtml += '<div class="repair-item-value">' + formatPartPrice(priceVal) + '</div>';
+      partsHtml += '<div class="repair-item-label"><strong>' + lineText + '</strong>' + descText + ' - ' + partType + '</div>';
+      partsHtml += '<div class="repair-item-value">' + priceText + '</div>';
       partsHtml += '</div>';
       partsCount += 1;
     }});
