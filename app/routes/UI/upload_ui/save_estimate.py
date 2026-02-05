@@ -207,6 +207,64 @@ function getAuthHeaders() {{
   return headers;
 }}
 
+function normalizeSummaryValue(raw) {{
+  if (raw === null || raw === undefined) return null;
+  if (typeof raw === 'number') return raw;
+  if (typeof raw !== 'string') return null;
+  const trimmed = raw.trim();
+  if (!trimmed || trimmed === '-' || trimmed.toLowerCase() === 'null') return null;
+  const numeric = trimmed.replace(/[^0-9.-]/g, '');
+  if (!numeric) return trimmed;
+  const parsed = parseFloat(numeric);
+  return Number.isNaN(parsed) ? trimmed : parsed;
+}}
+
+function formatEstimateValue(value) {{
+  const normalized = normalizeSummaryValue(value);
+  if (normalized === null || normalized === undefined) return '-';
+  if (typeof normalized === 'number' && Number.isFinite(normalized)) {{
+    return normalized.toLocaleString('en-US', {{minimumFractionDigits: 2, maximumFractionDigits: 2}});
+  }}
+  return normalized;
+}}
+
+function readSummaryValue(elementId) {{
+  const el = document.getElementById(elementId);
+  if (!el) return null;
+  return normalizeSummaryValue(el.textContent);
+}}
+
+function resolveEstimateTotals(estimateTotals) {{
+  const baseTotals = estimateTotals && typeof estimateTotals === 'object' ? estimateTotals : {{}};
+  const fallbackTotals = (typeof currentEstimateTotals !== 'undefined' && currentEstimateTotals && typeof currentEstimateTotals === 'object')
+    ? currentEstimateTotals
+    : (window.currentEstimateTotals && typeof window.currentEstimateTotals === 'object')
+      ? window.currentEstimateTotals
+      : {{}};
+
+  const totalDefs = [
+    {{key: 'parts_total', label: 'PARTS TOTAL', fallbackId: 'summaryPartsTotal'}},
+    {{key: 'grand_total', label: 'GRAND TOTAL', fallbackId: 'summaryGrandTotal'}},
+    {{key: 'deductible', label: 'DEDUCTIBLE', fallbackId: 'summaryDeductible'}},
+    {{key: 'customer_pay', label: 'CUSTOMER PAY', fallbackId: 'summaryCustomerPay'}},
+    {{key: 'insurance_pay', label: 'INSURANCE PAY', fallbackId: 'summaryInsurancePay'}},
+  ];
+
+  const resolved = {{}};
+  totalDefs.forEach((def) => {{
+    let value = baseTotals[def.key];
+    if (value === null || value === undefined) {{
+      value = fallbackTotals[def.key];
+    }}
+    if (value === null || value === undefined) {{
+      value = readSummaryValue(def.fallbackId);
+    }}
+    resolved[def.key] = value;
+  }});
+
+  return {{resolved, totalDefs}};
+}}
+
 function switchTab(tabName) {{
   // Hide all tabs
   document.querySelectorAll('.tab-content').forEach(tab => tab.style.display = 'none');
@@ -219,7 +277,8 @@ function switchTab(tabName) {{
 
 function openSaveEstimateModal(estimateTotals) {{
   // Store estimate totals globally
-  saveEstimateTotalsData = estimateTotals || {{}};
+  const resolvedTotals = resolveEstimateTotals(estimateTotals);
+  saveEstimateTotalsData = resolvedTotals.resolved;
   
   // Parse vehicle info
   const vehicleInfo = parseVehicleInfo(saveVehicleInfoLine);
@@ -266,11 +325,11 @@ function openSaveEstimateModal(estimateTotals) {{
   
   // Populate estimate totals summary
   let totalsHtml = '';
-  for (const [key, value] of Object.entries(saveEstimateTotalsData)) {{
-    const displayLabel = key.replace(/_/g, ' ').toUpperCase();
-    const displayValue = typeof value === 'number' ? parseFloat(value).toLocaleString('en-US', {{minimumFractionDigits: 2, maximumFractionDigits: 2}}) : value;
-    totalsHtml += '<div class="total-row"><div class="total-label">' + displayLabel + '</div><div class="total-value">' + displayValue + '</div></div>';
-  }}
+  resolvedTotals.totalDefs.forEach((def) => {{
+    const value = saveEstimateTotalsData[def.key];
+    const displayValue = formatEstimateValue(value);
+    totalsHtml += '<div class="total-row"><div class="total-label">' + def.label + '</div><div class="total-value">' + displayValue + '</div></div>';
+  }});
   document.getElementById('saveEstimateTotalsSummary').innerHTML = totalsHtml || '<p style="color:#666;">No totals data available.</p>';
   
   // Reset selections
