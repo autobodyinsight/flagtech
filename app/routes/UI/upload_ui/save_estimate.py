@@ -373,20 +373,25 @@ function openSaveEstimateModal(estimateTotals) {{
 
   // Populate parts replacements
   let partsHtml = '';
-  if (!savePartsItems || savePartsItems.length === 0) {{
-    partsHtml = '<p style="padding: 12px; color: #666;">No parts items found.</p>';
-  }} else {{
-    savePartsItems.forEach((item, index) => {{
+  let partsCount = 0;
+  if (savePartsItems && savePartsItems.length > 0) {{
+    savePartsItems.forEach((item) => {{
+      const priceVal = parseFloat(item.price);
+      if (!Number.isFinite(priceVal) || priceVal <= 0) {{
+        return;
+      }}
       const partType = resolvePartType(item);
-      const qty = (item.qty !== null && item.qty !== undefined) ? item.qty : '';
-      const qtyText = qty !== '' ? (' Qty ' + qty) : '';
       const lineText = item.line ? ('Line ' + item.line + ' - ') : '';
       const descText = item.description || 'Part';
-      partsHtml += '<div class="repair-item" id="part-item-' + index + '">';
-      partsHtml += '<div class="repair-item-label"><strong>' + lineText + '</strong>' + descText + ' (' + partType + ')' + qtyText + '</div>';
-      partsHtml += '<div class="repair-item-value">' + formatPartPrice(item.price) + '</div>';
+      partsHtml += '<div class="repair-item" id="part-item-' + partsCount + '">';
+      partsHtml += '<div class="repair-item-label"><strong>' + lineText + '</strong>' + descText + '</div>';
+      partsHtml += '<div class="repair-item-value">' + partType + '</div>';
       partsHtml += '</div>';
+      partsCount += 1;
     }});
+  }}
+  if (partsCount === 0) {{
+    partsHtml = '<p style="padding: 12px; color: #666;">No parts items found.</p>';
   }}
   document.getElementById('saveEstimatePartsList').innerHTML = partsHtml;
   
