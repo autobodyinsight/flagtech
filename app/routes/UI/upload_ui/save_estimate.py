@@ -45,12 +45,6 @@ def get_save_estimate_modal_html(
           </div>
         </div>
       </div>
-      <div style="margin-top: 10px; padding: 12px; background-color: #f0f8ff; border-radius: 3px; border: 1px solid #b0d4f1;">
-        <div style="margin-bottom: 8px;">
-          <label style="font-weight: bold; font-size: 12px; color: #333;">OWNER INFORMATION</label>
-        </div>
-        <div id="ownerInfo" style="font-size: 14px; color: #333; line-height: 1.6;">-</div>
-      </div>
     </div>
 
     <h2>Save Estimate Data</h2>
@@ -78,7 +72,6 @@ def get_save_estimate_modal_html(
       <div style="margin-bottom: 15px;">
         <h3>Parts Replacements</h3>
         <div id="saveEstimatePartsList" class="repair-list"></div>
-        <div class="repair-total">Total Parts: <span id="saveEstimatePartsTotal">-</span></div>
       </div>
     </div>
 
@@ -475,7 +468,6 @@ function openSaveEstimateModal(estimateTotals) {{
     partsHtml = '<p style="padding: 12px; color: #666;">No parts items found.</p>';
   }}
   document.getElementById('saveEstimatePartsList').innerHTML = partsHtml;
-  document.getElementById('saveEstimatePartsTotal').textContent = partsCount ? ('$' + formatPartPrice(partsTotal)) : '-';
   
   // Populate estimate totals summary
   let totalsHtml = '';
