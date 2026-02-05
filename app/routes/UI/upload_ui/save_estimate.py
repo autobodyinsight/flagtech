@@ -13,6 +13,8 @@ def get_save_estimate_modal_html(
   deductible,
   customer_pay,
   insurance_pay,
+  owner_info="",
+  vin="",
 ):
     """Return the HTML for the save estimate modal."""
     return f"""
@@ -37,7 +39,17 @@ def get_save_estimate_modal_html(
             <label style="font-weight: bold; font-size: 12px; color: #666;">MODEL</label>
             <div id="vehicleModel" style="font-size: 14px; margin-top: 3px;">-</div>
           </div>
+          <div>
+            <label style="font-weight: bold; font-size: 12px; color: #666;">VIN</label>
+            <div id="vehicleVIN" style="font-size: 14px; margin-top: 3px;">-</div>
+          </div>
         </div>
+      </div>
+      <div style="margin-top: 10px; padding: 12px; background-color: #f0f8ff; border-radius: 3px; border: 1px solid #b0d4f1;">
+        <div style="margin-bottom: 8px;">
+          <label style="font-weight: bold; font-size: 12px; color: #333;">OWNER INFORMATION</label>
+        </div>
+        <div id="ownerInfo" style="font-size: 14px; color: #333;">-</div>
       </div>
     </div>
 
@@ -178,6 +190,8 @@ def get_save_estimate_modal_script(
   deductible,
   customer_pay,
   insurance_pay,
+  owner_info="",
+  vin="",
 ):
     """Return the JavaScript for the save estimate modal functionality."""
     return f"""
@@ -188,6 +202,8 @@ var savePartsItems = {parts_items_json};
 var saveRoNumber = {json.dumps(ro_number or '').replace("<", "\\u003c")};
 var saveSecondRoLine = {json.dumps(second_ro_line or '').replace("<", "\\u003c")};
 var saveVehicleInfoLine = {json.dumps(vehicle_info_line or '').replace("<", "\\u003c")};
+var saveOwnerInfo = {json.dumps(owner_info or '').replace("<", "\\u003c")};
+var saveVIN = {json.dumps(vin or '').replace("<", "\\u003c")};
 var saveEstimateTotalsData = {{}};
 var preloadedEstimateTotals = {json.dumps({
     "parts_total": parts_total,
@@ -302,7 +318,7 @@ function extractPartsReplacements() {{
       return;
     }}
     const partType = resolvePartType(item);
-    const cleanedDesc = (rowText || descText || 'Part').replace(/^\s*\d+\s+/, '').trim();
+    const cleanedDesc = (rowText || descText || 'Part').replace(/^\\s*\\d+\\s+/, '').trim();
     replacements.push({{
       line: item.line || null,
       description: cleanedDesc,
@@ -382,6 +398,12 @@ function openSaveEstimateModal(estimateTotals) {{
   document.getElementById('vehicleMake').textContent = vehicleMake || '-';
   document.getElementById('vehicleModel').textContent = vehicleModel || '-';
   
+  // Display VIN
+  document.getElementById('vehicleVIN').textContent = saveVIN || '-';
+  
+  // Display owner information
+  document.getElementById('ownerInfo').textContent = saveOwnerInfo || '-';
+  
   // Populate labor repairs
   let laborHtml = '';
   if (saveLaborItems.length === 0) {{
@@ -429,7 +451,7 @@ function openSaveEstimateModal(estimateTotals) {{
       const partType = resolvePartType(item);
       const lineText = item.line ? ('Line ' + item.line + ' - ') : '';
       const rawDesc = rowText || descText || 'Part';
-      const cleanedDesc = rawDesc.replace(/^\s*\d+\s+/, '').trim();
+      const cleanedDesc = rawDesc.replace(/^\\s*\\d+\\s+/, '').trim();
       const priceText = '$' + formatPartPrice(priceVal);
       partsHtml += '<div class="repair-item" id="part-item-' + partsCount + '">';
       partsHtml += '<div class="repair-item-label"><strong>' + lineText + '</strong>' + cleanedDesc + ' - ' + partType + '</div>';
