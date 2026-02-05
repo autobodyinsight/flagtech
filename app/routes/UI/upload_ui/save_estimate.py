@@ -66,6 +66,7 @@ def get_save_estimate_modal_html(
       <div style="margin-bottom: 15px;">
         <h3>Parts Replacements</h3>
         <div id="saveEstimatePartsList" class="repair-list"></div>
+        <div class="repair-total">Total Parts: <span id="saveEstimatePartsTotal">-</span></div>
       </div>
     </div>
 
@@ -377,6 +378,7 @@ function openSaveEstimateModal(estimateTotals) {{
   // Populate parts replacements
   let partsHtml = '';
   let partsCount = 0;
+  let partsTotal = 0;
   if (savePartsItems && savePartsItems.length > 0) {{
     savePartsItems.forEach((item) => {{
       const priceVal = parseFloat(item.price);
@@ -386,7 +388,7 @@ function openSaveEstimateModal(estimateTotals) {{
       const descText = String(item.description || '').trim();
       const rowText = String(item.row_text || '').trim();
       const sourceText = (rowText || descText).toLowerCase();
-      if (!sourceText.includes('repl')) {{
+      if (!sourceText.includes('repl') && !sourceText.includes('sublet')) {{
         return;
       }}
       const partType = resolvePartType(item);
@@ -398,6 +400,7 @@ function openSaveEstimateModal(estimateTotals) {{
       partsHtml += '<div class="repair-item-label"><strong>' + lineText + '</strong>' + cleanedDesc + ' - ' + partType + '</div>';
       partsHtml += '<div class="repair-item-value">' + priceText + '</div>';
       partsHtml += '</div>';
+      partsTotal += priceVal;
       partsCount += 1;
     }});
   }}
@@ -405,6 +408,7 @@ function openSaveEstimateModal(estimateTotals) {{
     partsHtml = '<p style="padding: 12px; color: #666;">No parts items found.</p>';
   }}
   document.getElementById('saveEstimatePartsList').innerHTML = partsHtml;
+  document.getElementById('saveEstimatePartsTotal').textContent = partsCount ? ('$' + formatPartPrice(partsTotal)) : '-';
   
   // Populate estimate totals summary
   let totalsHtml = '';
