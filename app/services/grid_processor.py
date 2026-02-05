@@ -461,6 +461,51 @@ def process_pdf_grid(pages: List[Dict]) -> Dict[str, Any]:
     total_labor = sum(item["value"] for item in labor_items)
     total_paint = sum(item["value"] for item in paint_items)
 
+    totals = {
+        "parts_total": None,
+        "grand_total": None,
+        "deductible": None,
+        "customer_pay": None,
+        "insurance_pay": None,
+    }
+
+    def _extract_last_numeric(text: str) -> Optional[float | str]:
+        matches = re.findall(r"[\d,.]+", text)
+        if not matches:
+            return None
+        raw = matches[-1]
+        numeric = raw.replace(",", "")
+        try:
+            return float(numeric)
+        except Exception:
+            return raw
+
+    if subtotals_page:
+        for pi, page in enumerate(pages, start=1):
+            if pi < subtotals_page:
+                continue
+            rows = group_rows(page.get("words", []), y_thresh=6.0)
+            for idx, r in enumerate(rows):
+                row_text = " ".join(w.get("text", "") for w in r["words"]).strip()
+                if re.search(r"\bESTIMATE\s+TOTALS\b", row_text, re.IGNORECASE):
+                    for follow_row in rows[idx + 1: idx + 11]:
+                        follow_text = " ".join(w.get("text", "") for w in follow_row["words"]).strip()
+                        upper = follow_text.upper()
+
+                        if "PARTS TOTAL" in upper and totals["parts_total"] is None:
+                            totals["parts_total"] = _extract_last_numeric(follow_text)
+                        if "GRAND TOTAL" in upper and totals["grand_total"] is None:
+                            totals["grand_total"] = _extract_last_numeric(follow_text)
+                        if "DEDUCTIBLE" in upper and totals["deductible"] is None:
+                            totals["deductible"] = _extract_last_numeric(follow_text)
+                        if "CUSTOMER PAY" in upper and totals["customer_pay"] is None:
+                            totals["customer_pay"] = _extract_last_numeric(follow_text)
+                        if "INSURANCE PAY" in upper and totals["insurance_pay"] is None:
+                            totals["insurance_pay"] = _extract_last_numeric(follow_text)
+                    break
+            if any(value is not None for value in totals.values()):
+                break
+
     return {
         "labor_items": labor_items,
         "paint_items": paint_items,
@@ -473,6 +518,11 @@ def process_pdf_grid(pages: List[Dict]) -> Dict[str, Any]:
         "anchor_ymid": anchor_ymid,
         "subtotals_page": subtotals_page,
         "subtotals_ymid": subtotals_ymid,
+        "parts_total": totals["parts_total"],
+        "grand_total": totals["grand_total"],
+        "deductible": totals["deductible"],
+        "customer_pay": totals["customer_pay"],
+        "insurance_pay": totals["insurance_pay"],
     }
 
 

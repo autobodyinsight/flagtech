@@ -263,6 +263,11 @@ async def grid_ui(request: Request, file: UploadFile = File(...), ajax: str = No
     parts_items = result.get("parts_items", [])
     total_labor = result["total_labor"]
     total_paint = result["total_paint"]
+    parts_total = result.get("parts_total")
+    grand_total = result.get("grand_total")
+    deductible = result.get("deductible")
+    customer_pay = result.get("customer_pay")
+    insurance_pay = result.get("insurance_pay")
     second_ro_line = result["second_ro_line"]
     vehicle_info_line = result["vehicle_info_line"]
     anchor_page = result["anchor_page"]
@@ -388,6 +393,11 @@ async def grid_ui(request: Request, file: UploadFile = File(...), ajax: str = No
             vehicle_info_line,
             total_labor,
             total_paint,
+            parts_total,
+            grand_total,
+            deductible,
+            customer_pay,
+            insurance_pay,
         )
         
         # Generate modal styles
@@ -406,14 +416,27 @@ async def grid_ui(request: Request, file: UploadFile = File(...), ajax: str = No
             ro_number,
             total_labor,
             total_paint,
+            parts_total,
+            grand_total,
+            deductible,
+            customer_pay,
+            insurance_pay,
         )
         close_handler = get_modal_close_handler()
+
+        estimate_totals_json = json.dumps({
+            "parts_total": parts_total,
+            "grand_total": grand_total,
+            "deductible": deductible,
+            "customer_pay": customer_pay,
+            "insurance_pay": insurance_pay,
+        })
         
         content = f"""
 <h2>Document Visual Grid</h2>
 <button onclick="openLaborModal()" style='padding:10px 20px; font-size:14px; cursor:pointer; background-color:#505050; color:white; border:none; border-radius:3px; margin-right:10px;'>Assign Labor</button>
 <button onclick="openRefinishModal()" style='padding:10px 20px; font-size:14px; cursor:pointer; background-color:#505050; color:white; border:none; border-radius:3px; margin-right:10px;'>Assign Refinish</button>
-<button onclick="openSaveEstimateModal({{}})" style='padding:10px 20px; font-size:14px; cursor:pointer; background-color:#4CAF50; color:white; border:none; border-radius:3px;'>Save Estimate</button>
+<button onclick="openSaveEstimateModal({estimate_totals_json})" style='padding:10px 20px; font-size:14px; cursor:pointer; background-color:#4CAF50; color:white; border:none; border-radius:3px;'>Save Estimate</button>
 <br><br>
 {pages_html}
 <br><a href='/ui'>Back</a>

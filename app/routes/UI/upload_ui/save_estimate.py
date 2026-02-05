@@ -3,7 +3,17 @@
 import json
 
 
-def get_save_estimate_modal_html(second_ro_line, vehicle_info_line, total_labor, total_paint):
+def get_save_estimate_modal_html(
+  second_ro_line,
+  vehicle_info_line,
+  total_labor,
+  total_paint,
+  parts_total,
+  grand_total,
+  deductible,
+  customer_pay,
+  insurance_pay,
+):
     """Return the HTML for the save estimate modal."""
     return f"""
 <div id="saveEstimateModal" class="modal" style="display: none;">
@@ -158,7 +168,20 @@ def get_save_estimate_modal_styles():
 """
 
 
-def get_save_estimate_modal_script(labor_items_json, paint_items_json, second_ro_line, vehicle_info_line, ro_number, total_labor, total_paint):
+def get_save_estimate_modal_script(
+  labor_items_json,
+  paint_items_json,
+  second_ro_line,
+  vehicle_info_line,
+  ro_number,
+  total_labor,
+  total_paint,
+  parts_total,
+  grand_total,
+  deductible,
+  customer_pay,
+  insurance_pay,
+):
     """Return the JavaScript for the save estimate modal functionality."""
     return f"""
 // Save Estimate Modal Variables
@@ -168,6 +191,19 @@ var saveRoNumber = {json.dumps(ro_number or '')};
 var saveSecondRoLine = {json.dumps(second_ro_line or '')};
 var saveVehicleInfoLine = {json.dumps(vehicle_info_line or '')};
 var saveEstimateTotalsData = {{}};
+var preloadedEstimateTotals = {json.dumps({
+    "parts_total": parts_total,
+    "grand_total": grand_total,
+    "deductible": deductible,
+    "customer_pay": customer_pay,
+    "insurance_pay": insurance_pay,
+})};
+
+if (typeof currentEstimateTotals === 'undefined' || !currentEstimateTotals || Object.keys(currentEstimateTotals).length === 0) {{
+  var currentEstimateTotals = preloadedEstimateTotals;
+}} else {{
+  currentEstimateTotals = Object.assign({{}}, preloadedEstimateTotals, currentEstimateTotals);
+}}
 
 // Vehicle info parsed from vehicle_info_line
 var vehicleYear = null;
