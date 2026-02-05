@@ -700,6 +700,45 @@ async def dashboard_data(request: Request):
         }
 
 
+@router.post("/flash")
+async def flash_data():
+    """Delete uploaded estimate data across screens."""
+    conn = get_conn()
+    cur = conn.cursor()
+
+    tables = [
+        "parts_received",
+        "parts_orders",
+        "parts_lines",
+        "parts_vendors",
+        "ro_notes",
+        "ro_phases",
+        "refinish_assignments",
+        "labor_assignments",
+        "estimate_uploads",
+        "saved_estimates",
+        "techs",
+    ]
+
+    deleted_counts = {}
+    try:
+        for table in tables:
+            cur.execute("SELECT to_regclass(%s) AS reg", (table,))
+            row = cur.fetchone()
+            if not row or not row.get("reg"):
+                continue
+            cur.execute(f"DELETE FROM {table}")
+            deleted_counts[table] = cur.rowcount
+        conn.commit()
+    except Exception as exc:
+        conn.rollback()
+        return JSONResponse(status_code=500, content={"status": "error", "message": str(exc)})
+    finally:
+        cur.close()
+
+    return {"status": "success", "deleted": deleted_counts}
+
+
 @router.get("/phase-data")
 async def phase_data(request: Request):
     """Get RO cards for the Phase board."""

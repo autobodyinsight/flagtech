@@ -414,9 +414,18 @@ function executeSaveEstimate() {{
       statusDiv.style.color = 'green';
       setTimeout(() => {{
         closeSaveEstimateModal();
-        document.getElementById('uploadStatus').innerHTML = '';
-        document.getElementById('estimateSummary').style.display = 'none';
-        document.getElementById('fileInput').value = '';
+        const uploadStatus = document.getElementById('uploadStatus');
+        if (uploadStatus) {{
+          uploadStatus.innerHTML = '';
+        }}
+        const estimateSummary = document.getElementById('estimateSummary');
+        if (estimateSummary) {{
+          estimateSummary.style.display = 'none';
+        }}
+        const fileInput = document.getElementById('fileInput');
+        if (fileInput) {{
+          fileInput.value = '';
+        }}
         statusDiv.textContent = '';
         saveBtn.disabled = false;
       }}, 2000);
