@@ -379,8 +379,8 @@ async def grid_ui(request: Request, file: UploadFile = File(...), ajax: str = No
         refinish_styles = get_refinish_modal_styles()
         
         # Generate modal scripts
-        labor_script = get_labor_modal_script(labor_items_json, total_labor, second_ro_line, vehicle_info_line)
-        refinish_script = get_refinish_modal_script(paint_items_json, total_paint, second_ro_line, vehicle_info_line)
+        labor_script = get_labor_modal_script(labor_items_json, total_labor, second_ro_line, vehicle_info_line, ro_number)
+        refinish_script = get_refinish_modal_script(paint_items_json, total_paint, second_ro_line, vehicle_info_line, ro_number)
         close_handler = get_modal_close_handler()
         
         content = f"""
