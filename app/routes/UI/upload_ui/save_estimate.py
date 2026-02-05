@@ -393,11 +393,8 @@ function openSaveEstimateModal(estimateTotals) {{
   
   const modal = document.getElementById('saveEstimateModal');
   
-  // Display vehicle information as formatted line: "year make model"
-  const vehicleDisplayText = [vehicleYear, vehicleMake, vehicleModel]
-    .filter(v => v && v !== '-')
-    .join(' ') || '-';
-  document.getElementById('vehicleInfoDisplay').textContent = vehicleDisplayText;
+  // Display vehicle information - show full line directly
+  document.getElementById('vehicleInfoDisplay').textContent = saveVehicleInfoLine || '-';
   
   // Display vehicle year, make, model in grid
   document.getElementById('vehicleYear').textContent = vehicleYear || '-';
