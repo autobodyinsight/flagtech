@@ -432,65 +432,7 @@ def extract_parts_items(
     return parts_items
 
 
-def extract_estimate_totals(
-    pages: List[Dict],
-    subtotals_page: Optional[int],
-    subtotals_ymid: Optional[float],
-) -> Dict[str, Optional[float]]:
-    """
-    Extract estimate totals from the PDF.
-    Looks for: GRAND TOTAL, DEDUCTIBLE, CUSTOMER PAY, INSURANCE PAY
-    Returns a dict with grand_total, deductible, customer_pay, insurance_pay
-    """
-    totals = {
-        "grand_total": None,
-        "deductible": None,
-        "customer_pay": None,
-        "insurance_pay": None,
-    }
-    
-    if not subtotals_page or subtotals_ymid is None:
-        return totals
-    
-    # Look at words starting from subtotals section
-    for pi, page in enumerate(pages, start=1):
-        if pi != subtotals_page:
-            continue
-        
-        page_words = page.get("words", [])
-        rows = group_rows(page_words, y_thresh=6.0)
-        
-        for row in rows:
-            # Only look below the subtotals marker
-            if row["ymid"] < subtotals_ymid:
-                continue
-            
-            row_text = " ".join(w["text"] for w in row["words"]).strip()
-            row_words = sorted(row["words"], key=lambda x: x["xmid"])
-            
-            # Look for specific patterns
-            row_upper = row_text.upper()
-            
-            # Extract value from row text (usually last number in the row)
-            numeric_matches = re.findall(r'-?\d+[\.,]\d+|-?\d+', row_text)
-            value = None
-            if numeric_matches:
-                try:
-                    value = float(numeric_matches[-1].replace(',', ''))
-                except (ValueError, IndexError):
-                    pass
-            
-            # Match against known total labels
-            if 'GRAND' in row_upper and 'TOTAL' in row_upper:
-                totals["grand_total"] = value
-            elif 'DEDUCTIBLE' in row_upper:
-                totals["deductible"] = value
-            elif 'CUSTOMER' in row_upper and 'PAY' in row_upper:
-                totals["customer_pay"] = value
-            elif 'INSURANCE' in row_upper and 'PAY' in row_upper:
-                totals["insurance_pay"] = value
-    
-    return totals
+
 
 
 def process_pdf_grid(pages: List[Dict]) -> Dict[str, Any]:
@@ -518,8 +460,6 @@ def process_pdf_grid(pages: List[Dict]) -> Dict[str, Any]:
 
     total_labor = sum(item["value"] for item in labor_items)
     total_paint = sum(item["value"] for item in paint_items)
-    
-    estimate_totals = extract_estimate_totals(pages, subtotals_page, subtotals_ymid)
 
     return {
         "labor_items": labor_items,
@@ -533,7 +473,6 @@ def process_pdf_grid(pages: List[Dict]) -> Dict[str, Any]:
         "anchor_ymid": anchor_ymid,
         "subtotals_page": subtotals_page,
         "subtotals_ymid": subtotals_ymid,
-        "estimate_totals": estimate_totals,
     }
 
 
