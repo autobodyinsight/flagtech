@@ -391,9 +391,11 @@ function openSaveEstimateModal(estimateTotals) {{
       }}
       const partType = resolvePartType(item);
       const lineText = item.line ? ('Line ' + item.line + ' - ') : '';
+      const rawDesc = rowText || descText || 'Part';
+      const cleanedDesc = rawDesc.replace(/^\s*\d+\s+/, '').trim();
       const priceText = '$' + formatPartPrice(priceVal);
       partsHtml += '<div class="repair-item" id="part-item-' + partsCount + '">';
-      partsHtml += '<div class="repair-item-label"><strong>' + lineText + '</strong>' + descText + ' - ' + partType + '</div>';
+      partsHtml += '<div class="repair-item-label"><strong>' + lineText + '</strong>' + cleanedDesc + ' - ' + partType + '</div>';
       partsHtml += '<div class="repair-item-value">' + priceText + '</div>';
       partsHtml += '</div>';
       partsCount += 1;
