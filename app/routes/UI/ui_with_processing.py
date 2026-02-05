@@ -55,6 +55,57 @@ def _ensure_estimate_uploads_table(cur) -> None:
     cur.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_estimate_uploads_ro_domain ON estimate_uploads(ro, domain)")
 
 
+def _ensure_saved_estimates_table(cur) -> None:
+    cur.execute(
+        """
+        CREATE TABLE IF NOT EXISTS saved_estimates (
+            id SERIAL PRIMARY KEY,
+            ro VARCHAR(255),
+            vehicle TEXT,
+            year VARCHAR(10),
+            make VARCHAR(50),
+            model VARCHAR(50),
+            labor_repairs JSONB,
+            paint_repairs JSONB,
+            parts_repairs JSONB,
+            estimate_totals JSONB,
+            parts_total NUMERIC,
+            grand_total NUMERIC,
+            deductible NUMERIC,
+            customer_pay NUMERIC,
+            insurance_pay NUMERIC,
+            domain VARCHAR(255),
+            saved_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+        """
+    )
+    cur.execute("ALTER TABLE saved_estimates ADD COLUMN IF NOT EXISTS parts_repairs JSONB")
+    cur.execute("ALTER TABLE saved_estimates ADD COLUMN IF NOT EXISTS estimate_totals JSONB")
+    cur.execute("ALTER TABLE saved_estimates ADD COLUMN IF NOT EXISTS parts_total NUMERIC")
+    cur.execute("ALTER TABLE saved_estimates ADD COLUMN IF NOT EXISTS grand_total NUMERIC")
+    cur.execute("ALTER TABLE saved_estimates ADD COLUMN IF NOT EXISTS deductible NUMERIC")
+    cur.execute("ALTER TABLE saved_estimates ADD COLUMN IF NOT EXISTS customer_pay NUMERIC")
+    cur.execute("ALTER TABLE saved_estimates ADD COLUMN IF NOT EXISTS insurance_pay NUMERIC")
+    cur.execute("ALTER TABLE saved_estimates ADD COLUMN IF NOT EXISTS domain VARCHAR(255)")
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_saved_estimates_ro_domain ON saved_estimates(ro, domain)")
+
+
+def _parse_money(value):
+    if value is None:
+        return None
+    if isinstance(value, (int, float)):
+        return float(value)
+    if not isinstance(value, str):
+        return None
+    cleaned = re.sub(r"[^0-9.\-]", "", value)
+    if not cleaned:
+        return None
+    try:
+        return float(cleaned)
+    except ValueError:
+        return None
+
+
 def _estimate_hash(payload: dict) -> str:
     normalized = json.dumps(payload, sort_keys=True, separators=(",", ":"))
     return hashlib.sha256(normalized.encode("utf-8")).hexdigest()
@@ -489,6 +540,54 @@ async def grid_ui(request: Request, file: UploadFile = File(...), ajax: str = No
 </script>
         """
         return content
+
+
+@router.post("/save-estimate")
+async def save_estimate(request: Request):
+    data = await request.json()
+    conn = get_conn()
+    cur = conn.cursor()
+
+    ro_value = (data.get("ro_number") or data.get("ro") or "").strip()
+    match = re.search(r"\bRO\b\s*[:#-]*\s*([A-Za-z0-9-]+)", ro_value)
+    if match:
+        ro_value = match.group(1)
+
+    estimate_totals = data.get("estimate_totals") or {}
+    domain = get_user_domain(request)
+
+    try:
+        _ensure_saved_estimates_table(cur)
+        cur.execute(
+            """
+            INSERT INTO saved_estimates
+            (ro, vehicle, year, make, model, labor_repairs, paint_repairs, parts_repairs,
+             estimate_totals, parts_total, grand_total, deductible, customer_pay, insurance_pay, domain)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            """,
+            (
+                ro_value,
+                data.get("vehicle"),
+                data.get("year"),
+                data.get("make"),
+                data.get("model"),
+                json.dumps(data.get("labor_repairs") or []),
+                json.dumps(data.get("paint_repairs") or []),
+                json.dumps(data.get("parts_repairs") or []),
+                json.dumps(estimate_totals or {}),
+                _parse_money(estimate_totals.get("parts_total")),
+                _parse_money(estimate_totals.get("grand_total")),
+                _parse_money(estimate_totals.get("deductible")),
+                _parse_money(estimate_totals.get("customer_pay")),
+                _parse_money(estimate_totals.get("insurance_pay")),
+                domain,
+            ),
+        )
+        conn.commit()
+    finally:
+        cur.close()
+
+    return {"status": "success"}
 
 
 @router.post("/aligned", response_class=HTMLResponse)

@@ -282,6 +282,41 @@ function formatEstimateValue(value) {{
   return normalized;
 }}
 
+function extractPartsReplacements() {
+  const replacements = [];
+  let partsTotal = 0;
+
+  if (!savePartsItems || savePartsItems.length === 0) {
+    return {items: replacements, total: partsTotal};
+  }
+
+  savePartsItems.forEach((item) => {
+    const priceVal = parseFloat(item.price);
+    if (!Number.isFinite(priceVal) || priceVal <= 0) {
+      return;
+    }
+    const descText = String(item.description || '').trim();
+    const rowText = String(item.row_text || '').trim();
+    const sourceText = (rowText || descText).toLowerCase();
+    if (!sourceText.includes('repl') && !sourceText.includes('sublet') && !sourceText.includes('subl')) {
+      return;
+    }
+    const partType = resolvePartType(item);
+    const cleanedDesc = (rowText || descText || 'Part').replace(/^\s*\d+\s+/, '').trim();
+    replacements.push({
+      line: item.line || null,
+      description: cleanedDesc,
+      part_type: partType,
+      price: priceVal,
+      qty: item.qty || null,
+      row_text: rowText || null
+    });
+    partsTotal += priceVal;
+  });
+
+  return {items: replacements, total: partsTotal};
+}
+
 function readSummaryValue(elementId) {{
   const el = document.getElementById(elementId);
   if (!el) return null;
@@ -431,20 +466,25 @@ function closeSaveEstimateModal() {{
 function executeSaveEstimate() {{
   const saveBtn = document.getElementById('executeSaveBtn');
   const statusDiv = document.getElementById('saveEstimateStatus');
-  
-  if (saveLaborItems.length === 0 && savePaintItems.length === 0) {{
-    statusDiv.textContent = 'No repair lines found to save';
-    statusDiv.style.color = 'red';
-    return;
-  }}
-  
-  saveBtn.disabled = true;
-  statusDiv.textContent = 'Saving...';
-  statusDiv.style.color = 'blue';
-  
+
   // Build payload
   const laborData = saveLaborItems.slice();
   const paintData = savePaintItems.slice();
+  const partsResult = extractPartsReplacements();
+
+  if (laborData.length === 0 && paintData.length === 0 && partsResult.items.length === 0) {
+    statusDiv.textContent = 'No repair lines found to save';
+    statusDiv.style.color = 'red';
+    return;
+  }
+
+  saveBtn.disabled = true;
+  statusDiv.textContent = 'Saving...';
+  statusDiv.style.color = 'blue';
+  const totalsData = Object.assign({}, saveEstimateTotalsData);
+  if (totalsData.parts_total === null || totalsData.parts_total === undefined) {
+    totalsData.parts_total = partsResult.total;
+  }
   
   const payload = {{
     ro: saveRoNumber,
@@ -454,7 +494,8 @@ function executeSaveEstimate() {{
     model: vehicleModel,
     labor_repairs: laborData,
     paint_repairs: paintData,
-    estimate_totals: saveEstimateTotalsData,
+    parts_repairs: partsResult.items,
+    estimate_totals: totalsData,
     timestamp: new Date().toISOString()
   }};
   
@@ -472,23 +513,21 @@ function executeSaveEstimate() {{
     if (result.status === 'success') {{
       statusDiv.textContent = 'Saved successfully!';
       statusDiv.style.color = 'green';
-      setTimeout(() => {{
-        closeSaveEstimateModal();
-        const uploadStatus = document.getElementById('uploadStatus');
-        if (uploadStatus) {{
-          uploadStatus.innerHTML = '';
-        }}
-        const estimateSummary = document.getElementById('estimateSummary');
-        if (estimateSummary) {{
-          estimateSummary.style.display = 'none';
-        }}
-        const fileInput = document.getElementById('fileInput');
-        if (fileInput) {{
-          fileInput.value = '';
-        }}
-        statusDiv.textContent = '';
-        saveBtn.disabled = false;
-      }}, 2000);
+      closeSaveEstimateModal();
+      const uploadStatus = document.getElementById('uploadStatus');
+      if (uploadStatus) {
+        uploadStatus.innerHTML = '';
+      }
+      const estimateSummary = document.getElementById('estimateSummary');
+      if (estimateSummary) {
+        estimateSummary.style.display = 'none';
+      }
+      const fileInput = document.getElementById('fileInput');
+      if (fileInput) {
+        fileInput.value = '';
+      }
+      statusDiv.textContent = '';
+      saveBtn.disabled = false;
     }} else {{
       statusDiv.textContent = 'Error: ' + (result.message || 'Failed to save');
       statusDiv.style.color = 'red';
