@@ -480,6 +480,26 @@ def process_pdf_grid(pages: List[Dict]) -> Dict[str, Any]:
         except Exception:
             return raw
 
+    def _extract_rightmost_numeric(row: Dict) -> Optional[float | str]:
+        candidates = []
+        for word in row.get("words", []):
+            text = str(word.get("text", "")).strip()
+            if not text or not re.search(r"\d", text):
+                continue
+            cleaned = re.sub(r"[^0-9.\-]", "", text)
+            if not cleaned or cleaned in {"-", "."}:
+                continue
+            candidates.append((word.get("x0", 0), cleaned))
+
+        if not candidates:
+            return None
+
+        _, raw = max(candidates, key=lambda item: item[0])
+        try:
+            return float(raw.replace(",", ""))
+        except Exception:
+            return raw
+
     if subtotals_page:
         for pi, page in enumerate(pages, start=1):
             if pi < subtotals_page:
@@ -488,20 +508,27 @@ def process_pdf_grid(pages: List[Dict]) -> Dict[str, Any]:
             for idx, r in enumerate(rows):
                 row_text = " ".join(w.get("text", "") for w in r["words"]).strip()
                 if re.search(r"\bESTIMATE\s+TOTALS\b", row_text, re.IGNORECASE):
-                    for follow_row in rows[idx + 1: idx + 11]:
+                    for follow_row in rows[idx + 1: idx + 16]:
                         follow_text = " ".join(w.get("text", "") for w in follow_row["words"]).strip()
                         upper = follow_text.upper()
+                        rightmost_value = _extract_rightmost_numeric(follow_row)
 
-                        if "PARTS TOTAL" in upper and totals["parts_total"] is None:
-                            totals["parts_total"] = _extract_last_numeric(follow_text)
-                        if "GRAND TOTAL" in upper and totals["grand_total"] is None:
-                            totals["grand_total"] = _extract_last_numeric(follow_text)
-                        if "DEDUCTIBLE" in upper and totals["deductible"] is None:
-                            totals["deductible"] = _extract_last_numeric(follow_text)
-                        if "CUSTOMER PAY" in upper and totals["customer_pay"] is None:
-                            totals["customer_pay"] = _extract_last_numeric(follow_text)
-                        if "INSURANCE PAY" in upper and totals["insurance_pay"] is None:
-                            totals["insurance_pay"] = _extract_last_numeric(follow_text)
+                        if totals["parts_total"] is None and (
+                            re.search(r"\bPARTS TOTAL\b", upper) or ("PARTS" in upper and "TOTAL" in upper)
+                        ):
+                            totals["parts_total"] = rightmost_value or _extract_last_numeric(follow_text)
+                        if totals["grand_total"] is None and re.search(r"\bGRAND TOTAL\b", upper):
+                            totals["grand_total"] = rightmost_value or _extract_last_numeric(follow_text)
+                        if totals["deductible"] is None and re.search(r"\bDEDUCTIBLE\b", upper):
+                            totals["deductible"] = rightmost_value or _extract_last_numeric(follow_text)
+                        if totals["customer_pay"] is None and (
+                            re.search(r"\bCUSTOMER PAY\b", upper) or re.search(r"\bCUSTOMER\b.*\bPAY\b", upper)
+                        ):
+                            totals["customer_pay"] = rightmost_value or _extract_last_numeric(follow_text)
+                        if totals["insurance_pay"] is None and (
+                            re.search(r"\bINSURANCE PAY\b", upper) or re.search(r"\bINSURANCE\b.*\bPAY\b", upper)
+                        ):
+                            totals["insurance_pay"] = rightmost_value or _extract_last_numeric(follow_text)
                     break
             if any(value is not None for value in totals.values()):
                 break
