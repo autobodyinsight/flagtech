@@ -13,6 +13,11 @@ try:
     from .upload_ui.upload import get_upload_screen_html, get_upload_script
     from .upload_ui.labor import get_labor_modal_html, get_labor_modal_styles, get_labor_modal_script
     from .upload_ui.paint import get_refinish_modal_html, get_refinish_modal_styles, get_refinish_modal_script, get_modal_close_handler
+    from .upload_ui.save_estimate import (
+        get_save_estimate_modal_html,
+        get_save_estimate_modal_styles,
+        get_save_estimate_modal_script,
+    )
 except ImportError:
     # Fallback if directory name has space
     import sys
@@ -22,6 +27,11 @@ except ImportError:
     from upload import get_upload_screen_html, get_upload_script
     from labor import get_labor_modal_html, get_labor_modal_styles, get_labor_modal_script
     from paint import get_refinish_modal_html, get_refinish_modal_styles, get_refinish_modal_script, get_modal_close_handler
+    from save_estimate import (
+        get_save_estimate_modal_html,
+        get_save_estimate_modal_styles,
+        get_save_estimate_modal_script,
+    )
 import math
 import re
 import json
@@ -382,14 +392,40 @@ async def grid_ui(request: Request, file: UploadFile = File(...), ajax: str = No
         # Generate modal HTML using imported functions
         labor_modal = get_labor_modal_html(second_ro_line, vehicle_info_line, total_labor)
         refinish_modal = get_refinish_modal_html(second_ro_line, vehicle_info_line, total_paint)
+        save_estimate_modal = get_save_estimate_modal_html(
+            second_ro_line,
+            vehicle_info_line,
+            total_labor,
+            total_paint,
+            parts_total,
+            grand_total,
+            deductible,
+            customer_pay,
+            insurance_pay,
+        )
         
         # Generate modal styles
         labor_styles = get_labor_modal_styles()
         refinish_styles = get_refinish_modal_styles()
+        save_estimate_styles = get_save_estimate_modal_styles()
         
         # Generate modal scripts
         labor_script = get_labor_modal_script(labor_items_json, total_labor, second_ro_line, vehicle_info_line, ro_number)
         refinish_script = get_refinish_modal_script(paint_items_json, total_paint, second_ro_line, vehicle_info_line, ro_number)
+        save_estimate_script = get_save_estimate_modal_script(
+            labor_items_json,
+            paint_items_json,
+            second_ro_line,
+            vehicle_info_line,
+            ro_number,
+            total_labor,
+            total_paint,
+            parts_total,
+            grand_total,
+            deductible,
+            customer_pay,
+            insurance_pay,
+        )
         close_handler = get_modal_close_handler()
 
         
@@ -397,22 +433,14 @@ async def grid_ui(request: Request, file: UploadFile = File(...), ajax: str = No
 <h2>Document Visual Grid</h2>
 <button onclick="openLaborModal()" style='padding:10px 20px; font-size:14px; cursor:pointer; background-color:#505050; color:white; border:none; border-radius:3px; margin-right:10px;'>Assign Labor</button>
 <button onclick="openRefinishModal()" style='padding:10px 20px; font-size:14px; cursor:pointer; background-color:#505050; color:white; border:none; border-radius:3px; margin-right:10px;'>Assign Refinish</button>
-<button onclick="openSaveModal()" style='padding:10px 20px; font-size:14px; cursor:pointer; background-color:#4CAF50; color:white; border:none; border-radius:3px;'>Save</button>
+<button onclick="openSaveEstimateModal(window.currentEstimateTotals)" style='padding:10px 20px; font-size:14px; cursor:pointer; background-color:#4CAF50; color:white; border:none; border-radius:3px;'>Save</button>
 <br><br>
 {pages_html}
 <br><a href='/ui'>Back</a>
 
 {labor_modal}
 {refinish_modal}
-<div id="saveModal" class="modal" style="display: none;">
-    <div class="modal-content" style="max-width: 700px;">
-        <span class="close" onclick="closeSaveModal()">&times;</span>
-        <div style="margin-bottom: 15px;">
-            <div style="font-weight: bold; font-size: 16px; margin-bottom: 5px;">{second_ro_line}</div>
-            <div style="font-size: 14px; color: #333;">{vehicle_info_line}</div>
-        </div>
-    </div>
-</div>
+{save_estimate_modal}
 
 <style>
   .modal {{
@@ -448,22 +476,14 @@ async def grid_ui(request: Request, file: UploadFile = File(...), ajax: str = No
   }}
 {labor_styles}
 {refinish_styles}
+{save_estimate_styles}
 </style>
 
 <script>
 {labor_script}
 {refinish_script}
+{save_estimate_script}
 {close_handler}
-function openSaveModal() {{
-    document.getElementById('saveModal').style.display = 'block';
-}}
-
-function closeSaveModal() {{
-    document.getElementById('saveModal').style.display = 'none';
-}}
-
-window.openSaveModal = openSaveModal;
-window.closeSaveModal = closeSaveModal;
 </script>
         """
         return content
