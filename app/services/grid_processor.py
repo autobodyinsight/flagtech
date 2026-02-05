@@ -508,14 +508,30 @@ def process_pdf_grid(pages: List[Dict]) -> Dict[str, Any]:
             for idx, r in enumerate(rows):
                 row_text = " ".join(w.get("text", "") for w in r["words"]).strip()
                 if re.search(r"\bESTIMATE\s+TOTALS\b", row_text, re.IGNORECASE):
-                    for follow_row in rows[idx + 1: idx + 16]:
+                    scan_end = min(len(rows), idx + 16)
+                    for follow_idx in range(idx + 1, scan_end):
+                        follow_row = rows[follow_idx]
                         follow_text = " ".join(w.get("text", "") for w in follow_row["words"]).strip()
                         upper = follow_text.upper()
                         rightmost_value = _extract_rightmost_numeric(follow_row)
 
-                        if totals["parts_total"] is None and (
-                            re.search(r"\bPARTS TOTAL\b", upper) or ("PARTS" in upper and "TOTAL" in upper)
-                        ):
+                        next_upper = ""
+                        if follow_idx + 1 < len(rows):
+                            next_text = " ".join(w.get("text", "") for w in rows[follow_idx + 1]["words"]).strip()
+                            next_upper = next_text.upper()
+                        prev_upper = ""
+                        if follow_idx - 1 >= 0:
+                            prev_text = " ".join(w.get("text", "") for w in rows[follow_idx - 1]["words"]).strip()
+                            prev_upper = prev_text.upper()
+
+                        parts_row = (
+                            re.search(r"\bPARTS TOTAL\b", upper)
+                            or ("PARTS" in upper and "TOTAL" in upper)
+                            or ("PARTS" in upper and "TOTAL" in next_upper)
+                            or ("TOTAL" in upper and "PARTS" in prev_upper)
+                            or re.search(r"\bPARTS\b", upper)
+                        )
+                        if totals["parts_total"] is None and parts_row:
                             totals["parts_total"] = rightmost_value or _extract_last_numeric(follow_text)
                         if totals["grand_total"] is None and re.search(r"\bGRAND TOTAL\b", upper):
                             totals["grand_total"] = rightmost_value or _extract_last_numeric(follow_text)
