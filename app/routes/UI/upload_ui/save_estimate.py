@@ -121,16 +121,6 @@ def get_save_estimate_modal_styles():
 .repair-item:hover {
   background-color: #f9f9f9;
 }
-.repair-item.selected {
-  background-color: #e8f5e9;
-  border-left: 4px solid #4CAF50;
-}
-.repair-item-checkbox {
-  cursor: pointer;
-  width: 18px;
-  height: 18px;
-  margin-right: 10px;
-}
 .repair-item-label {
   flex: 1;
   font-size: 13px;
@@ -213,10 +203,6 @@ if (
 var vehicleYear = null;
 var vehicleMake = null;
 var vehicleModel = null;
-
-// Track selected items
-var selectedLaborItems = [];
-var selectedPaintItems = [];
 
 var apiBase = window.API_BASE || 'https://flagtech1.onrender.com';
 
@@ -339,8 +325,7 @@ function openSaveEstimateModal(estimateTotals) {{
     laborHtml = '<p style="padding: 12px; color: #666;">No labor items found.</p>';
   }} else {{
     saveLaborItems.forEach((item, index) => {{
-      laborHtml += '<div class="repair-item" id="labor-item-' + index + '" onclick="toggleRepairSelection(\\'labor\\', ' + index + ')">';
-      laborHtml += '<input type="checkbox" class="repair-item-checkbox" id="labor-check-' + index + '" onchange="toggleRepairSelection(\\'labor\\', ' + index + ')" />';
+      laborHtml += '<div class="repair-item" id="labor-item-' + index + '">';
       laborHtml += '<div class="repair-item-label"><strong>Line ' + item.line + '</strong> - ' + item.description + '</div>';
       laborHtml += '<div class="repair-item-value">' + parseFloat(item.value).toFixed(1) + ' hrs</div>';
       laborHtml += '</div>';
@@ -354,8 +339,7 @@ function openSaveEstimateModal(estimateTotals) {{
     paintHtml = '<p style="padding: 12px; color: #666;">No paint items found.</p>';
   }} else {{
     savePaintItems.forEach((item, index) => {{
-      paintHtml += '<div class="repair-item" id="paint-item-' + index + '" onclick="toggleRepairSelection(\\'paint\\', ' + index + ')">';
-      paintHtml += '<input type="checkbox" class="repair-item-checkbox" id="paint-check-' + index + '" onchange="toggleRepairSelection(\\'paint\\', ' + index + ')" />';
+      paintHtml += '<div class="repair-item" id="paint-item-' + index + '">';
       paintHtml += '<div class="repair-item-label"><strong>Line ' + item.line + '</strong> - ' + item.description + '</div>';
       paintHtml += '<div class="repair-item-value">' + parseFloat(item.value).toFixed(1) + ' hrs</div>';
       paintHtml += '</div>';
@@ -372,9 +356,6 @@ function openSaveEstimateModal(estimateTotals) {{
   }});
   document.getElementById('saveEstimateTotalsSummary').innerHTML = totalsHtml || '<p style="color:#666;">No totals data available.</p>';
   
-  // Reset selections
-  selectedLaborItems = [];
-  selectedPaintItems = [];
   document.getElementById('saveEstimateStatus').textContent = '';
   
   modal.style.display = 'block';
@@ -384,36 +365,12 @@ function closeSaveEstimateModal() {{
   document.getElementById('saveEstimateModal').style.display = 'none';
 }}
 
-function toggleRepairSelection(type, index) {{
-  const itemElement = document.getElementById(type + '-item-' + index);
-  const checkbox = document.getElementById(type + '-check-' + index);
-  
-  itemElement.classList.toggle('selected');
-  checkbox.checked = !checkbox.checked;
-  
-  if (type === 'labor') {{
-    const idx = selectedLaborItems.indexOf(index);
-    if (idx > -1) {{
-      selectedLaborItems.splice(idx, 1);
-    }} else {{
-      selectedLaborItems.push(index);
-    }}
-  }} else {{
-    const idx = selectedPaintItems.indexOf(index);
-    if (idx > -1) {{
-      selectedPaintItems.splice(idx, 1);
-    }} else {{
-      selectedPaintItems.push(index);
-    }}
-  }}
-}}
-
 function executeSaveEstimate() {{
   const saveBtn = document.getElementById('executeSaveBtn');
   const statusDiv = document.getElementById('saveEstimateStatus');
   
-  if (selectedLaborItems.length === 0 && selectedPaintItems.length === 0) {{
-    statusDiv.textContent = 'Please select at least one repair line';
+  if (saveLaborItems.length === 0 && savePaintItems.length === 0) {{
+    statusDiv.textContent = 'No repair lines found to save';
     statusDiv.style.color = 'red';
     return;
   }}
@@ -423,8 +380,8 @@ function executeSaveEstimate() {{
   statusDiv.style.color = 'blue';
   
   // Build payload
-  const laborData = selectedLaborItems.map(idx => saveLaborItems[idx]);
-  const paintData = selectedPaintItems.map(idx => savePaintItems[idx]);
+  const laborData = saveLaborItems.slice();
+  const paintData = savePaintItems.slice();
   
   const payload = {{
     ro: saveRoNumber,
