@@ -94,20 +94,27 @@ def detect_anchors_and_vehicle_info(
                     anchor_ymid = r["ymid"]
                     first_ro_line = row_text
 
-            # Extract owner info (look for "owner:" or "customer:" and capture next 4 lines)
+            # Extract owner info (look for "owner:" or "customer:" and extract name and phone only)
             if re.search(r"\b(owner|customer)\b", row_text, re.IGNORECASE):
-                owner_lines = []
-                # Capture next 4 lines: name, address, city/state/zip, phone
-                for j in range(idx + 1, min(idx + 5, len(rows))):
-                    next_line = " ".join(w.get("text", "") for w in rows[j]["words"]).strip()
-                    if next_line:
-                        owner_lines.append(next_line)
-                if len(owner_lines) >= 4:
-                    # Join the 4 lines with newline
-                    owner_info = "\n".join(owner_lines[:4])
-                elif owner_lines:
-                    # If less than 4 lines, use what we have
-                    owner_info = "\n".join(owner_lines)
+                name = ""
+                phone = ""
+                
+                # Get the next line as the name (Last, First)
+                if idx + 1 < len(rows):
+                    name = " ".join(w.get("text", "") for w in rows[idx + 1]["words"]).strip()
+                
+                # Get the 4th line down as the phone number (skip 2 address lines)
+                if idx + 4 < len(rows):
+                    phone = " ".join(w.get("text", "") for w in rows[idx + 4]["words"]).strip()
+                
+                # Only store name and phone
+                if name or phone:
+                    owner_info_parts = []
+                    if name:
+                        owner_info_parts.append(name)
+                    if phone:
+                        owner_info_parts.append(phone)
+                    owner_info = "\n".join(owner_info_parts)
 
             # Extract VIN (look for "VIN:" and capture the 17-character value)
             if re.search(r"\bVIN\b", row_text, re.IGNORECASE):
