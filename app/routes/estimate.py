@@ -712,6 +712,46 @@ async def dashboard_data(request: Request):
         }
 
 
+@router.delete("/flash-data")
+async def flash_data(request: Request):
+    """Delete all stored estimate data from all tables."""
+    try:
+        conn = get_conn()
+        cur = conn.cursor()
+
+        tables_to_clear = [
+            "labor_assignments",
+            "refinish_assignments", 
+            "estimate_totals",
+            "parts_lines",
+            "parts_orders",
+            "parts_received",
+            "ro_notes",
+            "ro_phases"
+        ]
+
+        for table in tables_to_clear:
+            try:
+                cur.execute(f"DELETE FROM {table}")
+                print(f"[flash-data] Cleared table: {table}")
+            except Exception as e:
+                print(f"[flash-data] Error clearing table {table}: {e}")
+
+        conn.commit()
+        cur.close()
+
+        return {
+            "status": "success",
+            "message": "All stored estimate data has been deleted"
+        }
+    except Exception as e:
+        print(f"[flash-data] Error: {e}")
+        return JSONResponse(
+            status_code=500,
+            content={"status": "error", "detail": str(e)}
+        )
+
+
 @router.get("/phase-data")
 async def phase_data(request: Request):
     """Get RO cards for the Phase board."""
