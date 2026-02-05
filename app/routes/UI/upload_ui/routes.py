@@ -101,41 +101,6 @@ async def parse_ui(file: UploadFile = File(...)):
 """
 
 
-@router.post("/save-estimate")
-async def save_estimate(request: Request):
-    data = await request.json()
-    conn = get_conn()
-    cur = conn.cursor()
-
-    try:
-        _ensure_saved_estimates_table(cur)
-        cur.execute(
-            """
-            INSERT INTO saved_estimates
-            (ro, vehicle, year, make, model, labor_repairs, paint_repairs, estimate_totals, saved_at)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, COALESCE(%s, CURRENT_TIMESTAMP))
-            """,
-            (
-                data.get("ro"),
-                data.get("vehicle"),
-                data.get("year"),
-                data.get("make"),
-                data.get("model"),
-                json.dumps(data.get("labor_repairs") or []),
-                json.dumps(data.get("paint_repairs") or []),
-                json.dumps(data.get("estimate_totals") or {}),
-                data.get("timestamp"),
-            ),
-        )
-        conn.commit()
-    except Exception as exc:
-        conn.rollback()
-        return JSONResponse(status_code=500, content={"status": "error", "message": str(exc)})
-    finally:
-        cur.close()
-
-    return {"status": "success"}
-
 # ============================================================
 # SAVE LABOR + REFINISH
 # ============================================================
