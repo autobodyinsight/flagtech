@@ -59,6 +59,10 @@ def _estimate_hash(payload: dict) -> str:
     normalized = json.dumps(payload, sort_keys=True, separators=(",", ":"))
     return hashlib.sha256(normalized.encode("utf-8")).hexdigest()
 
+
+def _safe_json(payload) -> str:
+    return json.dumps(payload).replace("<", "\\u003c")
+
 @router.get("/", response_class=HTMLResponse)
 async def home_screen():
     return f"""
@@ -380,8 +384,8 @@ async def grid_ui(request: Request, file: UploadFile = File(...), ajax: str = No
     # Generate pages HTML visualization
     pages_html = generate_pages_html(pages, anchor_page, anchor_ymid, subtotals_page, subtotals_ymid)
     
-    labor_items_json = json.dumps(labor_items)
-    paint_items_json = json.dumps(paint_items)
+    labor_items_json = _safe_json(labor_items)
+    paint_items_json = _safe_json(paint_items)
 
     # If AJAX request, return just the content without HTML wrapper
     if ajax:
@@ -424,7 +428,7 @@ async def grid_ui(request: Request, file: UploadFile = File(...), ajax: str = No
         )
         close_handler = get_modal_close_handler()
 
-        estimate_totals_json = json.dumps({
+        estimate_totals_json = _safe_json({
             "parts_total": parts_total,
             "grand_total": grand_total,
             "deductible": deductible,

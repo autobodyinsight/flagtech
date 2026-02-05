@@ -187,9 +187,9 @@ def get_save_estimate_modal_script(
 // Save Estimate Modal Variables
 var saveLaborItems = {labor_items_json};
 var savePaintItems = {paint_items_json};
-var saveRoNumber = {json.dumps(ro_number or '')};
-var saveSecondRoLine = {json.dumps(second_ro_line or '')};
-var saveVehicleInfoLine = {json.dumps(vehicle_info_line or '')};
+var saveRoNumber = {json.dumps(ro_number or '').replace("<", "\\u003c")};
+var saveSecondRoLine = {json.dumps(second_ro_line or '').replace("<", "\\u003c")};
+var saveVehicleInfoLine = {json.dumps(vehicle_info_line or '').replace("<", "\\u003c")};
 var saveEstimateTotalsData = {{}};
 var preloadedEstimateTotals = {json.dumps({
     "parts_total": parts_total,
