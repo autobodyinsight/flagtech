@@ -24,9 +24,9 @@ def get_save_estimate_modal_html(
 
     <div style="margin-bottom: 15px;">
       <div style="font-weight: bold; font-size: 16px; margin-bottom: 5px;">{second_ro_line}</div>
-      <div style="font-size: 14px; color: #333;">{vehicle_info_line}</div>
+      <div style="font-size: 14px; color: #333;" id="vehicleInfoDisplay">-</div>
       <div style="margin-top: 10px; padding: 12px; background-color: #f9f9f9; border-radius: 3px; border: 1px solid #ddd;">
-        <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 15px;">
+        <div style="display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 15px;">
           <div>
             <label style="font-weight: bold; font-size: 12px; color: #666;">YEAR</label>
             <div id="vehicleYear" style="font-size: 14px; margin-top: 3px;">-</div>
@@ -49,7 +49,7 @@ def get_save_estimate_modal_html(
         <div style="margin-bottom: 8px;">
           <label style="font-weight: bold; font-size: 12px; color: #333;">OWNER INFORMATION</label>
         </div>
-        <div id="ownerInfo" style="font-size: 14px; color: #333;">-</div>
+        <div id="ownerInfo" style="font-size: 14px; color: #333; line-height: 1.6;">-</div>
       </div>
     </div>
 
@@ -393,7 +393,13 @@ function openSaveEstimateModal(estimateTotals) {{
   
   const modal = document.getElementById('saveEstimateModal');
   
-  // Display vehicle information
+  // Display vehicle information as formatted line: "year make model"
+  const vehicleDisplayText = [vehicleYear, vehicleMake, vehicleModel]
+    .filter(v => v && v !== '-')
+    .join(' ') || '-';
+  document.getElementById('vehicleInfoDisplay').textContent = vehicleDisplayText;
+  
+  // Display vehicle year, make, model in grid
   document.getElementById('vehicleYear').textContent = vehicleYear || '-';
   document.getElementById('vehicleMake').textContent = vehicleMake || '-';
   document.getElementById('vehicleModel').textContent = vehicleModel || '-';
@@ -401,8 +407,15 @@ function openSaveEstimateModal(estimateTotals) {{
   // Display VIN
   document.getElementById('vehicleVIN').textContent = saveVIN || '-';
   
-  // Display owner information
-  document.getElementById('ownerInfo').textContent = saveOwnerInfo || '-';
+  // Display owner information - parse multi-line format
+  let ownerHtml = '-';
+  if (saveOwnerInfo && saveOwnerInfo.trim()) {{
+    const ownerLines = saveOwnerInfo.split('\\n').map(line => line.trim()).filter(line => line);
+    if (ownerLines.length > 0) {{
+      ownerHtml = ownerLines.join('<br>');
+    }}
+  }}
+  document.getElementById('ownerInfo').innerHTML = ownerHtml;
   
   // Populate labor repairs
   let laborHtml = '';

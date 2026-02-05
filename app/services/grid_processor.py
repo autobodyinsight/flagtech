@@ -100,14 +100,20 @@ def detect_anchors_and_vehicle_info(
                             vehicle_info_line = next_line
                             break
 
-            # Extract owner info (look for "owner:" and capture next line)
-            if re.search(r"\bowner\b", row_text, re.IGNORECASE):
-                for j in range(idx + 1, min(idx + 3, len(rows))):
+            # Extract owner info (look for "owner:" or "customer:" and capture next 4 lines)
+            if re.search(r"\b(owner|customer)\b", row_text, re.IGNORECASE):
+                owner_lines = []
+                # Capture next 4 lines: name, address, city/state/zip, phone
+                for j in range(idx + 1, min(idx + 5, len(rows))):
                     next_line = " ".join(w.get("text", "") for w in rows[j]["words"]).strip()
-                    # Try to match phone pattern (000) 000-0000 or similar
-                    if re.search(r'\(\d{3}\)\s*\d{3}[-.\s]?\d{4}', next_line) or next_line:
-                        owner_info = next_line
-                        break
+                    if next_line:
+                        owner_lines.append(next_line)
+                if len(owner_lines) >= 4:
+                    # Join the 4 lines with newline
+                    owner_info = "\n".join(owner_lines[:4])
+                elif owner_lines:
+                    # If less than 4 lines, use what we have
+                    owner_info = "\n".join(owner_lines)
 
             # Extract VIN (look for "VIN:" and capture the 17-character value)
             if re.search(r"\bVIN\b", row_text, re.IGNORECASE):
