@@ -79,6 +79,7 @@ def detect_anchors_and_vehicle_info(
     vehicle_info_line = ""
     owner_info = ""
     vin = ""
+    vin_row_idx = None
 
     for pi, page in enumerate(pages, start=1):
         rows = group_rows(page.get("words", []), y_thresh=6.0)
@@ -92,13 +93,6 @@ def detect_anchors_and_vehicle_info(
                     anchor_page = pi
                     anchor_ymid = r["ymid"]
                     first_ro_line = row_text
-
-                    # Look for vehicle info in next lines
-                    for j in range(idx + 1, min(idx + 10, len(rows))):
-                        next_line = " ".join(w.get("text", "") for w in rows[j]["words"]).strip()
-                        if re.search(r'\b(19\d{2}|20\d{2})\b', next_line):
-                            vehicle_info_line = next_line
-                            break
 
             # Extract owner info (look for "owner:" or "customer:" and capture next 4 lines)
             if re.search(r"\b(owner|customer)\b", row_text, re.IGNORECASE):
@@ -117,6 +111,12 @@ def detect_anchors_and_vehicle_info(
 
             # Extract VIN (look for "VIN:" and capture the 17-character value)
             if re.search(r"\bVIN\b", row_text, re.IGNORECASE):
+                vin_row_idx = idx
+                
+                # Capture the line directly before VIN as vehicle info
+                if idx > 0:
+                    vehicle_info_line = " ".join(w.get("text", "") for w in rows[idx - 1]["words"]).strip()
+                
                 # Look for 17-character alphanumeric value after VIN
                 vin_match = re.search(r"VIN\s*[:#-]*\s*([A-Za-z0-9]{17})", row_text, re.IGNORECASE)
                 if vin_match:
