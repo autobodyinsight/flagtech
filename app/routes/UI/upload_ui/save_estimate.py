@@ -388,7 +388,7 @@ function openSaveEstimateModal(estimateTotals) {{
       const descText = String(item.description || '').trim();
       const rowText = String(item.row_text || '').trim();
       const sourceText = (rowText || descText).toLowerCase();
-      if (!sourceText.includes('repl') && !sourceText.includes('sublet')) {{
+      if (!sourceText.includes('repl') && !sourceText.includes('sublet') && !sourceText.includes('subl')) {{
         return;
       }}
       const partType = resolvePartType(item);
