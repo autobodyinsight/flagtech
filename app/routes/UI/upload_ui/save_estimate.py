@@ -62,6 +62,11 @@ def get_save_estimate_modal_html(
         <div id="saveEstimatePaintList" class="repair-list"></div>
         <div class="repair-total">Total Refinish: <span id="saveEstimateTotalPaint">{total_paint}</span> hrs</div>
       </div>
+
+      <div style="margin-bottom: 15px;">
+        <h3>Parts Replacements</h3>
+        <div id="saveEstimatePartsList" class="repair-list"></div>
+      </div>
     </div>
 
     <!-- Estimate Totals Tab -->
@@ -161,6 +166,7 @@ def get_save_estimate_modal_styles():
 def get_save_estimate_modal_script(
   labor_items_json,
   paint_items_json,
+  parts_items_json,
   second_ro_line,
   vehicle_info_line,
   ro_number,
@@ -177,6 +183,7 @@ def get_save_estimate_modal_script(
 // Save Estimate Modal Variables
 var saveLaborItems = {labor_items_json};
 var savePaintItems = {paint_items_json};
+var savePartsItems = {parts_items_json};
 var saveRoNumber = {json.dumps(ro_number or '').replace("<", "\\u003c")};
 var saveSecondRoLine = {json.dumps(second_ro_line or '').replace("<", "\\u003c")};
 var saveVehicleInfoLine = {json.dumps(vehicle_info_line or '').replace("<", "\\u003c")};
@@ -243,6 +250,23 @@ function normalizeSummaryValue(raw) {{
   if (!numeric) return trimmed;
   const parsed = parseFloat(numeric);
   return Number.isNaN(parsed) ? trimmed : parsed;
+}}
+
+function resolvePartType(item) {{
+  if (!item) return 'OEM';
+  const explicit = String(item.part_type || '').trim();
+  if (explicit) return explicit;
+  const description = String(item.description || '').toUpperCase();
+  if (description.includes('LKQ')) return 'LKQ';
+  if (description.includes('A/M') || description.includes('A M') || description.includes('AFTERMARKET')) return 'A/M';
+  return 'OEM';
+}}
+
+function formatPartPrice(value) {{
+  if (value === null || value === undefined || value === '') return '-';
+  const parsed = parseFloat(value);
+  if (!Number.isFinite(parsed)) return value;
+  return parsed.toFixed(2);
 }}
 
 function formatEstimateValue(value) {{
@@ -346,6 +370,25 @@ function openSaveEstimateModal(estimateTotals) {{
     }});
   }}
   document.getElementById('saveEstimatePaintList').innerHTML = paintHtml;
+
+  // Populate parts replacements
+  let partsHtml = '';
+  if (!savePartsItems || savePartsItems.length === 0) {{
+    partsHtml = '<p style="padding: 12px; color: #666;">No parts items found.</p>';
+  }} else {{
+    savePartsItems.forEach((item, index) => {{
+      const partType = resolvePartType(item);
+      const qty = (item.qty !== null && item.qty !== undefined) ? item.qty : '';
+      const qtyText = qty !== '' ? (' Qty ' + qty) : '';
+      const lineText = item.line ? ('Line ' + item.line + ' - ') : '';
+      const descText = item.description || 'Part';
+      partsHtml += '<div class="repair-item" id="part-item-' + index + '">';
+      partsHtml += '<div class="repair-item-label"><strong>' + lineText + '</strong>' + descText + ' (' + partType + ')' + qtyText + '</div>';
+      partsHtml += '<div class="repair-item-value">' + formatPartPrice(item.price) + '</div>';
+      partsHtml += '</div>';
+    }});
+  }}
+  document.getElementById('saveEstimatePartsList').innerHTML = partsHtml;
   
   // Populate estimate totals summary
   let totalsHtml = '';

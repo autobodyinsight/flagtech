@@ -386,6 +386,7 @@ async def grid_ui(request: Request, file: UploadFile = File(...), ajax: str = No
     
     labor_items_json = _safe_json(labor_items)
     paint_items_json = _safe_json(paint_items)
+    parts_items_json = _safe_json(parts_items)
 
     # If AJAX request, return just the content without HTML wrapper
     if ajax:
@@ -415,6 +416,7 @@ async def grid_ui(request: Request, file: UploadFile = File(...), ajax: str = No
         save_estimate_script = get_save_estimate_modal_script(
             labor_items_json,
             paint_items_json,
+            parts_items_json,
             second_ro_line,
             vehicle_info_line,
             ro_number,
