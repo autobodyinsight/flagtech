@@ -101,8 +101,6 @@ def get_refinish_modal_script(paint_items_json, total_paint, second_ro_line, veh
   var paintAdditionalCounter = 0;
   var paintRoNumber = {json.dumps(ro_number or '')};
   var paintRoDisplay = {json.dumps(second_ro_line or '')};
-  var paintSecondRoLine = {json.dumps(second_ro_line or '')};
-  var paintVehicleInfo = {json.dumps(vehicle_info_line or '')};
 
   var apiBase = window.API_BASE || 'https://flagtech1.onrender.com';
 
@@ -236,8 +234,8 @@ def get_refinish_modal_script(paint_items_json, total_paint, second_ro_line, veh
     let printContent = '<html><head><title>Refinish Assignment</title></head><body style="font-family: Arial; padding: 20px;">';
     
     printContent += '<div style="margin-bottom: 15px;">';
-    printContent += '<div style="font-weight: bold; font-size: 14px; margin-bottom: 5px;">' + paintSecondRoLine + '</div>';
-    printContent += '<div style="font-size: 14px; color: #333;">' + paintVehicleInfo + '</div>';
+    printContent += '<div style="font-weight: bold; font-size: 14px; margin-bottom: 5px;">{second_ro_line}</div>';
+    printContent += '<div style="font-size: 14px; color: #333;">{vehicle_info_line}</div>';
     printContent += '</div>';
     printContent += '<div style="margin-bottom: 15px;">';
     printContent += '<label style="font-weight: bold; font-size: 14px;">TECH:</label>';
@@ -337,7 +335,7 @@ def get_refinish_modal_script(paint_items_json, total_paint, second_ro_line, veh
     totalPaint,
     tech,
     ro: roValue,
-    vehicle: paintVehicleInfo,
+    vehicle: "{vehicle_info_line}",
     timestamp: new Date().toISOString()
   }};
 

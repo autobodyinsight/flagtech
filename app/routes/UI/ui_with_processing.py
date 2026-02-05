@@ -10,28 +10,20 @@ from .parts import get_parts_screen_html, get_parts_script
 from .techs import get_techs_screen_html
 from .phase import get_phase_screen_html
 try:
-    from .upload_ui.upload import get_upload_screen_html, get_upload_script
+    from .upload_ui.upload import get_upload_screen_html, get_upload_script, get_estimate_summary_html
     from .upload_ui.labor import get_labor_modal_html, get_labor_modal_styles, get_labor_modal_script
     from .upload_ui.paint import get_refinish_modal_html, get_refinish_modal_styles, get_refinish_modal_script, get_modal_close_handler
-    from .upload_ui.save_estimate import (
-        get_save_estimate_modal_html,
-        get_save_estimate_modal_styles,
-        get_save_estimate_modal_script,
-    )
+    from .upload_ui.save_estimate import get_save_estimate_modal_html, get_save_estimate_modal_styles, get_save_estimate_modal_script
 except ImportError:
     # Fallback if directory name has space
     import sys
     from pathlib import Path
     upload_dir = Path(__file__).parent / "upload_ui"
     sys.path.insert(0, str(upload_dir))
-    from upload import get_upload_screen_html, get_upload_script
+    from upload import get_upload_screen_html, get_upload_script, get_estimate_summary_html
     from labor import get_labor_modal_html, get_labor_modal_styles, get_labor_modal_script
     from paint import get_refinish_modal_html, get_refinish_modal_styles, get_refinish_modal_script, get_modal_close_handler
-    from save_estimate import (
-        get_save_estimate_modal_html,
-        get_save_estimate_modal_styles,
-        get_save_estimate_modal_script,
-    )
+    from save_estimate import get_save_estimate_modal_html, get_save_estimate_modal_styles, get_save_estimate_modal_script
 import math
 import re
 import json
@@ -55,13 +47,94 @@ def _ensure_estimate_uploads_table(cur) -> None:
     cur.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_estimate_uploads_ro_domain ON estimate_uploads(ro, domain)")
 
 
+def _parse_vehicle_info(vehicle_info_line: str) -> tuple:
+    """Parse year, make, and model from vehicle info line.
+    
+    Returns:
+        (year, make, model) - all as strings or None if not found
+    """
+    year = None
+    make = None
+    model = None
+    
+    if not vehicle_info_line:
+        return year, make, model
+    
+    import re
+    # Extract year (4 digits starting with 19 or 20)
+    year_match = re.search(r'\b(19\d{2}|20\d{2})\b', vehicle_info_line)
+    if year_match:
+        year = year_match.group(1)
+    
+    # Remove year and extra spaces for make/model parsing
+    remaining = vehicle_info_line
+    if year_match:
+        remaining = vehicle_info_line.replace(year_match.group(0), '').strip()
+    
+    # Split remaining text - typically: Make Model [trim/body info]
+    parts = remaining.split()
+    if len(parts) >= 1:
+        make = parts[0]
+    if len(parts) >= 2:
+        model = parts[1]
+    
+    return year, make, model
+
+
+def _ensure_estimate_totals_table(cur) -> None:
+    cur.execute(
+        """
+        CREATE TABLE IF NOT EXISTS estimate_totals (
+            id SERIAL PRIMARY KEY,
+            ro VARCHAR(255) NOT NULL,
+            vehicle VARCHAR(255),
+            year VARCHAR(4),
+            make VARCHAR(50),
+            model VARCHAR(50),
+            labors_total NUMERIC,
+            paints_total NUMERIC,
+            parts_total NUMERIC,
+            grand_total NUMERIC,
+            deductible NUMERIC,
+            customer_pay NUMERIC,
+            insurance_pay NUMERIC,
+            domain VARCHAR(255) NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+        """
+    )
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_estimate_totals_domain ON estimate_totals(domain)")
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_estimate_totals_ro ON estimate_totals(ro)")
+    cur.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_estimate_totals_ro_domain ON estimate_totals(ro, domain)")
+
+
+def _ensure_repair_lines_table(cur) -> None:
+    cur.execute(
+        """
+        CREATE TABLE IF NOT EXISTS repair_lines (
+            id SERIAL PRIMARY KEY,
+            ro VARCHAR(255) NOT NULL,
+            repair_type VARCHAR(50) NOT NULL,
+            line_number VARCHAR(50),
+            description TEXT,
+            labor NUMERIC,
+            paint NUMERIC,
+            value NUMERIC,
+            domain VARCHAR(255) NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+        """
+    )
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_repair_lines_domain ON repair_lines(domain)")
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_repair_lines_ro ON repair_lines(ro)")
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_repair_lines_ro_domain ON repair_lines(ro, domain)")
+
+
 def _estimate_hash(payload: dict) -> str:
     normalized = json.dumps(payload, sort_keys=True, separators=(",", ":"))
     return hashlib.sha256(normalized.encode("utf-8")).hexdigest()
-
-
-def _safe_json(payload) -> str:
-    return json.dumps(payload).replace("<", "\\u003c")
 
 @router.get("/", response_class=HTMLResponse)
 async def home_screen():
@@ -134,11 +207,12 @@ async def home_screen():
         <div class="nav-box" onclick="switchScreen('tech')">TECHS</div>
         <div class="nav-box" onclick="switchScreen('phase')">PHASE</div>
         <div class="nav-box" onclick="switchScreen('parts')">PARTS</div>
-        <div class="nav-box" onclick="switchScreen('flagtech')">FLAG TECH</div>
+        <div class="nav-box" onclick="switchScreen('flagtech')">FLAGOUT</div>
     </div>
     
     <div class="content-area">
         {get_upload_screen_html()}
+        {get_estimate_summary_html()}
         {get_parts_screen_html()}
         {get_techs_screen_html()}
         {get_phase_screen_html()}
@@ -267,11 +341,7 @@ async def grid_ui(request: Request, file: UploadFile = File(...), ajax: str = No
     parts_items = result.get("parts_items", [])
     total_labor = result["total_labor"]
     total_paint = result["total_paint"]
-    parts_total = result.get("parts_total")
-    grand_total = result.get("grand_total")
-    deductible = result.get("deductible")
-    customer_pay = result.get("customer_pay")
-    insurance_pay = result.get("insurance_pay")
+    estimate_totals = result.get("estimate_totals", {})
     second_ro_line = result["second_ro_line"]
     vehicle_info_line = result["vehicle_info_line"]
     anchor_page = result["anchor_page"]
@@ -384,26 +454,14 @@ async def grid_ui(request: Request, file: UploadFile = File(...), ajax: str = No
     # Generate pages HTML visualization
     pages_html = generate_pages_html(pages, anchor_page, anchor_ymid, subtotals_page, subtotals_ymid)
     
-    labor_items_json = _safe_json(labor_items)
-    paint_items_json = _safe_json(paint_items)
-    parts_items_json = _safe_json(parts_items)
+    labor_items_json = json.dumps(labor_items)
+    paint_items_json = json.dumps(paint_items)
 
     # If AJAX request, return just the content without HTML wrapper
     if ajax:
         # Generate modal HTML using imported functions
         labor_modal = get_labor_modal_html(second_ro_line, vehicle_info_line, total_labor)
         refinish_modal = get_refinish_modal_html(second_ro_line, vehicle_info_line, total_paint)
-        save_estimate_modal = get_save_estimate_modal_html(
-            second_ro_line,
-            vehicle_info_line,
-            total_labor,
-            total_paint,
-            parts_total,
-            grand_total,
-            deductible,
-            customer_pay,
-            insurance_pay,
-        )
         
         # Generate modal styles
         labor_styles = get_labor_modal_styles()
@@ -413,29 +471,18 @@ async def grid_ui(request: Request, file: UploadFile = File(...), ajax: str = No
         # Generate modal scripts
         labor_script = get_labor_modal_script(labor_items_json, total_labor, second_ro_line, vehicle_info_line, ro_number)
         refinish_script = get_refinish_modal_script(paint_items_json, total_paint, second_ro_line, vehicle_info_line, ro_number)
-        save_estimate_script = get_save_estimate_modal_script(
-            labor_items_json,
-            paint_items_json,
-            parts_items_json,
-            second_ro_line,
-            vehicle_info_line,
-            ro_number,
-            total_labor,
-            total_paint,
-            parts_total,
-            grand_total,
-            deductible,
-            customer_pay,
-            insurance_pay,
-        )
+        save_estimate_script = get_save_estimate_modal_script(labor_items_json, paint_items_json, second_ro_line, vehicle_info_line, ro_number, total_labor, total_paint)
         close_handler = get_modal_close_handler()
-
+        
+        # Generate save estimate modal HTML
+        save_estimate_modal = get_save_estimate_modal_html(second_ro_line, vehicle_info_line, total_labor, total_paint)
         
         content = f"""
 <h2>Document Visual Grid</h2>
 <button onclick="openLaborModal()" style='padding:10px 20px; font-size:14px; cursor:pointer; background-color:#505050; color:white; border:none; border-radius:3px; margin-right:10px;'>Assign Labor</button>
 <button onclick="openRefinishModal()" style='padding:10px 20px; font-size:14px; cursor:pointer; background-color:#505050; color:white; border:none; border-radius:3px; margin-right:10px;'>Assign Refinish</button>
-<button onclick="openSaveEstimateModal(window.currentEstimateTotals)" style='padding:10px 20px; font-size:14px; cursor:pointer; background-color:#4CAF50; color:white; border:none; border-radius:3px;'>Save</button>
+<button id="saveSummaryBtn" onclick="openSaveEstimateModal(estimateTotals)" style='padding:10px 20px; font-size:14px; cursor:pointer; background-color:#4CAF50; color:white; border:none; border-radius:3px;'>Save</button>
+<span id="saveStatus" style="margin-left: 10px; color: green;"></span>
 <br><br>
 {pages_html}
 <br><a href='/ui'>Back</a>
@@ -486,9 +533,209 @@ async def grid_ui(request: Request, file: UploadFile = File(...), ajax: str = No
 {refinish_script}
 {save_estimate_script}
 {close_handler}
+
+// Build estimate totals object with all data (populated from PDF if available)
+const estimateTotals = {{
+  "parts_total": null,
+  "grand_total": null,
+  "deductible": null,
+  "customer_pay": null,
+  "insurance_pay": null
+}};
 </script>
         """
         return content
+
+
+@router.post("/save-estimate-totals")
+async def save_estimate_totals(request: Request):
+    """Legacy endpoint - save estimate totals to database."""
+    try:
+        data = await request.json()
+        domain = get_user_domain(request)
+        
+        if not domain:
+            return {"status": "error", "message": "Domain not found"}
+        
+        ro = data.get("ro", "").strip()
+        if not ro:
+            return {"status": "error", "message": "RO number not provided"}
+        
+        conn = get_conn()
+        cur = conn.cursor()
+        
+        try:
+            _ensure_estimate_totals_table(cur)
+            
+            # Insert or update the estimate totals
+            cur.execute(
+                """
+                INSERT INTO estimate_totals (ro, vehicle, grand_total, deductible, customer_pay, insurance_pay, domain)
+                VALUES (%s, %s, %s, %s, %s, %s, %s)
+                ON CONFLICT (ro, domain)
+                DO UPDATE SET 
+                    vehicle = EXCLUDED.vehicle,
+                    grand_total = EXCLUDED.grand_total,
+                    deductible = EXCLUDED.deductible,
+                    customer_pay = EXCLUDED.customer_pay,
+                    insurance_pay = EXCLUDED.insurance_pay,
+                    updated_at = CURRENT_TIMESTAMP
+                """,
+                (
+                    ro,
+                    data.get("vehicle"),
+                    data.get("grand_total"),
+                    data.get("deductible"),
+                    data.get("customer_pay"),
+                    data.get("insurance_pay"),
+                    domain,
+                ),
+            )
+            
+            conn.commit()
+            return {"status": "success", "message": "Estimate totals saved successfully"}
+        
+        except Exception as e:
+            print(f"[save-estimate-totals] Error: {str(e)}")
+            return {"status": "error", "message": f"Database error: {str(e)}"}
+        
+        finally:
+            cur.close()
+    
+    except Exception as e:
+        print(f"[save-estimate-totals] Request error: {str(e)}")
+        return {"status": "error", "message": f"Request error: {str(e)}"}
+
+
+@router.post("/save-estimate")
+async def save_estimate(request: Request):
+    """Save estimate with repair lines and totals - main save entry point."""
+    try:
+        data = await request.json()
+        domain = get_user_domain(request)
+        
+        if not domain:
+            return {"status": "error", "message": "Domain not found"}
+        
+        ro = data.get("ro", "").strip()
+        if not ro:
+            return {"status": "error", "message": "RO number not provided"}
+        
+        labor_repairs = data.get("labor_repairs", [])
+        paint_repairs = data.get("paint_repairs", [])
+        estimate_totals = data.get("estimate_totals", {})
+        vehicle = data.get("vehicle", "")
+        year = data.get("year")
+        make = data.get("make")
+        model = data.get("model")
+        
+        conn = get_conn()
+        cur = conn.cursor()
+        
+        try:
+            # Ensure all tables exist
+            _ensure_estimate_totals_table(cur)
+            _ensure_repair_lines_table(cur)
+            
+            # Delete existing repair lines for this RO
+            cur.execute("DELETE FROM repair_lines WHERE ro = %s AND domain = %s", (ro, domain))
+            
+            # Insert labor repairs
+            for repair in labor_repairs:
+                cur.execute(
+                    """
+                    INSERT INTO repair_lines (ro, repair_type, line_number, description, value, domain)
+                    VALUES (%s, %s, %s, %s, %s, %s)
+                    """,
+                    (
+                        ro,
+                        "labor",
+                        repair.get("line"),
+                        repair.get("description"),
+                        repair.get("value"),
+                        domain,
+                    ),
+                )
+            
+            # Insert paint repairs
+            for repair in paint_repairs:
+                cur.execute(
+                    """
+                    INSERT INTO repair_lines (ro, repair_type, line_number, description, value, domain)
+                    VALUES (%s, %s, %s, %s, %s, %s)
+                    """,
+                    (
+                        ro,
+                        "paint",
+                        repair.get("line"),
+                        repair.get("description"),
+                        repair.get("value"),
+                        domain,
+                    ),
+                )
+            
+            # Parse vehicle info for year, make, model if not provided
+            if not year or not make or not model:
+                parsed_year, parsed_make, parsed_model = _parse_vehicle_info(vehicle)
+                year = year or parsed_year
+                make = make or parsed_make
+                model = model or parsed_model
+            
+            # Save estimate totals
+            cur.execute(
+                """
+                INSERT INTO estimate_totals (ro, vehicle, year, make, model, parts_total, grand_total, deductible, customer_pay, insurance_pay, labors_total, paints_total, domain)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                ON CONFLICT (ro, domain)
+                DO UPDATE SET 
+                    vehicle = EXCLUDED.vehicle,
+                    year = EXCLUDED.year,
+                    make = EXCLUDED.make,
+                    model = EXCLUDED.model,
+                    parts_total = EXCLUDED.parts_total,
+                    grand_total = EXCLUDED.grand_total,
+                    deductible = EXCLUDED.deductible,
+                    customer_pay = EXCLUDED.customer_pay,
+                    insurance_pay = EXCLUDED.insurance_pay,
+                    labors_total = EXCLUDED.labors_total,
+                    paints_total = EXCLUDED.paints_total,
+                    updated_at = CURRENT_TIMESTAMP
+                """,
+                (
+                    ro,
+                    vehicle,
+                    year,
+                    make,
+                    model,
+                    estimate_totals.get("parts_total"),
+                    estimate_totals.get("grand_total"),
+                    estimate_totals.get("deductible"),
+                    estimate_totals.get("customer_pay"),
+                    estimate_totals.get("insurance_pay"),
+                    estimate_totals.get("labors_total"),
+                    estimate_totals.get("paints_total"),
+                    domain,
+                ),
+            )
+            
+            conn.commit()
+            return {
+                "status": "success",
+                "message": f"Estimate saved successfully with {len(labor_repairs)} labor and {len(paint_repairs)} paint repairs",
+                "ro": ro
+            }
+        
+        except Exception as e:
+            print(f"[save-estimate] Error: {str(e)}")
+            conn.rollback()
+            return {"status": "error", "message": f"Database error: {str(e)}"}
+        
+        finally:
+            cur.close()
+    
+    except Exception as e:
+        print(f"[save-estimate] Request error: {str(e)}")
+        return {"status": "error", "message": f"Request error: {str(e)}"}
 
 
 @router.post("/aligned", response_class=HTMLResponse)

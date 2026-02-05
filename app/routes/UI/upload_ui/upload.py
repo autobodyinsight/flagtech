@@ -86,7 +86,6 @@ def get_upload_script():
             currentEstimateTotals = totals;
             currentRO = ro;
             currentVehicle = vehicle;
-            window.currentEstimateTotals = totals;
             
             const summaryDiv = document.getElementById('estimateSummary');
             if (!summaryDiv) {

@@ -5,9 +5,9 @@ def get_dashboard_screen_html():
     """Return the HTML content for the Dashboard screen."""
     return """
         <div id="dashboard" class="screen active" style="padding:20px;">
-            <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:30px; gap:20px;">
-                <h1 style="text-align:center; margin:0; flex:1;">DASHBOARD</h1>
-                <button onclick="flashAllData()" style="padding:10px 16px; background:#d32f2f; color:#fff; border:none; border-radius:4px; font-weight:bold; cursor:pointer;">FLASH</button>
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:30px;">
+                <h1 style="text-align:center; flex:1; margin:0;">DASHBOARD</h1>
+                <button id="flashBtn" onclick="flashData()" style="padding:10px 20px; background:#f44336; color:#fff; border:none; border-radius:4px; cursor:pointer; font-weight:bold;">FLASH</button>
             </div>
             
             <div style="display:flex; gap:20px;">
@@ -134,49 +134,46 @@ def get_dashboard_screen_html():
                     console.error('Error loading dashboard data:', error);
                 }
             }
-
-            async function flashAllData() {
-                const confirmed = confirm('This will delete all uploaded estimate data. Continue?');
-                if (!confirmed) return;
-
-                try {
-                    const response = await fetch(BACKEND_BASE + '/api/flash', { method: 'POST' });
-                    const result = await response.json();
-                    if (result.status === 'success') {
-                        await loadDashboardData();
-                        alert('All uploaded estimate data cleared.');
-                    } else {
-                        alert('Flash failed: ' + (result.message || 'Unknown error'));
-                    }
-                } catch (error) {
-                    alert('Flash failed: ' + error.message);
-                }
-            }
             
             // Update all dashboard elements
             function updateDashboard(data) {
+                // Helper to format currency or return "-"
+                function formatCurrency(value) {
+                    return (value === null || value === undefined || value === '') ? '-' : '$' + parseFloat(value).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+                }
+                
+                // Helper to format percentage or return "-"
+                function formatPercent(value) {
+                    return (value === null || value === undefined || value === '') ? '-' : parseFloat(value).toFixed(1) + '%';
+                }
+                
+                // Helper to format decimal or return "-"
+                function formatDecimal(value) {
+                    return (value === null || value === undefined || value === '') ? '-' : parseFloat(value).toFixed(1);
+                }
+                
                 // Update Total Sales bar and value
-                const maxSales = Math.max(data.totalSales, data.pendingPayments, 10000); // minimum scale
-                const salesPercent = (data.totalSales / maxSales) * 100;
+                const maxSales = Math.max(data.totalSales || 0, data.pendingPayments || 0, 10000); // minimum scale
+                const salesPercent = ((data.totalSales || 0) / maxSales) * 100;
                 document.getElementById('totalSalesBar').style.height = salesPercent + '%';
-                document.getElementById('totalSalesValue').innerText = '$' + data.totalSales.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+                document.getElementById('totalSalesValue').innerText = formatCurrency(data.totalSales);
                 
                 // Update Pending Payments bar and value
-                const pendingPercent = (data.pendingPayments / maxSales) * 100;
+                const pendingPercent = ((data.pendingPayments || 0) / maxSales) * 100;
                 document.getElementById('pendingPaymentsBar').style.height = pendingPercent + '%';
-                document.getElementById('pendingPaymentsValue').innerText = '$' + data.pendingPayments.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+                document.getElementById('pendingPaymentsValue').innerText = formatCurrency(data.pendingPayments);
                 
                 // Update Current GP
-                document.getElementById('currentGP').innerText = data.currentGP.toFixed(1) + '%';
+                document.getElementById('currentGP').innerText = formatPercent(data.currentGP);
                 
                 // Update Parts Cost
-                document.getElementById('partsCost').innerText = '$' + data.partsCost.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+                document.getElementById('partsCost').innerText = formatCurrency(data.partsCost);
                 
                 // Update Average Hours
-                document.getElementById('averageHrs').innerText = data.averageHrs.toFixed(1);
+                document.getElementById('averageHrs').innerText = formatDecimal(data.averageHrs);
                 
                 // Update Average RO
-                document.getElementById('averageRO').innerText = '$' + data.averageRO.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+                document.getElementById('averageRO').innerText = formatCurrency(data.averageRO);
                 
                 // Update Total Hrs per Tech - Pie Chart
                 updateHoursPerTechChart(data.hoursPerTech);
@@ -248,8 +245,8 @@ def get_dashboard_screen_html():
             function updateRosPerTechList(rosPerTech) {
                 const container = document.getElementById('rosPerTechList');
                 
-                if (rosPerTech.length === 0) {
-                    container.innerHTML = '<div style="color:#999; text-align:center;">No data</div>';
+                if (!rosPerTech || rosPerTech.length === 0) {
+                    container.innerHTML = '<div style="color:#999; text-align:center;">-</div>';
                     return;
                 }
                 
@@ -257,8 +254,8 @@ def get_dashboard_screen_html():
                 rosPerTech.forEach(item => {
                     html += `
                         <div style="display:flex; justify-content:space-between; padding:6px 0; border-bottom:1px solid #eee;">
-                            <span style="color:#333;">${item.tech}</span>
-                            <span style="font-weight:bold; color:#795548;">${item.ros}</span>
+                            <span style="color:#333;">${item.tech || '-'}</span>
+                            <span style="font-weight:bold; color:#795548;">${item.ros || '-'}</span>
                         </div>
                     `;
                 });
@@ -342,7 +339,7 @@ def get_dashboard_screen_html():
                 const tbody = document.getElementById('roListBody');
                 
                 if (!roList || roList.length === 0) {
-                    tbody.innerHTML = '<tr><td colspan="5" style="padding:20px; text-align:center; color:#999;">No repair orders found</td></tr>';
+                    tbody.innerHTML = '<tr><td colspan="5" style="padding:20px; text-align:center; color:#999;">-</td></tr>';
                     return;
                 }
                 
@@ -352,11 +349,11 @@ def get_dashboard_screen_html():
                     const rowId = safeId(ro.ro);
                     html += `
                         <tr style="background:${rowBg}; cursor:pointer;" onclick="toggleRoNotes('${ro.ro}')">
-                            <td style="padding:12px; border-bottom:1px solid #eee; color:#0066cc; text-decoration:underline;">${ro.ro}</td>
-                            <td style="padding:12px; border-bottom:1px solid #eee; color:#333;">${ro.vehicle || 'N/A'}</td>
-                            <td style="padding:12px; border-bottom:1px solid #eee; color:#333;">${ro.tech || 'Unassigned'}</td>
-                            <td style="padding:12px; border-bottom:1px solid #eee; color:#333; text-align:right;">${ro.hours.toFixed(1)}</td>
-                            <td style="padding:12px; border-bottom:1px solid #eee; color:#333; text-align:right; font-weight:bold;">$${ro.total.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                            <td style="padding:12px; border-bottom:1px solid #eee; color:#0066cc; text-decoration:underline;">${ro.ro || '-'}</td>
+                            <td style="padding:12px; border-bottom:1px solid #eee; color:#333;">${ro.vehicle || '-'}</td>
+                            <td style="padding:12px; border-bottom:1px solid #eee; color:#333;">${ro.tech || '-'}</td>
+                            <td style="padding:12px; border-bottom:1px solid #eee; color:#333; text-align:right;">${(ro.hours !== null && ro.hours !== undefined) ? ro.hours.toFixed(1) : '-'}</td>
+                            <td style="padding:12px; border-bottom:1px solid #eee; color:#333; text-align:right; font-weight:bold;">${(ro.total !== null && ro.total !== undefined) ? '$' + ro.total.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2}) : '-'}</td>
                         </tr>
                         <tr id="notes-row-${rowId}" style="display:none; background:${rowBg};">
                             <td colspan="5" style="padding:12px 16px; border-bottom:1px solid #eee;">
@@ -385,6 +382,34 @@ def get_dashboard_screen_html():
                     loadDashboardData();
                 }
             };
+            
+            // Flash data - clear all stored estimate data
+            async function flashData() {
+                if (!confirm('Are you sure you want to delete all stored estimate data? This action cannot be undone.')) {
+                    return;
+                }
+                
+                try {
+                    const response = await fetch(BACKEND_BASE + '/api/flash-data', {
+                        method: 'DELETE',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        }
+                    });
+                    
+                    const result = await response.json();
+                    
+                    if (response.ok) {
+                        alert('All data has been cleared successfully.');
+                        loadDashboardData();
+                    } else {
+                        alert('Error clearing data: ' + (result.detail || 'Unknown error'));
+                    }
+                } catch (error) {
+                    console.error('Error flashing data:', error);
+                    alert('Error clearing data: ' + error.message);
+                }
+            }
             
             // Load initially if dashboard is the first screen (unlikely but handle it)
             if (document.readyState === 'loading') {

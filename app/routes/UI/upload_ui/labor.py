@@ -105,8 +105,6 @@ var initialTotal = {total_labor};
 var laborAdditionalCounter = 0;
 var laborRoNumber = {json.dumps(ro_number or '')};
 var laborRoDisplay = {json.dumps(second_ro_line or '')};
-var laborSecondRoLine = {json.dumps(second_ro_line or '')};
-var laborVehicleInfo = {json.dumps(vehicle_info_line or '')};
 
 var apiBase = window.API_BASE || 'https://flagtech1.onrender.com';
 
@@ -242,8 +240,8 @@ function printModal() {{
   let printContent = '<html><head><title>Labor Assignment</title></head><body style="font-family: Arial; padding: 20px;">';
 
   printContent += '<div style="margin-bottom: 15px;">';
-  printContent += '<div style="font-weight: bold; font-size: 14px; margin-bottom: 5px;">' + laborSecondRoLine + '</div>';
-  printContent += '<div style="font-size: 14px; color: #333;">' + laborVehicleInfo + '</div>';
+  printContent += '<div style="font-weight: bold; font-size: 14px; margin-bottom: 5px;">{second_ro_line}</div>';
+  printContent += '<div style="font-size: 14px; color: #333;">{vehicle_info_line}</div>';
   printContent += '</div>';
 
   printContent += '<div style="margin-bottom: 15px;">';
@@ -343,7 +341,7 @@ function saveModal() {{
     totalLabor,        // already correct
     tech,
     ro: roValue,
-    vehicle: laborVehicleInfo,
+    vehicle: "{vehicle_info_line}",
     timestamp: new Date().toISOString()
   }};
 

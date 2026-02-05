@@ -3,17 +3,7 @@
 import json
 
 
-def get_save_estimate_modal_html(
-  second_ro_line,
-  vehicle_info_line,
-  total_labor,
-  total_paint,
-  parts_total,
-  grand_total,
-  deductible,
-  customer_pay,
-  insurance_pay,
-):
+def get_save_estimate_modal_html(second_ro_line, vehicle_info_line, total_labor, total_paint):
     """Return the HTML for the save estimate modal."""
     return f"""
 <div id="saveEstimateModal" class="modal" style="display: none;">
@@ -61,12 +51,6 @@ def get_save_estimate_modal_html(
         <h3>Refinish Repairs</h3>
         <div id="saveEstimatePaintList" class="repair-list"></div>
         <div class="repair-total">Total Refinish: <span id="saveEstimateTotalPaint">{total_paint}</span> hrs</div>
-      </div>
-
-      <div style="margin-bottom: 15px;">
-        <h3>Parts Replacements</h3>
-        <div id="saveEstimatePartsList" class="repair-list"></div>
-        <div class="repair-total">Total Parts: <span id="saveEstimatePartsTotal">-</span></div>
       </div>
     </div>
 
@@ -127,6 +111,16 @@ def get_save_estimate_modal_styles():
 .repair-item:hover {
   background-color: #f9f9f9;
 }
+.repair-item.selected {
+  background-color: #e8f5e9;
+  border-left: 4px solid #4CAF50;
+}
+.repair-item-checkbox {
+  cursor: pointer;
+  width: 18px;
+  height: 18px;
+  margin-right: 10px;
+}
 .repair-item-label {
   flex: 1;
   font-size: 13px;
@@ -164,53 +158,25 @@ def get_save_estimate_modal_styles():
 """
 
 
-def get_save_estimate_modal_script(
-  labor_items_json,
-  paint_items_json,
-  parts_items_json,
-  second_ro_line,
-  vehicle_info_line,
-  ro_number,
-  total_labor,
-  total_paint,
-  parts_total,
-  grand_total,
-  deductible,
-  customer_pay,
-  insurance_pay,
-):
+def get_save_estimate_modal_script(labor_items_json, paint_items_json, second_ro_line, vehicle_info_line, ro_number, total_labor, total_paint):
     """Return the JavaScript for the save estimate modal functionality."""
     return f"""
 // Save Estimate Modal Variables
 var saveLaborItems = {labor_items_json};
 var savePaintItems = {paint_items_json};
-var savePartsItems = {parts_items_json};
-var saveRoNumber = {json.dumps(ro_number or '').replace("<", "\\u003c")};
-var saveSecondRoLine = {json.dumps(second_ro_line or '').replace("<", "\\u003c")};
-var saveVehicleInfoLine = {json.dumps(vehicle_info_line or '').replace("<", "\\u003c")};
+var saveRoNumber = {json.dumps(ro_number or '')};
+var saveSecondRoLine = {json.dumps(second_ro_line or '')};
+var saveVehicleInfoLine = {json.dumps(vehicle_info_line or '')};
 var saveEstimateTotalsData = {{}};
-var preloadedEstimateTotals = {json.dumps({
-    "parts_total": parts_total,
-    "grand_total": grand_total,
-    "deductible": deductible,
-    "customer_pay": customer_pay,
-    "insurance_pay": insurance_pay,
-})};
-
-if (
-  typeof window.currentEstimateTotals === 'undefined' ||
-  !window.currentEstimateTotals ||
-  Object.keys(window.currentEstimateTotals).length === 0
-) {{
-  window.currentEstimateTotals = preloadedEstimateTotals;
-}} else {{
-  window.currentEstimateTotals = Object.assign({{}}, preloadedEstimateTotals, window.currentEstimateTotals);
-}}
 
 // Vehicle info parsed from vehicle_info_line
 var vehicleYear = null;
 var vehicleMake = null;
 var vehicleModel = null;
+
+// Track selected items
+var selectedLaborItems = [];
+var selectedPaintItems = [];
 
 var apiBase = window.API_BASE || 'https://flagtech1.onrender.com';
 
@@ -241,84 +207,6 @@ function getAuthHeaders() {{
   return headers;
 }}
 
-function normalizeSummaryValue(raw) {{
-  if (raw === null || raw === undefined) return null;
-  if (typeof raw === 'number') return raw;
-  if (typeof raw !== 'string') return null;
-  const trimmed = raw.trim();
-  if (!trimmed || trimmed === '-' || trimmed.toLowerCase() === 'null') return null;
-  const numeric = trimmed.replace(/[^0-9.-]/g, '');
-  if (!numeric) return trimmed;
-  const parsed = parseFloat(numeric);
-  return Number.isNaN(parsed) ? trimmed : parsed;
-}}
-
-function resolvePartType(item) {{
-  if (!item) return 'OEM';
-  const explicit = String(item.part_type || '').trim();
-  if (explicit) return explicit;
-  const description = String(item.description || '').toUpperCase();
-  const rowText = String(item.row_text || '').toUpperCase();
-  const combined = description + ' ' + rowText;
-  if (combined.includes('LKQ')) return 'LKQ';
-  if (combined.includes('A/M') || combined.includes('A M') || combined.includes('AFTERMARKET')) return 'A/M';
-  return 'OEM';
-}}
-
-function formatPartPrice(value) {{
-  if (value === null || value === undefined || value === '') return '-';
-  const parsed = parseFloat(value);
-  if (!Number.isFinite(parsed)) return value;
-  const fixed = parsed.toFixed(2);
-  return fixed.endsWith('.00') ? String(parseInt(fixed, 10)) : fixed;
-}}
-
-function formatEstimateValue(value) {{
-  const normalized = normalizeSummaryValue(value);
-  if (normalized === null || normalized === undefined) return '-';
-  if (typeof normalized === 'number' && Number.isFinite(normalized)) {{
-    return normalized.toLocaleString('en-US', {{minimumFractionDigits: 2, maximumFractionDigits: 2}});
-  }}
-  return normalized;
-}}
-
-function readSummaryValue(elementId) {{
-  const el = document.getElementById(elementId);
-  if (!el) return null;
-  return normalizeSummaryValue(el.textContent);
-}}
-
-function resolveEstimateTotals(estimateTotals) {{
-  const baseTotals = estimateTotals && typeof estimateTotals === 'object' ? estimateTotals : {{}};
-  const fallbackTotals = (typeof currentEstimateTotals !== 'undefined' && currentEstimateTotals && typeof currentEstimateTotals === 'object')
-    ? currentEstimateTotals
-    : (window.currentEstimateTotals && typeof window.currentEstimateTotals === 'object')
-      ? window.currentEstimateTotals
-      : {{}};
-
-  const totalDefs = [
-    {{key: 'parts_total', label: 'PARTS TOTAL', fallbackId: 'summaryPartsTotal'}},
-    {{key: 'grand_total', label: 'GRAND TOTAL', fallbackId: 'summaryGrandTotal'}},
-    {{key: 'deductible', label: 'DEDUCTIBLE', fallbackId: 'summaryDeductible'}},
-    {{key: 'customer_pay', label: 'CUSTOMER PAY', fallbackId: 'summaryCustomerPay'}},
-    {{key: 'insurance_pay', label: 'INSURANCE PAY', fallbackId: 'summaryInsurancePay'}},
-  ];
-
-  const resolved = {{}};
-  totalDefs.forEach((def) => {{
-    let value = baseTotals[def.key];
-    if (value === null || value === undefined) {{
-      value = fallbackTotals[def.key];
-    }}
-    if (value === null || value === undefined) {{
-      value = readSummaryValue(def.fallbackId);
-    }}
-    resolved[def.key] = value;
-  }});
-
-  return {{resolved, totalDefs}};
-}}
-
 function switchTab(tabName) {{
   // Hide all tabs
   document.querySelectorAll('.tab-content').forEach(tab => tab.style.display = 'none');
@@ -331,8 +219,7 @@ function switchTab(tabName) {{
 
 function openSaveEstimateModal(estimateTotals) {{
   // Store estimate totals globally
-  const resolvedTotals = resolveEstimateTotals(estimateTotals);
-  saveEstimateTotalsData = resolvedTotals.resolved;
+  saveEstimateTotalsData = estimateTotals || {{}};
   
   // Parse vehicle info
   const vehicleInfo = parseVehicleInfo(saveVehicleInfoLine);
@@ -353,7 +240,8 @@ function openSaveEstimateModal(estimateTotals) {{
     laborHtml = '<p style="padding: 12px; color: #666;">No labor items found.</p>';
   }} else {{
     saveLaborItems.forEach((item, index) => {{
-      laborHtml += '<div class="repair-item" id="labor-item-' + index + '">';
+      laborHtml += '<div class="repair-item" id="labor-item-' + index + '" onclick="toggleRepairSelection(\\'labor\\', ' + index + ')">';
+      laborHtml += '<input type="checkbox" class="repair-item-checkbox" id="labor-check-' + index + '" onchange="toggleRepairSelection(\\'labor\\', ' + index + ')" />';
       laborHtml += '<div class="repair-item-label"><strong>Line ' + item.line + '</strong> - ' + item.description + '</div>';
       laborHtml += '<div class="repair-item-value">' + parseFloat(item.value).toFixed(1) + ' hrs</div>';
       laborHtml += '</div>';
@@ -367,58 +255,27 @@ function openSaveEstimateModal(estimateTotals) {{
     paintHtml = '<p style="padding: 12px; color: #666;">No paint items found.</p>';
   }} else {{
     savePaintItems.forEach((item, index) => {{
-      paintHtml += '<div class="repair-item" id="paint-item-' + index + '">';
+      paintHtml += '<div class="repair-item" id="paint-item-' + index + '" onclick="toggleRepairSelection(\\'paint\\', ' + index + ')">';
+      paintHtml += '<input type="checkbox" class="repair-item-checkbox" id="paint-check-' + index + '" onchange="toggleRepairSelection(\\'paint\\', ' + index + ')" />';
       paintHtml += '<div class="repair-item-label"><strong>Line ' + item.line + '</strong> - ' + item.description + '</div>';
       paintHtml += '<div class="repair-item-value">' + parseFloat(item.value).toFixed(1) + ' hrs</div>';
       paintHtml += '</div>';
     }});
   }}
   document.getElementById('saveEstimatePaintList').innerHTML = paintHtml;
-
-  // Populate parts replacements
-  let partsHtml = '';
-  let partsCount = 0;
-  let partsTotal = 0;
-  if (savePartsItems && savePartsItems.length > 0) {{
-    savePartsItems.forEach((item) => {{
-      const priceVal = parseFloat(item.price);
-      if (!Number.isFinite(priceVal) || priceVal <= 0) {{
-        return;
-      }}
-      const descText = String(item.description || '').trim();
-      const rowText = String(item.row_text || '').trim();
-      const sourceText = (rowText || descText).toLowerCase();
-      if (!sourceText.includes('repl') && !sourceText.includes('sublet') && !sourceText.includes('subl')) {{
-        return;
-      }}
-      const partType = resolvePartType(item);
-      const lineText = item.line ? ('Line ' + item.line + ' - ') : '';
-      const rawDesc = rowText || descText || 'Part';
-      const cleanedDesc = rawDesc.replace(/^\s*\d+\s+/, '').trim();
-      const priceText = '$' + formatPartPrice(priceVal);
-      partsHtml += '<div class="repair-item" id="part-item-' + partsCount + '">';
-      partsHtml += '<div class="repair-item-label"><strong>' + lineText + '</strong>' + cleanedDesc + ' - ' + partType + '</div>';
-      partsHtml += '<div class="repair-item-value">' + priceText + '</div>';
-      partsHtml += '</div>';
-      partsTotal += priceVal;
-      partsCount += 1;
-    }});
-  }}
-  if (partsCount === 0) {{
-    partsHtml = '<p style="padding: 12px; color: #666;">No parts items found.</p>';
-  }}
-  document.getElementById('saveEstimatePartsList').innerHTML = partsHtml;
-  document.getElementById('saveEstimatePartsTotal').textContent = partsCount ? ('$' + formatPartPrice(partsTotal)) : '-';
   
   // Populate estimate totals summary
   let totalsHtml = '';
-  resolvedTotals.totalDefs.forEach((def) => {{
-    const value = saveEstimateTotalsData[def.key];
-    const displayValue = formatEstimateValue(value);
-    totalsHtml += '<div class="total-row"><div class="total-label">' + def.label + '</div><div class="total-value">' + displayValue + '</div></div>';
-  }});
+  for (const [key, value] of Object.entries(saveEstimateTotalsData)) {{
+    const displayLabel = key.replace(/_/g, ' ').toUpperCase();
+    const displayValue = typeof value === 'number' ? parseFloat(value).toLocaleString('en-US', {{minimumFractionDigits: 2, maximumFractionDigits: 2}}) : value;
+    totalsHtml += '<div class="total-row"><div class="total-label">' + displayLabel + '</div><div class="total-value">' + displayValue + '</div></div>';
+  }}
   document.getElementById('saveEstimateTotalsSummary').innerHTML = totalsHtml || '<p style="color:#666;">No totals data available.</p>';
   
+  // Reset selections
+  selectedLaborItems = [];
+  selectedPaintItems = [];
   document.getElementById('saveEstimateStatus').textContent = '';
   
   modal.style.display = 'block';
@@ -428,12 +285,36 @@ function closeSaveEstimateModal() {{
   document.getElementById('saveEstimateModal').style.display = 'none';
 }}
 
+function toggleRepairSelection(type, index) {{
+  const itemElement = document.getElementById(type + '-item-' + index);
+  const checkbox = document.getElementById(type + '-check-' + index);
+  
+  itemElement.classList.toggle('selected');
+  checkbox.checked = !checkbox.checked;
+  
+  if (type === 'labor') {{
+    const idx = selectedLaborItems.indexOf(index);
+    if (idx > -1) {{
+      selectedLaborItems.splice(idx, 1);
+    }} else {{
+      selectedLaborItems.push(index);
+    }}
+  }} else {{
+    const idx = selectedPaintItems.indexOf(index);
+    if (idx > -1) {{
+      selectedPaintItems.splice(idx, 1);
+    }} else {{
+      selectedPaintItems.push(index);
+    }}
+  }}
+}}
+
 function executeSaveEstimate() {{
   const saveBtn = document.getElementById('executeSaveBtn');
   const statusDiv = document.getElementById('saveEstimateStatus');
   
-  if (saveLaborItems.length === 0 && savePaintItems.length === 0) {{
-    statusDiv.textContent = 'No repair lines found to save';
+  if (selectedLaborItems.length === 0 && selectedPaintItems.length === 0) {{
+    statusDiv.textContent = 'Please select at least one repair line';
     statusDiv.style.color = 'red';
     return;
   }}
@@ -443,12 +324,12 @@ function executeSaveEstimate() {{
   statusDiv.style.color = 'blue';
   
   // Build payload
-  const laborData = saveLaborItems.slice();
-  const paintData = savePaintItems.slice();
+  const laborData = selectedLaborItems.map(idx => saveLaborItems[idx]);
+  const paintData = selectedPaintItems.map(idx => savePaintItems[idx]);
   
   const payload = {{
     ro: saveRoNumber,
-    vehicle: saveVehicleInfoLine,
+    vehicle: saveSecondRoLine,
     year: vehicleYear,
     make: vehicleMake,
     model: vehicleModel,
@@ -474,18 +355,9 @@ function executeSaveEstimate() {{
       statusDiv.style.color = 'green';
       setTimeout(() => {{
         closeSaveEstimateModal();
-        const uploadStatus = document.getElementById('uploadStatus');
-        if (uploadStatus) {{
-          uploadStatus.innerHTML = '';
-        }}
-        const estimateSummary = document.getElementById('estimateSummary');
-        if (estimateSummary) {{
-          estimateSummary.style.display = 'none';
-        }}
-        const fileInput = document.getElementById('fileInput');
-        if (fileInput) {{
-          fileInput.value = '';
-        }}
+        document.getElementById('uploadStatus').innerHTML = '';
+        document.getElementById('estimateSummary').style.display = 'none';
+        document.getElementById('fileInput').value = '';
         statusDiv.textContent = '';
         saveBtn.disabled = false;
       }}, 2000);
@@ -501,7 +373,4 @@ function executeSaveEstimate() {{
     saveBtn.disabled = false;
   }});
 }}
-
-window.openSaveEstimateModal = openSaveEstimateModal;
-window.executeSaveEstimate = executeSaveEstimate;
 """
