@@ -44,6 +44,10 @@ def get_save_estimate_modal_html(
             <div id="vehicleVIN" style="font-size: 14px; margin-top: 3px;">-</div>
           </div>
         </div>
+        <div style="margin-top: 12px;">
+          <label style="font-weight: bold; font-size: 12px; color: #666;">OWNER</label>
+          <div id="ownerInfo" style="font-size: 14px; margin-top: 3px;">-</div>
+        </div>
       </div>
     </div>
 
