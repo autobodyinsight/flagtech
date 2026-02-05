@@ -124,28 +124,6 @@ def _ensure_ro_notes_table(cur) -> None:
     cur.execute("CREATE INDEX IF NOT EXISTS idx_ro_notes_ro_domain ON ro_notes(ro, domain)")
 
 
-def _ensure_estimate_totals_table(cur) -> None:
-    cur.execute(
-        """
-        CREATE TABLE IF NOT EXISTS estimate_totals (
-            id SERIAL PRIMARY KEY,
-            ro VARCHAR(255) NOT NULL,
-            vehicle VARCHAR(255),
-            grand_total NUMERIC,
-            deductible NUMERIC,
-            customer_pay NUMERIC,
-            insurance_pay NUMERIC,
-            domain VARCHAR(255) NOT NULL,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-        """
-    )
-    cur.execute("CREATE INDEX IF NOT EXISTS idx_estimate_totals_domain ON estimate_totals(domain)")
-    cur.execute("CREATE INDEX IF NOT EXISTS idx_estimate_totals_ro ON estimate_totals(ro)")
-    cur.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_estimate_totals_ro_domain ON estimate_totals(ro, domain)")
-
-
 def _parse_json_field(value):
     if value is None:
         return []
@@ -545,8 +523,6 @@ async def dashboard_data(request: Request):
     try:
         conn = get_conn()
         cur = conn.cursor()
-
-        _ensure_estimate_totals_table(cur)
         
         # Calculate total sales and pending payments from all ROs
         # Assuming sales = labor hours * rate + parts cost (simplified calculation)
@@ -568,9 +544,38 @@ async def dashboard_data(request: Request):
         total_refinish_hours = float(hours_row["total_refinish_hours"] or 0)
         total_hours = total_labor_hours + total_refinish_hours
         
+        # Calculate total sales (simplified: $100 per hour as base rate)
+        # In production, this should use actual pricing from ROs
+        total_sales = total_hours * 100.0
+        
+        # For pending payments, let's assume 30% of sales are pending (placeholder)
+        pending_payments = total_sales * 0.3
+        
+        # Get count of unique ROs
+        cur.execute("""
+            SELECT COUNT(DISTINCT ro) as ro_count
+            FROM (
+                SELECT ro FROM labor_assignments
+                UNION
+                SELECT ro FROM refinish_assignments
+            ) AS all_ros
+        """)
+        ro_count_row = cur.fetchone()
+        ro_count = int(ro_count_row["ro_count"] or 0)
+        
+        # Calculate average RO
+        average_ro = total_sales / ro_count if ro_count > 0 else 0
+        
+        # Calculate average hours per RO
+        average_hrs = total_hours / ro_count if ro_count > 0 else 0
+        
         # Calculate current GP (Gross Profit percentage) - placeholder calculation
         # Assuming 40% GP for now
         current_gp = 40.0
+        
+        # Calculate parts cost - placeholder
+        # In production, this should come from actual parts data
+        parts_cost = total_sales * 0.3
         
         # Get hours per tech
         cur.execute("""
@@ -622,7 +627,7 @@ async def dashboard_data(request: Request):
                 "ros": int(row["ro_count"] or 0)
             })
         
-        # Get detailed RO list with grand total values (fallback to hours-based estimate).
+        # Get detailed RO list
         cur.execute("""
             SELECT 
                 ro,
@@ -636,14 +641,9 @@ async def dashboard_data(request: Request):
                     l.vehicle,
                     l.tech,
                     COALESCE(l.total_labor, 0) + COALESCE(r.total_paint, 0) as total_hours,
-                    COALESCE(t.grand_total, (COALESCE(l.total_labor, 0) + COALESCE(r.total_paint, 0)) * 100) as total_amount
+                    (COALESCE(l.total_labor, 0) + COALESCE(r.total_paint, 0)) * 100 as total_amount
                 FROM labor_assignments l
                 LEFT JOIN refinish_assignments r ON l.ro = r.ro
-                LEFT JOIN (
-                    SELECT ro, MAX(grand_total) as grand_total
-                    FROM estimate_totals
-                    GROUP BY ro
-                ) t ON t.ro = l.ro
                 WHERE l.tech IS NOT NULL AND l.tech <> ''
                 UNION
                 SELECT 
@@ -651,14 +651,9 @@ async def dashboard_data(request: Request):
                     r.vehicle,
                     r.tech,
                     COALESCE(l.total_labor, 0) + COALESCE(r.total_paint, 0) as total_hours,
-                    COALESCE(t.grand_total, (COALESCE(l.total_labor, 0) + COALESCE(r.total_paint, 0)) * 100) as total_amount
+                    (COALESCE(l.total_labor, 0) + COALESCE(r.total_paint, 0)) * 100 as total_amount
                 FROM refinish_assignments r
                 LEFT JOIN labor_assignments l ON r.ro = l.ro
-                LEFT JOIN (
-                    SELECT ro, MAX(grand_total) as grand_total
-                    FROM estimate_totals
-                    GROUP BY ro
-                ) t ON t.ro = r.ro
                 WHERE r.tech IS NOT NULL AND r.tech <> ''
                 AND NOT EXISTS (SELECT 1 FROM labor_assignments WHERE ro = r.ro)
             ) AS combined
@@ -676,15 +671,8 @@ async def dashboard_data(request: Request):
                 "total": round(float(row["total_amount"] or 0), 2)
             })
         
-        ro_count = len(ro_list)
-        total_sales = sum(item["total"] for item in ro_list)
-        pending_payments = total_sales
-        average_ro = total_sales / ro_count if ro_count > 0 else 0
-        average_hrs = total_hours / ro_count if ro_count > 0 else 0
-        parts_cost = total_sales * 0.3
-
         cur.close()
-
+        
         return {
             "totalSales": round(total_sales, 2),
             "pendingPayments": round(pending_payments, 2),
@@ -712,44 +700,43 @@ async def dashboard_data(request: Request):
         }
 
 
-@router.delete("/flash-data")
-async def flash_data(request: Request):
-    """Delete all stored estimate data from all tables."""
+@router.post("/flash")
+async def flash_data():
+    """Delete uploaded estimate data across screens."""
+    conn = get_conn()
+    cur = conn.cursor()
+
+    tables = [
+        "parts_received",
+        "parts_orders",
+        "parts_lines",
+        "parts_vendors",
+        "ro_notes",
+        "ro_phases",
+        "refinish_assignments",
+        "labor_assignments",
+        "estimate_uploads",
+        "saved_estimates",
+        "techs",
+    ]
+
+    deleted_counts = {}
     try:
-        conn = get_conn()
-        cur = conn.cursor()
-
-        tables_to_clear = [
-            "labor_assignments",
-            "refinish_assignments", 
-            "estimate_totals",
-            "parts_lines",
-            "parts_orders",
-            "parts_received",
-            "ro_notes",
-            "ro_phases"
-        ]
-
-        for table in tables_to_clear:
-            try:
-                cur.execute(f"DELETE FROM {table}")
-                print(f"[flash-data] Cleared table: {table}")
-            except Exception as e:
-                print(f"[flash-data] Error clearing table {table}: {e}")
-
+        for table in tables:
+            cur.execute("SELECT to_regclass(%s) AS reg", (table,))
+            row = cur.fetchone()
+            if not row or not row.get("reg"):
+                continue
+            cur.execute(f"DELETE FROM {table}")
+            deleted_counts[table] = cur.rowcount
         conn.commit()
+    except Exception as exc:
+        conn.rollback()
+        return JSONResponse(status_code=500, content={"status": "error", "message": str(exc)})
+    finally:
         cur.close()
 
-        return {
-            "status": "success",
-            "message": "All stored estimate data has been deleted"
-        }
-    except Exception as e:
-        print(f"[flash-data] Error: {e}")
-        return JSONResponse(
-            status_code=500,
-            content={"status": "error", "detail": str(e)}
-        )
+    return {"status": "success", "deleted": deleted_counts}
 
 
 @router.get("/phase-data")

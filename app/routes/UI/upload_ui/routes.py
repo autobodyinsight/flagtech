@@ -1,7 +1,7 @@
 """Upload processing routes for PDF parsing and grid display."""
 
 from fastapi import APIRouter, UploadFile, File, Request
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, JSONResponse
 import json
 import re
 
@@ -10,6 +10,25 @@ from app.services.parser import parse_estimate_text
 from app.services.db import get_conn
 
 router = APIRouter()
+
+
+def _ensure_saved_estimates_table(cur) -> None:
+    cur.execute(
+        """
+        CREATE TABLE IF NOT EXISTS saved_estimates (
+            id SERIAL PRIMARY KEY,
+            ro VARCHAR(255),
+            vehicle TEXT,
+            year VARCHAR(10),
+            make VARCHAR(50),
+            model VARCHAR(50),
+            labor_repairs JSONB,
+            paint_repairs JSONB,
+            estimate_totals JSONB,
+            saved_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+        """
+    )
 
 # ============================================================
 # UPLOAD + PARSE UI
@@ -80,6 +99,7 @@ async def parse_ui(file: UploadFile = File(...)):
 </body>
 </html>
 """
+
 
 # ============================================================
 # SAVE LABOR + REFINISH
