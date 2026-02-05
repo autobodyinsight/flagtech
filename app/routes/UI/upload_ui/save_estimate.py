@@ -257,8 +257,10 @@ function resolvePartType(item) {{
   const explicit = String(item.part_type || '').trim();
   if (explicit) return explicit;
   const description = String(item.description || '').toUpperCase();
-  if (description.includes('LKQ')) return 'LKQ';
-  if (description.includes('A/M') || description.includes('A M') || description.includes('AFTERMARKET')) return 'A/M';
+  const rowText = String(item.row_text || '').toUpperCase();
+  const combined = description + ' ' + rowText;
+  if (combined.includes('LKQ')) return 'LKQ';
+  if (combined.includes('A/M') || combined.includes('A M') || combined.includes('AFTERMARKET')) return 'A/M';
   return 'OEM';
 }}
 
@@ -382,7 +384,9 @@ function openSaveEstimateModal(estimateTotals) {{
         return;
       }}
       const descText = String(item.description || '').trim();
-      if (!descText.toLowerCase().includes('repl')) {{
+      const rowText = String(item.row_text || '').trim();
+      const sourceText = (rowText || descText).toLowerCase();
+      if (!sourceText.includes('repl')) {{
         return;
       }}
       const partType = resolvePartType(item);

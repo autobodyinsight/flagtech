@@ -379,7 +379,8 @@ def extract_parts_items(
 
         for row in rows:
             row_words = sorted(row["words"], key=lambda x: x["xmid"])
-            row_text_upper = " ".join(w.get("text", "") for w in row_words).upper()
+            row_text = " ".join(w.get("text", "") for w in row_words).strip()
+            row_text_upper = row_text.upper()
 
             if all(token in row_text_upper for token in ["LINE", "OPER", "DESCRIPTION"]):
                 continue
@@ -427,6 +428,7 @@ def extract_parts_items(
                 "part_type": part_type,
                 "price": price_val if price_val is not None else 0.0,
                 "qty": qty_val if qty_val is not None else 1,
+                "row_text": row_text,
             })
 
     return parts_items
