@@ -384,8 +384,8 @@ function openSaveEstimateModal(estimateTotals) {{
       const lineText = item.line ? ('Line ' + item.line + ' - ') : '';
       const descText = item.description || 'Part';
       partsHtml += '<div class="repair-item" id="part-item-' + partsCount + '">';
-      partsHtml += '<div class="repair-item-label"><strong>' + lineText + '</strong>' + descText + '</div>';
-      partsHtml += '<div class="repair-item-value">' + partType + '</div>';
+      partsHtml += '<div class="repair-item-label"><strong>' + lineText + '</strong>' + descText + ' (' + partType + ')</div>';
+      partsHtml += '<div class="repair-item-value">' + formatPartPrice(priceVal) + '</div>';
       partsHtml += '</div>';
       partsCount += 1;
     }});
