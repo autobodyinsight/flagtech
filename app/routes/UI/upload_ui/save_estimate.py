@@ -199,10 +199,14 @@ var preloadedEstimateTotals = {json.dumps({
     "insurance_pay": insurance_pay,
 })};
 
-if (typeof currentEstimateTotals === 'undefined' || !currentEstimateTotals || Object.keys(currentEstimateTotals).length === 0) {{
-  var currentEstimateTotals = preloadedEstimateTotals;
+if (
+  typeof window.currentEstimateTotals === 'undefined' ||
+  !window.currentEstimateTotals ||
+  Object.keys(window.currentEstimateTotals).length === 0
+) {{
+  window.currentEstimateTotals = preloadedEstimateTotals;
 }} else {{
-  currentEstimateTotals = Object.assign({{}}, preloadedEstimateTotals, currentEstimateTotals);
+  window.currentEstimateTotals = Object.assign({{}}, preloadedEstimateTotals, window.currentEstimateTotals);
 }}
 
 // Vehicle info parsed from vehicle_info_line
