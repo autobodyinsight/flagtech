@@ -481,4 +481,7 @@ function executeSaveEstimate() {{
     saveBtn.disabled = false;
   }});
 }}
+
+window.openSaveEstimateModal = openSaveEstimateModal;
+window.executeSaveEstimate = executeSaveEstimate;
 """
