@@ -64,11 +64,11 @@ def group_rows(words: List[Dict], y_thresh: float = 8.0) -> List[Dict]:
 
 def detect_anchors_and_vehicle_info(
     pages: List[Dict]
-) -> Tuple[Optional[int], Optional[float], Optional[int], Optional[float], str, str, str, str, str]:
+) -> Tuple[Optional[int], Optional[float], Optional[int], Optional[float], str, str, str, str, str, str]:
     """
-    Detect anchor points in PDF and extract vehicle information, owner info, and VIN.
+    Detect anchor points in PDF and extract vehicle information, owner info, insurance company, and VIN.
     Returns:
-        (anchor_page, anchor_ymid, subtotals_page, subtotals_ymid, first_ro_line, vehicle_info_line, owner_info, vin)
+        (anchor_page, anchor_ymid, subtotals_page, subtotals_ymid, first_ro_line, vehicle_info_line, owner_info, insurance_company, vin)
     """
     anchor_page = None
     anchor_ymid = None
@@ -78,6 +78,7 @@ def detect_anchors_and_vehicle_info(
     first_ro_line = ""
     vehicle_info_line = ""
     owner_info = ""
+    insurance_company = ""
     vin = ""
     vin_row_idx = None
 
@@ -127,6 +128,11 @@ def detect_anchors_and_vehicle_info(
                         owner_info_parts.append(phone)
                     owner_info = "\n".join(owner_info_parts)
 
+            # Extract insurance company (look for "insurance company:" and take next line)
+            if re.search(r"\binsurance\s+company\s*:", row_text, re.IGNORECASE):
+                if idx + 1 < len(rows):
+                    insurance_company = " ".join(w.get("text", "") for w in rows[idx + 1]["words"]).strip()
+
             # Extract VIN (look for "VIN:" and capture the 17-character value)
             if re.search(r"\bVIN\b", row_text, re.IGNORECASE):
                 vin_row_idx = idx
@@ -155,7 +161,7 @@ def detect_anchors_and_vehicle_info(
         if anchor_page and subtotals_page:
             break
 
-    return anchor_page, anchor_ymid, subtotals_page, subtotals_ymid, first_ro_line, vehicle_info_line, owner_info, vin
+    return anchor_page, anchor_ymid, subtotals_page, subtotals_ymid, first_ro_line, vehicle_info_line, owner_info, insurance_company, vin
 
 
 def collect_words_in_range(
@@ -497,7 +503,7 @@ def process_pdf_grid(pages: List[Dict]) -> Dict[str, Any]:
             w["xmid"] = (w["x0"] + w["x1"]) / 2.0
             w["ymid"] = (w["y0"] + w["y1"]) / 2.0
 
-    anchor_page, anchor_ymid, subtotals_page, subtotals_ymid, first_ro_line, vehicle_info_line, owner_info, vin = \
+    anchor_page, anchor_ymid, subtotals_page, subtotals_ymid, first_ro_line, vehicle_info_line, owner_info, insurance_company, vin = \
         detect_anchors_and_vehicle_info(pages)
 
     all_words = collect_words_in_range(pages, anchor_page, anchor_ymid, subtotals_page, subtotals_ymid)
@@ -613,6 +619,7 @@ def process_pdf_grid(pages: List[Dict]) -> Dict[str, Any]:
         "second_ro_line": first_ro_line,  # Keep for backward compatibility
         "vehicle_info_line": vehicle_info_line,
         "owner_info": owner_info,
+        "insurance_company": insurance_company,
         "vin": vin,
         "anchor_page": anchor_page,
         "anchor_ymid": anchor_ymid,

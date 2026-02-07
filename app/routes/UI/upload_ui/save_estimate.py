@@ -14,6 +14,7 @@ def get_save_estimate_modal_html(
   customer_pay,
   insurance_pay,
   owner_info="",
+  insurance_company="",
   vin="",
 ):
     """Return the HTML for the save estimate modal."""
@@ -44,9 +45,15 @@ def get_save_estimate_modal_html(
             <div id="vehicleVIN" style="font-size: 14px; margin-top: 3px;">-</div>
           </div>
         </div>
-        <div style="margin-top: 12px;">
-          <label style="font-weight: bold; font-size: 12px; color: #666;">OWNER</label>
-          <div id="ownerInfo" style="font-size: 14px; margin-top: 3px;">-</div>
+        <div style="margin-top: 12px; display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+          <div>
+            <label style="font-weight: bold; font-size: 12px; color: #666;">OWNER</label>
+            <div id="ownerInfo" style="font-size: 14px; margin-top: 3px;">-</div>
+          </div>
+          <div>
+            <label style="font-weight: bold; font-size: 12px; color: #666;">INSURANCE COMPANY</label>
+            <div id="insuranceCompany" style="font-size: 14px; margin-top: 3px;">-</div>
+          </div>
         </div>
       </div>
     </div>
@@ -188,6 +195,7 @@ def get_save_estimate_modal_script(
   customer_pay,
   insurance_pay,
   owner_info="",
+  insurance_company="",
   vin="",
 ):
     """Return the JavaScript for the save estimate modal functionality."""
@@ -200,6 +208,7 @@ var saveRoNumber = {json.dumps(ro_number or '').replace("<", "\\u003c")};
 var saveSecondRoLine = {json.dumps(second_ro_line or '').replace("<", "\\u003c")};
 var saveVehicleInfoLine = {json.dumps(vehicle_info_line or '').replace("<", "\\u003c")};
 var saveOwnerInfo = {json.dumps(owner_info or '').replace("<", "\\u003c")};
+var saveInsuranceCompany = {json.dumps(insurance_company or '').replace("<", "\\u003c")};
 var saveVIN = {json.dumps(vin or '').replace("<", "\\u003c")};
 var saveEstimateTotalsData = {{}};
 var preloadedEstimateTotals = {json.dumps({
@@ -410,6 +419,7 @@ function openSaveEstimateModal(estimateTotals) {{
     }}
   }}
   document.getElementById('ownerInfo').innerHTML = ownerHtml;
+  document.getElementById('insuranceCompany').textContent = saveInsuranceCompany || '-';
   
   // Populate labor repairs
   let laborHtml = '';

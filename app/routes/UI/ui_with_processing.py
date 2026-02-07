@@ -326,6 +326,7 @@ async def grid_ui(request: Request, file: UploadFile = File(...), ajax: str = No
     second_ro_line = result["second_ro_line"]
     vehicle_info_line = result["vehicle_info_line"]
     owner_info = result.get("owner_info", "")
+    insurance_company = result.get("insurance_company", "")
     vin = result.get("vin", "")
     anchor_page = result["anchor_page"]
     anchor_ymid = result["anchor_ymid"]
@@ -457,6 +458,7 @@ async def grid_ui(request: Request, file: UploadFile = File(...), ajax: str = No
             customer_pay,
             insurance_pay,
             owner_info,
+            insurance_company,
             vin,
         )
         
@@ -483,6 +485,7 @@ async def grid_ui(request: Request, file: UploadFile = File(...), ajax: str = No
             customer_pay,
             insurance_pay,
             owner_info,
+            insurance_company,
             vin,
         )
         close_handler = get_modal_close_handler()
