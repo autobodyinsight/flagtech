@@ -62,6 +62,34 @@ def group_rows(words: List[Dict], y_thresh: float = 8.0) -> List[Dict]:
     return rows
 
 
+def _group_row_words_by_x(words: List[Dict], gap: float = 15.0) -> List[Dict]:
+    """Group row words into x clusters based on spacing."""
+    if not words:
+        return []
+    sorted_words = sorted(words, key=lambda w: w.get("x0", 0))
+    groups = []
+    current = [sorted_words[0]]
+    for wd in sorted_words[1:]:
+        prev = current[-1]
+        if wd.get("x0", 0) - prev.get("x1", 0) > gap:
+            groups.append(current)
+            current = [wd]
+        else:
+            current.append(wd)
+    groups.append(current)
+
+    grouped = []
+    for group in groups:
+        text = " ".join(w.get("text", "") for w in group).strip()
+        grouped.append({
+            "words": group,
+            "text": text,
+            "min_x": min(w.get("x0", 0) for w in group),
+            "max_x": max(w.get("x1", 0) for w in group),
+        })
+    return grouped
+
+
 def detect_anchors_and_vehicle_info(
     pages: List[Dict]
 ) -> Tuple[Optional[int], Optional[float], Optional[int], Optional[float], str, str, str, str, str, str]:
@@ -131,7 +159,33 @@ def detect_anchors_and_vehicle_info(
             # Extract insurance company (look for "insurance company:" and take next line)
             if re.search(r"\binsurance\s+company\s*:", row_text, re.IGNORECASE):
                 if idx + 1 < len(rows):
-                    insurance_company = " ".join(w.get("text", "") for w in rows[idx + 1]["words"]).strip()
+                    header_groups = _group_row_words_by_x(r["words"])
+                    insurance_group = None
+                    for group in header_groups:
+                        lower_text = group["text"].lower()
+                        if "insurance" in lower_text and "company" in lower_text:
+                            insurance_group = group
+                            break
+
+                    next_row_words = rows[idx + 1]["words"]
+                    filtered_words = next_row_words
+                    if insurance_group:
+                        left_bound = insurance_group["min_x"] - 2
+                        right_bound = None
+                        for group in header_groups:
+                            if group["min_x"] > insurance_group["max_x"]:
+                                right_bound = group["min_x"] - 2
+                                break
+                        filtered_words = [
+                            w for w in next_row_words
+                            if w.get("xmid", 0) >= left_bound and (right_bound is None or w.get("xmid", 0) < right_bound)
+                        ]
+
+                    raw_company = " ".join(w.get("text", "") for w in sorted(filtered_words, key=lambda w: w.get("x0", 0))).strip()
+                    cleaned_company = raw_company
+                    # Drop leading owner name if it appears at the start of the line.
+                    cleaned_company = re.sub(r"^[A-Za-z][A-Za-z\-]*,\s*[A-Za-z][A-Za-z\-]*\s+", "", cleaned_company)
+                    insurance_company = cleaned_company
 
             # Extract VIN (look for "VIN:" and capture the 17-character value)
             if re.search(r"\bVIN\b", row_text, re.IGNORECASE):
