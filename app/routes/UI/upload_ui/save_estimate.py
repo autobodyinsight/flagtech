@@ -399,7 +399,7 @@ function openSaveEstimateModal(estimateTotals) {{
   const modal = document.getElementById('saveEstimateModal');
   
   // Display RO number (already extracted on backend)
-  document.getElementById('roNumberDisplay').textContent = 'ro number: ' + (saveRoNumber || '-');
+  document.getElementById('roNumberDisplay').textContent = 'RO NUMBER: ' + (saveRoNumber || '-');
   
   // Display vehicle year, make, model in grid
   document.getElementById('vehicleYear').textContent = vehicleYear || '-';

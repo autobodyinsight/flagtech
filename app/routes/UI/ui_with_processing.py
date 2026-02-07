@@ -336,7 +336,7 @@ async def grid_ui(request: Request, file: UploadFile = File(...), ajax: str = No
     domain = get_user_domain(request)
     ro_number = None
     if domain:
-        ro_match = re.search(r"\bRO\b\s*[:#-]*\s*([A-Za-z0-9-]+)", second_ro_line)
+        ro_match = re.search(r"\bRO\b.*?(\d+)", second_ro_line)
         ro_number = ro_match.group(1) if ro_match else None
 
     duplicate_estimate = False
