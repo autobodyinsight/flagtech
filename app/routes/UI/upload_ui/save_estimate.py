@@ -398,13 +398,8 @@ function openSaveEstimateModal(estimateTotals) {{
   
   const modal = document.getElementById('saveEstimateModal');
   
-  // Extract and display RO number from first RO line - capture only digits
-  let roNumber = '-';
-  if (saveSecondRoLine) {{
-    const roMatch = saveSecondRoLine.match(/\bRO\b\s*[:#-]*\s*(\d+)/);
-    roNumber = roMatch ? roMatch[1] : '-';
-  }}
-  document.getElementById('roNumberDisplay').textContent = 'ro number: ' + roNumber;
+  // Display RO number (already extracted on backend)
+  document.getElementById('roNumberDisplay').textContent = 'ro number: ' + (saveRoNumber || '-');
   
   // Display vehicle year, make, model in grid
   document.getElementById('vehicleYear').textContent = vehicleYear || '-';
