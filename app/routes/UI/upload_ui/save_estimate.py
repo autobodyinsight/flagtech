@@ -19,9 +19,8 @@ def get_save_estimate_modal_html(
 ):
     """Return the HTML for the save estimate modal."""
     return f"""
-<div id="saveEstimateModal" class="modal" style="display: none;">
-  <div class="modal-content modal-large">
-    <span class="close" onclick="closeSaveEstimateModal()">&times;</span>
+<div id="saveEstimateModal" style="display: block; position: static; width: 100%; height: auto; background-color: transparent; z-index: auto;">
+  <div style="background-color: #f2f2f2; padding: 20px; border: 1px solid #888; width: 95%; margin: 0 auto;">
 
     <div style="margin-bottom: 15px;">
       <div style="font-weight: bold; font-size: 16px; margin-bottom: 5px;" id="roNumberDisplay">RO Number: -</div>
@@ -98,7 +97,7 @@ def get_save_estimate_modal_html(
 
     <!-- Action Buttons -->
     <div style="margin-top: 20px; display: flex; gap: 10px; justify-content: flex-end;">
-      <button onclick="closeSaveEstimateModal()" style='padding:10px 20px; font-size:14px; cursor:pointer; background-color:#999; color:white; border:none; border-radius:3px;'>Cancel</button>
+      <button onclick="location.href='/ui'" style='padding:10px 20px; font-size:14px; cursor:pointer; background-color:#999; color:white; border:none; border-radius:3px;'>Cancel</button>
       <button onclick="executeSaveEstimate()" id="executeSaveBtn" style='padding:10px 20px; font-size:14px; cursor:pointer; background-color:#4CAF50; color:white; border:none; border-radius:3px;'>Save Estimate</button>
     </div>
   </div>
@@ -396,8 +395,6 @@ function openSaveEstimateModal(estimateTotals) {{
   vehicleMake = vehicleInfo.make;
   vehicleModel = vehicleInfo.model;
   
-  const modal = document.getElementById('saveEstimateModal');
-  
   // Display RO number (already extracted on backend)
   document.getElementById('roNumberDisplay').textContent = 'RO NUMBER: ' + (saveRoNumber || '-');
   
@@ -492,12 +489,11 @@ function openSaveEstimateModal(estimateTotals) {{
   document.getElementById('saveEstimateTotalsSummary').innerHTML = totalsHtml || '<p style="color:#666;">No totals data available.</p>';
   
   document.getElementById('saveEstimateStatus').textContent = '';
-  
-  modal.style.display = 'block';
 }}
 
 function closeSaveEstimateModal() {{
-  document.getElementById('saveEstimateModal').style.display = 'none';
+  // Modal is now primary content - redirect instead of hiding
+  window.location.href = '/ui';
 }}
 
 function executeSaveEstimate() {{
