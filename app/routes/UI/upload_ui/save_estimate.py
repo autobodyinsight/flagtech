@@ -24,8 +24,7 @@ def get_save_estimate_modal_html(
     <span class="close" onclick="closeSaveEstimateModal()">&times;</span>
 
     <div style="margin-bottom: 15px;">
-      <div style="font-weight: bold; font-size: 16px; margin-bottom: 5px;">{second_ro_line}</div>
-      <div style="font-size: 14px; color: #333;" id="vehicleInfoDisplay">-</div>
+      <div style="font-weight: bold; font-size: 16px; margin-bottom: 5px;" id="roNumberDisplay">RO Number: -</div>
       <div style="margin-top: 10px; padding: 12px; background-color: #f9f9f9; border-radius: 3px; border: 1px solid #ddd;">
         <div style="display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 15px;">
           <div>
@@ -399,8 +398,13 @@ function openSaveEstimateModal(estimateTotals) {{
   
   const modal = document.getElementById('saveEstimateModal');
   
-  // Display vehicle information - show full line directly
-  document.getElementById('vehicleInfoDisplay').textContent = saveVehicleInfoLine || '-';
+  // Extract and display RO number from first RO line
+  let roNumber = '-';
+  if (saveSecondRoLine) {{
+    const roMatch = saveSecondRoLine.match(/\bRO\b\s*[:#-]*\s*([A-Za-z0-9-]+)/);
+    roNumber = roMatch ? roMatch[1] : '-';
+  }}
+  document.getElementById('roNumberDisplay').textContent = 'RO Number: ' + roNumber;
   
   // Display vehicle year, make, model in grid
   document.getElementById('vehicleYear').textContent = vehicleYear || '-';
