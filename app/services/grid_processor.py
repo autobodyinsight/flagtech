@@ -109,14 +109,14 @@ def detect_anchors_and_vehicle_info(
                 # Get the 4th line down as the phone number (skip 2 address lines)
                 if idx + 4 < len(rows):
                     full_line = " ".join(w.get("text", "") for w in rows[idx + 4]["words"]).strip()
-                    # Extract phone number pattern (NNN)NNN-NNNN and optionally "cell/work/home/mobile"
-                    phone_match = re.search(r"(\(\d{3}\)\d{3}-\d{4})\s*(cell|work|home|mobile)?", full_line, re.IGNORECASE)
+                    # Extract phone number pattern (NNN) NNN-NNNN and optionally "cell/work/home/mobile"
+                    phone_match = re.search(r"(\(\d{3}\)\s*\d{3}-\d{4})\s*(cell|work|home|mobile)?", full_line, re.IGNORECASE)
                     if phone_match:
-                        phone = phone_match.group(1)
+                        phone = phone_match.group(1).strip()
                         if phone_match.group(2):
-                            phone += " " + phone_match.group(2)
+                            phone += " " + phone_match.group(2).strip()
                     else:
-                        phone = full_line
+                        phone = ""
                 
                 # Only store name and phone
                 if name or phone:
