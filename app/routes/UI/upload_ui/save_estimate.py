@@ -497,7 +497,7 @@ function openSaveEstimateModal(estimateTotals) {{
 }}
 
 function closeSaveEstimateModal() {{
-  document.getElementById('saveEstimateModal').style.display = 'none';
+  window.location.href = '/ui';
 }}
 
 function executeSaveEstimate() {{
@@ -550,7 +550,9 @@ function executeSaveEstimate() {{
     if (result.status === 'success') {{
       statusDiv.textContent = 'Saved successfully!';
       statusDiv.style.color = 'green';
-      closeSaveEstimateModal();
+      setTimeout(() => {{
+        window.location.href = '/ui';
+      }}, 1500);
       const uploadStatus = document.getElementById('uploadStatus');
       if (uploadStatus) {{
         uploadStatus.innerHTML = '';

@@ -492,17 +492,10 @@ async def grid_ui(request: Request, file: UploadFile = File(...), ajax: str = No
 
         
         content = f"""
-<h2>Document Visual Grid</h2>
-<button onclick="openLaborModal()" style='padding:10px 20px; font-size:14px; cursor:pointer; background-color:#505050; color:white; border:none; border-radius:3px; margin-right:10px;'>Assign Labor</button>
-<button onclick="openRefinishModal()" style='padding:10px 20px; font-size:14px; cursor:pointer; background-color:#505050; color:white; border:none; border-radius:3px; margin-right:10px;'>Assign Refinish</button>
-<button onclick="openSaveEstimateModal(window.currentEstimateTotals)" style='padding:10px 20px; font-size:14px; cursor:pointer; background-color:#4CAF50; color:white; border:none; border-radius:3px;'>Save</button>
-<br><br>
-{pages_html}
-<br><a href='/ui'>Back</a>
+{save_estimate_modal}
 
 {labor_modal}
 {refinish_modal}
-{save_estimate_modal}
 
 <style>
   .modal {{
@@ -514,6 +507,9 @@ async def grid_ui(request: Request, file: UploadFile = File(...), ajax: str = No
     width: 100%;
     height: 100%;
     background-color: rgba(0,0,0,0.4);
+  }}
+  .modal.open {{
+    display: block !important;
   }}
     .modal-content {{
         background-color: #f2f2f2;
@@ -546,6 +542,13 @@ async def grid_ui(request: Request, file: UploadFile = File(...), ajax: str = No
 {refinish_script}
 {save_estimate_script}
 {close_handler}
+
+// Auto-open save estimate modal when page loads
+window.addEventListener('load', function() {{
+  setTimeout(function() {{
+    openSaveEstimateModal(window.currentEstimateTotals);
+  }}, 100);
+}});
 </script>
         """
         return content
