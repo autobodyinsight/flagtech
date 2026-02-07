@@ -546,6 +546,13 @@ async def grid_ui(request: Request, file: UploadFile = File(...), ajax: str = No
 {refinish_script}
 {save_estimate_script}
 {close_handler}
+
+// Auto-open save estimate modal when page loads
+document.addEventListener('DOMContentLoaded', function() {{
+  setTimeout(function() {{
+    openSaveEstimateModal(window.currentEstimateTotals);
+  }}, 500);
+}});
 </script>
         """
         return content
