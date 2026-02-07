@@ -428,9 +428,11 @@ def _parse_int(text: str) -> Optional[int]:
     t = text.strip().replace(",", "")
     if not t:
         return None
-    if re.match(r"^\d+$", t):
+    # Extract leading digits from the text (handles cases like "4 **" or "4 <>")
+    match = re.match(r"^(\d+)", t)
+    if match:
         try:
-            return int(t)
+            return int(match.group(1))
         except Exception:
             return None
     return None
