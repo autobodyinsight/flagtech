@@ -95,7 +95,7 @@ def detect_anchors_and_vehicle_info(
                     first_ro_line = row_text
 
             # Extract owner info (look for "owner:" or "customer:" and extract name and phone only)
-            if re.search(r"\b(owner|customer)\b", row_text, re.IGNORECASE):
+            if re.search(r"\b(owner|customer)\s*:", row_text, re.IGNORECASE):
                 name = ""
                 phone = ""
                 
