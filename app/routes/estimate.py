@@ -418,7 +418,10 @@ async def get_dashboard_data(request: Request):
             """
             SELECT DISTINCT ON (ro)
                    ro,
-                   vehicle,
+                     vehicle,
+                     year,
+                     make,
+                     model,
                    labor_repairs,
                    paint_repairs,
                    parts_repairs,
@@ -471,10 +474,16 @@ async def get_dashboard_data(request: Request):
             total_parts += parts_total
             total_hours += ro_hours
 
+            year = (row.get("year") or "").strip()
+            make = (row.get("make") or "").strip()
+            model = (row.get("model") or "").strip()
+            short_vehicle = " ".join(part for part in (year, make, model) if part)
+            vehicle_display = short_vehicle or row.get("vehicle")
+
             ro_list.append(
                 {
                     "ro": ro,
-                    "vehicle": row.get("vehicle"),
+                    "vehicle": vehicle_display,
                     "tech": "",
                     "hours": ro_hours,
                     "total": grand_total,
