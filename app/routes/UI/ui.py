@@ -148,5 +148,3 @@ async def home_screen(request: Request):
 # ---------------------------------------------------------
 # Individual Screen Endpoints
 # ---------------------------------------------------------
-
-# Note: save-labor and save-refinish endpoints are now in upload_ui/routes.py

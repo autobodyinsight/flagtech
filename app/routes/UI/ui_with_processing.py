@@ -11,8 +11,6 @@ from .techs import get_techs_screen_html
 from .phase import get_phase_screen_html
 try:
     from .upload_ui.upload import get_upload_screen_html, get_upload_script
-    from .upload_ui.labor import get_labor_modal_html, get_labor_modal_styles, get_labor_modal_script
-    from .upload_ui.paint import get_refinish_modal_html, get_refinish_modal_styles, get_refinish_modal_script, get_modal_close_handler
     from .upload_ui.save_estimate import (
         get_save_estimate_modal_html,
         get_save_estimate_modal_styles,
@@ -25,8 +23,6 @@ except ImportError:
     upload_dir = Path(__file__).parent / "upload_ui"
     sys.path.insert(0, str(upload_dir))
     from upload import get_upload_screen_html, get_upload_script
-    from labor import get_labor_modal_html, get_labor_modal_styles, get_labor_modal_script
-    from paint import get_refinish_modal_html, get_refinish_modal_styles, get_refinish_modal_script, get_modal_close_handler
     from save_estimate import (
         get_save_estimate_modal_html,
         get_save_estimate_modal_styles,
@@ -65,6 +61,9 @@ def _ensure_saved_estimates_table(cur) -> None:
             year VARCHAR(10),
             make VARCHAR(50),
             model VARCHAR(50),
+            owner_info TEXT,
+            insurance_company TEXT,
+            vin VARCHAR(32),
             labor_repairs JSONB,
             paint_repairs JSONB,
             parts_repairs JSONB,
@@ -86,6 +85,9 @@ def _ensure_saved_estimates_table(cur) -> None:
     cur.execute("ALTER TABLE saved_estimates ADD COLUMN IF NOT EXISTS deductible NUMERIC")
     cur.execute("ALTER TABLE saved_estimates ADD COLUMN IF NOT EXISTS customer_pay NUMERIC")
     cur.execute("ALTER TABLE saved_estimates ADD COLUMN IF NOT EXISTS insurance_pay NUMERIC")
+    cur.execute("ALTER TABLE saved_estimates ADD COLUMN IF NOT EXISTS owner_info TEXT")
+    cur.execute("ALTER TABLE saved_estimates ADD COLUMN IF NOT EXISTS insurance_company TEXT")
+    cur.execute("ALTER TABLE saved_estimates ADD COLUMN IF NOT EXISTS vin VARCHAR(32)")
     cur.execute("ALTER TABLE saved_estimates ADD COLUMN IF NOT EXISTS domain VARCHAR(255)")
     cur.execute("CREATE INDEX IF NOT EXISTS idx_saved_estimates_ro_domain ON saved_estimates(ro, domain)")
 
@@ -387,54 +389,6 @@ async def grid_ui(request: Request, file: UploadFile = File(...), ajax: str = No
             return message
         return f"<html><body>{message}<br><a href='/ui'>Back</a></body></html>"
 
-    if domain and parts_items and ro_number:
-            conn = get_conn()
-            cur = conn.cursor()
-            try:
-                cur.execute(
-                    """
-                    CREATE TABLE IF NOT EXISTS parts_lines (
-                        id SERIAL PRIMARY KEY,
-                        ro VARCHAR(255) NOT NULL,
-                        vehicle VARCHAR(255),
-                        line_number INTEGER,
-                        description TEXT,
-                        part_type VARCHAR(50),
-                        price NUMERIC,
-                        qty NUMERIC,
-                        domain VARCHAR(255) NOT NULL,
-                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                    )
-                    """
-                )
-                cur.execute("CREATE INDEX IF NOT EXISTS idx_parts_lines_domain ON parts_lines(domain)")
-                cur.execute("CREATE INDEX IF NOT EXISTS idx_parts_lines_ro ON parts_lines(ro)")
-
-                cur.execute("DELETE FROM parts_lines WHERE ro = %s AND domain = %s", (ro_number, domain))
-
-                for item in parts_items:
-                    cur.execute(
-                        """
-                        INSERT INTO parts_lines
-                        (ro, vehicle, line_number, description, part_type, price, qty, domain)
-                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
-                        """,
-                        (
-                            ro_number,
-                            vehicle_info_line,
-                            item.get("line"),
-                            item.get("description"),
-                            item.get("part_type"),
-                            item.get("price"),
-                            item.get("qty"),
-                            domain,
-                        ),
-                    )
-
-                conn.commit()
-            finally:
-                cur.close()
-    
     # Generate pages HTML visualization
     pages_html = generate_pages_html(pages, anchor_page, anchor_ymid, subtotals_page, subtotals_ymid)
     
@@ -445,8 +399,6 @@ async def grid_ui(request: Request, file: UploadFile = File(...), ajax: str = No
     # If AJAX request, return just the content without HTML wrapper
     if ajax:
         # Generate modal HTML using imported functions
-        labor_modal = get_labor_modal_html(second_ro_line, vehicle_info_line, total_labor)
-        refinish_modal = get_refinish_modal_html(second_ro_line, vehicle_info_line, total_paint)
         save_estimate_modal = get_save_estimate_modal_html(
             second_ro_line,
             vehicle_info_line,
@@ -463,13 +415,9 @@ async def grid_ui(request: Request, file: UploadFile = File(...), ajax: str = No
         )
         
         # Generate modal styles
-        labor_styles = get_labor_modal_styles()
-        refinish_styles = get_refinish_modal_styles()
         save_estimate_styles = get_save_estimate_modal_styles()
         
         # Generate modal scripts
-        labor_script = get_labor_modal_script(labor_items_json, total_labor, second_ro_line, vehicle_info_line, ro_number)
-        refinish_script = get_refinish_modal_script(paint_items_json, total_paint, second_ro_line, vehicle_info_line, ro_number)
         save_estimate_script = get_save_estimate_modal_script(
             labor_items_json,
             paint_items_json,
@@ -488,20 +436,14 @@ async def grid_ui(request: Request, file: UploadFile = File(...), ajax: str = No
             insurance_company,
             vin,
         )
-        close_handler = get_modal_close_handler()
-
         
         content = f"""
 <h2>Document Visual Grid</h2>
-<button onclick="openLaborModal()" style='padding:10px 20px; font-size:14px; cursor:pointer; background-color:#505050; color:white; border:none; border-radius:3px; margin-right:10px;'>Assign Labor</button>
-<button onclick="openRefinishModal()" style='padding:10px 20px; font-size:14px; cursor:pointer; background-color:#505050; color:white; border:none; border-radius:3px; margin-right:10px;'>Assign Refinish</button>
 <button onclick="openSaveEstimateModal(window.currentEstimateTotals)" style='padding:10px 20px; font-size:14px; cursor:pointer; background-color:#4CAF50; color:white; border:none; border-radius:3px;'>Save</button>
 <br><br>
 {pages_html}
 <br><a href='/ui'>Back</a>
 
-{labor_modal}
-{refinish_modal}
 {save_estimate_modal}
 
 <style>
@@ -536,16 +478,11 @@ async def grid_ui(request: Request, file: UploadFile = File(...), ajax: str = No
   .close:hover {{
     color: black;
   }}
-{labor_styles}
-{refinish_styles}
 {save_estimate_styles}
 </style>
 
 <script>
-{labor_script}
-{refinish_script}
 {save_estimate_script}
-{close_handler}
 </script>
         """
         return content
@@ -570,9 +507,10 @@ async def save_estimate(request: Request):
         cur.execute(
             """
             INSERT INTO saved_estimates
-            (ro, vehicle, year, make, model, labor_repairs, paint_repairs, parts_repairs,
+            (ro, vehicle, year, make, model, owner_info, insurance_company, vin,
+             labor_repairs, paint_repairs, parts_repairs,
              estimate_totals, parts_total, grand_total, deductible, customer_pay, insurance_pay, domain)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             """,
             (
                 ro_value,
@@ -580,6 +518,9 @@ async def save_estimate(request: Request):
                 data.get("year"),
                 data.get("make"),
                 data.get("model"),
+                data.get("owner_info"),
+                data.get("insurance_company"),
+                data.get("vin"),
                 json.dumps(data.get("labor_repairs") or []),
                 json.dumps(data.get("paint_repairs") or []),
                 json.dumps(data.get("parts_repairs") or []),

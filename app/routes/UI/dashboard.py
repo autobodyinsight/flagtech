@@ -125,14 +125,19 @@ def get_dashboard_screen_html():
             
             // Load dashboard data
             async function loadDashboardData() {
-                try {
-                    const response = await fetch(BACKEND_BASE + '/api/dashboard-data');
-                    const data = await response.json();
-                    dashboardData = data;
-                    updateDashboard(data);
-                } catch (error) {
-                    console.error('Error loading dashboard data:', error);
-                }
+                const data = {
+                    totalSales: 0,
+                    pendingPayments: 0,
+                    currentGP: 0,
+                    partsCost: 0,
+                    averageHrs: 0,
+                    averageRO: 0,
+                    hoursPerTech: [],
+                    rosPerTech: [],
+                    roList: []
+                };
+                dashboardData = data;
+                updateDashboard(data);
             }
 
             async function flashAllData() {

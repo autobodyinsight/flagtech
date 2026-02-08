@@ -260,19 +260,11 @@ def get_phase_screen_html():
             }
 
             function loadPhaseData() {
-                fetch('/api/phase-data', { credentials: 'include' })
-                    .then(r => r.json())
-                    .then(res => {
-                        renderPhaseCards(res.items || []);
-                    })
-                    .catch(err => {
-                        console.error('Error loading phase data:', err);
-                        clearPhaseColumns();
-                        const teardown = document.getElementById('phase-teardown');
-                        if (teardown) {
-                            teardown.innerHTML = '<div style="color:red; text-align:center; padding:10px;">Error loading data</div>';
-                        }
-                    });
+                clearPhaseColumns();
+                const teardown = document.getElementById('phase-teardown');
+                if (teardown) {
+                    teardown.innerHTML = '<div style="color:#999; text-align:center; padding:10px;">Phase board is disabled</div>';
+                }
             }
         </script>
     </div>

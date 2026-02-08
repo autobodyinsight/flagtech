@@ -76,45 +76,6 @@ def init_users_table():
             else:
                 raise
         
-        # Add domain column to labor_assignments table if needed
-        try:
-            cur.execute("""
-                ALTER TABLE labor_assignments 
-                ADD COLUMN domain VARCHAR(255)
-            """)
-            print("✓ Added domain column to labor_assignments table")
-        except Exception as e:
-            if "already exists" in str(e) or "duplicate column" in str(e).lower():
-                print("✓ Domain column already exists in labor_assignments table")
-            else:
-                raise
-        
-        # Add domain column to refinish_assignments table if needed
-        try:
-            cur.execute("""
-                ALTER TABLE refinish_assignments 
-                ADD COLUMN domain VARCHAR(255)
-            """)
-            print("✓ Added domain column to refinish_assignments table")
-        except Exception as e:
-            if "already exists" in str(e) or "duplicate column" in str(e).lower():
-                print("✓ Domain column already exists in refinish_assignments table")
-            else:
-                raise
-        
-        # Create indexes on domain columns
-        cur.execute("""
-            CREATE INDEX IF NOT EXISTS idx_techs_domain ON techs(domain)
-        """)
-        
-        cur.execute("""
-            CREATE INDEX IF NOT EXISTS idx_labor_domain ON labor_assignments(domain)
-        """)
-        
-        cur.execute("""
-            CREATE INDEX IF NOT EXISTS idx_refinish_domain ON refinish_assignments(domain)
-        """)
-
         # Create parts vendors table
         cur.execute("""
             CREATE TABLE IF NOT EXISTS parts_vendors (
