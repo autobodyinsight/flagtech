@@ -164,6 +164,17 @@ def _parse_float_value(value) -> float:
         return 0.0
 
 
+def _sum_hours(items) -> float:
+    if not isinstance(items, list):
+        return 0.0
+    total = 0.0
+    for item in items:
+        if not isinstance(item, dict):
+            continue
+        total += _parse_float_value(item.get("value"))
+    return total
+
+
 @router.post("/parse-labor", response_model=EstimateResponse)
 async def parse_labor(file: UploadFile = File(...)):
     doc = load_pdf(file)
@@ -534,6 +545,81 @@ async def phase_update(request: Request):
         )
         conn.commit()
         return {"status": "ok"}
+    finally:
+        cur.close()
+
+
+@router.get("/phase/board")
+async def phase_board(request: Request):
+    domain = get_user_domain(request)
+    if not domain:
+        return JSONResponse(status_code=401, content={"error": "Not authenticated"})
+
+    conn = get_conn()
+    cur = conn.cursor()
+    try:
+        _ensure_saved_estimates_table(cur)
+        _ensure_ro_phases_table(cur)
+
+        cur.execute(
+            """
+            SELECT DISTINCT ON (ro)
+                   ro,
+                   vehicle,
+                   year,
+                   make,
+                   model,
+                   labor_repairs,
+                   paint_repairs
+            FROM saved_estimates
+            WHERE domain = %s
+              AND ro IS NOT NULL
+              AND ro <> ''
+            ORDER BY ro, saved_at DESC, id DESC
+            """,
+            (domain,),
+        )
+        estimate_rows = cur.fetchall()
+
+        cur.execute(
+            """
+            SELECT ro, phase
+            FROM ro_phases
+            WHERE domain = %s
+            """,
+            (domain,),
+        )
+        phase_rows = cur.fetchall()
+        phase_map = {row.get("ro"): row.get("phase") for row in phase_rows}
+
+        items = []
+        for row in estimate_rows:
+            ro = row.get("ro")
+            labor_repairs = _parse_json_field(row.get("labor_repairs"))
+            paint_repairs = _parse_json_field(row.get("paint_repairs"))
+
+            labor_hours = _sum_hours(labor_repairs)
+            paint_hours = _sum_hours(paint_repairs)
+
+            year = (row.get("year") or "").strip()
+            make = (row.get("make") or "").strip()
+            model = (row.get("model") or "").strip()
+            short_vehicle = " ".join(part for part in (year, make, model) if part)
+            vehicle_display = short_vehicle or row.get("vehicle") or ""
+
+            items.append(
+                {
+                    "ro": ro,
+                    "vehicle": vehicle_display,
+                    "phase": phase_map.get(ro, "teardown"),
+                    "labor_tech": "Unassigned",
+                    "labor_hours": labor_hours,
+                    "paint_tech": "Unassigned",
+                    "paint_hours": paint_hours,
+                }
+            )
+
+        return {"items": items}
     finally:
         cur.close()
 

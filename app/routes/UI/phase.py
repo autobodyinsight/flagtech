@@ -90,9 +90,9 @@ def get_phase_screen_html():
                 margin-bottom: 6px;
             }
             .phase-card .meta {
-                display: grid;
-                grid-template-columns: 1fr 1fr;
-                gap: 4px 8px;
+                display: flex;
+                flex-direction: column;
+                gap: 4px;
                 font-size: 11px;
                 color: #666;
             }
@@ -184,11 +184,8 @@ def get_phase_screen_html():
                         <div class="ro">RO# ${item.ro || '—'}</div>
                         <div class="vehicle">${item.vehicle || '—'}</div>
                         <div class="meta">
-                            <div><strong>Tech:</strong> ${item.tech || '—'}</div>
-                            <div><strong>Labor:</strong> ${item.labor_hours?.toFixed ? item.labor_hours.toFixed(1) : (item.labor_hours || 0)} hrs</div>
-                            <div><strong>Total:</strong> ${item.total_hours?.toFixed ? item.total_hours.toFixed(1) : (item.total_hours || 0)} hrs</div>
-                            <div><strong>Days In:</strong> ${item.days_in ?? '—'}</div>
-                            <div><strong>ECD:</strong> ${item.ecd || '—'}</div>
+                            <div><strong>Labor:</strong> ${item.labor_tech || 'Unassigned'} — ${item.labor_hours?.toFixed ? item.labor_hours.toFixed(1) : (item.labor_hours || 0)} hrs</div>
+                            <div><strong>Paint:</strong> ${item.paint_tech || 'Unassigned'} — ${item.paint_hours?.toFixed ? item.paint_hours.toFixed(1) : (item.paint_hours || 0)} hrs</div>
                         </div>
                     `;
                     card.addEventListener('dragstart', (event) => {
@@ -263,8 +260,23 @@ def get_phase_screen_html():
                 clearPhaseColumns();
                 const teardown = document.getElementById('phase-teardown');
                 if (teardown) {
-                    teardown.innerHTML = '<div style="color:#999; text-align:center; padding:10px;">Phase board is disabled</div>';
+                    teardown.innerHTML = '<div style="color:#999; text-align:center; padding:10px;">Loading...</div>';
                 }
+
+                fetch('/api/phase/board', { credentials: 'include' })
+                    .then(r => r.json())
+                    .then(res => {
+                        if (res.error) {
+                            throw new Error(res.error);
+                        }
+                        renderPhaseCards(res.items || []);
+                    })
+                    .catch(err => {
+                        console.error('Error loading phase data:', err);
+                        if (teardown) {
+                            teardown.innerHTML = '<div style="color:#999; text-align:center; padding:10px;">Unable to load phase board</div>';
+                        }
+                    });
             }
         </script>
     </div>
