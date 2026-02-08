@@ -520,6 +520,44 @@ async def get_dashboard_data(request: Request):
         cur.close()
 
 
+@router.get("/ro-repairs")
+async def get_ro_repairs(request: Request, ro: str):
+    domain = get_user_domain(request)
+    if not domain:
+        return JSONResponse(status_code=401, content={"error": "Not authenticated"})
+
+    ro_value = (ro or "").strip()
+    if not ro_value:
+        return JSONResponse(status_code=400, content={"error": "ro is required"})
+
+    conn = get_conn()
+    cur = conn.cursor()
+    try:
+        _ensure_saved_estimates_table(cur)
+        cur.execute(
+            """
+            SELECT labor_repairs, paint_repairs
+            FROM saved_estimates
+            WHERE domain = %s AND ro = %s
+            ORDER BY saved_at DESC, id DESC
+            LIMIT 1
+            """,
+            (domain, ro_value),
+        )
+        row = cur.fetchone()
+        labor_repairs = _parse_json_field(row.get("labor_repairs")) if row else []
+        paint_repairs = _parse_json_field(row.get("paint_repairs")) if row else []
+
+        if not isinstance(labor_repairs, list):
+            labor_repairs = []
+        if not isinstance(paint_repairs, list):
+            paint_repairs = []
+
+        return {"labor": labor_repairs, "paint": paint_repairs}
+    finally:
+        cur.close()
+
+
 @router.post("/phase/update")
 async def phase_update(request: Request):
     domain = get_user_domain(request) or "default"

@@ -98,17 +98,26 @@ def get_dashboard_screen_html():
                                 <th style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold; color:#555;">RO#</th>
                                 <th style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold; color:#555;">Vehicle</th>
                                 <th style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold; color:#555;">Tech</th>
+                                <th style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold; color:#555;">Painter</th>
                                 <th style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold; color:#555; text-align:right;">HRS</th>
                                 <th style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold; color:#555; text-align:right;">Total</th>
                             </tr>
                         </thead>
                         <tbody id="roListBody">
                             <tr>
-                                <td colspan="5" style="padding:20px; text-align:center; color:#999;">Loading...</td>
+                                <td colspan="6" style="padding:20px; text-align:center; color:#999;">Loading...</td>
                             </tr>
                         </tbody>
                     </table>
                 </div>
+            </div>
+        </div>
+
+        <div id="repairLinesModal" class="modal" style="display:none;">
+            <div class="modal-content" style="max-width:900px; max-height:80vh; overflow-y:auto;">
+                <span class="close" onclick="closeRepairLinesModal()">&times;</span>
+                <h2 id="repairLinesTitle" style="margin-bottom:16px;">Repair Lines</h2>
+                <div id="repairLinesBody"></div>
             </div>
         </div>
         
@@ -359,7 +368,7 @@ def get_dashboard_screen_html():
                 const tbody = document.getElementById('roListBody');
                 
                 if (!roList || roList.length === 0) {
-                    tbody.innerHTML = '<tr><td colspan="5" style="padding:20px; text-align:center; color:#999;">No repair orders found</td></tr>';
+                    tbody.innerHTML = '<tr><td colspan="6" style="padding:20px; text-align:center; color:#999;">No repair orders found</td></tr>';
                     return;
                 }
                 
@@ -367,16 +376,27 @@ def get_dashboard_screen_html():
                 roList.forEach((ro, index) => {
                     const rowBg = index % 2 === 0 ? '#fff' : '#f9f9f9';
                     const rowId = safeId(ro.ro);
+                    const techLabel = ro.tech || 'Unassigned';
+                    const painterLabel = ro.painter || 'Unassigned';
                     html += `
                         <tr style="background:${rowBg}; cursor:pointer;" onclick="toggleRoNotes('${ro.ro}')">
                             <td style="padding:12px; border-bottom:1px solid #eee; color:#0066cc; text-decoration:underline;">${ro.ro}</td>
                             <td style="padding:12px; border-bottom:1px solid #eee; color:#333;">${ro.vehicle || 'N/A'}</td>
-                            <td style="padding:12px; border-bottom:1px solid #eee; color:#333;">${ro.tech || 'Unassigned'}</td>
+                            <td style="padding:12px; border-bottom:1px solid #eee; color:#333;">
+                                <button type="button" onclick="openRepairLinesModal(event, '${ro.ro}', 'labor')" style="background:none; border:none; color:#0066cc; text-decoration:underline; cursor:pointer; padding:0; font:inherit;">
+                                    ${techLabel}
+                                </button>
+                            </td>
+                            <td style="padding:12px; border-bottom:1px solid #eee; color:#333;">
+                                <button type="button" onclick="openRepairLinesModal(event, '${ro.ro}', 'paint')" style="background:none; border:none; color:#0066cc; text-decoration:underline; cursor:pointer; padding:0; font:inherit;">
+                                    ${painterLabel}
+                                </button>
+                            </td>
                             <td style="padding:12px; border-bottom:1px solid #eee; color:#333; text-align:right;">${ro.hours.toFixed(1)}</td>
                             <td style="padding:12px; border-bottom:1px solid #eee; color:#333; text-align:right; font-weight:bold;">$${ro.total.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
                         </tr>
                         <tr id="notes-row-${rowId}" style="display:none; background:${rowBg};">
-                            <td colspan="5" style="padding:12px 16px; border-bottom:1px solid #eee;">
+                            <td colspan="6" style="padding:12px 16px; border-bottom:1px solid #eee;">
                                 <div style="background:#fafafa; border:1px solid #ddd; border-radius:6px; padding:12px;">
                                     <div style="font-weight:bold; margin-bottom:8px;">Notes</div>
                                     <div id="notes-list-${rowId}" style="max-height:180px; overflow-y:auto; margin-bottom:10px;"></div>
@@ -391,6 +411,62 @@ def get_dashboard_screen_html():
                 });
                 
                 tbody.innerHTML = html;
+            }
+
+            function closeRepairLinesModal() {
+                const modal = document.getElementById('repairLinesModal');
+                if (modal) modal.style.display = 'none';
+            }
+
+            function renderRepairLines(lines, mode) {
+                const container = document.getElementById('repairLinesBody');
+                if (!container) return;
+
+                if (!lines || lines.length === 0) {
+                    container.innerHTML = '<div style="color:#777;">No repair lines found.</div>';
+                    return;
+                }
+
+                container.innerHTML = lines.map(item => {
+                    const line = item.line || '—';
+                    const desc = item.description || '';
+                    const value = Number.isFinite(parseFloat(item.value)) ? parseFloat(item.value).toFixed(1) : '0.0';
+                    return `
+                        <div style="display:flex; justify-content:space-between; padding:10px 8px; border-bottom:1px solid #eee;">
+                            <div style="flex:1;"><strong>Line ${line}</strong> - ${desc}</div>
+                            <div style="min-width:80px; text-align:right; font-weight:bold;">${value} hrs</div>
+                        </div>
+                    `;
+                }).join('');
+            }
+
+            function openRepairLinesModal(event, roNumber, mode) {
+                if (event) {
+                    event.stopPropagation();
+                }
+                const modal = document.getElementById('repairLinesModal');
+                const title = document.getElementById('repairLinesTitle');
+                const container = document.getElementById('repairLinesBody');
+                if (!modal || !title || !container) return;
+
+                const label = mode === 'paint' ? 'Paint' : 'Labor';
+                title.textContent = `${label} Repair Lines - RO# ${roNumber}`;
+                container.innerHTML = '<div style="color:#777;">Loading...</div>';
+                modal.style.display = 'block';
+
+                fetch(`/api/ro-repairs?ro=${encodeURIComponent(roNumber)}`, { credentials: 'include' })
+                    .then(r => r.json())
+                    .then(res => {
+                        if (res.error) {
+                            throw new Error(res.error);
+                        }
+                        const lines = mode === 'paint' ? res.paint : res.labor;
+                        renderRepairLines(lines || [], mode);
+                    })
+                    .catch(err => {
+                        console.error('Error loading repair lines:', err);
+                        container.innerHTML = '<div style="color:red;">Error loading repair lines.</div>';
+                    });
             }
             
             // Load dashboard data when dashboard screen is shown
