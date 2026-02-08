@@ -142,6 +142,29 @@ def _ensure_ro_notes_table(cur) -> None:
     cur.execute("CREATE INDEX IF NOT EXISTS idx_ro_notes_ro_domain ON ro_notes(ro, domain)")
 
 
+def _ensure_ro_assignments_table(cur) -> None:
+    cur.execute(
+        """
+        CREATE TABLE IF NOT EXISTS ro_assignments (
+            id SERIAL PRIMARY KEY,
+            ro VARCHAR(255) NOT NULL,
+            role VARCHAR(20) NOT NULL,
+            tech_id INTEGER,
+            tech_name VARCHAR(255),
+            excluded_lines JSONB,
+            domain VARCHAR(255) NOT NULL,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+        """
+    )
+    cur.execute(
+        """
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_ro_assignments_ro_role_domain
+        ON ro_assignments(ro, role, domain)
+        """
+    )
+
+
 def _parse_json_field(value):
     if value is None:
         return []
@@ -425,6 +448,7 @@ async def get_dashboard_data(request: Request):
     cur = conn.cursor()
     try:
         _ensure_saved_estimates_table(cur)
+        _ensure_ro_assignments_table(cur)
         cur.execute(
             """
             SELECT DISTINCT ON (ro)
@@ -447,6 +471,19 @@ async def get_dashboard_data(request: Request):
             (domain,),
         )
         rows = cur.fetchall()
+
+        cur.execute(
+            """
+            SELECT ro, role, tech_name
+            FROM ro_assignments
+            WHERE domain = %s
+            """,
+            (domain,),
+        )
+        assignment_rows = cur.fetchall()
+        assignment_map = {}
+        for row in assignment_rows:
+            assignment_map[(row.get("ro"), row.get("role"))] = row.get("tech_name")
 
         total_sales = 0.0
         total_parts = 0.0
@@ -495,7 +532,8 @@ async def get_dashboard_data(request: Request):
                 {
                     "ro": ro,
                     "vehicle": vehicle_display,
-                    "tech": "",
+                    "tech": assignment_map.get((ro, "labor"), "Unassigned"),
+                    "painter": assignment_map.get((ro, "paint"), "Unassigned"),
                     "hours": ro_hours,
                     "total": grand_total,
                 }
@@ -534,6 +572,7 @@ async def get_ro_repairs(request: Request, ro: str):
     cur = conn.cursor()
     try:
         _ensure_saved_estimates_table(cur)
+        _ensure_ro_assignments_table(cur)
         cur.execute(
             """
             SELECT labor_repairs, paint_repairs
@@ -553,7 +592,90 @@ async def get_ro_repairs(request: Request, ro: str):
         if not isinstance(paint_repairs, list):
             paint_repairs = []
 
-        return {"labor": labor_repairs, "paint": paint_repairs}
+        cur.execute(
+            """
+            SELECT role, tech_id, tech_name, excluded_lines
+            FROM ro_assignments
+            WHERE domain = %s AND ro = %s
+            """,
+            (domain, ro_value),
+        )
+        assignment_rows = cur.fetchall()
+        assignments = {
+            "labor": {},
+            "paint": {},
+        }
+        for assignment in assignment_rows:
+            role = assignment.get("role")
+            if role not in assignments:
+                continue
+            assignments[role] = {
+                "tech_id": assignment.get("tech_id"),
+                "tech_name": assignment.get("tech_name"),
+                "excluded_lines": assignment.get("excluded_lines") or [],
+            }
+
+        return {"labor": labor_repairs, "paint": paint_repairs, "assignments": assignments}
+    finally:
+        cur.close()
+
+
+@router.post("/ro-assignments")
+async def save_ro_assignments(request: Request):
+    domain = get_user_domain(request)
+    if not domain:
+        return JSONResponse(status_code=401, content={"error": "Not authenticated"})
+
+    data = await request.json()
+    ro_value = (data.get("ro") or "").strip()
+    role = (data.get("role") or "").strip().lower()
+    tech_id = data.get("tech_id")
+    tech_name = (data.get("tech_name") or "").strip()
+    excluded_lines = data.get("excluded_lines") or []
+
+    if not ro_value or role not in {"labor", "paint"}:
+        return JSONResponse(status_code=400, content={"error": "ro and role are required"})
+
+    conn = get_conn()
+    cur = conn.cursor()
+    try:
+        _ensure_ro_assignments_table(cur)
+
+        if tech_id and not tech_name:
+            cur.execute(
+                """
+                SELECT first_name, last_name
+                FROM techs
+                WHERE id = %s
+                """,
+                (tech_id,),
+            )
+            row = cur.fetchone()
+            if row:
+                tech_name = " ".join(part for part in [row.get("first_name"), row.get("last_name")] if part)
+
+        cur.execute(
+            """
+            INSERT INTO ro_assignments (ro, role, tech_id, tech_name, excluded_lines, domain)
+            VALUES (%s, %s, %s, %s, %s, %s)
+            ON CONFLICT (ro, role, domain)
+            DO UPDATE SET
+                tech_id = EXCLUDED.tech_id,
+                tech_name = EXCLUDED.tech_name,
+                excluded_lines = EXCLUDED.excluded_lines,
+                updated_at = CURRENT_TIMESTAMP
+            """,
+            (
+                ro_value,
+                role,
+                tech_id,
+                tech_name or None,
+                json.dumps(excluded_lines),
+                domain,
+            ),
+        )
+        conn.commit()
+        return {"status": "ok"}
     finally:
         cur.close()
 

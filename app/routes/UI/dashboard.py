@@ -117,9 +117,48 @@ def get_dashboard_screen_html():
             <div class="modal-content" style="max-width:900px; max-height:80vh; overflow-y:auto;">
                 <span class="close" onclick="closeRepairLinesModal()">&times;</span>
                 <h2 id="repairLinesTitle" style="margin-bottom:16px;">Repair Lines</h2>
+                <div style="margin-bottom:12px;">
+                    <label for="repairLinesTech" style="font-weight:bold; font-size:12px; color:#666;">TECH</label>
+                    <select id="repairLinesTech" style="width:100%; padding:8px; margin-top:6px;"></select>
+                </div>
                 <div id="repairLinesBody"></div>
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-top:12px;">
+                    <div id="repairLinesTotal" style="font-weight:bold;">Total Assigned: 0.0 hrs</div>
+                    <button id="repairLinesSave" onclick="saveRepairAssignment()" style="padding:8px 16px; background:#4CAF50; color:#fff; border:none; border-radius:4px; cursor:pointer;">Save</button>
+                </div>
             </div>
         </div>
+
+        <style>
+            .modal {
+                position: fixed;
+                z-index: 1000;
+                left: 0;
+                top: 0;
+                width: 100%;
+                height: 100%;
+                overflow: auto;
+                background-color: rgba(0,0,0,0.4);
+            }
+            .modal-content {
+                background-color: #f2f2f2;
+                margin: 3% auto;
+                padding: 20px;
+                border: 1px solid #888;
+                width: 95%;
+                border-radius: 6px;
+            }
+            .close {
+                color: #aaa;
+                float: right;
+                font-size: 28px;
+                font-weight: bold;
+                cursor: pointer;
+            }
+            .close:hover {
+                color: #000;
+            }
+        </style>
         
         <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
         <script>
@@ -418,26 +457,76 @@ def get_dashboard_screen_html():
                 if (modal) modal.style.display = 'none';
             }
 
-            function renderRepairLines(lines, mode) {
+            let currentRepairMode = 'labor';
+            let currentRepairRo = '';
+            let currentRepairLines = [];
+
+            function normalizeLineKey(item, index) {
+                return item.line !== null && item.line !== undefined ? String(item.line) : String(index + 1);
+            }
+
+            function updateAssignedTotal() {
+                const totalEl = document.getElementById('repairLinesTotal');
+                if (!totalEl) return;
+                let total = 0.0;
+                currentRepairLines.forEach((item, index) => {
+                    const key = normalizeLineKey(item, index);
+                    const checkbox = document.querySelector(`.repair-line-omit[data-line="${key}"]`);
+                    if (checkbox && checkbox.checked) {
+                        return;
+                    }
+                    const val = parseFloat(item.value);
+                    if (Number.isFinite(val)) {
+                        total += val;
+                    }
+                });
+                totalEl.textContent = `Total Assigned: ${total.toFixed(1)} hrs`;
+            }
+
+            function renderRepairLines(lines, mode, assignment, techs) {
                 const container = document.getElementById('repairLinesBody');
                 if (!container) return;
 
+                const techSelect = document.getElementById('repairLinesTech');
+                if (techSelect) {
+                    const options = ['<option value="">Select tech...</option>'];
+                    (techs || []).forEach(tech => {
+                        const label = `${tech.first_name || ''} ${tech.last_name || ''}`.trim() || `Tech #${tech.id}`;
+                        options.push(`<option value="${tech.id}" data-name="${label}">${label}</option>`);
+                    });
+                    techSelect.innerHTML = options.join('');
+                    if (assignment && assignment.tech_id) {
+                        techSelect.value = String(assignment.tech_id);
+                    }
+                }
+
+                const excluded = Array.isArray(assignment?.excluded_lines) ? assignment.excluded_lines.map(String) : [];
+
                 if (!lines || lines.length === 0) {
                     container.innerHTML = '<div style="color:#777;">No repair lines found.</div>';
+                    updateAssignedTotal();
                     return;
                 }
 
-                container.innerHTML = lines.map(item => {
-                    const line = item.line || '—';
+                container.innerHTML = lines.map((item, index) => {
+                    const lineKey = normalizeLineKey(item, index);
+                    const line = item.line || lineKey || '—';
                     const desc = item.description || '';
                     const value = Number.isFinite(parseFloat(item.value)) ? parseFloat(item.value).toFixed(1) : '0.0';
+                    const isOmitted = excluded.includes(lineKey);
                     return `
-                        <div style="display:flex; justify-content:space-between; padding:10px 8px; border-bottom:1px solid #eee;">
+                        <div style="display:flex; align-items:center; gap:10px; padding:10px 8px; border-bottom:1px solid #eee;">
+                            <div style="width:24px;"><input type="checkbox" class="repair-line-omit" data-line="${lineKey}" ${isOmitted ? 'checked' : ''} /></div>
                             <div style="flex:1;"><strong>Line ${line}</strong> - ${desc}</div>
                             <div style="min-width:80px; text-align:right; font-weight:bold;">${value} hrs</div>
                         </div>
                     `;
                 }).join('');
+
+                container.querySelectorAll('.repair-line-omit').forEach(checkbox => {
+                    checkbox.addEventListener('change', updateAssignedTotal);
+                });
+                updateAssignedTotal();
             }
 
             function openRepairLinesModal(event, roNumber, mode) {
@@ -449,23 +538,80 @@ def get_dashboard_screen_html():
                 const container = document.getElementById('repairLinesBody');
                 if (!modal || !title || !container) return;
 
-                const label = mode === 'paint' ? 'Paint' : 'Labor';
+                currentRepairMode = mode === 'paint' ? 'paint' : 'labor';
+                currentRepairRo = roNumber;
+                currentRepairLines = [];
+
+                const label = currentRepairMode === 'paint' ? 'Paint' : 'Labor';
                 title.textContent = `${label} Repair Lines - RO# ${roNumber}`;
                 container.innerHTML = '<div style="color:#777;">Loading...</div>';
                 modal.style.display = 'block';
 
-                fetch(`/api/ro-repairs?ro=${encodeURIComponent(roNumber)}`, { credentials: 'include' })
+                Promise.all([
+                    fetch(`/api/ro-repairs?ro=${encodeURIComponent(roNumber)}`, { credentials: 'include' }).then(r => r.json()),
+                    fetch('/api/techs/list', { credentials: 'include' }).then(r => r.json())
+                ])
+                    .then(([repairsRes, techsRes]) => {
+                        if (repairsRes.error) {
+                            throw new Error(repairsRes.error);
+                        }
+                        const lines = currentRepairMode === 'paint' ? repairsRes.paint : repairsRes.labor;
+                        const assignment = repairsRes.assignments ? repairsRes.assignments[currentRepairMode] : null;
+                        const techs = techsRes.techs || [];
+                        currentRepairLines = Array.isArray(lines) ? lines : [];
+                        renderRepairLines(currentRepairLines, currentRepairMode, assignment, techs);
+                    })
+                    .catch(err => {
+                        console.error('Error loading repair lines:', err);
+                        container.innerHTML = '<div style="color:red;">Error loading repair lines.</div>';
+                    });
+            }
+
+            function saveRepairAssignment() {
+                if (!currentRepairRo) {
+                    return;
+                }
+
+                const techSelect = document.getElementById('repairLinesTech');
+                if (!techSelect || !techSelect.value) {
+                    alert('Please select a tech.');
+                    return;
+                }
+                const techId = parseInt(techSelect.value, 10);
+                const techName = techSelect.options[techSelect.selectedIndex]?.dataset?.name || '';
+
+                const excludedLines = [];
+                currentRepairLines.forEach((item, index) => {
+                    const key = normalizeLineKey(item, index);
+                    const checkbox = document.querySelector(`.repair-line-omit[data-line="${key}"]`);
+                    if (checkbox && checkbox.checked) {
+                        excludedLines.push(key);
+                    }
+                });
+
+                fetch('/api/ro-assignments', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'include',
+                    body: JSON.stringify({
+                        ro: currentRepairRo,
+                        role: currentRepairMode,
+                        tech_id: techId,
+                        tech_name: techName,
+                        excluded_lines: excludedLines
+                    })
+                })
                     .then(r => r.json())
                     .then(res => {
                         if (res.error) {
                             throw new Error(res.error);
                         }
-                        const lines = mode === 'paint' ? res.paint : res.labor;
-                        renderRepairLines(lines || [], mode);
+                        closeRepairLinesModal();
+                        loadDashboardData();
                     })
                     .catch(err => {
-                        console.error('Error loading repair lines:', err);
-                        container.innerHTML = '<div style="color:red;">Error loading repair lines.</div>';
+                        console.error('Error saving assignment:', err);
+                        alert('Error saving assignment.');
                     });
             }
             
