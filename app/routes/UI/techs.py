@@ -54,6 +54,52 @@ def get_techs_screen_html():
             </div>
         </div>
 
+        <div id="techAssignmentModal" class="modal" style="display:none;">
+            <div class="modal-content" style="max-width:900px; max-height:80vh; overflow-y:auto;">
+                <span class="close" onclick="closeTechAssignmentModal()">&times;</span>
+                <h3 id="techAssignmentTitle" style="margin-bottom:12px;">Assigned Repairs</h3>
+                <div id="techAssignmentBody"></div>
+                <div style="text-align:right; margin-top:12px;">
+                    <button onclick="printTechAssignment()" style="padding:8px 16px; background:#505050; color:#fff; border:none; border-radius:4px; cursor:pointer;">Print</button>
+                </div>
+            </div>
+        </div>
+
+        <style>
+            .tech-row.clickable {
+                cursor: pointer;
+            }
+            .tech-assignments {
+                padding: 10px 12px;
+                border-bottom: 1px solid #eee;
+                background: #fafafa;
+            }
+            .tech-assignments .assignment-item {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                padding: 8px 0;
+                border-bottom: 1px solid #eee;
+            }
+            .tech-assignments .assignment-item:last-child {
+                border-bottom: none;
+            }
+            .tech-assignments .assignment-meta {
+                display: flex;
+                gap: 12px;
+                align-items: center;
+                font-size: 12px;
+                color: #555;
+            }
+            .tech-assignments .assignment-role {
+                padding: 2px 6px;
+                border-radius: 10px;
+                background: #e0e0e0;
+                font-size: 11px;
+                text-transform: uppercase;
+            }
+        </style>
+
         <script>
 
         // Check if BACKEND_BASE is already defined, if not, define it
@@ -125,11 +171,12 @@ def get_techs_screen_html():
                 // Display tech details in table
                 techsRes.techs.forEach(tech => {
                     const fullName = `${tech.first_name} ${tech.last_name}`;
+                    const assignmentsId = `tech-assignments-${tech.id}`;
 
                     // Main tech row
                     const row = document.createElement('div');
                     row.style.cssText = 'display:flex; justify-content:space-between; align-items:center; padding:12px; border-bottom:1px solid #eee;';
-                    row.className = 'tech-row';
+                    row.className = 'tech-row clickable';
 
                     const techNameCell = document.createElement('div');
                     techNameCell.style.flex = "1";
@@ -179,13 +226,168 @@ def get_techs_screen_html():
                     row.onmouseover = function() { this.style.backgroundColor = "#f5f5f5"; };
                     row.onmouseout = function() { this.style.backgroundColor = "transparent"; };
 
+                    row.onclick = function() {
+                        toggleTechAssignments(tech.id, fullName, assignmentsId);
+                    };
+
+                    const assignmentsRow = document.createElement('div');
+                    assignmentsRow.id = assignmentsId;
+                    assignmentsRow.className = 'tech-assignments';
+                    assignmentsRow.style.display = 'none';
+
                     tableContainer.appendChild(row);
+                    tableContainer.appendChild(assignmentsRow);
                 });
             })
             .catch(err => {
                 console.error("Error loading techs:", err);
                 tableContainer.innerHTML = "<p style='color:red; text-align:center; padding:12px;'>Error loading techs.</p>";
             });
+        }
+
+        function toggleTechAssignments(techId, techName, containerId) {
+            const container = document.getElementById(containerId);
+            if (!container) return;
+            const isVisible = container.style.display === 'block';
+            container.style.display = isVisible ? 'none' : 'block';
+            if (!isVisible) {
+                loadTechAssignments(techId, techName, container);
+            }
+        }
+
+        function loadTechAssignments(techId, techName, container) {
+            container.innerHTML = '<div style="color:#777;">Loading assignments...</div>';
+
+            fetch(`${BACKEND_BASE}/api/tech-assignments?tech_id=${encodeURIComponent(techId)}`, { credentials: 'include' })
+                .then(r => r.json())
+                .then(res => {
+                    if (res.error) {
+                        throw new Error(res.error);
+                    }
+                    const assignments = res.assignments || [];
+                    if (assignments.length === 0) {
+                        container.innerHTML = '<div style="color:#999;">No assignments yet.</div>';
+                        return;
+                    }
+                    container.innerHTML = assignments.map(item => {
+                        const roleLabel = item.role === 'paint' ? 'Painter' : 'Labor';
+                        const total = Number.isFinite(parseFloat(item.total_hours)) ? parseFloat(item.total_hours).toFixed(1) : '0.0';
+                        const ro = item.ro || '—';
+                        const excluded = encodeURIComponent(JSON.stringify(item.excluded_lines || []));
+                        return `
+                            <div class="assignment-item">
+                                <div class="assignment-meta">
+                                    <span class="assignment-role">${roleLabel}</span>
+                                    <button type="button" class="assignment-link" data-ro="${ro}" data-role="${item.role}" data-excluded="${excluded}" data-tech="${techName.replace(/"/g, '&quot;')}" style="background:none; border:none; color:#0066cc; text-decoration:underline; cursor:pointer; padding:0; font:inherit;">
+                                        RO# ${ro}
+                                    </button>
+                                </div>
+                                <div style="font-weight:bold;">${total} hrs</div>
+                            </div>
+                        `;
+                    }).join('');
+
+                    container.querySelectorAll('.assignment-link').forEach(button => {
+                        button.addEventListener('click', (event) => {
+                            event.stopPropagation();
+                            const ro = button.dataset.ro || '';
+                            const role = button.dataset.role || 'labor';
+                            const tech = button.dataset.tech || '';
+                            let excluded = [];
+                            try {
+                                excluded = JSON.parse(decodeURIComponent(button.dataset.excluded || '[]'));
+                            } catch (e) {
+                                excluded = [];
+                            }
+                            openTechAssignmentModal(event, ro, role, excluded, tech);
+                        });
+                    });
+                })
+                .catch(err => {
+                    console.error('Error loading assignments:', err);
+                    container.innerHTML = '<div style="color:red;">Error loading assignments.</div>';
+                });
+        }
+
+        let currentAssignmentPrintHtml = '';
+
+        function openTechAssignmentModal(event, roNumber, role, excludedLines, techName) {
+            if (event) {
+                event.stopPropagation();
+            }
+            const modal = document.getElementById('techAssignmentModal');
+            const title = document.getElementById('techAssignmentTitle');
+            const body = document.getElementById('techAssignmentBody');
+            if (!modal || !title || !body) return;
+
+            const roleLabel = role === 'paint' ? 'Painter' : 'Labor';
+            title.textContent = `${roleLabel} Lines - RO# ${roNumber} (${techName})`;
+            body.innerHTML = '<div style="color:#777;">Loading...</div>';
+            modal.style.display = 'block';
+
+            fetch(`${BACKEND_BASE}/api/ro-repairs?ro=${encodeURIComponent(roNumber)}`, { credentials: 'include' })
+                .then(r => r.json())
+                .then(res => {
+                    if (res.error) {
+                        throw new Error(res.error);
+                    }
+                    const lines = role === 'paint' ? res.paint : res.labor;
+                    const excluded = Array.isArray(excludedLines) ? excludedLines.map(String) : [];
+                    const visible = (lines || []).filter((item, index) => {
+                        const key = item.line !== null && item.line !== undefined ? String(item.line) : String(index + 1);
+                        return !excluded.includes(key);
+                    });
+                    if (!visible.length) {
+                        body.innerHTML = '<div style="color:#777;">No assigned repair lines.</div>';
+                        currentAssignmentPrintHtml = '<div>No assigned repair lines.</div>';
+                        return;
+                    }
+                    body.innerHTML = visible.map(item => {
+                        const line = item.line || '—';
+                        const desc = item.description || '';
+                        const value = Number.isFinite(parseFloat(item.value)) ? parseFloat(item.value).toFixed(1) : '0.0';
+                        return `
+                            <div style="display:flex; justify-content:space-between; padding:10px 8px; border-bottom:1px solid #eee;">
+                                <div style="flex:1;"><strong>Line ${line}</strong> - ${desc}</div>
+                                <div style="min-width:80px; text-align:right; font-weight:bold;">${value} hrs</div>
+                            </div>
+                        `;
+                    }).join('');
+                    currentAssignmentPrintHtml = body.innerHTML;
+                })
+                .catch(err => {
+                    console.error('Error loading repair lines:', err);
+                    body.innerHTML = '<div style="color:red;">Error loading repair lines.</div>';
+                    currentAssignmentPrintHtml = '<div>Error loading repair lines.</div>';
+                });
+        }
+
+        function closeTechAssignmentModal() {
+            const modal = document.getElementById('techAssignmentModal');
+            if (modal) modal.style.display = 'none';
+        }
+
+        function printTechAssignment() {
+            const printWindow = window.open('', '_blank', 'width=900,height=700');
+            if (!printWindow) return;
+            printWindow.document.write(`
+                <html>
+                <head>
+                    <title>Repair Lines</title>
+                    <style>
+                        body { font-family: Arial, sans-serif; padding: 20px; }
+                        .line { display:flex; justify-content:space-between; padding:8px 0; border-bottom:1px solid #eee; }
+                        .line strong { margin-right: 6px; }
+                    </style>
+                </head>
+                <body>
+                    ${currentAssignmentPrintHtml}
+                </body>
+                </html>
+            `);
+            printWindow.document.close();
+            printWindow.focus();
+            printWindow.print();
         }
 
         function deleteTech(techId, techName) {

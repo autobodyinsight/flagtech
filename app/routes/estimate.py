@@ -198,6 +198,27 @@ def _sum_hours(items) -> float:
     return total
 
 
+def _line_key(item: dict, index: int) -> str:
+    line = item.get("line") if isinstance(item, dict) else None
+    if line is None or line == "":
+        return str(index + 1)
+    return str(line)
+
+
+def _sum_assigned_hours(items, excluded_lines) -> float:
+    if not isinstance(items, list):
+        return 0.0
+    excluded = {str(val) for val in (excluded_lines or [])}
+    total = 0.0
+    for idx, item in enumerate(items):
+        if not isinstance(item, dict):
+            continue
+        if _line_key(item, idx) in excluded:
+            continue
+        total += _parse_float_value(item.get("value"))
+    return total
+
+
 @router.post("/parse-labor", response_model=EstimateResponse)
 async def parse_labor(file: UploadFile = File(...)):
     doc = load_pdf(file)
@@ -676,6 +697,77 @@ async def save_ro_assignments(request: Request):
         )
         conn.commit()
         return {"status": "ok"}
+    finally:
+        cur.close()
+
+
+@router.get("/tech-assignments")
+async def get_tech_assignments(request: Request, tech_id: int):
+    domain = get_user_domain(request)
+    if not domain:
+        return JSONResponse(status_code=401, content={"error": "Not authenticated"})
+
+    if not tech_id:
+        return JSONResponse(status_code=400, content={"error": "tech_id is required"})
+
+    conn = get_conn()
+    cur = conn.cursor()
+    try:
+        _ensure_saved_estimates_table(cur)
+        _ensure_ro_assignments_table(cur)
+
+        cur.execute(
+            """
+            SELECT ro, role, excluded_lines
+            FROM ro_assignments
+            WHERE domain = %s AND tech_id = %s
+            """,
+            (domain, tech_id),
+        )
+        assignment_rows = cur.fetchall()
+
+        ros = [row.get("ro") for row in assignment_rows if row.get("ro")]
+        if not ros:
+            return {"assignments": []}
+
+        cur.execute(
+            """
+            SELECT DISTINCT ON (ro)
+                   ro,
+                   labor_repairs,
+                   paint_repairs
+            FROM saved_estimates
+            WHERE domain = %s AND ro = ANY(%s)
+            ORDER BY ro, saved_at DESC, id DESC
+            """,
+            (domain, ros),
+        )
+        estimate_rows = cur.fetchall()
+        repairs_map = {row.get("ro"): row for row in estimate_rows}
+
+        assignments = []
+        for row in assignment_rows:
+            ro = row.get("ro")
+            role = row.get("role")
+            excluded_lines = row.get("excluded_lines") or []
+            repairs = repairs_map.get(ro) or {}
+
+            if role == "paint":
+                items = _parse_json_field(repairs.get("paint_repairs"))
+            else:
+                items = _parse_json_field(repairs.get("labor_repairs"))
+
+            total_hours = _sum_assigned_hours(items, excluded_lines)
+            assignments.append(
+                {
+                    "ro": ro,
+                    "role": role,
+                    "total_hours": total_hours,
+                    "excluded_lines": excluded_lines,
+                }
+            )
+
+        return {"assignments": assignments}
     finally:
         cur.close()
 
