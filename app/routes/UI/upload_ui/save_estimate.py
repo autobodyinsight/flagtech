@@ -218,15 +218,7 @@ var preloadedEstimateTotals = {json.dumps({
     "insurance_pay": insurance_pay,
 })};
 
-if (
-  typeof window.currentEstimateTotals === 'undefined' ||
-  !window.currentEstimateTotals ||
-  Object.keys(window.currentEstimateTotals).length === 0
-) {{
-  window.currentEstimateTotals = preloadedEstimateTotals;
-}} else {{
-  window.currentEstimateTotals = Object.assign({{}}, preloadedEstimateTotals, window.currentEstimateTotals);
-}}
+window.currentEstimateTotals = Object.assign({}, preloadedEstimateTotals);
 
 // Vehicle info parsed from vehicle_info_line
 var vehicleYear = null;
