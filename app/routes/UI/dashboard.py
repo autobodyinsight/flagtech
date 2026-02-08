@@ -125,7 +125,19 @@ def get_dashboard_screen_html():
             
             // Load dashboard data
             async function loadDashboardData() {
-                const data = {
+                try {
+                    const response = await fetch(BACKEND_BASE + '/api/dashboard-data', { credentials: 'include' });
+                    const data = await response.json();
+                    if (data && !data.error) {
+                        dashboardData = data;
+                        updateDashboard(data);
+                        return;
+                    }
+                } catch (error) {
+                    console.error('Error loading dashboard data:', error);
+                }
+
+                const fallback = {
                     totalSales: 0,
                     pendingPayments: 0,
                     currentGP: 0,
@@ -136,8 +148,8 @@ def get_dashboard_screen_html():
                     rosPerTech: [],
                     roList: []
                 };
-                dashboardData = data;
-                updateDashboard(data);
+                dashboardData = fallback;
+                updateDashboard(fallback);
             }
 
             async function flashAllData() {

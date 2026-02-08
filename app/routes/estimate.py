@@ -153,6 +153,17 @@ def _parse_json_field(value):
         return []
 
 
+def _parse_float_value(value) -> float:
+    if value is None:
+        return 0.0
+    if isinstance(value, (int, float)):
+        return float(value)
+    try:
+        return float(str(value).replace(",", ""))
+    except Exception:
+        return 0.0
+
+
 @router.post("/parse-labor", response_model=EstimateResponse)
 async def parse_labor(file: UploadFile = File(...)):
     doc = load_pdf(file)
@@ -391,6 +402,102 @@ async def flash_data():
         cur.close()
 
     return {"status": "success", "deleted": deleted_counts}
+
+
+@router.get("/dashboard-data")
+async def get_dashboard_data(request: Request):
+    domain = get_user_domain(request)
+    if not domain:
+        return JSONResponse(status_code=401, content={"error": "Not authenticated"})
+
+    conn = get_conn()
+    cur = conn.cursor()
+    try:
+        _ensure_saved_estimates_table(cur)
+        cur.execute(
+            """
+            SELECT DISTINCT ON (ro)
+                   ro,
+                   vehicle,
+                   labor_repairs,
+                   paint_repairs,
+                   parts_repairs,
+                   parts_total,
+                   grand_total
+            FROM saved_estimates
+            WHERE domain = %s
+              AND ro IS NOT NULL
+              AND ro <> ''
+            ORDER BY ro, saved_at DESC, id DESC
+            """,
+            (domain,),
+        )
+        rows = cur.fetchall()
+
+        total_sales = 0.0
+        total_parts = 0.0
+        total_hours = 0.0
+        ro_list = []
+
+        for row in rows:
+            ro = row.get("ro")
+            labor_repairs = _parse_json_field(row.get("labor_repairs"))
+            paint_repairs = _parse_json_field(row.get("paint_repairs"))
+            parts_repairs = _parse_json_field(row.get("parts_repairs"))
+
+            labor_hours = sum(
+                _parse_float_value(item.get("value"))
+                for item in labor_repairs
+                if isinstance(item, dict)
+            )
+            paint_hours = sum(
+                _parse_float_value(item.get("value"))
+                for item in paint_repairs
+                if isinstance(item, dict)
+            )
+            ro_hours = labor_hours + paint_hours
+
+            parts_total = _parse_float_value(row.get("parts_total"))
+            if parts_total == 0.0 and isinstance(parts_repairs, list):
+                parts_total = sum(
+                    _parse_float_value(item.get("price")) * _parse_float_value(item.get("qty") or 1)
+                    for item in parts_repairs
+                    if isinstance(item, dict)
+                )
+
+            grand_total = _parse_float_value(row.get("grand_total"))
+
+            total_sales += grand_total
+            total_parts += parts_total
+            total_hours += ro_hours
+
+            ro_list.append(
+                {
+                    "ro": ro,
+                    "vehicle": row.get("vehicle"),
+                    "tech": "",
+                    "hours": ro_hours,
+                    "total": grand_total,
+                }
+            )
+
+        ro_count = len(rows)
+        average_hours = total_hours / ro_count if ro_count else 0.0
+        average_ro = total_sales / ro_count if ro_count else 0.0
+
+        return {
+            "totalSales": total_sales,
+            "pendingPayments": 0.0,
+            "currentGP": 0.0,
+            "partsCost": total_parts,
+            "averageHrs": average_hours,
+            "averageRO": average_ro,
+            "hoursPerTech": [],
+            "rosPerTech": [],
+            "roList": ro_list,
+        }
+    finally:
+        cur.close()
 
 
 @router.post("/phase/update")
