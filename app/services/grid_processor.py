@@ -738,8 +738,6 @@ def process_pdf_grid(pages: List[Dict]) -> Dict[str, Any]:
             if any(value is not None for value in totals.values()):
                 break
 
-    if totals["deductible"] is None and totals["customer_pay"] is not None:
-        totals["deductible"] = totals["customer_pay"]
     if totals["customer_pay"] is None and totals["deductible"] is not None:
         totals["customer_pay"] = totals["deductible"]
 
