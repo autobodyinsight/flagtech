@@ -93,19 +93,20 @@ def _group_row_words_by_x(words: List[Dict], gap: float = 15.0) -> List[Dict]:
 def extract_claim_number(text: str) -> str:
     """
     Extract claim number from text.
-    Looks for "Claim:" or "Claim #:" followed by an adjacent value.
-    Returns only the numeric digits from that value.
+    Looks for the label "claim" (case-insensitive) followed by an adjacent alphanumeric value.
+    Returns the claim number or empty string if not found.
     """
     if not text:
         return ""
     
-    # Match "Claim:" or "Claim #:" followed by the adjacent token.
-    pattern = r"(?:Claim\s*#?:)\s*([A-Za-z0-9\-]+)"
+    # Pattern to match "claim" then optional separators and the adjacent value.
+    # Examples: "Claim: 25-503553305-02", "claim # 155598", "CLAIM 1A2B3C"
+    pattern = r"\bclaim\b\s*(?:[#:]?\s*)?([A-Za-z0-9\-]+)"
     match = re.search(pattern, text, re.IGNORECASE)
+    
     if match:
-        raw_value = match.group(1).strip()
-        numeric_only = re.sub(r"\D", "", raw_value)
-        return numeric_only
+        claim_num = match.group(1).strip()
+        return claim_num
     
     return ""
 
@@ -143,8 +144,10 @@ def detect_anchors_and_vehicle_info(
                     anchor_page = pi
                     anchor_ymid = r["ymid"]
                     first_ro_line = row_text
-                    # Extract claim number from the first RO line
-                    claim_number = extract_claim_number(row_text)
+
+            # Extract claim number anywhere the label appears
+            if not claim_number and re.search(r"\bclaim\b", row_text, re.IGNORECASE):
+                claim_number = extract_claim_number(row_text)
 
             # Extract owner info (look for "owner:" or "customer:" and extract name/phone in the same x column)
             if re.search(r"\b(owner|customer)\s*:", row_text, re.IGNORECASE):
