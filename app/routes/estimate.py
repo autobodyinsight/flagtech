@@ -482,7 +482,8 @@ async def get_dashboard_data(request: Request):
                    paint_repairs,
                    parts_repairs,
                    parts_total,
-                   grand_total
+                   grand_total,
+                   owner_info
             FROM saved_estimates
             WHERE domain = %s
               AND ro IS NOT NULL
@@ -549,10 +550,23 @@ async def get_dashboard_data(request: Request):
             short_vehicle = " ".join(part for part in (year, make, model) if part)
             vehicle_display = short_vehicle or row.get("vehicle")
 
+            # Parse owner_info to extract customer name and phone
+            owner_info = (row.get("owner_info") or "").strip()
+            customer_name = ""
+            customer_phone = ""
+            if owner_info:
+                lines = [line.strip() for line in owner_info.split("\n") if line.strip()]
+                if lines:
+                    customer_name = lines[0]  # First line is the name
+                    if len(lines) > 1:
+                        customer_phone = lines[1]  # Second line is the phone
+
             ro_list.append(
                 {
                     "ro": ro,
                     "vehicle": vehicle_display,
+                    "customer": customer_name,
+                    "phone": customer_phone,
                     "tech": assignment_map.get((ro, "labor"), "Unassigned"),
                     "painter": assignment_map.get((ro, "paint"), "Unassigned"),
                     "hours": ro_hours,

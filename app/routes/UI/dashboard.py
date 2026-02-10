@@ -97,6 +97,8 @@ def get_dashboard_screen_html():
                             <tr style="background:#f5f5f5; text-align:left;">
                                 <th style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold; color:#555;">RO#</th>
                                 <th style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold; color:#555;">Vehicle</th>
+                                <th style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold; color:#555;">Customer</th>
+                                <th style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold; color:#555;">Phone</th>
                                 <th style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold; color:#555;">Tech</th>
                                 <th style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold; color:#555;">Painter</th>
                                 <th style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold; color:#555; text-align:right;">HRS</th>
@@ -105,7 +107,7 @@ def get_dashboard_screen_html():
                         </thead>
                         <tbody id="roListBody">
                             <tr>
-                                <td colspan="6" style="padding:20px; text-align:center; color:#999;">Loading...</td>
+                                <td colspan="8" style="padding:20px; text-align:center; color:#999;">Loading...</td>
                             </tr>
                         </tbody>
                     </table>
@@ -407,7 +409,7 @@ def get_dashboard_screen_html():
                 const tbody = document.getElementById('roListBody');
                 
                 if (!roList || roList.length === 0) {
-                    tbody.innerHTML = '<tr><td colspan="6" style="padding:20px; text-align:center; color:#999;">No repair orders found</td></tr>';
+                    tbody.innerHTML = '<tr><td colspan="8" style="padding:20px; text-align:center; color:#999;">No repair orders found</td></tr>';
                     return;
                 }
                 
@@ -417,10 +419,14 @@ def get_dashboard_screen_html():
                     const rowId = safeId(ro.ro);
                     const techLabel = ro.tech || 'Unassigned';
                     const painterLabel = ro.painter || 'Unassigned';
+                    const customerDisplay = ro.customer || '-';
+                    const phoneDisplay = ro.phone || '-';
                     html += `
                         <tr style="background:${rowBg}; cursor:pointer;" onclick="toggleRoNotes('${ro.ro}')">
                             <td style="padding:12px; border-bottom:1px solid #eee; color:#0066cc; text-decoration:underline;">${ro.ro}</td>
                             <td style="padding:12px; border-bottom:1px solid #eee; color:#333;">${ro.vehicle || 'N/A'}</td>
+                            <td style="padding:12px; border-bottom:1px solid #eee; color:#333;">${customerDisplay}</td>
+                            <td style="padding:12px; border-bottom:1px solid #eee; color:#333;">${phoneDisplay}</td>
                             <td style="padding:12px; border-bottom:1px solid #eee; color:#333;">
                                 <button type="button" onclick="openRepairLinesModal(event, '${ro.ro}', 'labor')" style="background:none; border:none; color:#0066cc; text-decoration:underline; cursor:pointer; padding:0; font:inherit;">
                                     ${techLabel}
@@ -435,7 +441,7 @@ def get_dashboard_screen_html():
                             <td style="padding:12px; border-bottom:1px solid #eee; color:#333; text-align:right; font-weight:bold;">$${ro.total.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
                         </tr>
                         <tr id="notes-row-${rowId}" style="display:none; background:${rowBg};">
-                            <td colspan="6" style="padding:12px 16px; border-bottom:1px solid #eee;">
+                            <td colspan="8" style="padding:12px 16px; border-bottom:1px solid #eee;">
                                 <div style="background:#fafafa; border:1px solid #ddd; border-radius:6px; padding:12px;">
                                     <div style="font-weight:bold; margin-bottom:8px;">Notes</div>
                                     <div id="notes-list-${rowId}" style="max-height:180px; overflow-y:auto; margin-bottom:10px;"></div>
