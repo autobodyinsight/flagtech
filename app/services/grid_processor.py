@@ -738,8 +738,27 @@ def process_pdf_grid(pages: List[Dict]) -> Dict[str, Any]:
             if any(value is not None for value in totals.values()):
                 break
 
+    def _to_float(value: Optional[float | str]) -> Optional[float]:
+        if value is None:
+            return None
+        if isinstance(value, (int, float)):
+            return float(value)
+        cleaned = re.sub(r"[^0-9.\-]", "", str(value))
+        if not cleaned:
+            return None
+        try:
+            return float(cleaned)
+        except Exception:
+            return None
+
     if totals["customer_pay"] is None and totals["deductible"] is not None:
         totals["customer_pay"] = totals["deductible"]
+
+    if totals["customer_pay"] is None and totals["deductible"] is None:
+        grand_total_val = _to_float(totals["grand_total"])
+        insurance_pay_val = _to_float(totals["insurance_pay"])
+        if grand_total_val is not None and insurance_pay_val is not None:
+            totals["customer_pay"] = round(grand_total_val - insurance_pay_val, 2)
 
     return {
         "labor_items": labor_items,
