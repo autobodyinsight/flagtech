@@ -148,6 +148,40 @@ def detect_anchors_and_vehicle_info(
             # Extract claim number anywhere the label appears
             if not claim_number and re.search(r"\bclaim\b", row_text, re.IGNORECASE):
                 claim_number = extract_claim_number(row_text)
+                if not claim_number and idx + 1 < len(rows):
+                    header_groups = _group_row_words_by_x(r["words"])
+                    claim_group = None
+                    for group in header_groups:
+                        if re.search(r"\bclaim\b", group["text"], re.IGNORECASE):
+                            claim_group = group
+                            break
+
+                    if claim_group:
+                        left_bound = claim_group["min_x"] - 2
+                        right_bound = None
+                        for group in header_groups:
+                            if group["min_x"] > claim_group["max_x"]:
+                                right_bound = group["min_x"] - 2
+                                break
+
+                        next_row_words = rows[idx + 1]["words"]
+                        filtered_words = []
+                        for word in next_row_words:
+                            x0 = word.get("x0", 0)
+                            x1 = word.get("x1", 0)
+                            xmid = word.get("xmid", (x0 + x1) / 2 if x1 or x0 else 0)
+                            if xmid >= left_bound and (right_bound is None or xmid < right_bound):
+                                filtered_words.append(word)
+
+                        next_row_text = " ".join(
+                            w.get("text", "") for w in sorted(filtered_words, key=lambda w: w.get("x0", 0))
+                        ).strip()
+                        if next_row_text:
+                            claim_number = extract_claim_number(next_row_text)
+                            if not claim_number:
+                                token_match = re.search(r"[A-Za-z0-9\-]+", next_row_text)
+                                if token_match:
+                                    claim_number = token_match.group(0)
 
             # Extract owner info (look for "owner:" or "customer:" and extract name/phone in the same x column)
             if re.search(r"\b(owner|customer)\s*:", row_text, re.IGNORECASE):
