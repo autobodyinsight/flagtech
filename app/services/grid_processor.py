@@ -123,30 +123,66 @@ def detect_anchors_and_vehicle_info(
                     anchor_ymid = r["ymid"]
                     first_ro_line = row_text
 
-            # Extract owner info (look for "owner:" or "customer:" and extract name and phone only)
+            # Extract owner info (look for "owner:" or "customer:" and extract name/phone in the same x column)
             if re.search(r"\b(owner|customer)\s*:", row_text, re.IGNORECASE):
                 name = ""
                 phone = ""
-                
-                # Get the next line as the name (Last, First)
-                if idx + 1 < len(rows):
-                    full_line = " ".join(w.get("text", "") for w in rows[idx + 1]["words"]).strip()
-                    # Extract only "Last, First" format, stopping at other content
+
+                header_groups = _group_row_words_by_x(r["words"])
+                owner_group = None
+                for group in header_groups:
+                    if re.search(r"\b(owner|customer)\b", group["text"], re.IGNORECASE):
+                        owner_group = group
+                        break
+
+                left_bound = None
+                right_bound = None
+                if owner_group:
+                    left_bound = owner_group["min_x"] - 2
+                    for group in header_groups:
+                        if group["min_x"] > owner_group["max_x"]:
+                            right_bound = group["min_x"] - 2
+                            break
+
+                def _row_text_in_bounds(row: Dict) -> str:
+                    words = row.get("words", [])
+                    if left_bound is None:
+                        filtered_words = words
+                    else:
+                        filtered_words = [
+                            w for w in words
+                            if w.get("xmid", 0) >= left_bound and (right_bound is None or w.get("xmid", 0) < right_bound)
+                        ]
+                    return " ".join(
+                        w.get("text", "") for w in sorted(filtered_words, key=lambda w: w.get("x0", 0))
+                    ).strip()
+
+                # Scan the next rows for name and phone within the same x column.
+                scan_end = min(len(rows), idx + 10)
+                for j in range(idx + 1, scan_end):
+                    full_line = _row_text_in_bounds(rows[j])
+                    if not full_line:
+                        continue
                     name_match = re.match(r"^([A-Za-z][A-Za-z\-]*,\s*[A-Za-z][A-Za-z\-]*)", full_line)
-                    name = name_match.group(1) if name_match else full_line
-                
-                # Get the 4th line down as the phone number (skip 2 address lines)
-                if idx + 4 < len(rows):
-                    full_line = " ".join(w.get("text", "") for w in rows[idx + 4]["words"]).strip()
-                    # Extract phone number pattern (NNN) NNN-NNNN and optionally "cell/work/home/mobile"
-                    phone_match = re.search(r"(\(\d{3}\)\s*\d{3}-\d{4})\s*(cell|work|home|mobile)?", full_line, re.IGNORECASE)
+                    if name_match:
+                        name = name_match.group(1)
+                        break
+
+                for j in range(idx + 1, scan_end):
+                    full_line = _row_text_in_bounds(rows[j])
+                    if not full_line:
+                        continue
+                    phone_match = re.search(
+                        r"(\(\d{3}\)\s*\d{3}-\d{4})\s*(cell|work|home|mobile)?",
+                        full_line,
+                        re.IGNORECASE,
+                    )
                     if phone_match:
                         phone = phone_match.group(1).strip()
                         if phone_match.group(2):
                             phone += " " + phone_match.group(2).strip()
-                    else:
-                        phone = ""
-                
+                        break
+
                 # Only store name and phone
                 if name or phone:
                     owner_info_parts = []
