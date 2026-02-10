@@ -192,14 +192,14 @@ def detect_anchors_and_vehicle_info(
                         owner_info_parts.append(phone)
                     owner_info = "\n".join(owner_info_parts)
 
-            # Extract insurance company (look for "insurance company:" and take next line)
-            if re.search(r"\binsurance\s+company\s*:", row_text, re.IGNORECASE):
+            # Extract insurance company (look for "insurance:" or "insurance company:" and take next line)
+            if re.search(r"\binsurance(?:\s+company)?\s*:", row_text, re.IGNORECASE):
                 if idx + 1 < len(rows):
                     header_groups = _group_row_words_by_x(r["words"])
                     insurance_group = None
                     for group in header_groups:
                         lower_text = group["text"].lower()
-                        if "insurance" in lower_text and "company" in lower_text:
+                        if "insurance" in lower_text:
                             insurance_group = group
                             break
 
