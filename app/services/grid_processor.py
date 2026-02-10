@@ -227,26 +227,16 @@ def detect_anchors_and_vehicle_info(
             if re.search(r"\bVIN\b", row_text, re.IGNORECASE):
                 vin_row_idx = idx
                 
-                # Capture consecutive lines above VIN until a stop condition is hit
+                # Capture the first line above VIN that contains a valid year (1900-2070)
                 if idx > 0:
-                    vehicle_lines = []
-                    j = idx - 1
-                    while j >= 0:
+                    year_pattern = re.compile(r"\b(19\d{2}|20[0-6]\d|2070)\b")
+                    for j in range(idx - 1, -1, -1):
                         text = " ".join(w.get("text", "") for w in rows[j]["words"]).strip()
                         if not text:
+                            continue
+                        if year_pattern.search(text):
+                            vehicle_info_line = text
                             break
-                        lower_text = text.lower()
-                        if "claim" in lower_text:
-                            break
-                        if "insured" in lower_text:
-                            break
-                        if "owner" in lower_text:
-                            break
-                        if "loss" in lower_text:
-                            break
-                        vehicle_lines.insert(0, text)
-                        j -= 1
-                    vehicle_info_line = " ".join(vehicle_lines)
                 
                 # Look for 17-character alphanumeric value after VIN
                 vin_match = re.search(r"VIN\s*[:#-]*\s*([A-Za-z0-9]{17})", row_text, re.IGNORECASE)
