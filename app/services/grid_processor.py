@@ -543,17 +543,13 @@ def extract_parts_items(
                 continue
 
             line_text = ""
-            desc_text = ""
-            part_text = ""
             qty_text = ""
             ext_text = ""
+            description_parts = []
 
             for w in row_words:
                 if columns.get("line") is not None and abs(w["xmid"] - columns["line"]) <= col_tol:
                     line_text += (w["text"] + " ")
-                    continue
-                if columns.get("part_number") is not None and abs(w["xmid"] - columns["part_number"]) <= col_tol:
-                    part_text += (w["text"] + " ")
                     continue
                 if columns.get("qty") is not None and abs(w["xmid"] - columns["qty"]) <= col_tol:
                     qty_text += (w["text"] + " ")
@@ -561,30 +557,33 @@ def extract_parts_items(
                 if columns.get("ext_price") is not None and abs(w["xmid"] - columns["ext_price"]) <= col_tol:
                     ext_text += (w["text"] + " ")
                     continue
-                if columns.get("description") is not None and abs(w["xmid"] - columns["description"]) <= col_tol:
-                    desc_text += (w["text"] + " ")
+
+                left_bound = columns.get("line")
+                right_bound = columns.get("ext_price") or columns.get("qty")
+                if left_bound is not None and right_bound is not None:
+                    if left_bound + col_tol < w["xmid"] < right_bound - col_tol:
+                        description_parts.append(w["text"])
 
             line_text = line_text.strip()
-            desc_text = desc_text.strip()
-            part_text = part_text.strip()
             qty_text = qty_text.strip()
             ext_text = ext_text.strip()
+            desc_text = " ".join(description_parts).strip()
 
-            if not part_text and not qty_text and not ext_text:
+            qty_val = _parse_float(qty_text) if qty_text else None
+            if qty_val is None or qty_val < 1:
                 continue
 
             line_num = _parse_int(line_text) if line_text else None
-            qty_val = _parse_float(qty_text) if qty_text else None
             price_val = _parse_float(ext_text) if ext_text else None
 
-            part_type = _parse_part_type(" ".join([desc_text, part_text]))
+            part_type = _parse_part_type(desc_text)
 
             parts_items.append({
                 "line": line_num,
-                "description": desc_text or part_text,
+                "description": desc_text,
                 "part_type": part_type,
                 "price": price_val if price_val is not None else 0.0,
-                "qty": qty_val if qty_val is not None else 1,
+                "qty": qty_val,
                 "row_text": row_text,
             })
 
