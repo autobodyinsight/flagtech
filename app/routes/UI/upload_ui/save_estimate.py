@@ -26,7 +26,6 @@ def get_save_estimate_modal_html(
 
     <div style="margin-bottom: 15px;">
       <div style="font-weight: bold; font-size: 16px; margin-bottom: 5px;" id="roNumberDisplay">RO Number: -</div>
-      <div style="font-weight: bold; font-size: 14px; margin-bottom: 10px; color: #d32f2f;" id="claimNumberDisplay">Claim: -</div>
       <div style="margin-top: 10px; padding: 12px; background-color: #f9f9f9; border-radius: 3px; border: 1px solid #ddd;">
         <div style="display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 15px;">
           <div>
@@ -54,6 +53,7 @@ def get_save_estimate_modal_html(
           <div>
             <label style="font-weight: bold; font-size: 12px; color: #666;">INSURANCE COMPANY</label>
             <div id="insuranceCompany" style="font-size: 14px; margin-top: 3px;">-</div>
+            <div id="claimNumberDisplay" style="font-weight: normal; font-size: 12px; margin-top: 4px; color: #666;">Claim: -</div>
           </div>
         </div>
       </div>

@@ -64,6 +64,7 @@ def _ensure_saved_estimates_table(cur) -> None:
             owner_info TEXT,
             insurance_company TEXT,
             vin VARCHAR(32),
+            claim_number VARCHAR(64),
             labor_repairs JSONB,
             paint_repairs JSONB,
             parts_repairs JSONB,
@@ -88,6 +89,7 @@ def _ensure_saved_estimates_table(cur) -> None:
     cur.execute("ALTER TABLE saved_estimates ADD COLUMN IF NOT EXISTS owner_info TEXT")
     cur.execute("ALTER TABLE saved_estimates ADD COLUMN IF NOT EXISTS insurance_company TEXT")
     cur.execute("ALTER TABLE saved_estimates ADD COLUMN IF NOT EXISTS vin VARCHAR(32)")
+    cur.execute("ALTER TABLE saved_estimates ADD COLUMN IF NOT EXISTS claim_number VARCHAR(64)")
     cur.execute("ALTER TABLE saved_estimates ADD COLUMN IF NOT EXISTS domain VARCHAR(255)")
     cur.execute("CREATE INDEX IF NOT EXISTS idx_saved_estimates_ro_domain ON saved_estimates(ro, domain)")
 
@@ -510,10 +512,10 @@ async def save_estimate(request: Request):
         cur.execute(
             """
             INSERT INTO saved_estimates
-            (ro, vehicle, year, make, model, owner_info, insurance_company, vin,
+            (ro, vehicle, year, make, model, owner_info, insurance_company, vin, claim_number,
              labor_repairs, paint_repairs, parts_repairs,
              estimate_totals, parts_total, grand_total, deductible, customer_pay, insurance_pay, domain)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             """,
             (
                 ro_value,
@@ -524,6 +526,7 @@ async def save_estimate(request: Request):
                 data.get("owner_info"),
                 data.get("insurance_company"),
                 data.get("vin"),
+                data.get("claim_number"),
                 json.dumps(data.get("labor_repairs") or []),
                 json.dumps(data.get("paint_repairs") or []),
                 json.dumps(data.get("parts_repairs") or []),
