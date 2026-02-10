@@ -697,11 +697,15 @@ def process_pdf_grid(pages: List[Dict]) -> Dict[str, Any]:
                         if totals["deductible"] is None and re.search(r"\bDEDUCTIBLE\b", upper):
                             totals["deductible"] = rightmost_value or _extract_last_numeric(follow_text)
                         if totals["customer_pay"] is None and (
-                            re.search(r"\bCUSTOMER PAY\b", upper) or re.search(r"\bCUSTOMER\b.*\bPAY\b", upper)
+                            re.search(r"\bCUSTOMER\s+PAY\b", upper)
+                            or re.search(r"\bCUSTOMER\b.*\bPAY\b", upper)
+                            or re.search(r"\bCUSTOMER\s+TOTAL\b", upper)
                         ):
                             totals["customer_pay"] = rightmost_value or _extract_last_numeric(follow_text)
                         if totals["insurance_pay"] is None and (
-                            re.search(r"\bINSURANCE PAY\b", upper) or re.search(r"\bINSURANCE\b.*\bPAY\b", upper)
+                            re.search(r"\bINSURANCE\s+PAY\b", upper)
+                            or re.search(r"\bINSURANCE\b.*\bPAY\b", upper)
+                            or re.search(r"\bINSURANCE\s+TOTAL\b", upper)
                         ):
                             totals["insurance_pay"] = rightmost_value or _extract_last_numeric(follow_text)
                     break
