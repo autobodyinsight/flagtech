@@ -304,26 +304,27 @@ function extractPartsReplacements() {{
   }}
 
   savePartsItems.forEach((item) => {{
-    const qtyVal = parseFloat(item.qty);
-    if (!Number.isFinite(qtyVal) || qtyVal < 1) {{
+    const priceVal = parseFloat(item.price);
+    if (!Number.isFinite(priceVal) || priceVal <= 0) {{
       return;
     }}
-    const priceVal = parseFloat(item.price);
     const descText = String(item.description || '').trim();
     const rowText = String(item.row_text || '').trim();
+    const sourceText = (rowText || descText).toLowerCase();
+    if (!sourceText.includes('repl') && !sourceText.includes('sublet') && !sourceText.includes('subl')) {{
+      return;
+    }}
     const partType = resolvePartType(item);
     const cleanedDesc = (rowText || descText || 'Part').replace(/^\\s*\\d+\\s+/, '').trim();
     replacements.push({{
       line: item.line || null,
       description: cleanedDesc,
       part_type: partType,
-      price: Number.isFinite(priceVal) ? priceVal : 0,
-      qty: qtyVal,
+      price: priceVal,
+      qty: item.qty || null,
       row_text: rowText || null
     }});
-    if (Number.isFinite(priceVal)) {{
-      partsTotal += priceVal;
-    }}
+    partsTotal += priceVal;
   }});
 
   return {{items: replacements, total: partsTotal}};
@@ -445,25 +446,26 @@ function openSaveEstimateModal(estimateTotals) {{
   let partsTotal = 0;
   if (savePartsItems && savePartsItems.length > 0) {{
     savePartsItems.forEach((item) => {{
-      const qtyVal = parseFloat(item.qty);
-      if (!Number.isFinite(qtyVal) || qtyVal < 1) {{
+      const priceVal = parseFloat(item.price);
+      if (!Number.isFinite(priceVal) || priceVal <= 0) {{
         return;
       }}
-      const priceVal = parseFloat(item.price);
       const descText = String(item.description || '').trim();
       const rowText = String(item.row_text || '').trim();
+      const sourceText = (rowText || descText).toLowerCase();
+      if (!sourceText.includes('repl') && !sourceText.includes('sublet') && !sourceText.includes('subl')) {{
+        return;
+      }}
       const partType = resolvePartType(item);
       const lineText = item.line ? ('Line ' + item.line + ' - ') : '';
       const rawDesc = rowText || descText || 'Part';
       const cleanedDesc = rawDesc.replace(/^\\s*\\d+\\s+/, '').trim();
-      const priceText = Number.isFinite(priceVal) ? ('$' + formatPartPrice(priceVal)) : '-';
+      const priceText = '$' + formatPartPrice(priceVal);
       partsHtml += '<div class="repair-item" id="part-item-' + partsCount + '">';
       partsHtml += '<div class="repair-item-label"><strong>' + lineText + '</strong>' + cleanedDesc + ' - ' + partType + '</div>';
       partsHtml += '<div class="repair-item-value">' + priceText + '</div>';
       partsHtml += '</div>';
-      if (Number.isFinite(priceVal)) {{
-        partsTotal += priceVal;
-      }}
+      partsTotal += priceVal;
       partsCount += 1;
     }});
   }}

@@ -329,19 +329,6 @@ def detect_header_columns(
         rows = group_rows(page_words, y_thresh=6.0)
 
         for row in rows:
-            row_text_upper = " ".join(w["text"] for w in row["words"]).upper()
-
-            is_labor_header = all(token in row_text_upper for token in ["LINE", "OPER", "DESCRIPTION", "LABOR", "PAINT"])
-            is_parts_header = (
-                ("LINE" in row_text_upper)
-                and ("DESC" in row_text_upper or "DESCRIPTION" in row_text_upper)
-                and ("QTY" in row_text_upper)
-                and ("EXT" in row_text_upper or "EXTENDED" in row_text_upper or "PRICE" in row_text_upper or "AMOUNT" in row_text_upper or "$" in row_text_upper)
-            )
-
-            if not (is_labor_header or is_parts_header):
-                continue
-
             for wd in row["words"]:
                 txt = wd["text"].upper()
                 xmid = wd["xmid"]
@@ -357,7 +344,7 @@ def detect_header_columns(
                     header_columns["part_number"] = xmid
                 elif "QTY" in txt and header_columns["qty"] is None:
                     header_columns["qty"] = xmid
-                elif ("EXT" in txt or "EXTENDED" in txt or "PRICE" in txt or "AMOUNT" in txt or "$" in txt) and header_columns["ext_price"] is None:
+                elif (re.search(r"\bEXT\b", txt) or "EXTENDED" in txt) and header_columns["ext_price"] is None:
                     header_columns["ext_price"] = xmid
                 elif "LABOR" in txt and header_columns["labor"] is None:
                     header_columns["labor"] = xmid
@@ -579,13 +566,13 @@ def extract_parts_items(
             desc_text = " ".join(description_parts).strip()
 
             qty_val = _parse_float(qty_text) if qty_text else None
-            price_val = _parse_float(ext_text) if ext_text else None
             if qty_val is None or qty_val < 1:
-                continue
-            if price_val is None:
                 continue
 
             line_num = _parse_int(line_text) if line_text else None
+            price_val = _parse_float(ext_text) if ext_text else None
+            if price_val is None:
+                continue
 
             part_type = _parse_part_type(desc_text)
 
