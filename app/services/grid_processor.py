@@ -329,27 +329,31 @@ def detect_header_columns(
         rows = group_rows(page_words, y_thresh=6.0)
 
         for row in rows:
-            for wd in row["words"]:
-                txt = wd["text"].upper()
-                xmid = wd["xmid"]
+            row_text_upper = " ".join(w["text"] for w in row["words"]).upper()
 
-                if "LINE" in txt and header_columns["line"] is None:
-                    header_columns["line"] = xmid
-                elif "OPER" in txt and header_columns["oper"] is None:
-                    header_columns["oper"] = xmid
-                elif "DESC" in txt or "DESCRIPTION" in txt:
-                    if header_columns["description"] is None:
+            if all(token in row_text_upper for token in ["LINE", "OPER", "DESCRIPTION", "LABOR", "PAINT"]):
+                for wd in row["words"]:
+                    txt = wd["text"].upper()
+                    xmid = wd["xmid"]
+
+                    if "LINE" in txt and header_columns["line"] is None:
+                        header_columns["line"] = xmid
+                    elif "OPER" in txt and header_columns["oper"] is None:
+                        header_columns["oper"] = xmid
+                    elif "DESC" in txt or "DESCRIPTION" in txt:
                         header_columns["description"] = xmid
-                elif "PART" in txt and header_columns["part_number"] is None:
-                    header_columns["part_number"] = xmid
-                elif "QTY" in txt and header_columns["qty"] is None:
-                    header_columns["qty"] = xmid
-                elif (re.search(r"\bEXT\b", txt) or "EXTENDED" in txt) and header_columns["ext_price"] is None:
-                    header_columns["ext_price"] = xmid
-                elif "LABOR" in txt and header_columns["labor"] is None:
-                    header_columns["labor"] = xmid
-                elif "PAINT" in txt and header_columns["paint"] is None:
-                    header_columns["paint"] = xmid
+                    elif "PART" in txt and header_columns["part_number"] is None:
+                        header_columns["part_number"] = xmid
+                    elif "QTY" in txt and header_columns["qty"] is None:
+                        header_columns["qty"] = xmid
+                    elif ("EXT" in txt or "EXTENDED" in txt) and header_columns["ext_price"] is None:
+                        header_columns["ext_price"] = xmid
+                    elif "LABOR" in txt and header_columns["labor"] is None:
+                        header_columns["labor"] = xmid
+                    elif "PAINT" in txt and header_columns["paint"] is None:
+                        header_columns["paint"] = xmid
+
+                return header_columns
 
     return header_columns
 
@@ -555,7 +559,7 @@ def extract_parts_items(
                     continue
 
                 left_bound = columns.get("line")
-                right_bound = columns.get("ext_price")
+                right_bound = columns.get("ext_price") or columns.get("qty")
                 if left_bound is not None and right_bound is not None:
                     if left_bound + col_tol < w["xmid"] < right_bound - col_tol:
                         description_parts.append(w["text"])
@@ -571,8 +575,6 @@ def extract_parts_items(
 
             line_num = _parse_int(line_text) if line_text else None
             price_val = _parse_float(ext_text) if ext_text else None
-            if price_val is None:
-                continue
 
             part_type = _parse_part_type(desc_text)
 
