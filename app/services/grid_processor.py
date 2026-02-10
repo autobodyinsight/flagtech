@@ -485,12 +485,13 @@ def _parse_float(text: str) -> Optional[float]:
     t = text.strip().replace(",", "")
     if not t:
         return None
-    if re.match(r"^-?\d+(?:\.\d+)?$", t):
-        try:
-            return float(t)
-        except Exception:
-            return None
-    return None
+    match = re.search(r"-?\d+(?:\.\d+)?", t)
+    if not match:
+        return None
+    try:
+        return float(match.group(0))
+    except Exception:
+        return None
 
 
 def _parse_part_type(text: str) -> str:
