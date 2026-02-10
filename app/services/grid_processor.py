@@ -559,7 +559,7 @@ def extract_parts_items(
                     continue
 
                 left_bound = columns.get("line")
-                right_bound = columns.get("ext_price") or columns.get("qty")
+                right_bound = columns.get("ext_price")
                 if left_bound is not None and right_bound is not None:
                     if left_bound + col_tol < w["xmid"] < right_bound - col_tol:
                         description_parts.append(w["text"])
@@ -570,11 +570,13 @@ def extract_parts_items(
             desc_text = " ".join(description_parts).strip()
 
             qty_val = _parse_float(qty_text) if qty_text else None
+            price_val = _parse_float(ext_text) if ext_text else None
             if qty_val is None or qty_val < 1:
+                continue
+            if price_val is None:
                 continue
 
             line_num = _parse_int(line_text) if line_text else None
-            price_val = _parse_float(ext_text) if ext_text else None
 
             part_type = _parse_part_type(desc_text)
 
