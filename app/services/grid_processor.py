@@ -227,9 +227,26 @@ def detect_anchors_and_vehicle_info(
             if re.search(r"\bVIN\b", row_text, re.IGNORECASE):
                 vin_row_idx = idx
                 
-                # Capture the line directly before VIN as vehicle info
+                # Capture consecutive lines above VIN until a stop condition is hit
                 if idx > 0:
-                    vehicle_info_line = " ".join(w.get("text", "") for w in rows[idx - 1]["words"]).strip()
+                    vehicle_lines = []
+                    j = idx - 1
+                    while j >= 0:
+                        text = " ".join(w.get("text", "") for w in rows[j]["words"]).strip()
+                        if not text:
+                            break
+                        lower_text = text.lower()
+                        if "claim" in lower_text:
+                            break
+                        if "insured" in lower_text:
+                            break
+                        if "owner" in lower_text:
+                            break
+                        if "loss" in lower_text:
+                            break
+                        vehicle_lines.insert(0, text)
+                        j -= 1
+                    vehicle_info_line = " ".join(vehicle_lines)
                 
                 # Look for 17-character alphanumeric value after VIN
                 vin_match = re.search(r"VIN\s*[:#-]*\s*([A-Za-z0-9]{17})", row_text, re.IGNORECASE)
