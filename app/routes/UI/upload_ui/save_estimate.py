@@ -16,6 +16,7 @@ def get_save_estimate_modal_html(
   owner_info="",
   insurance_company="",
   vin="",
+  claim_number="",
 ):
     """Return the HTML for the save estimate modal."""
     return f"""
@@ -25,6 +26,7 @@ def get_save_estimate_modal_html(
 
     <div style="margin-bottom: 15px;">
       <div style="font-weight: bold; font-size: 16px; margin-bottom: 5px;" id="roNumberDisplay">RO Number: -</div>
+      <div style="font-weight: bold; font-size: 14px; margin-bottom: 10px; color: #d32f2f;" id="claimNumberDisplay">Claim: -</div>
       <div style="margin-top: 10px; padding: 12px; background-color: #f9f9f9; border-radius: 3px; border: 1px solid #ddd;">
         <div style="display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 15px;">
           <div>
@@ -196,6 +198,7 @@ def get_save_estimate_modal_script(
   owner_info="",
   insurance_company="",
   vin="",
+  claim_number="",
 ):
     """Return the JavaScript for the save estimate modal functionality."""
     return f"""
@@ -209,6 +212,7 @@ var saveVehicleInfoLine = {json.dumps(vehicle_info_line or '').replace("<", "\\u
 var saveOwnerInfo = {json.dumps(owner_info or '').replace("<", "\\u003c")};
 var saveInsuranceCompany = {json.dumps(insurance_company or '').replace("<", "\\u003c")};
 var saveVIN = {json.dumps(vin or '').replace("<", "\\u003c")};
+var saveClaimNumber = {json.dumps(claim_number or '').replace("<", "\\u003c")};
 var saveEstimateTotalsData = {{}};
 var preloadedEstimateTotals = {json.dumps({
     "parts_total": parts_total,
@@ -393,6 +397,9 @@ function openSaveEstimateModal(estimateTotals) {{
   // Display RO number (already extracted on backend)
   document.getElementById('roNumberDisplay').textContent = 'RO NUMBER: ' + (saveRoNumber || '-');
   
+  // Display claim number if available
+  document.getElementById('claimNumberDisplay').textContent = saveClaimNumber ? 'CLAIM: ' + saveClaimNumber : 'CLAIM: -';
+  
   // Display vehicle year, make, model in grid
   document.getElementById('vehicleYear').textContent = vehicleYear || '-';
   document.getElementById('vehicleMake').textContent = vehicleMake || '-';
@@ -524,6 +531,7 @@ function executeSaveEstimate() {{
     owner_info: saveOwnerInfo,
     insurance_company: saveInsuranceCompany,
     vin: saveVIN,
+    claim_number: saveClaimNumber,
     labor_repairs: laborData,
     paint_repairs: paintData,
     parts_repairs: partsResult.items,

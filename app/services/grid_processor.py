@@ -90,13 +90,34 @@ def _group_row_words_by_x(words: List[Dict], gap: float = 15.0) -> List[Dict]:
     return grouped
 
 
+def extract_claim_number(text: str) -> str:
+    """
+    Extract claim number from text.
+    Looks for "Claim:" or "Claim #:" followed by a series of numbers, hyphens, and letters.
+    Returns the claim number or empty string if not found.
+    """
+    if not text:
+        return ""
+    
+    # Pattern to match "Claim:" or "Claim #:" followed by numbers/hyphens/letters
+    # Example: "Claim: 25-503553305-02" or "Claim #: 155598"
+    pattern = r"(?:Claim\s*#?:)\s*([A-Za-z0-9\-]+)"
+    match = re.search(pattern, text, re.IGNORECASE)
+    
+    if match:
+        claim_num = match.group(1).strip()
+        return claim_num
+    
+    return ""
+
+
 def detect_anchors_and_vehicle_info(
     pages: List[Dict]
-) -> Tuple[Optional[int], Optional[float], Optional[int], Optional[float], str, str, str, str, str, str]:
+) -> Tuple[Optional[int], Optional[float], Optional[int], Optional[float], str, str, str, str, str, str, str]:
     """
-    Detect anchor points in PDF and extract vehicle information, owner info, insurance company, and VIN.
+    Detect anchor points in PDF and extract vehicle information, owner info, insurance company, VIN, and claim number.
     Returns:
-        (anchor_page, anchor_ymid, subtotals_page, subtotals_ymid, first_ro_line, vehicle_info_line, owner_info, insurance_company, vin)
+        (anchor_page, anchor_ymid, subtotals_page, subtotals_ymid, first_ro_line, vehicle_info_line, owner_info, insurance_company, vin, claim_number)
     """
     anchor_page = None
     anchor_ymid = None
@@ -108,6 +129,7 @@ def detect_anchors_and_vehicle_info(
     owner_info = ""
     insurance_company = ""
     vin = ""
+    claim_number = ""
     vin_row_idx = None
 
     for pi, page in enumerate(pages, start=1):
@@ -122,6 +144,8 @@ def detect_anchors_and_vehicle_info(
                     anchor_page = pi
                     anchor_ymid = r["ymid"]
                     first_ro_line = row_text
+                    # Extract claim number from the first RO line
+                    claim_number = extract_claim_number(row_text)
 
             # Extract owner info (look for "owner:" or "customer:" and extract name/phone in the same x column)
             if re.search(r"\b(owner|customer)\s*:", row_text, re.IGNORECASE):
@@ -266,7 +290,7 @@ def detect_anchors_and_vehicle_info(
         if anchor_page and subtotals_page:
             break
 
-    return anchor_page, anchor_ymid, subtotals_page, subtotals_ymid, first_ro_line, vehicle_info_line, owner_info, insurance_company, vin
+    return anchor_page, anchor_ymid, subtotals_page, subtotals_ymid, first_ro_line, vehicle_info_line, owner_info, insurance_company, vin, claim_number
 
 
 def collect_words_in_range(
@@ -610,7 +634,7 @@ def process_pdf_grid(pages: List[Dict]) -> Dict[str, Any]:
             w["xmid"] = (w["x0"] + w["x1"]) / 2.0
             w["ymid"] = (w["y0"] + w["y1"]) / 2.0
 
-    anchor_page, anchor_ymid, subtotals_page, subtotals_ymid, first_ro_line, vehicle_info_line, owner_info, insurance_company, vin = \
+    anchor_page, anchor_ymid, subtotals_page, subtotals_ymid, first_ro_line, vehicle_info_line, owner_info, insurance_company, vin, claim_number = \
         detect_anchors_and_vehicle_info(pages)
 
     all_words = collect_words_in_range(pages, anchor_page, anchor_ymid, subtotals_page, subtotals_ymid)
@@ -772,6 +796,7 @@ def process_pdf_grid(pages: List[Dict]) -> Dict[str, Any]:
         "owner_info": owner_info,
         "insurance_company": insurance_company,
         "vin": vin,
+        "claim_number": claim_number,
         "anchor_page": anchor_page,
         "anchor_ymid": anchor_ymid,
         "subtotals_page": subtotals_page,
