@@ -93,20 +93,19 @@ def _group_row_words_by_x(words: List[Dict], gap: float = 15.0) -> List[Dict]:
 def extract_claim_number(text: str) -> str:
     """
     Extract claim number from text.
-    Looks for "Claim:" or "Claim #:" followed by a series of numbers, hyphens, and letters.
-    Returns the claim number or empty string if not found.
+    Looks for "Claim:" or "Claim #:" followed by an adjacent value.
+    Returns only the numeric digits from that value.
     """
     if not text:
         return ""
     
-    # Pattern to match "Claim:" or "Claim #:" followed by numbers/hyphens/letters
-    # Example: "Claim: 25-503553305-02" or "Claim #: 155598"
+    # Match "Claim:" or "Claim #:" followed by the adjacent token.
     pattern = r"(?:Claim\s*#?:)\s*([A-Za-z0-9\-]+)"
     match = re.search(pattern, text, re.IGNORECASE)
-    
     if match:
-        claim_num = match.group(1).strip()
-        return claim_num
+        raw_value = match.group(1).strip()
+        numeric_only = re.sub(r"\D", "", raw_value)
+        return numeric_only
     
     return ""
 
