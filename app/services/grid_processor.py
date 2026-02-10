@@ -251,9 +251,17 @@ def detect_anchors_and_vehicle_info(
                             vin = vin_match.group(1)
                             break
 
-            if not subtotals_page and re.search(r"\bESTIMATE\s+TOTALS\b", row_text):
-                subtotals_page = pi
-                subtotals_ymid = r["ymid"]
+            if not subtotals_page:
+                if re.search(r"\bESTIMATE\s+TOTALS\b", row_text, re.IGNORECASE):
+                    subtotals_page = pi
+                    subtotals_ymid = r["ymid"]
+                else:
+                    upper = row_text.upper()
+                    if "ESTIMATE" in upper and idx + 1 < len(rows):
+                        next_text = " ".join(w.get("text", "") for w in rows[idx + 1]["words"]).strip()
+                        if re.search(r"\bTOTALS\b", next_text, re.IGNORECASE):
+                            subtotals_page = pi
+                            subtotals_ymid = rows[idx + 1]["ymid"]
 
         if anchor_page and subtotals_page:
             break
@@ -659,6 +667,35 @@ def process_pdf_grid(pages: List[Dict]) -> Dict[str, Any]:
         except Exception:
             return raw
 
+    def _apply_totals_from_row(text: str, row: Dict, next_upper: str, prev_upper: str) -> None:
+        upper = text.upper()
+        rightmost_value = _extract_rightmost_numeric(row)
+        parts_row = (
+            re.search(r"\bPARTS TOTAL\b", upper)
+            or ("PARTS" in upper and "TOTAL" in upper)
+            or ("PARTS" in upper and "TOTAL" in next_upper)
+            or ("TOTAL" in upper and "PARTS" in prev_upper)
+            or re.search(r"\bPARTS\b", upper)
+        )
+        if totals["parts_total"] is None and parts_row:
+            totals["parts_total"] = rightmost_value or _extract_last_numeric(text)
+        if totals["grand_total"] is None and re.search(r"\bGRAND TOTAL\b", upper):
+            totals["grand_total"] = rightmost_value or _extract_last_numeric(text)
+        if totals["deductible"] is None and re.search(r"\bDEDUCTIBLE\b", upper):
+            totals["deductible"] = rightmost_value or _extract_last_numeric(text)
+        if totals["customer_pay"] is None and (
+            re.search(r"\bCUSTOMER\s+PAY\b", upper)
+            or re.search(r"\bCUSTOMER\b.*\bPAY\b", upper)
+            or re.search(r"\bCUSTOMER\s+TOTAL\b", upper)
+        ):
+            totals["customer_pay"] = rightmost_value or _extract_last_numeric(text)
+        if totals["insurance_pay"] is None and (
+            re.search(r"\bINSURANCE\s+PAY\b", upper)
+            or re.search(r"\bINSURANCE\b.*\bPAY\b", upper)
+            or re.search(r"\bINSURANCE\s+TOTAL\b", upper)
+        ):
+            totals["insurance_pay"] = rightmost_value or _extract_last_numeric(text)
+
     if subtotals_page:
         for pi, page in enumerate(pages, start=1):
             if pi < subtotals_page:
@@ -671,9 +708,6 @@ def process_pdf_grid(pages: List[Dict]) -> Dict[str, Any]:
                     for follow_idx in range(idx + 1, scan_end):
                         follow_row = rows[follow_idx]
                         follow_text = " ".join(w.get("text", "") for w in follow_row["words"]).strip()
-                        upper = follow_text.upper()
-                        rightmost_value = _extract_rightmost_numeric(follow_row)
-
                         next_upper = ""
                         if follow_idx + 1 < len(rows):
                             next_text = " ".join(w.get("text", "") for w in rows[follow_idx + 1]["words"]).strip()
@@ -682,33 +716,25 @@ def process_pdf_grid(pages: List[Dict]) -> Dict[str, Any]:
                         if follow_idx - 1 >= 0:
                             prev_text = " ".join(w.get("text", "") for w in rows[follow_idx - 1]["words"]).strip()
                             prev_upper = prev_text.upper()
-
-                        parts_row = (
-                            re.search(r"\bPARTS TOTAL\b", upper)
-                            or ("PARTS" in upper and "TOTAL" in upper)
-                            or ("PARTS" in upper and "TOTAL" in next_upper)
-                            or ("TOTAL" in upper and "PARTS" in prev_upper)
-                            or re.search(r"\bPARTS\b", upper)
-                        )
-                        if totals["parts_total"] is None and parts_row:
-                            totals["parts_total"] = rightmost_value or _extract_last_numeric(follow_text)
-                        if totals["grand_total"] is None and re.search(r"\bGRAND TOTAL\b", upper):
-                            totals["grand_total"] = rightmost_value or _extract_last_numeric(follow_text)
-                        if totals["deductible"] is None and re.search(r"\bDEDUCTIBLE\b", upper):
-                            totals["deductible"] = rightmost_value or _extract_last_numeric(follow_text)
-                        if totals["customer_pay"] is None and (
-                            re.search(r"\bCUSTOMER\s+PAY\b", upper)
-                            or re.search(r"\bCUSTOMER\b.*\bPAY\b", upper)
-                            or re.search(r"\bCUSTOMER\s+TOTAL\b", upper)
-                        ):
-                            totals["customer_pay"] = rightmost_value or _extract_last_numeric(follow_text)
-                        if totals["insurance_pay"] is None and (
-                            re.search(r"\bINSURANCE\s+PAY\b", upper)
-                            or re.search(r"\bINSURANCE\b.*\bPAY\b", upper)
-                            or re.search(r"\bINSURANCE\s+TOTAL\b", upper)
-                        ):
-                            totals["insurance_pay"] = rightmost_value or _extract_last_numeric(follow_text)
+                        _apply_totals_from_row(follow_text, follow_row, next_upper, prev_upper)
                     break
+            if any(value is not None for value in totals.values()):
+                break
+
+    if not any(value is not None for value in totals.values()):
+        for page in pages:
+            rows = group_rows(page.get("words", []), y_thresh=6.0)
+            for idx, r in enumerate(rows):
+                text = " ".join(w.get("text", "") for w in r["words"]).strip()
+                next_upper = ""
+                if idx + 1 < len(rows):
+                    next_text = " ".join(w.get("text", "") for w in rows[idx + 1]["words"]).strip()
+                    next_upper = next_text.upper()
+                prev_upper = ""
+                if idx - 1 >= 0:
+                    prev_text = " ".join(w.get("text", "") for w in rows[idx - 1]["words"]).strip()
+                    prev_upper = prev_text.upper()
+                _apply_totals_from_row(text, r, next_upper, prev_upper)
             if any(value is not None for value in totals.values()):
                 break
 
