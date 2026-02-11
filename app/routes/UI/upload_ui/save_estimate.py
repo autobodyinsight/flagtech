@@ -378,12 +378,27 @@ function extractClaimNumberFromDisplayedEstimate() {{
   if (!container) return '';
 
   const nodes = Array.from(container.querySelectorAll('div'));
+  let claimLabelLine = '';
   for (let i = 0; i < nodes.length; i += 1) {{
     const text = (nodes[i].textContent || '').trim();
     if (!text) continue;
-    const match = text.match(/\bclaim\b\s*[:#-]?\s*([A-Za-z0-9-]+)/i);
-    if (match && match[1]) {{
-      return match[1];
+    if (!claimLabelLine && /\bclaim\s*#\b/i.test(text)) {{
+      claimLabelLine = text;
+    }}
+    if (claimLabelLine && /\bclaim\b/i.test(text)) {{
+      const match = text.match(/\bclaim\b\s*#\s*[:#-]?\s*([A-Za-z0-9-]+)/i);
+      if (match && match[1]) {{
+        return match[1];
+      }}
+    }}
+    if (!claimLabelLine && /\bclaim\b\s*:/i.test(text)) {{
+      claimLabelLine = text;
+    }}
+    if (claimLabelLine && /\bclaim\b/i.test(text)) {{
+      const match = text.match(/\bclaim\b\s*[:#-]?\s*([A-Za-z0-9-]+)/i);
+      if (match && match[1]) {{
+        return match[1];
+      }}
     }}
     if (/\bclaim\b/i.test(text)) {{
       for (let j = i + 1; j < Math.min(i + 6, nodes.length); j += 1) {{
