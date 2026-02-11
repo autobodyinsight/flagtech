@@ -377,23 +377,45 @@ function extractClaimNumberFromDisplayedEstimate() {{
     || document.body;
   if (!container) return '';
 
-  const nodes = Array.from(container.querySelectorAll('div'));
-  for (let i = 0; i < nodes.length; i += 1) {{
-    const text = (nodes[i].textContent || '').trim();
-    if (!text) continue;
-    const match = text.match(/\bclaim\b\s*[:#-]?\s*([A-Za-z0-9-]+)/i);
+  const wordNodes = Array.from(container.querySelectorAll('div')).map((node) => {{
+    const style = node.getAttribute('style') || '';
+    if (!style.includes('position:absolute')) return null;
+    const topMatch = style.match(/top:\s*([\d.]+)px/i);
+    const leftMatch = style.match(/left:\s*([\d.]+)px/i);
+    if (!topMatch || !leftMatch) return null;
+    const text = (node.textContent || '').trim();
+    if (!text) return null;
+    return {{
+      text,
+      top: parseFloat(topMatch[1]),
+      left: parseFloat(leftMatch[1])
+    }};
+  }}).filter(Boolean);
+
+  if (wordNodes.length === 0) return '';
+
+  const sorted = wordNodes.sort((a, b) => (a.top - b.top) || (a.left - b.left));
+  const rows = [];
+  const rowThresh = 4;
+
+  sorted.forEach((word) => {{
+    const row = rows.find(r => Math.abs(r.top - word.top) <= rowThresh);
+    if (row) {{
+      row.words.push(word);
+      row.top = (row.top * (row.words.length - 1) + word.top) / row.words.length;
+    }} else {{
+      rows.push({{top: word.top, words: [word]}});
+    }}
+  }});
+
+  for (let i = 0; i < rows.length; i += 1) {{
+    const rowWords = rows[i].words.sort((a, b) => a.left - b.left);
+    const rowText = rowWords.map(w => w.text).join(' ').trim();
+    if (!rowText) continue;
+    const match = rowText.match(/\bclaim\b\s*#?\s*:?\s*([A-Za-z0-9-]+)/i)
+      || rowText.match(/\bclaim#\s*:?\s*([A-Za-z0-9-]+)/i);
     if (match && match[1]) {{
       return match[1];
-    }}
-    if (/\bclaim\b/i.test(text)) {{
-      for (let j = i + 1; j < Math.min(i + 6, nodes.length); j += 1) {{
-        const nextText = (nodes[j].textContent || '').trim();
-        if (!nextText) continue;
-        const tokenMatch = nextText.match(/[A-Za-z0-9-]+/);
-        if (tokenMatch && tokenMatch[0]) {{
-          return tokenMatch[0];
-        }}
-      }}
     }}
   }}
 
