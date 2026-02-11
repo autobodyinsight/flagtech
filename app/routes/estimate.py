@@ -1379,3 +1379,157 @@ async def save_parts_received(request: Request):
         return {"status": "ok"}
     finally:
         cur.close()
+
+@router.get("/ro-tech-assignments")
+async def get_ro_tech_assignments(request: Request, ro: str):
+    """Get all tech assignments for a specific RO with total hours and rates."""
+    domain = get_user_domain(request)
+    if not domain:
+        return JSONResponse(status_code=401, content={"error": "Not authenticated"})
+
+    if not ro:
+        return JSONResponse(status_code=400, content={"error": "RO is required"})
+
+    conn = get_conn()
+    cur = conn.cursor()
+    try:
+        _ensure_ro_assignments_table(cur)
+        _ensure_techs_table(cur)
+        _ensure_saved_estimates_table(cur)
+
+        # Get assignments with tech info
+        cur.execute(
+            """
+            SELECT a.ro, a.role, a.tech_id, a.tech_name, a.excluded_lines, a.assigned_hours,
+                   t.hourly_rate as tech_rate
+            FROM ro_assignments a
+            LEFT JOIN techs t ON a.tech_id = t.id
+            WHERE a.domain = %s AND a.ro = %s
+            """,
+            (domain, ro),
+        )
+        assignment_rows = cur.fetchall()
+
+        if not assignment_rows:
+            return {"assignments": []}
+
+        # Get the estimate data to calculate actual hours
+        cur.execute(
+            """
+            SELECT labor_repairs, paint_repairs
+            FROM saved_estimates
+            WHERE domain = %s AND ro = %s
+            ORDER BY saved_at DESC, id DESC
+            LIMIT 1
+            """,
+            (domain, ro),
+        )
+        estimate_row = cur.fetchone()
+        
+        labor_repairs = _parse_json_field(estimate_row.get("labor_repairs") if estimate_row else None)
+        paint_repairs = _parse_json_field(estimate_row.get("paint_repairs") if estimate_row else None)
+        
+        if not isinstance(labor_repairs, list):
+            labor_repairs = []
+        if not isinstance(paint_repairs, list):
+            paint_repairs = []
+
+        assignments = []
+        for row in assignment_rows:
+            role = row.get("role", "labor")
+            lines = labor_repairs if role == "labor" else paint_repairs
+            excluded_lines = _parse_json_field(row.get("excluded_lines")) or []
+            
+            total_hours = _sum_assigned_hours(lines, excluded_lines)
+            
+            assignments.append({
+                "tech_id": row.get("tech_id"),
+                "tech_name": row.get("tech_name") or "Unknown",
+                "role": role,
+                "tech_rate": float(row.get("tech_rate") or 0),
+                "total_hours": total_hours,
+            })
+
+        return {"assignments": assignments}
+    finally:
+        cur.close()
+
+
+@router.get("/ro-tech-detail")
+async def get_ro_tech_detail(request: Request, ro: str, tech_id: int, role: str):
+    """Get detailed repair lines for a specific tech assignment on an RO."""
+    domain = get_user_domain(request)
+    if not domain:
+        return JSONResponse(status_code=401, content={"error": "Not authenticated"})
+
+    if not ro or not tech_id or not role:
+        return JSONResponse(status_code=400, content={"error": "RO, tech_id, and role are required"})
+
+    conn = get_conn()
+    cur = conn.cursor()
+    try:
+        _ensure_ro_assignments_table(cur)
+        _ensure_saved_estimates_table(cur)
+
+        # Get the assignment
+        cur.execute(
+            """
+            SELECT excluded_lines
+            FROM ro_assignments
+            WHERE domain = %s AND ro = %s AND tech_id = %s AND role = %s
+            """,
+            (domain, ro, tech_id, role),
+        )
+        assignment_row = cur.fetchone()
+        
+        if not assignment_row:
+            return {"repair_lines": [], "total_hours": 0}
+
+        excluded_lines = _parse_json_field(assignment_row.get("excluded_lines")) or []
+
+        # Get the estimate data
+        cur.execute(
+            """
+            SELECT labor_repairs, paint_repairs
+            FROM saved_estimates
+            WHERE domain = %s AND ro = %s
+            ORDER BY saved_at DESC, id DESC
+            LIMIT 1
+            """,
+            (domain, ro),
+        )
+        estimate_row = cur.fetchone()
+        
+        if not estimate_row:
+            return {"repair_lines": [], "total_hours": 0}
+
+        labor_repairs = _parse_json_field(estimate_row.get("labor_repairs"))
+        paint_repairs = _parse_json_field(estimate_row.get("paint_repairs"))
+        
+        if not isinstance(labor_repairs, list):
+            labor_repairs = []
+        if not isinstance(paint_repairs, list):
+            paint_repairs = []
+
+        lines = labor_repairs if role == "labor" else paint_repairs
+        
+        # Filter out excluded lines
+        repair_lines = []
+        total_hours = 0
+        
+        for idx, line in enumerate(lines):
+            line_key = str(line.get("line") if line.get("line") is not None else idx + 1)
+            if line_key not in excluded_lines:
+                repair_lines.append({
+                    "line": line.get("line") or line_key,
+                    "description": line.get("description") or "",
+                    "value": float(line.get("value") or 0),
+                })
+                total_hours += float(line.get("value") or 0)
+
+        return {
+            "repair_lines": repair_lines,
+            "total_hours": total_hours
+        }
+    finally:
+        cur.close()

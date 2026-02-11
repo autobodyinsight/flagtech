@@ -125,6 +125,40 @@ def get_dashboard_screen_html():
             </div>
         </div>
 
+        <div id="assignTechModal" class="modal" style="display:none;">
+            <div class="modal-content" style="max-width:600px;">
+                <span class="close" onclick="closeAssignTechModal()">&times;</span>
+                <h2 id="assignTechTitle" style="margin-bottom:16px;">Assign Tech</h2>
+                <div style="margin-bottom:12px;">
+                    <label for="assignTechSelect" style="font-weight:bold; font-size:12px; color:#666;">SELECT TECH</label>
+                    <select id="assignTechSelect" style="width:100%; padding:8px; margin-top:6px;"></select>
+                </div>
+                <div style="margin-bottom:12px;">
+                    <label for="assignTechRole" style="font-weight:bold; font-size:12px; color:#666;">ROLE</label>
+                    <select id="assignTechRole" style="width:100%; padding:8px; margin-top:6px;">
+                        <option value="labor">Labor</option>
+                        <option value="paint">Paint</option>
+                    </select>
+                </div>
+                <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:16px;">
+                    <button onclick="closeAssignTechModal()" style="padding:8px 16px; background:#999; color:#fff; border:none; border-radius:4px; cursor:pointer;">Cancel</button>
+                    <button onclick="saveAssignTech()" style="padding:8px 16px; background:#d32f2f; color:#fff; border:none; border-radius:4px; cursor:pointer; font-weight:bold;">ASSIGN</button>
+                </div>
+            </div>
+        </div>
+
+        <div id="techDetailModal" class="modal" style="display:none;">
+            <div class="modal-content" style="max-width:800px; max-height:80vh; overflow-y:auto;">
+                <span class="close" onclick="closeTechDetailModal()" style="color:#d32f2f; font-size:32px;">&times;</span>
+                <h2 id="techDetailTitle" style="margin-bottom:16px;">Tech Repair Lines</h2>
+                <div id="techDetailBody" style="margin-bottom:16px;"></div>
+                <div style="display:flex; justify-content:space-between; align-items:center; padding-top:12px; border-top:2px solid #ddd;">
+                    <div id="techDetailTotal" style="font-weight:bold; font-size:18px;">Total: 0.0 hrs</div>
+                    <button onclick="printTechDetail()" style="padding:10px 20px; background:#d32f2f; color:#fff; border:none; border-radius:4px; cursor:pointer; font-weight:bold;">PRINT</button>
+                </div>
+            </div>
+        </div>
+
         <style>
             .modal {
                 position: fixed;
@@ -528,8 +562,23 @@ def get_dashboard_screen_html():
                                     ${painterLabel}
                                 </button>
                             </td>
-                            <td style="padding:12px; border-bottom:1px solid #eee; color:#333; text-align:right;">${ro.hours.toFixed(1)}</td>
+                            <td style="padding:12px; border-bottom:1px solid #eee; text-align:right;">
+                                <button type="button" onclick="toggleTechAssignment(event, '${ro.ro}')" style="background:none; border:none; color:#0066cc; text-decoration:underline; cursor:pointer; padding:0; font:inherit; font-weight:bold;">
+                                    ${ro.hours.toFixed(1)}
+                                </button>
+                            </td>
                             <td style="padding:12px; border-bottom:1px solid #eee; color:#333; text-align:right; font-weight:bold;">$${ro.total.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                        </tr>
+                        <tr id="tech-assignment-row-${rowId}" style="display:none; background:${rowBg};">
+                            <td colspan="10" style="padding:16px; border-bottom:1px solid #eee;">
+                                <div style="background:#fafafa; border:1px solid #ddd; border-radius:6px; padding:16px;">
+                                    <button onclick="openAssignTechModal('${ro.ro}')" style="padding:10px 20px; background:#d32f2f; color:#fff; border:none; border-radius:4px; cursor:pointer; font-weight:bold; margin-bottom:12px;">ASSIGN</button>
+                                    <hr style="border:none; border-top:1px solid #ccc; margin:12px 0;">
+                                    <div id="tech-assignment-list-${rowId}" style="margin-top:12px;">
+                                        <div style="color:#777;">Loading...</div>
+                                    </div>
+                                </div>
+                            </td>
                         </tr>
                         <tr id="notes-row-${rowId}" style="display:none; background:${rowBg};">
                             <td colspan="10" style="padding:12px 16px; border-bottom:1px solid #eee;">
@@ -552,6 +601,246 @@ def get_dashboard_screen_html():
             function closeRepairLinesModal() {
                 const modal = document.getElementById('repairLinesModal');
                 if (modal) modal.style.display = 'none';
+            }
+
+            function toggleTechAssignment(event, roNumber) {
+                if (event) event.stopPropagation();
+                const assignmentRow = document.getElementById(`tech-assignment-row-${safeId(roNumber)}`);
+                if (!assignmentRow) return;
+                const isHidden = assignmentRow.style.display === 'none' || assignmentRow.style.display === '';
+                assignmentRow.style.display = isHidden ? 'table-row' : 'none';
+                if (isHidden) {
+                    loadTechAssignments(roNumber);
+                }
+            }
+
+            function loadTechAssignments(roNumber) {
+                const listEl = document.getElementById(`tech-assignment-list-${safeId(roNumber)}`);
+                if (!listEl) return;
+                listEl.innerHTML = '<div style="color:#777;">Loading...</div>';
+
+                fetch(`/api/ro-tech-assignments?ro=${encodeURIComponent(roNumber)}`, { credentials: 'include' })
+                    .then(r => r.json())
+                    .then(res => {
+                        if (!res.assignments || res.assignments.length === 0) {
+                            listEl.innerHTML = '<div style="color:#999;">No techs assigned yet.</div>';
+                            return;
+                        }
+                        
+                        let html = '<table style="width:100%; border-collapse:collapse;">';
+                        html += '<thead><tr style="background:#e0e0e0; text-align:left;">';
+                        html += '<th style="padding:8px; font-weight:bold; color:#555;">Tech</th>';
+                        html += '<th style="padding:8px; font-weight:bold; color:#555;">Rate</th>';
+                        html += '<th style="padding:8px; font-weight:bold; color:#555; text-align:right;">Total Hrs</th>';
+                        html += '</tr></thead><tbody>';
+                        
+                        res.assignments.forEach(assignment => {
+                            const techName = assignment.tech_name || 'Unknown';
+                            const rate = assignment.tech_rate ? `$${parseFloat(assignment.tech_rate).toFixed(2)}` : 'N/A';
+                            const totalHrs = assignment.total_hours ? parseFloat(assignment.total_hours).toFixed(1) : '0.0';
+                            html += `
+                                <tr style="cursor:pointer; border-bottom:1px solid #eee;" onclick="openTechDetailModal('${roNumber}', ${assignment.tech_id}, '${techName}', '${assignment.role}')">
+                                    <td style="padding:10px; color:#0066cc; text-decoration:underline;">${techName}</td>
+                                    <td style="padding:10px;">${rate}</td>
+                                    <td style="padding:10px; text-align:right; font-weight:bold;">${totalHrs}</td>
+                                </tr>
+                            `;
+                        });
+                        
+                        html += '</tbody></table>';
+                        listEl.innerHTML = html;
+                    })
+                    .catch(err => {
+                        console.error('Error loading tech assignments:', err);
+                        listEl.innerHTML = '<div style="color:red;">Error loading assignments.</div>';
+                    });
+            }
+
+            let currentAssignRo = '';
+
+            function openAssignTechModal(roNumber) {
+                currentAssignRo = roNumber;
+                const modal = document.getElementById('assignTechModal');
+                const title = document.getElementById('assignTechTitle');
+                const techSelect = document.getElementById('assignTechSelect');
+                
+                if (!modal || !title || !techSelect) return;
+                
+                title.textContent = `Assign Tech - RO# ${roNumber}`;
+                techSelect.innerHTML = '<option value="">Loading...</option>';
+                modal.style.display = 'block';
+                
+                fetch('/api/techs/list', { credentials: 'include' })
+                    .then(r => r.json())
+                    .then(res => {
+                        const techs = res.techs || [];
+                        if (techs.length === 0) {
+                            techSelect.innerHTML = '<option value="">No techs available</option>';
+                            return;
+                        }
+                        
+                        const options = ['<option value="">Select tech...</option>'];
+                        techs.forEach(tech => {
+                            const label = `${tech.first_name || ''} ${tech.last_name || ''}`.trim() || `Tech #${tech.id}`;
+                            const rate = tech.hourly_rate ? ` ($${parseFloat(tech.hourly_rate).toFixed(2)}/hr)` : '';
+                            options.push(`<option value="${tech.id}" data-name="${label}" data-rate="${tech.hourly_rate || 0}">${label}${rate}</option>`);
+                        });
+                        techSelect.innerHTML = options.join('');
+                    })
+                    .catch(err => {
+                        console.error('Error loading techs:', err);
+                        techSelect.innerHTML = '<option value="">Error loading techs</option>';
+                    });
+            }
+
+            function closeAssignTechModal() {
+                const modal = document.getElementById('assignTechModal');
+                if (modal) modal.style.display = 'none';
+            }
+
+            function saveAssignTech() {
+                if (!currentAssignRo) return;
+                
+                const techSelect = document.getElementById('assignTechSelect');
+                const roleSelect = document.getElementById('assignTechRole');
+                
+                if (!techSelect || !techSelect.value) {
+                    alert('Please select a tech.');
+                    return;
+                }
+                
+                const techId = parseInt(techSelect.value, 10);
+                const techName = techSelect.options[techSelect.selectedIndex]?.dataset?.name || '';
+                const role = roleSelect?.value || 'labor';
+                
+                fetch('/api/ro-assignments', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'include',
+                    body: JSON.stringify({
+                        ro: currentAssignRo,
+                        role: role,
+                        tech_id: techId,
+                        tech_name: techName,
+                        excluded_lines: []
+                    })
+                })
+                    .then(r => r.json())
+                    .then(res => {
+                        if (res.error) {
+                            throw new Error(res.error);
+                        }
+                        closeAssignTechModal();
+                        loadTechAssignments(currentAssignRo);
+                        loadDashboardData();
+                    })
+                    .catch(err => {
+                        console.error('Error saving assignment:', err);
+                        alert('Error saving assignment.');
+                    });
+            }
+
+            let currentTechDetailData = null;
+
+            function openTechDetailModal(roNumber, techId, techName, role) {
+                const modal = document.getElementById('techDetailModal');
+                const title = document.getElementById('techDetailTitle');
+                const body = document.getElementById('techDetailBody');
+                
+                if (!modal || !title || !body) return;
+                
+                title.textContent = `${techName} - RO# ${roNumber}`;
+                body.innerHTML = '<div style="color:#777;">Loading...</div>';
+                modal.style.display = 'block';
+                
+                currentTechDetailData = { roNumber, techId, techName, role };
+                
+                fetch(`/api/ro-tech-detail?ro=${encodeURIComponent(roNumber)}&tech_id=${techId}&role=${role}`, { credentials: 'include' })
+                    .then(r => r.json())
+                    .then(res => {
+                        if (res.error) {
+                            throw new Error(res.error);
+                        }
+                        
+                        const lines = res.repair_lines || [];
+                        let totalHrs = 0;
+                        
+                        if (lines.length === 0) {
+                            body.innerHTML = '<div style="color:#999;">No repair lines assigned.</div>';
+                        } else {
+                            let html = '<table style="width:100%; border-collapse:collapse;">';
+                            html += '<thead><tr style="background:#f5f5f5; text-align:left;">';
+                            html += '<th style="padding:8px; font-weight:bold; color:#555;">Line</th>';
+                            html += '<th style="padding:8px; font-weight:bold; color:#555;">Description</th>';
+                            html += '<th style="padding:8px; font-weight:bold; color:#555; text-align:right;">Hours</th>';
+                            html += '</tr></thead><tbody>';
+                            
+                            lines.forEach(line => {
+                                const lineNum = line.line || '—';
+                                const desc = line.description || '';
+                                const hours = line.value ? parseFloat(line.value).toFixed(1) : '0.0';
+                                totalHrs += parseFloat(hours);
+                                
+                                html += `
+                                    <tr style="border-bottom:1px solid #eee;">
+                                        <td style="padding:10px;">${lineNum}</td>
+                                        <td style="padding:10px;">${desc}</td>
+                                        <td style="padding:10px; text-align:right; font-weight:bold;">${hours}</td>
+                                    </tr>
+                                `;
+                            });
+                            
+                            html += '</tbody></table>';
+                            body.innerHTML = html;
+                        }
+                        
+                        const totalEl = document.getElementById('techDetailTotal');
+                        if (totalEl) {
+                            totalEl.textContent = `Total: ${totalHrs.toFixed(1)} hrs`;
+                        }
+                    })
+                    .catch(err => {
+                        console.error('Error loading tech detail:', err);
+                        body.innerHTML = '<div style="color:red;">Error loading repair lines.</div>';
+                    });
+            }
+
+            function closeTechDetailModal() {
+                const modal = document.getElementById('techDetailModal');
+                if (modal) modal.style.display = 'none';
+            }
+
+            function printTechDetail() {
+                if (!currentTechDetailData) return;
+                
+                const body = document.getElementById('techDetailBody');
+                const total = document.getElementById('techDetailTotal');
+                
+                if (!body || !total) return;
+                
+                const printWindow = window.open('', '_blank');
+                printWindow.document.write(`
+                    <html>
+                        <head>
+                            <title>Tech Detail - ${currentTechDetailData.techName}</title>
+                            <style>
+                                body { font-family: Arial, sans-serif; padding: 20px; }
+                                h1 { color: #d32f2f; }
+                                table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+                                th, td { padding: 10px; text-align: left; border-bottom: 1px solid #ddd; }
+                                th { background: #f5f5f5; font-weight: bold; }
+                                .total { margin-top: 20px; font-size: 18px; font-weight: bold; }
+                            </style>
+                        </head>
+                        <body>
+                            <h1>${currentTechDetailData.techName} - RO# ${currentTechDetailData.roNumber}</h1>
+                            ${body.innerHTML}
+                            <div class="total">${total.textContent}</div>
+                        </body>
+                    </html>
+                `);
+                printWindow.document.close();
+                printWindow.print();
             }
 
             let currentRepairMode = 'labor';
