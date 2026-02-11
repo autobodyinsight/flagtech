@@ -45,6 +45,8 @@ def _ensure_saved_estimates_table(cur) -> None:
             owner_info TEXT,
             insurance_company TEXT,
             claim_number VARCHAR(64),
+            phone_original TEXT,
+            phone_override TEXT,
             vin VARCHAR(32),
             labor_repairs JSONB,
             paint_repairs JSONB,
@@ -70,6 +72,8 @@ def _ensure_saved_estimates_table(cur) -> None:
     cur.execute("ALTER TABLE saved_estimates ADD COLUMN IF NOT EXISTS owner_info TEXT")
     cur.execute("ALTER TABLE saved_estimates ADD COLUMN IF NOT EXISTS insurance_company TEXT")
     cur.execute("ALTER TABLE saved_estimates ADD COLUMN IF NOT EXISTS claim_number VARCHAR(64)")
+    cur.execute("ALTER TABLE saved_estimates ADD COLUMN IF NOT EXISTS phone_original TEXT")
+    cur.execute("ALTER TABLE saved_estimates ADD COLUMN IF NOT EXISTS phone_override TEXT")
     cur.execute("ALTER TABLE saved_estimates ADD COLUMN IF NOT EXISTS vin VARCHAR(32)")
     cur.execute("ALTER TABLE saved_estimates ADD COLUMN IF NOT EXISTS domain VARCHAR(255)")
     cur.execute("CREATE INDEX IF NOT EXISTS idx_saved_estimates_ro_domain ON saved_estimates(ro, domain)")
@@ -187,6 +191,18 @@ def _parse_float_value(value) -> float:
         return float(str(value).replace(",", ""))
     except Exception:
         return 0.0
+
+
+def _parse_owner_info(owner_info: str) -> tuple[str, str]:
+    cleaned = (owner_info or "").strip()
+    if not cleaned:
+        return "", ""
+    lines = [line.strip() for line in cleaned.split("\n") if line.strip()]
+    if not lines:
+        return "", ""
+    name = lines[0]
+    phone = lines[1] if len(lines) > 1 else ""
+    return name, phone
 
 
 def _sum_hours(items) -> float:
@@ -487,7 +503,9 @@ async def get_dashboard_data(request: Request):
                    grand_total,
                    owner_info,
                    insurance_company,
-                   claim_number
+                   claim_number,
+                   phone_original,
+                   phone_override
             FROM saved_estimates
             WHERE domain = %s
               AND ro IS NOT NULL
@@ -556,21 +574,18 @@ async def get_dashboard_data(request: Request):
 
             # Parse owner_info to extract customer name and phone
             owner_info = (row.get("owner_info") or "").strip()
-            customer_name = ""
-            customer_phone = ""
-            if owner_info:
-                lines = [line.strip() for line in owner_info.split("\n") if line.strip()]
-                if lines:
-                    customer_name = lines[0]  # First line is the name
-                    if len(lines) > 1:
-                        customer_phone = lines[1]  # Second line is the phone
+            customer_name, customer_phone = _parse_owner_info(owner_info)
+            phone_override = (row.get("phone_override") or "").strip()
+            phone_original = (row.get("phone_original") or customer_phone).strip()
+            current_phone = phone_override or customer_phone
 
             ro_list.append(
                 {
                     "ro": ro,
                     "vehicle": vehicle_display,
                     "customer": customer_name,
-                    "phone": customer_phone,
+                    "phone": current_phone,
+                    "phone_original": phone_original,
                     "insurance": row.get("insurance_company") or "",
                     "claim_number": row.get("claim_number") or "",
                     "tech": assignment_map.get((ro, "labor"), "Unassigned"),
@@ -595,6 +610,55 @@ async def get_dashboard_data(request: Request):
             "rosPerTech": [],
             "roList": ro_list,
         }
+    finally:
+        cur.close()
+
+
+@router.post("/ro-phone")
+async def update_ro_phone(request: Request):
+    domain = get_user_domain(request)
+    if not domain:
+        return JSONResponse(status_code=401, content={"error": "Not authenticated"})
+
+    data = await request.json()
+    ro_value = (data.get("ro") or "").strip()
+    new_phone = (data.get("phone") or "").strip()
+
+    if not ro_value or not new_phone:
+        return JSONResponse(status_code=400, content={"error": "ro and phone are required"})
+
+    conn = get_conn()
+    cur = conn.cursor()
+    try:
+        _ensure_saved_estimates_table(cur)
+        cur.execute(
+            """
+            SELECT id, owner_info, phone_original
+            FROM saved_estimates
+            WHERE domain = %s AND ro = %s
+            ORDER BY saved_at DESC, id DESC
+            LIMIT 1
+            """,
+            (domain, ro_value),
+        )
+        row = cur.fetchone()
+        if not row:
+            return JSONResponse(status_code=404, content={"error": "RO not found"})
+
+        _, parsed_phone = _parse_owner_info(row.get("owner_info") or "")
+        phone_original = (row.get("phone_original") or parsed_phone or "").strip()
+
+        cur.execute(
+            """
+            UPDATE saved_estimates
+            SET phone_override = %s,
+                phone_original = COALESCE(phone_original, %s)
+            WHERE id = %s
+            """,
+            (new_phone, phone_original, row.get("id")),
+        )
+        conn.commit()
+        return {"status": "success", "phone": new_phone, "phone_original": phone_original}
     finally:
         cur.close()
 

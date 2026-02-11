@@ -406,6 +406,75 @@ def get_dashboard_screen_html():
                 });
             }
 
+            function toggleRoNotesFromLink(event, roNumber) {
+                if (event) event.stopPropagation();
+                toggleRoNotes(roNumber);
+            }
+
+            function toggleOldPhone(event, rowId) {
+                if (event) event.stopPropagation();
+                const oldEl = document.getElementById(`phone-old-${rowId}`);
+                if (!oldEl) return;
+                oldEl.style.display = oldEl.style.display === 'none' ? 'inline-block' : 'none';
+            }
+
+            function startPhoneEdit(event, rowId) {
+                if (event) event.stopPropagation();
+                const displayEl = document.getElementById(`phone-display-${rowId}`);
+                const editEl = document.getElementById(`phone-edit-${rowId}`);
+                if (!displayEl || !editEl) return;
+                displayEl.style.display = 'none';
+                editEl.style.display = 'inline-flex';
+                const input = document.getElementById(`phone-input-${rowId}`);
+                if (input) {
+                    input.focus();
+                    input.select();
+                }
+            }
+
+            function cancelPhoneEdit(event, rowId) {
+                if (event) event.stopPropagation();
+                const displayEl = document.getElementById(`phone-display-${rowId}`);
+                const editEl = document.getElementById(`phone-edit-${rowId}`);
+                if (!displayEl || !editEl) return;
+                editEl.style.display = 'none';
+                displayEl.style.display = 'inline-flex';
+            }
+
+            function confirmPhoneEdit(event, rowId, roNumber) {
+                if (event) event.stopPropagation();
+                const input = document.getElementById(`phone-input-${rowId}`);
+                const displayValue = document.getElementById(`phone-current-${rowId}`);
+                const oldValue = document.getElementById(`phone-old-value-${rowId}`);
+                if (!input || !displayValue || !oldValue) return;
+
+                const newPhone = (input.value || '').trim();
+                if (!newPhone) {
+                    alert('Please enter a phone number.');
+                    return;
+                }
+
+                fetch(BACKEND_BASE + '/api/ro-phone', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'include',
+                    body: JSON.stringify({ ro: roNumber, phone: newPhone })
+                })
+                .then(r => r.json())
+                .then(res => {
+                    if (res.error) {
+                        throw new Error(res.error);
+                    }
+                    displayValue.textContent = res.phone || newPhone;
+                    oldValue.textContent = res.phone_original || oldValue.textContent;
+                    cancelPhoneEdit(event, rowId);
+                })
+                .catch(err => {
+                    console.error('Error updating phone:', err);
+                    alert('Error updating phone.');
+                });
+            }
+
             // Update RO list table
             function updateRoListTable(roList) {
                 const tbody = document.getElementById('roListBody');
@@ -425,12 +494,30 @@ def get_dashboard_screen_html():
                     const phoneDisplay = ro.phone || '-';
                     const insuranceDisplay = (ro.insurance || '-').split(/\s+/).slice(0, 2).join(' ');
                     const claimDisplay = ro.claim_number || '-';
+                    const phoneOriginal = ro.phone_original || phoneDisplay || '-';
                     html += `
-                        <tr style="background:${rowBg}; cursor:pointer;" onclick="toggleRoNotes('${ro.ro}')">
-                            <td style="padding:12px; border-bottom:1px solid #eee; color:#0066cc; text-decoration:underline;">${ro.ro}</td>
+                        <tr style="background:${rowBg};">
+                            <td style="padding:12px; border-bottom:1px solid #eee;">
+                                <button type="button" onclick="toggleRoNotesFromLink(event, '${ro.ro}')" style="background:none; border:none; color:#0066cc; text-decoration:underline; cursor:pointer; padding:0; font:inherit;">
+                                    ${ro.ro}
+                                </button>
+                            </td>
                             <td style="padding:12px; border-bottom:1px solid #eee; color:#333;">${ro.vehicle || 'N/A'}</td>
                             <td style="padding:12px; border-bottom:1px solid #eee; color:#333;">${customerDisplay}</td>
-                            <td style="padding:12px; border-bottom:1px solid #eee; color:#333;">${phoneDisplay}</td>
+                            <td style="padding:12px; border-bottom:1px solid #eee; color:#333;">
+                                <span id="phone-display-${rowId}" style="display:inline-flex; align-items:center; gap:6px;">
+                                    <button type="button" onclick="startPhoneEdit(event, '${rowId}')" style="background:none; border:none; color:#0066cc; text-decoration:underline; cursor:pointer; padding:0; font:inherit;">
+                                        <span id="phone-current-${rowId}">${phoneDisplay}</span>
+                                    </button>
+                                    <button type="button" onclick="toggleOldPhone(event, '${rowId}')" style="background:#eee; border:1px solid #ccc; border-radius:3px; padding:0 6px; font-size:12px; cursor:pointer;">+</button>
+                                    <span id="phone-old-${rowId}" style="display:none; font-size:12px; color:#777;">Old: <span id="phone-old-value-${rowId}">${phoneOriginal}</span></span>
+                                </span>
+                                <span id="phone-edit-${rowId}" style="display:none; align-items:center; gap:6px;">
+                                    <input id="phone-input-${rowId}" value="${phoneDisplay === '-' ? '' : phoneDisplay}" style="padding:4px 6px; width:140px;" />
+                                    <button type="button" onclick="confirmPhoneEdit(event, '${rowId}', '${ro.ro}')" style="padding:4px 8px; font-size:12px; background:#4CAF50; color:#fff; border:none; border-radius:4px; cursor:pointer;">Confirm</button>
+                                    <button type="button" onclick="cancelPhoneEdit(event, '${rowId}')" style="padding:4px 8px; font-size:12px; background:#999; color:#fff; border:none; border-radius:4px; cursor:pointer;">Cancel</button>
+                                </span>
+                            </td>
                             <td style="padding:12px; border-bottom:1px solid #eee; color:#333;">${insuranceDisplay}</td>
                             <td style="padding:12px; border-bottom:1px solid #eee; color:#333;">${claimDisplay}</td>
                             <td style="padding:12px; border-bottom:1px solid #eee; color:#333;">

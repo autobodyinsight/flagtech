@@ -22,6 +22,8 @@ def _ensure_saved_estimates_table(cur) -> None:
             labor_repairs JSONB,
             paint_repairs JSONB,
             estimate_totals JSONB,
+            phone_original TEXT,
+            phone_override TEXT,
             saved_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
         """
