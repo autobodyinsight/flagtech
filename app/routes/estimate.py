@@ -158,11 +158,13 @@ def _ensure_ro_assignments_table(cur) -> None:
             tech_id INTEGER,
             tech_name VARCHAR(255),
             excluded_lines JSONB,
+            assigned_hours NUMERIC,
             domain VARCHAR(255) NOT NULL,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
         """
     )
+    cur.execute("ALTER TABLE ro_assignments ADD COLUMN IF NOT EXISTS assigned_hours NUMERIC")
     cur.execute(
         """
         CREATE UNIQUE INDEX IF NOT EXISTS idx_ro_assignments_ro_role_domain
@@ -518,7 +520,7 @@ async def get_dashboard_data(request: Request):
 
         cur.execute(
             """
-            SELECT ro, role, tech_name
+            SELECT ro, role, tech_name, excluded_lines, assigned_hours
             FROM ro_assignments
             WHERE domain = %s
             """,
@@ -527,7 +529,11 @@ async def get_dashboard_data(request: Request):
         assignment_rows = cur.fetchall()
         assignment_map = {}
         for row in assignment_rows:
-            assignment_map[(row.get("ro"), row.get("role"))] = row.get("tech_name")
+            assignment_map[(row.get("ro"), row.get("role"))] = {
+                "tech_name": row.get("tech_name"),
+                "excluded_lines": row.get("excluded_lines") or [],
+                "assigned_hours": row.get("assigned_hours"),
+            }
 
         total_sales = 0.0
         total_parts = 0.0
@@ -581,6 +587,11 @@ async def get_dashboard_data(request: Request):
             phone_original = (row.get("phone_original") or customer_phone).strip()
             current_phone = phone_override or customer_phone
 
+            labor_assignment = assignment_map.get((ro, "labor")) or {}
+            paint_assignment = assignment_map.get((ro, "paint")) or {}
+            labor_tech = labor_assignment.get("tech_name") or "Unassigned"
+            paint_tech = paint_assignment.get("tech_name") or "Unassigned"
+
             ro_list.append(
                 {
                     "ro": ro,
@@ -590,17 +601,18 @@ async def get_dashboard_data(request: Request):
                     "phone_original": phone_original,
                     "insurance": row.get("insurance_company") or "",
                     "claim_number": row.get("claim_number") or "",
-                    "tech": assignment_map.get((ro, "labor"), "Unassigned"),
-                    "painter": assignment_map.get((ro, "paint"), "Unassigned"),
+                    "tech": labor_tech,
+                    "painter": paint_tech,
                     "hours": ro_hours,
                     "total": grand_total,
                 }
             )
 
-            labor_tech = assignment_map.get((ro, "labor"), "Unassigned")
-            if labor_tech:
-                labor_hours_by_tech[labor_tech] = labor_hours_by_tech.get(labor_tech, 0.0) + labor_hours
-                ros_by_tech[labor_tech] = ros_by_tech.get(labor_tech, 0) + 1
+            assigned_labor_hours = labor_assignment.get("assigned_hours")
+            if assigned_labor_hours is None:
+                assigned_labor_hours = _sum_assigned_hours(labor_repairs, labor_assignment.get("excluded_lines"))
+            labor_hours_by_tech[labor_tech] = labor_hours_by_tech.get(labor_tech, 0.0) + assigned_labor_hours
+            ros_by_tech[labor_tech] = ros_by_tech.get(labor_tech, 0) + 1
 
         ro_count = len(rows)
         average_hours = total_hours / ro_count if ro_count else 0.0
@@ -761,7 +773,29 @@ async def save_ro_assignments(request: Request):
     conn = get_conn()
     cur = conn.cursor()
     try:
+        _ensure_saved_estimates_table(cur)
         _ensure_ro_assignments_table(cur)
+
+        cur.execute(
+            """
+            SELECT labor_repairs, paint_repairs
+            FROM saved_estimates
+            WHERE domain = %s AND ro = %s
+            ORDER BY saved_at DESC, id DESC
+            LIMIT 1
+            """,
+            (domain, ro_value),
+        )
+        estimate_row = cur.fetchone() or {}
+        labor_repairs = _parse_json_field(estimate_row.get("labor_repairs"))
+        paint_repairs = _parse_json_field(estimate_row.get("paint_repairs"))
+        if not isinstance(labor_repairs, list):
+            labor_repairs = []
+        if not isinstance(paint_repairs, list):
+            paint_repairs = []
+
+        lines = labor_repairs if role == "labor" else paint_repairs
+        assigned_hours = _sum_assigned_hours(lines, excluded_lines)
 
         if tech_id and not tech_name:
             cur.execute(
@@ -778,13 +812,14 @@ async def save_ro_assignments(request: Request):
 
         cur.execute(
             """
-            INSERT INTO ro_assignments (ro, role, tech_id, tech_name, excluded_lines, domain)
-            VALUES (%s, %s, %s, %s, %s, %s)
+            INSERT INTO ro_assignments (ro, role, tech_id, tech_name, excluded_lines, assigned_hours, domain)
+            VALUES (%s, %s, %s, %s, %s, %s, %s)
             ON CONFLICT (ro, role, domain)
             DO UPDATE SET
                 tech_id = EXCLUDED.tech_id,
                 tech_name = EXCLUDED.tech_name,
                 excluded_lines = EXCLUDED.excluded_lines,
+                assigned_hours = EXCLUDED.assigned_hours,
                 updated_at = CURRENT_TIMESTAMP
             """,
             (
@@ -793,6 +828,7 @@ async def save_ro_assignments(request: Request):
                 tech_id,
                 tech_name or None,
                 json.dumps(excluded_lines),
+                assigned_hours,
                 domain,
             ),
         )
