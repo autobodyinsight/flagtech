@@ -637,62 +637,133 @@ def get_dashboard_screen_html():
                     .then(([assignRes, repairsRes]) => {
                         let html = '';
                         
-                        // Display Tech Assignments
+                        // Organize assignments by tech for easy lookup
+                        const techAssignments = {};
+                        const assignedLinesByRole = { labor: [], paint: [] };
+                        
                         if (assignRes.assignments && assignRes.assignments.length > 0) {
-                            html += '<table style="width:100%; border-collapse:collapse; margin-bottom:20px;">';
+                            assignRes.assignments.forEach(assignment => {
+                                if (!techAssignments[assignment.tech_id]) {
+                                    techAssignments[assignment.tech_id] = [];
+                                }
+                                techAssignments[assignment.tech_id].push(assignment);
+                                
+                                // Track assigned lines
+                                if (assignment.role === 'labor' || assignment.role === 'labor') {
+                                    assignedLinesByRole[assignment.role].push(assignment.tech_id);
+                                }
+                            });
+                        }
+                        
+                        // Create display list
+                        const displayList = [];
+                        
+                        // Add regular tech assignments
+                        if (assignRes.assignments && assignRes.assignments.length > 0) {
+                            assignRes.assignments.forEach(assignment => {
+                                const techId = assignment.tech_id;
+                                const techName = assignment.tech_name || 'Unknown';
+                                const role = assignment.role || 'labor';
+                                const totalHrs = assignment.total_hours ? parseFloat(assignment.total_hours).toFixed(1) : '0.0';
+                                displayList.push({
+                                    type: 'tech',
+                                    tech_id: techId,
+                                    tech_name: techName,
+                                    role: role,
+                                    rate: assignment.tech_rate,
+                                    hours: totalHrs
+                                });
+                            });
+                        }
+                        
+                        // Calculate unassigned hours for labor
+                        let unassignedLaborHrs = 0;
+                        if (repairsRes.labor && repairsRes.labor.length > 0) {
+                            repairsRes.labor.forEach(line => {
+                                const hrs = line.hours ? parseFloat(line.hours) : 0;
+                                unassignedLaborHrs += hrs;
+                            });
+                            
+                            // Subtract assigned labor hours
+                            if (assignRes.assignments) {
+                                assignRes.assignments.forEach(assignment => {
+                                    if (assignment.role === 'labor') {
+                                        const assignedHrs = assignment.total_hours ? parseFloat(assignment.total_hours) : 0;
+                                        unassignedLaborHrs -= assignedHrs;
+                                    }
+                                });
+                            }
+                            
+                            if (unassignedLaborHrs > 0.05) {
+                                displayList.push({
+                                    type: 'unassigned',
+                                    role: 'labor',
+                                    tech_name: 'UNASSIGNED',
+                                    hours: unassignedLaborHrs.toFixed(1)
+                                });
+                            }
+                        }
+                        
+                        // Calculate unassigned hours for paint
+                        let unassignedPaintHrs = 0;
+                        if (repairsRes.paint && repairsRes.paint.length > 0) {
+                            repairsRes.paint.forEach(line => {
+                                const hrs = line.hours ? parseFloat(line.hours) : 0;
+                                unassignedPaintHrs += hrs;
+                            });
+                            
+                            // Subtract assigned paint hours
+                            if (assignRes.assignments) {
+                                assignRes.assignments.forEach(assignment => {
+                                    if (assignment.role === 'paint') {
+                                        const assignedHrs = assignment.total_hours ? parseFloat(assignment.total_hours) : 0;
+                                        unassignedPaintHrs -= assignedHrs;
+                                    }
+                                });
+                            }
+                            
+                            if (unassignedPaintHrs > 0.05) {
+                                displayList.push({
+                                    type: 'unassigned',
+                                    role: 'paint',
+                                    tech_name: 'UNASSIGNED',
+                                    hours: unassignedPaintHrs.toFixed(1)
+                                });
+                            }
+                        }
+                        
+                        // Render table
+                        if (displayList.length === 0) {
+                            html = '<div style="color:#999; padding:12px;">No assignments or repair lines found.</div>';
+                        } else {
+                            html = '<table style="width:100%; border-collapse:collapse;">';
                             html += '<thead><tr style="background:#e0e0e0; text-align:left;">';
-                            html += '<th style="padding:8px; font-weight:bold; color:#555;">Tech</th>';
-                            html += '<th style="padding:8px; font-weight:bold; color:#555;">Rate</th>';
-                            html += '<th style="padding:8px; font-weight:bold; color:#555; text-align:right;">Total Hrs</th>';
+                            html += '<th style="padding:10px; font-weight:bold; color:#555;">Tech</th>';
+                            html += '<th style="padding:10px; font-weight:bold; color:#555;">Role</th>';
+                            html += '<th style="padding:10px; font-weight:bold; color:#555; text-align:right;">Total Hrs</th>';
                             html += '</tr></thead><tbody>';
                             
-                            assignRes.assignments.forEach(assignment => {
-                                const techName = assignment.tech_name || 'Unknown';
-                                const rate = assignment.tech_rate ? `$${parseFloat(assignment.tech_rate).toFixed(2)}` : 'N/A';
-                                const totalHrs = assignment.total_hours ? parseFloat(assignment.total_hours).toFixed(1) : '0.0';
+                            displayList.forEach((item, idx) => {
+                                const techName = item.tech_name;
+                                const role = (item.role || 'labor').toUpperCase();
+                                const hours = item.hours || '0.0';
+                                const isUnassigned = item.type === 'unassigned';
+                                const bgColor = idx % 2 === 0 ? '#fff' : '#f9f9f9';
+                                const textColor = isUnassigned ? '#d32f2f' : '#333';
+                                const fontWeight = isUnassigned ? 'bold' : 'normal';
+                                const cursor = isUnassigned ? 'default' : 'pointer';
+                                const textDecoration = isUnassigned ? 'none' : 'underline';
+                                const clickHandler = isUnassigned ? '' : `onclick="openTechDetailModal('${roNumber}', ${item.tech_id}, '${item.tech_name}', '${item.role}')"`;
+                                
                                 html += `
-                                    <tr style="cursor:pointer; border-bottom:1px solid #eee;" onclick="openTechDetailModal('${roNumber}', ${assignment.tech_id}, '${techName}', '${assignment.role}')">
-                                        <td style="padding:10px; color:#0066cc; text-decoration:underline;">${techName}</td>
-                                        <td style="padding:10px;">${rate}</td>
-                                        <td style="padding:10px; text-align:right; font-weight:bold;">${totalHrs}</td>
+                                    <tr style="background:${bgColor}; border-bottom:1px solid #ddd; cursor:${cursor};" ${clickHandler}>
+                                        <td style="padding:10px; color:${textColor}; font-weight:${fontWeight}; text-decoration:${textDecoration};">${techName}</td>
+                                        <td style="padding:10px; color:#666;">${role}</td>
+                                        <td style="padding:10px; text-align:right; font-weight:bold; color:${textColor};">${hours}</td>
                                     </tr>
                                 `;
                             });
                             
-                            html += '</tbody></table>';
-                        } else {
-                            html += '<div style="color:#999; margin-bottom:20px;">No techs assigned yet.</div>';
-                        }
-                        
-                        // Display LABOR Repair Lines
-                        if (repairsRes.labor && repairsRes.labor.length > 0) {
-                            html += '<div style="font-weight:bold; font-size:16px; margin:16px 0 8px 0; color:#333;">LABOR</div>';
-                            html += '<table style="width:100%; border-collapse:collapse; margin-bottom:16px; font-size:13px;">';
-                            html += '<thead><tr style="background:#f5f5f5;">';
-                            html += '<th style="padding:6px 8px; text-align:left; color:#666;">Description</th>';
-                            html += '<th style="padding:6px 8px; text-align:right; color:#666;">Hrs</th>';
-                            html += '</tr></thead><tbody>';
-                            repairsRes.labor.forEach(line => {
-                                const desc = line.description || line.line_description || 'N/A';
-                                const hrs = line.hours ? parseFloat(line.hours).toFixed(1) : '0.0';
-                                html += `<tr style="border-bottom:1px solid #eee;"><td style="padding:6px 8px;">${desc}</td><td style="padding:6px 8px; text-align:right;">${hrs}</td></tr>`;
-                            });
-                            html += '</tbody></table>';
-                        }
-                        
-                        // Display PAINT Repair Lines
-                        if (repairsRes.paint && repairsRes.paint.length > 0) {
-                            html += '<div style="font-weight:bold; font-size:16px; margin:16px 0 8px 0; color:#333;">PAINT</div>';
-                            html += '<table style="width:100%; border-collapse:collapse; font-size:13px;">';
-                            html += '<thead><tr style="background:#f5f5f5;">';
-                            html += '<th style="padding:6px 8px; text-align:left; color:#666;">Description</th>';
-                            html += '<th style="padding:6px 8px; text-align:right; color:#666;">Hrs</th>';
-                            html += '</tr></thead><tbody>';
-                            repairsRes.paint.forEach(line => {
-                                const desc = line.description || line.line_description || 'N/A';
-                                const hrs = line.hours ? parseFloat(line.hours).toFixed(1) : '0.0';
-                                html += `<tr style="border-bottom:1px solid #eee;"><td style="padding:6px 8px;">${desc}</td><td style="padding:6px 8px; text-align:right;">${hrs}</td></tr>`;
-                            });
                             html += '</tbody></table>';
                         }
                         
