@@ -371,6 +371,35 @@ function resolveEstimateTotals(estimateTotals) {{
   return {{resolved, totalDefs}};
 }}
 
+function extractClaimNumberFromDisplayedEstimate() {{
+  const container = document.getElementById('estimatePages')
+    || document.getElementById('uploadStatus')
+    || document.body;
+  if (!container) return '';
+
+  const nodes = Array.from(container.querySelectorAll('div'));
+  for (let i = 0; i < nodes.length; i += 1) {{
+    const text = (nodes[i].textContent || '').trim();
+    if (!text) continue;
+    const match = text.match(/\bclaim\b\s*[:#-]?\s*([A-Za-z0-9-]+)/i);
+    if (match && match[1]) {{
+      return match[1];
+    }}
+    if (/\bclaim\b/i.test(text)) {{
+      for (let j = i + 1; j < Math.min(i + 6, nodes.length); j += 1) {{
+        const nextText = (nodes[j].textContent || '').trim();
+        if (!nextText) continue;
+        const tokenMatch = nextText.match(/[A-Za-z0-9-]+/);
+        if (tokenMatch && tokenMatch[0]) {{
+          return tokenMatch[0];
+        }}
+      }}
+    }}
+  }}
+
+  return '';
+}}
+
 function switchTab(tabName) {{
   // Hide all tabs
   document.querySelectorAll('.tab-content').forEach(tab => tab.style.display = 'none');
@@ -385,6 +414,11 @@ function openSaveEstimateModal(estimateTotals) {{
   // Store estimate totals globally
   const resolvedTotals = resolveEstimateTotals(estimateTotals);
   saveEstimateTotalsData = resolvedTotals.resolved;
+
+  const displayedClaimNumber = extractClaimNumberFromDisplayedEstimate();
+  if (displayedClaimNumber) {{
+    saveClaimNumber = displayedClaimNumber;
+  }}
   
   // Parse vehicle info
   const vehicleInfo = parseVehicleInfo(saveVehicleInfoLine);
