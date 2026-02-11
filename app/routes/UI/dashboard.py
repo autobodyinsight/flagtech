@@ -93,15 +93,13 @@ def get_dashboard_screen_html():
                                 <th style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold; color:#555;">Phone</th>
                                 <th style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold; color:#555;">Insurance</th>
                                 <th style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold; color:#555;">Claim #</th>
-                                <th style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold; color:#555;">Tech</th>
-                                <th style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold; color:#555;">Painter</th>
                                 <th style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold; color:#555; text-align:right;">HRS</th>
                                 <th style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold; color:#555; text-align:right;">Total</th>
                             </tr>
                         </thead>
                         <tbody id="roListBody">
                             <tr>
-                                <td colspan="10" style="padding:20px; text-align:center; color:#999;">Loading...</td>
+                                <td colspan="8" style="padding:20px; text-align:center; color:#999;">Loading...</td>
                             </tr>
                         </tbody>
                     </table>
@@ -507,12 +505,25 @@ def get_dashboard_screen_html():
                 });
             }
 
+            // Clean phone number to display only digits
+            function cleanPhoneNumber(phone) {
+                if (!phone || phone === '-') return '-';
+                // Extract only numeric characters
+                const digits = phone.replace(/\D/g, '');
+                if (!digits) return '-';
+                // Format as (XXX) XXX-XXXX if 10 digits, otherwise just return digits
+                if (digits.length === 10) {
+                    return `(${digits.slice(0,3)}) ${digits.slice(3,6)}-${digits.slice(6)}`;
+                }
+                return digits;
+            }
+
             // Update RO list table
             function updateRoListTable(roList) {
                 const tbody = document.getElementById('roListBody');
                 
                 if (!roList || roList.length === 0) {
-                    tbody.innerHTML = '<tr><td colspan="10" style="padding:20px; text-align:center; color:#999;">No repair orders found</td></tr>';
+                    tbody.innerHTML = '<tr><td colspan="8" style="padding:20px; text-align:center; color:#999;">No repair orders found</td></tr>';
                     return;
                 }
                 
@@ -520,13 +531,11 @@ def get_dashboard_screen_html():
                 roList.forEach((ro, index) => {
                     const rowBg = index % 2 === 0 ? '#fff' : '#f9f9f9';
                     const rowId = safeId(ro.ro);
-                    const techLabel = ro.tech || 'Unassigned';
-                    const painterLabel = ro.painter || 'Unassigned';
                     const customerDisplay = ro.customer || '-';
-                    const phoneDisplay = ro.phone || '-';
+                    const phoneDisplay = cleanPhoneNumber(ro.phone);
                     const insuranceDisplay = (ro.insurance || '-').split(/\s+/).slice(0, 2).join(' ');
                     const claimDisplay = ro.claim_number || '-';
-                    const phoneOriginal = ro.phone_original || phoneDisplay || '-';
+                    const phoneOriginal = cleanPhoneNumber(ro.phone_original) || phoneDisplay || '-';
                     html += `
                         <tr style="background:${rowBg};">
                             <td style="padding:12px; border-bottom:1px solid #eee;">
@@ -552,16 +561,6 @@ def get_dashboard_screen_html():
                             </td>
                             <td style="padding:12px; border-bottom:1px solid #eee; color:#333;">${insuranceDisplay}</td>
                             <td style="padding:12px; border-bottom:1px solid #eee; color:#333;">${claimDisplay}</td>
-                            <td style="padding:12px; border-bottom:1px solid #eee; color:#333;">
-                                <button type="button" onclick="openRepairLinesModal(event, '${ro.ro}', 'labor')" style="background:none; border:none; color:#0066cc; text-decoration:underline; cursor:pointer; padding:0; font:inherit;">
-                                    ${techLabel}
-                                </button>
-                            </td>
-                            <td style="padding:12px; border-bottom:1px solid #eee; color:#333;">
-                                <button type="button" onclick="openRepairLinesModal(event, '${ro.ro}', 'paint')" style="background:none; border:none; color:#0066cc; text-decoration:underline; cursor:pointer; padding:0; font:inherit;">
-                                    ${painterLabel}
-                                </button>
-                            </td>
                             <td style="padding:12px; border-bottom:1px solid #eee; text-align:right;">
                                 <button type="button" onclick="toggleTechAssignment(event, '${ro.ro}')" style="background:none; border:none; color:#0066cc; text-decoration:underline; cursor:pointer; padding:0; font:inherit; font-weight:bold;">
                                     ${ro.hours.toFixed(1)}
@@ -570,7 +569,7 @@ def get_dashboard_screen_html():
                             <td style="padding:12px; border-bottom:1px solid #eee; color:#333; text-align:right; font-weight:bold;">$${ro.total.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
                         </tr>
                         <tr id="tech-assignment-row-${rowId}" style="display:none; background:${rowBg};">
-                            <td colspan="10" style="padding:16px; border-bottom:1px solid #eee;">
+                            <td colspan="8" style="padding:16px; border-bottom:1px solid #eee;">
                                 <div style="background:#fafafa; border:1px solid #ddd; border-radius:6px; padding:16px;">
                                     <button onclick="openAssignTechModal('${ro.ro}')" style="padding:10px 20px; background:#d32f2f; color:#fff; border:none; border-radius:4px; cursor:pointer; font-weight:bold; margin-bottom:12px;">ASSIGN</button>
                                     <hr style="border:none; border-top:1px solid #ccc; margin:12px 0;">
@@ -581,7 +580,7 @@ def get_dashboard_screen_html():
                             </td>
                         </tr>
                         <tr id="notes-row-${rowId}" style="display:none; background:${rowBg};">
-                            <td colspan="10" style="padding:12px 16px; border-bottom:1px solid #eee;">
+                            <td colspan="8" style="padding:12px 16px; border-bottom:1px solid #eee;">
                                 <div style="background:#fafafa; border:1px solid #ddd; border-radius:6px; padding:12px;">
                                     <div style="font-weight:bold; margin-bottom:8px;">Notes</div>
                                     <div id="notes-list-${rowId}" style="max-height:180px; overflow-y:auto; margin-bottom:10px;"></div>
@@ -619,40 +618,77 @@ def get_dashboard_screen_html():
                 if (!listEl) return;
                 listEl.innerHTML = '<div style="color:#777;">Loading...</div>';
 
-                fetch(`/api/ro-tech-assignments?ro=${encodeURIComponent(roNumber)}`, { credentials: 'include' })
-                    .then(r => r.json())
-                    .then(res => {
-                        if (!res.assignments || res.assignments.length === 0) {
-                            listEl.innerHTML = '<div style="color:#999;">No techs assigned yet.</div>';
-                            return;
+                Promise.all([
+                    fetch(`/api/ro-tech-assignments?ro=${encodeURIComponent(roNumber)}`, { credentials: 'include' }).then(r => r.json()),
+                    fetch(`/api/ro-repairs?ro=${encodeURIComponent(roNumber)}`, { credentials: 'include' }).then(r => r.json())
+                ])
+                    .then(([assignRes, repairsRes]) => {
+                        let html = '';
+                        
+                        // Display Tech Assignments
+                        if (assignRes.assignments && assignRes.assignments.length > 0) {
+                            html += '<table style="width:100%; border-collapse:collapse; margin-bottom:20px;">';
+                            html += '<thead><tr style="background:#e0e0e0; text-align:left;">';
+                            html += '<th style="padding:8px; font-weight:bold; color:#555;">Tech</th>';
+                            html += '<th style="padding:8px; font-weight:bold; color:#555;">Rate</th>';
+                            html += '<th style="padding:8px; font-weight:bold; color:#555; text-align:right;">Total Hrs</th>';
+                            html += '</tr></thead><tbody>';
+                            
+                            assignRes.assignments.forEach(assignment => {
+                                const techName = assignment.tech_name || 'Unknown';
+                                const rate = assignment.tech_rate ? `$${parseFloat(assignment.tech_rate).toFixed(2)}` : 'N/A';
+                                const totalHrs = assignment.total_hours ? parseFloat(assignment.total_hours).toFixed(1) : '0.0';
+                                html += `
+                                    <tr style="cursor:pointer; border-bottom:1px solid #eee;" onclick="openTechDetailModal('${roNumber}', ${assignment.tech_id}, '${techName}', '${assignment.role}')">
+                                        <td style="padding:10px; color:#0066cc; text-decoration:underline;">${techName}</td>
+                                        <td style="padding:10px;">${rate}</td>
+                                        <td style="padding:10px; text-align:right; font-weight:bold;">${totalHrs}</td>
+                                    </tr>
+                                `;
+                            });
+                            
+                            html += '</tbody></table>';
+                        } else {
+                            html += '<div style="color:#999; margin-bottom:20px;">No techs assigned yet.</div>';
                         }
                         
-                        let html = '<table style="width:100%; border-collapse:collapse;">';
-                        html += '<thead><tr style="background:#e0e0e0; text-align:left;">';
-                        html += '<th style="padding:8px; font-weight:bold; color:#555;">Tech</th>';
-                        html += '<th style="padding:8px; font-weight:bold; color:#555;">Rate</th>';
-                        html += '<th style="padding:8px; font-weight:bold; color:#555; text-align:right;">Total Hrs</th>';
-                        html += '</tr></thead><tbody>';
+                        // Display LABOR Repair Lines
+                        if (repairsRes.labor && repairsRes.labor.length > 0) {
+                            html += '<div style="font-weight:bold; font-size:16px; margin:16px 0 8px 0; color:#333;">LABOR</div>';
+                            html += '<table style="width:100%; border-collapse:collapse; margin-bottom:16px; font-size:13px;">';
+                            html += '<thead><tr style="background:#f5f5f5;">';
+                            html += '<th style="padding:6px 8px; text-align:left; color:#666;">Description</th>';
+                            html += '<th style="padding:6px 8px; text-align:right; color:#666;">Hrs</th>';
+                            html += '</tr></thead><tbody>';
+                            repairsRes.labor.forEach(line => {
+                                const desc = line.description || line.line_description || 'N/A';
+                                const hrs = line.hours ? parseFloat(line.hours).toFixed(1) : '0.0';
+                                html += `<tr style="border-bottom:1px solid #eee;"><td style="padding:6px 8px;">${desc}</td><td style="padding:6px 8px; text-align:right;">${hrs}</td></tr>`;
+                            });
+                            html += '</tbody></table>';
+                        }
                         
-                        res.assignments.forEach(assignment => {
-                            const techName = assignment.tech_name || 'Unknown';
-                            const rate = assignment.tech_rate ? `$${parseFloat(assignment.tech_rate).toFixed(2)}` : 'N/A';
-                            const totalHrs = assignment.total_hours ? parseFloat(assignment.total_hours).toFixed(1) : '0.0';
-                            html += `
-                                <tr style="cursor:pointer; border-bottom:1px solid #eee;" onclick="openTechDetailModal('${roNumber}', ${assignment.tech_id}, '${techName}', '${assignment.role}')">
-                                    <td style="padding:10px; color:#0066cc; text-decoration:underline;">${techName}</td>
-                                    <td style="padding:10px;">${rate}</td>
-                                    <td style="padding:10px; text-align:right; font-weight:bold;">${totalHrs}</td>
-                                </tr>
-                            `;
-                        });
+                        // Display PAINT Repair Lines
+                        if (repairsRes.paint && repairsRes.paint.length > 0) {
+                            html += '<div style="font-weight:bold; font-size:16px; margin:16px 0 8px 0; color:#333;">PAINT</div>';
+                            html += '<table style="width:100%; border-collapse:collapse; font-size:13px;">';
+                            html += '<thead><tr style="background:#f5f5f5;">';
+                            html += '<th style="padding:6px 8px; text-align:left; color:#666;">Description</th>';
+                            html += '<th style="padding:6px 8px; text-align:right; color:#666;">Hrs</th>';
+                            html += '</tr></thead><tbody>';
+                            repairsRes.paint.forEach(line => {
+                                const desc = line.description || line.line_description || 'N/A';
+                                const hrs = line.hours ? parseFloat(line.hours).toFixed(1) : '0.0';
+                                html += `<tr style="border-bottom:1px solid #eee;"><td style="padding:6px 8px;">${desc}</td><td style="padding:6px 8px; text-align:right;">${hrs}</td></tr>`;
+                            });
+                            html += '</tbody></table>';
+                        }
                         
-                        html += '</tbody></table>';
                         listEl.innerHTML = html;
                     })
                     .catch(err => {
                         console.error('Error loading tech assignments:', err);
-                        listEl.innerHTML = '<div style="color:red;">Error loading assignments.</div>';
+                        listEl.innerHTML = '<div style="color:red;">Error loading data.</div>';
                     });
             }
 
