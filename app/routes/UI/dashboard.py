@@ -10,12 +10,18 @@ def get_dashboard_screen_html():
                 <button onclick="flashAllData()" style="padding:10px 16px; background:#d32f2f; color:#fff; border:none; border-radius:4px; font-weight:bold; cursor:pointer;">FLASH</button>
             </div>
             
-            <div style="display:flex; gap:20px; align-items:stretch;">
+            <div style="display:flex; gap:20px; align-items:stretch; --dash-card-h: 150px;">
+                <style>
+                    .dash-stack { display:flex; flex-direction:column; gap:20px; }
+                    .dash-card { height: var(--dash-card-h); }
+                    .dash-card-fill { flex:1; }
+                    .dash-chart { height: calc(var(--dash-card-h) * 3 + 40px); }
+                </style>
                 <!-- Column 1: Current Sales + Total ROs -->
-                <div style="flex:0 0 300px; display:flex; flex-direction:column; gap:20px; min-height:420px;">
-                    <div style="background:#f9f9f9; padding:20px; border-radius:8px; border:1px solid #ddd; flex:1; display:flex; flex-direction:column; height:calc((100% - 20px) / 2);">
+                <div style="flex:0 0 300px;" class="dash-stack">
+                    <div style="background:#f9f9f9; padding:20px; border-radius:8px; border:1px solid #ddd; display:flex; flex-direction:column;" class="dash-card">
                         <h3 style="margin:0 0 10px 0; text-align:center; color:#333;">Current Sales</h3>
-                        <div style="position:relative; flex:1; background:#e0e0e0; border-radius:4px; overflow:hidden;">
+                        <div style="position:relative; background:#e0e0e0; border-radius:4px; overflow:hidden;" class="dash-card-fill">
                             <div id="totalSalesBar" style="position:absolute; bottom:0; width:100%; background:linear-gradient(to top, #4caf50, #81c784); transition:height 0.5s ease;">
                             </div>
                         </div>
@@ -24,9 +30,9 @@ def get_dashboard_screen_html():
                         </div>
                     </div>
 
-                    <div style="background:#f9f9f9; padding:20px; border-radius:8px; border:1px solid #ddd; flex:1; display:flex; flex-direction:column; height:calc((100% - 20px) / 2);">
+                    <div style="background:#f9f9f9; padding:20px; border-radius:8px; border:1px solid #ddd; display:flex; flex-direction:column;" class="dash-card">
                         <h3 style="margin:0 0 10px 0; text-align:center; color:#333;">Total RO's</h3>
-                        <div style="position:relative; flex:1; background:#e0e0e0; border-radius:4px; overflow:hidden;">
+                        <div style="position:relative; background:#e0e0e0; border-radius:4px; overflow:hidden;" class="dash-card-fill">
                             <div id="totalRosBar" style="position:absolute; bottom:0; width:100%; background:linear-gradient(to top, #42a5f5, #90caf9); transition:height 0.5s ease;">
                             </div>
                         </div>
@@ -37,34 +43,34 @@ def get_dashboard_screen_html():
                 </div>
 
                 <!-- Column 2: Average Hrs + Average RO + Total ROs per Tech -->
-                <div style="flex:0 0 320px; display:flex; flex-direction:column; gap:20px; min-height:420px;">
-                    <div style="background:#fff; padding:20px; border-radius:8px; border:2px solid #9c27b0; box-shadow:0 2px 4px rgba(0,0,0,0.1);">
+                <div style="flex:0 0 320px;" class="dash-stack">
+                    <div style="background:#fff; padding:20px; border-radius:8px; border:2px solid #9c27b0; box-shadow:0 2px 4px rgba(0,0,0,0.1);" class="dash-card">
                         <h4 style="margin:0 0 15px 0; color:#666; font-size:14px;">Average Hrs</h4>
                         <div id="averageHrs" style="font-size:32px; font-weight:bold; color:#9c27b0;">
                             0.0
                         </div>
                     </div>
 
-                    <div style="background:#fff; padding:20px; border-radius:8px; border:2px solid #ff5722; box-shadow:0 2px 4px rgba(0,0,0,0.1);">
+                    <div style="background:#fff; padding:20px; border-radius:8px; border:2px solid #ff5722; box-shadow:0 2px 4px rgba(0,0,0,0.1);" class="dash-card">
                         <h4 style="margin:0 0 15px 0; color:#666; font-size:14px;">Average RO</h4>
                         <div id="averageRO" style="font-size:32px; font-weight:bold; color:#ff5722;">
                             $0
                         </div>
                     </div>
 
-                    <div style="background:#fff; padding:20px; border-radius:8px; border:2px solid #795548; box-shadow:0 2px 4px rgba(0,0,0,0.1);">
+                    <div style="background:#fff; padding:20px; border-radius:8px; border:2px solid #795548; box-shadow:0 2px 4px rgba(0,0,0,0.1);" class="dash-card">
                         <h4 style="margin:0 0 15px 0; color:#666; font-size:14px;">Total ROs per Tech</h4>
-                        <div id="rosPerTechList" style="max-height:150px; overflow-y:auto; font-size:14px;">
+                        <div id="rosPerTechList" style="height:100%; overflow-y:auto; font-size:14px;">
                             <div style="color:#999; text-align:center;">Loading...</div>
                         </div>
                     </div>
                 </div>
 
                 <!-- Column 3: Total Hrs per Tech -->
-                <div style="flex:1; display:flex; flex-direction:column; min-height:420px;">
-                    <div style="background:#fff; padding:20px; border-radius:8px; border:2px solid #00bcd4; box-shadow:0 2px 4px rgba(0,0,0,0.1); height:100%; display:flex; flex-direction:column;">
+                <div style="flex:1; display:flex; flex-direction:column;">
+                    <div style="background:#fff; padding:20px; border-radius:8px; border:2px solid #00bcd4; box-shadow:0 2px 4px rgba(0,0,0,0.1); display:flex; flex-direction:column; align-items:center;" class="dash-chart">
                         <h4 style="margin:0 0 15px 0; color:#666; font-size:14px;">Total Hrs per Tech</h4>
-                        <canvas id="hoursPerTechChart" style="flex:1; max-height:none;"></canvas>
+                        <canvas id="hoursPerTechChart" style="height:100%; width:100%;"></canvas>
                     </div>
                 </div>
             </div>
