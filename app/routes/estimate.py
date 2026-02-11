@@ -44,6 +44,7 @@ def _ensure_saved_estimates_table(cur) -> None:
             model VARCHAR(50),
             owner_info TEXT,
             insurance_company TEXT,
+            claim_number VARCHAR(64),
             vin VARCHAR(32),
             labor_repairs JSONB,
             paint_repairs JSONB,
@@ -68,6 +69,7 @@ def _ensure_saved_estimates_table(cur) -> None:
     cur.execute("ALTER TABLE saved_estimates ADD COLUMN IF NOT EXISTS insurance_pay NUMERIC")
     cur.execute("ALTER TABLE saved_estimates ADD COLUMN IF NOT EXISTS owner_info TEXT")
     cur.execute("ALTER TABLE saved_estimates ADD COLUMN IF NOT EXISTS insurance_company TEXT")
+    cur.execute("ALTER TABLE saved_estimates ADD COLUMN IF NOT EXISTS claim_number VARCHAR(64)")
     cur.execute("ALTER TABLE saved_estimates ADD COLUMN IF NOT EXISTS vin VARCHAR(32)")
     cur.execute("ALTER TABLE saved_estimates ADD COLUMN IF NOT EXISTS domain VARCHAR(255)")
     cur.execute("CREATE INDEX IF NOT EXISTS idx_saved_estimates_ro_domain ON saved_estimates(ro, domain)")
@@ -483,7 +485,9 @@ async def get_dashboard_data(request: Request):
                    parts_repairs,
                    parts_total,
                    grand_total,
-                   owner_info
+                   owner_info,
+                   insurance_company,
+                   claim_number
             FROM saved_estimates
             WHERE domain = %s
               AND ro IS NOT NULL
@@ -567,6 +571,8 @@ async def get_dashboard_data(request: Request):
                     "vehicle": vehicle_display,
                     "customer": customer_name,
                     "phone": customer_phone,
+                    "insurance": row.get("insurance_company") or "",
+                    "claim_number": row.get("claim_number") or "",
                     "tech": assignment_map.get((ro, "labor"), "Unassigned"),
                     "painter": assignment_map.get((ro, "paint"), "Unassigned"),
                     "hours": ro_hours,
