@@ -90,32 +90,11 @@ def _group_row_words_by_x(words: List[Dict], gap: float = 15.0) -> List[Dict]:
     return grouped
 
 
-def extract_claim_number(text: str) -> str:
-    """
-    Extract claim number from text.
-    Looks for the label "claim" (case-insensitive) followed by an adjacent alphanumeric value.
-    Returns the claim number or empty string if not found.
-    """
-    if not text:
-        return ""
-    
-    # Pattern to match "claim" then optional separators and the adjacent value.
-    # Examples: "Claim: 25-503553305-02", "claim # 155598", "CLAIM 1A2B3C"
-    pattern = r"\bclaim\b\s*(?:[#:]?\s*)?([A-Za-z0-9\-]+)"
-    match = re.search(pattern, text, re.IGNORECASE)
-    
-    if match:
-        claim_num = match.group(1).strip()
-        return claim_num
-    
-    return ""
-
-
 def detect_anchors_and_vehicle_info(
     pages: List[Dict]
-) -> Tuple[Optional[int], Optional[float], Optional[int], Optional[float], str, str, str, str, str, str, str]:
+) -> Tuple[Optional[int], Optional[float], Optional[int], Optional[float], str, str, str, str, str, str]:
     """
-    Detect anchor points in PDF and extract vehicle information, owner info, insurance company, VIN, and claim number.
+    Detect anchor points in PDF and extract vehicle information, owner info, insurance company, and VIN.
     Returns:
         (anchor_page, anchor_ymid, subtotals_page, subtotals_ymid, first_ro_line, vehicle_info_line, owner_info, insurance_company, vin, claim_number)
     """
@@ -132,6 +111,37 @@ def detect_anchors_and_vehicle_info(
     claim_number = ""
     vin_row_idx = None
 
+    def _extract_claim_number() -> str:
+        words = [w for page in pages for w in page.get("words", [])]
+        claim_tokens = []
+        for w in words:
+            text = str(w.get("text", "")).lower().replace(" ", "")
+            if text.startswith("claim"):
+                claim_tokens.append(w)
+
+        for w in claim_tokens:
+            raw = str(w.get("text", ""))
+            match = re.search(r"claim[:#]?\s*([A-Za-z0-9-]+)", raw, re.IGNORECASE)
+            if match:
+                return match.group(1)
+
+        for w in claim_tokens:
+            y0 = w.get("y0", 0)
+            same_line = [
+                x
+                for x in words
+                if abs(x.get("y0", 0) - y0) < 3 and x.get("x0", 0) > w.get("x1", 0)
+            ]
+            same_line_sorted = sorted(same_line, key=lambda x: x.get("x0", 0))
+            if same_line_sorted:
+                candidate = str(same_line_sorted[0].get("text", "")).strip()
+                if re.match(r"^[A-Za-z0-9-]+$", candidate):
+                    return candidate
+
+        return ""
+
+    claim_number = _extract_claim_number()
+
     for pi, page in enumerate(pages, start=1):
         rows = group_rows(page.get("words", []), y_thresh=6.0)
         for idx, r in enumerate(rows):
@@ -144,44 +154,6 @@ def detect_anchors_and_vehicle_info(
                     anchor_page = pi
                     anchor_ymid = r["ymid"]
                     first_ro_line = row_text
-
-            # Extract claim number anywhere the label appears
-            if not claim_number and re.search(r"\bclaim\b", row_text, re.IGNORECASE):
-                claim_number = extract_claim_number(row_text)
-                if not claim_number and idx + 1 < len(rows):
-                    header_groups = _group_row_words_by_x(r["words"])
-                    claim_group = None
-                    for group in header_groups:
-                        if re.search(r"\bclaim\b", group["text"], re.IGNORECASE):
-                            claim_group = group
-                            break
-
-                    if claim_group:
-                        left_bound = claim_group["min_x"] - 2
-                        right_bound = None
-                        for group in header_groups:
-                            if group["min_x"] > claim_group["max_x"]:
-                                right_bound = group["min_x"] - 2
-                                break
-
-                        next_row_words = rows[idx + 1]["words"]
-                        filtered_words = []
-                        for word in next_row_words:
-                            x0 = word.get("x0", 0)
-                            x1 = word.get("x1", 0)
-                            xmid = word.get("xmid", (x0 + x1) / 2 if x1 or x0 else 0)
-                            if xmid >= left_bound and (right_bound is None or xmid < right_bound):
-                                filtered_words.append(word)
-
-                        next_row_text = " ".join(
-                            w.get("text", "") for w in sorted(filtered_words, key=lambda w: w.get("x0", 0))
-                        ).strip()
-                        if next_row_text:
-                            claim_number = extract_claim_number(next_row_text)
-                            if not claim_number:
-                                token_match = re.search(r"[A-Za-z0-9\-]+", next_row_text)
-                                if token_match:
-                                    claim_number = token_match.group(0)
 
             # Extract owner info (look for "owner:" or "customer:" and extract name/phone in the same x column)
             if re.search(r"\b(owner|customer)\s*:", row_text, re.IGNORECASE):
