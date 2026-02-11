@@ -12,7 +12,7 @@ def get_dashboard_screen_html():
             
             <div style="display:flex; gap:20px; align-items:stretch;">
                 <!-- Column 1: Current Sales + Total ROs -->
-                <div style="flex:0 0 300px; display:flex; flex-direction:column; gap:20px;">
+                <div style="flex:0 0 300px; display:flex; flex-direction:column; gap:20px; min-height:420px;">
                     <div style="background:#f9f9f9; padding:20px; border-radius:8px; border:1px solid #ddd; flex:1; display:flex; flex-direction:column; height:calc((100% - 20px) / 2);">
                         <h3 style="margin:0 0 10px 0; text-align:center; color:#333;">Current Sales</h3>
                         <div style="position:relative; flex:1; background:#e0e0e0; border-radius:4px; overflow:hidden;">
@@ -37,7 +37,7 @@ def get_dashboard_screen_html():
                 </div>
 
                 <!-- Column 2: Average Hrs + Average RO + Total ROs per Tech -->
-                <div style="flex:0 0 320px; display:flex; flex-direction:column; gap:20px;">
+                <div style="flex:0 0 320px; display:flex; flex-direction:column; gap:20px; min-height:420px;">
                     <div style="background:#fff; padding:20px; border-radius:8px; border:2px solid #9c27b0; box-shadow:0 2px 4px rgba(0,0,0,0.1);">
                         <h4 style="margin:0 0 15px 0; color:#666; font-size:14px;">Average Hrs</h4>
                         <div id="averageHrs" style="font-size:32px; font-weight:bold; color:#9c27b0;">
@@ -61,10 +61,10 @@ def get_dashboard_screen_html():
                 </div>
 
                 <!-- Column 3: Total Hrs per Tech -->
-                <div style="flex:1; display:flex; flex-direction:column;">
-                    <div style="background:#fff; padding:20px; border-radius:8px; border:2px solid #00bcd4; box-shadow:0 2px 4px rgba(0,0,0,0.1);">
+                <div style="flex:1; display:flex; flex-direction:column; min-height:420px;">
+                    <div style="background:#fff; padding:20px; border-radius:8px; border:2px solid #00bcd4; box-shadow:0 2px 4px rgba(0,0,0,0.1); height:100%; display:flex; flex-direction:column;">
                         <h4 style="margin:0 0 15px 0; color:#666; font-size:14px;">Total Hrs per Tech</h4>
-                        <canvas id="hoursPerTechChart" style="max-height:150px;"></canvas>
+                        <canvas id="hoursPerTechChart" style="flex:1; max-height:none;"></canvas>
                     </div>
                 </div>
             </div>
