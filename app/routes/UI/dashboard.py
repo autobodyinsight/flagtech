@@ -10,12 +10,12 @@ def get_dashboard_screen_html():
                 <button onclick="flashAllData()" style="padding:10px 16px; background:#d32f2f; color:#fff; border:none; border-radius:4px; font-weight:bold; cursor:pointer;">FLASH</button>
             </div>
             
-            <div style="display:flex; gap:20px; align-items:stretch; --dash-card-h: 150px;">
+            <div style="display:flex; gap:20px; align-items:stretch; --dash-chart-h: 520px; --dash-card-h: calc((var(--dash-chart-h) - 40px) / 3);">
                 <style>
                     .dash-stack { display:flex; flex-direction:column; gap:20px; }
                     .dash-card { height: var(--dash-card-h); }
                     .dash-card-fill { flex:1; }
-                    .dash-chart { height: calc(var(--dash-card-h) * 3 + 40px); }
+                    .dash-chart { height: var(--dash-chart-h); }
                 </style>
                 <!-- Column 1: Current Sales + Total ROs -->
                 <div style="flex:0 0 300px;" class="dash-stack">
