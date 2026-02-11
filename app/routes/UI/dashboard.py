@@ -68,9 +68,14 @@ def get_dashboard_screen_html():
 
                 <!-- Column 3: Total Hrs per Tech -->
                 <div style="flex:1; display:flex; flex-direction:column;">
-                    <div style="background:#fff; padding:20px; border-radius:8px; border:2px solid #00bcd4; box-shadow:0 2px 4px rgba(0,0,0,0.1); display:flex; flex-direction:column; align-items:center;" class="dash-chart">
+                    <div style="background:#fff; padding:20px; border-radius:8px; border:2px solid #00bcd4; box-shadow:0 2px 4px rgba(0,0,0,0.1); display:flex; flex-direction:column;" class="dash-chart">
                         <h4 style="margin:0 0 15px 0; color:#666; font-size:14px;">Total Hrs per Tech</h4>
-                        <canvas id="hoursPerTechChart" style="height:100%; width:100%;"></canvas>
+                        <div style="display:flex; gap:16px; align-items:center; width:100%; flex:1;">
+                            <div style="flex:0 0 55%; max-width:55%; height:100%;">
+                                <canvas id="hoursPerTechChart" style="height:100%; width:100%;"></canvas>
+                            </div>
+                            <div id="hoursPerTechLegend" style="flex:1; font-size:12px; color:#333; max-height:100%; overflow:auto;"></div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -239,8 +244,19 @@ def get_dashboard_screen_html():
             // Update pie chart for hours per tech
             function updateHoursPerTechChart(hoursPerTech) {
                 const ctx = document.getElementById('hoursPerTechChart');
+                const legendEl = document.getElementById('hoursPerTechLegend');
                 
                 if (!ctx) return;
+                if (!legendEl) return;
+
+                if (!hoursPerTech || hoursPerTech.length === 0) {
+                    if (hoursPerTechChartInstance) {
+                        hoursPerTechChartInstance.destroy();
+                        hoursPerTechChartInstance = null;
+                    }
+                    legendEl.innerHTML = '<div style="color:#999; text-align:center;">No data</div>';
+                    return;
+                }
                 
                 const labels = hoursPerTech.map(item => item.tech);
                 const dataValues = hoursPerTech.map(item => item.hours);
@@ -269,16 +285,10 @@ def get_dashboard_screen_html():
                     },
                     options: {
                         responsive: true,
-                        maintainAspectRatio: true,
+                        maintainAspectRatio: false,
                         plugins: {
                             legend: {
-                                position: 'bottom',
-                                labels: {
-                                    font: {
-                                        size: 10
-                                    },
-                                    padding: 8
-                                }
+                                display: false
                             },
                             tooltip: {
                                 callbacks: {
@@ -290,6 +300,20 @@ def get_dashboard_screen_html():
                         }
                     }
                 });
+
+                legendEl.innerHTML = labels.map((label, idx) => {
+                    const color = colors[idx % colors.length];
+                    const value = dataValues[idx];
+                    return `
+                        <div style="display:flex; align-items:center; justify-content:space-between; gap:10px; padding:4px 0; border-bottom:1px solid #eee;">
+                            <div style="display:flex; align-items:center; gap:8px;">
+                                <span style="width:10px; height:10px; background:${color}; display:inline-block; border-radius:2px;"></span>
+                                <span>${label}</span>
+                            </div>
+                            <span style="font-weight:bold;">${value.toFixed(1)} hrs</span>
+                        </div>
+                    `;
+                }).join('');
             }
             
             // Update list for ROs per tech
