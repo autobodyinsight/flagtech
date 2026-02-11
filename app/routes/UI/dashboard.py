@@ -13,9 +13,9 @@ def get_dashboard_screen_html():
             <div style="display:flex; gap:20px;">
                 <!-- Left Side: Vertical Bars -->
                 <div style="flex:0 0 300px; display:flex; flex-direction:column; gap:20px;">
-                    <!-- Total Sales Bar -->
+                    <!-- Current Sales Bar -->
                     <div style="background:#f9f9f9; padding:20px; border-radius:8px; border:1px solid #ddd; flex:1; display:flex; flex-direction:column; height:calc((100% - 20px) / 2);">
-                        <h3 style="margin:0 0 10px 0; text-align:center; color:#333;">Total Sales</h3>
+                        <h3 style="margin:0 0 10px 0; text-align:center; color:#333;">Current Sales</h3>
                         <div style="position:relative; flex:1; background:#e0e0e0; border-radius:4px; overflow:hidden;">
                             <div id="totalSalesBar" style="position:absolute; bottom:0; width:100%; background:linear-gradient(to top, #4caf50, #81c784); transition:height 0.5s ease;">
                             </div>
@@ -25,17 +25,6 @@ def get_dashboard_screen_html():
                         </div>
                     </div>
                     
-                    <!-- Pending Payments Bar -->
-                    <div style="background:#f9f9f9; padding:20px; border-radius:8px; border:1px solid #ddd; flex:1; display:flex; flex-direction:column; height:calc((100% - 20px) / 2);">
-                        <h3 style="margin:0 0 10px 0; text-align:center; color:#333;">Pending Payments</h3>
-                        <div style="position:relative; flex:1; background:#e0e0e0; border-radius:4px; overflow:hidden;">
-                            <div id="pendingPaymentsBar" style="position:absolute; bottom:0; width:100%; background:linear-gradient(to top, #ff9800, #ffb74d); transition:height 0.5s ease;">
-                            </div>
-                        </div>
-                        <div id="pendingPaymentsValue" style="text-align:center; font-size:20px; font-weight:bold; color:#ff9800; margin-top:10px;">
-                            $0
-                        </div>
-                    </div>
                 </div>
                 
                 <!-- Right Side: 4 Display Cards in 2 Columns -->
@@ -176,7 +165,6 @@ def get_dashboard_screen_html():
 
                 const fallback = {
                     totalSales: 0,
-                    pendingPayments: 0,
                     averageHrs: 0,
                     averageRO: 0,
                     hoursPerTech: [],
@@ -208,15 +196,10 @@ def get_dashboard_screen_html():
             // Update all dashboard elements
             function updateDashboard(data) {
                 // Update Total Sales bar and value
-                const maxSales = Math.max(data.totalSales, data.pendingPayments, 10000); // minimum scale
+                const maxSales = Math.max(data.totalSales, 10000); // minimum scale
                 const salesPercent = (data.totalSales / maxSales) * 100;
                 document.getElementById('totalSalesBar').style.height = salesPercent + '%';
                 document.getElementById('totalSalesValue').innerText = '$' + data.totalSales.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
-                
-                // Update Pending Payments bar and value
-                const pendingPercent = (data.pendingPayments / maxSales) * 100;
-                document.getElementById('pendingPaymentsBar').style.height = pendingPercent + '%';
-                document.getElementById('pendingPaymentsValue').innerText = '$' + data.pendingPayments.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
                 
                 // Update Average Hours
                 document.getElementById('averageHrs').innerText = data.averageHrs.toFixed(1);
