@@ -627,7 +627,10 @@ def get_dashboard_screen_html():
 
             function loadTechAssignments(roNumber) {
                 const listEl = document.getElementById(`tech-assignment-list-${safeId(roNumber)}`);
-                if (!listEl) return;
+                if (!listEl) {
+                    console.error('Could not find tech assignment list element for RO:', roNumber, 'Safe ID:', safeId(roNumber));
+                    return;
+                }
                 listEl.innerHTML = '<div style="color:#777;">Loading...</div>';
 
                 Promise.all([
@@ -636,41 +639,17 @@ def get_dashboard_screen_html():
                 ])
                     .then(([assignRes, repairsRes]) => {
                         let html = '';
+                        let displayList = [];
                         
                         // Organize assignments by tech for easy lookup
-                        const techAssignments = {};
-                        const assignedLinesByRole = { labor: [], paint: [] };
-                        
                         if (assignRes.assignments && assignRes.assignments.length > 0) {
                             assignRes.assignments.forEach(assignment => {
-                                if (!techAssignments[assignment.tech_id]) {
-                                    techAssignments[assignment.tech_id] = [];
-                                }
-                                techAssignments[assignment.tech_id].push(assignment);
-                                
-                                // Track assigned lines
-                                if (assignment.role === 'labor' || assignment.role === 'labor') {
-                                    assignedLinesByRole[assignment.role].push(assignment.tech_id);
-                                }
-                            });
-                        }
-                        
-                        // Create display list
-                        const displayList = [];
-                        
-                        // Add regular tech assignments
-                        if (assignRes.assignments && assignRes.assignments.length > 0) {
-                            assignRes.assignments.forEach(assignment => {
-                                const techId = assignment.tech_id;
-                                const techName = assignment.tech_name || 'Unknown';
-                                const role = assignment.role || 'labor';
                                 const totalHrs = assignment.total_hours ? parseFloat(assignment.total_hours).toFixed(1) : '0.0';
                                 displayList.push({
                                     type: 'tech',
-                                    tech_id: techId,
-                                    tech_name: techName,
-                                    role: role,
-                                    rate: assignment.tech_rate,
+                                    tech_id: assignment.tech_id,
+                                    tech_name: assignment.tech_name || 'Unknown',
+                                    role: assignment.role || 'labor',
                                     hours: totalHrs
                                 });
                             });
@@ -734,13 +713,13 @@ def get_dashboard_screen_html():
                         
                         // Render table
                         if (displayList.length === 0) {
-                            html = '<div style="color:#999; padding:12px;">No assignments or repair lines found.</div>';
+                            html = '<div style="color:#999; padding:12px;">No assignments yet.</div>';
                         } else {
-                            html = '<table style="width:100%; border-collapse:collapse;">';
-                            html += '<thead><tr style="background:#e0e0e0; text-align:left;">';
-                            html += '<th style="padding:10px; font-weight:bold; color:#555;">Tech</th>';
-                            html += '<th style="padding:10px; font-weight:bold; color:#555;">Role</th>';
-                            html += '<th style="padding:10px; font-weight:bold; color:#555; text-align:right;">Total Hrs</th>';
+                            html = '<table style="width:100%; border-collapse:collapse; margin:0;">';
+                            html += '<thead><tr style="background:#e8e8e8; border-bottom:2px solid #999;">';
+                            html += '<th style="padding:10px 12px; text-align:left; font-weight:bold; color:#333; width:35%;">TECH</th>';
+                            html += '<th style="padding:10px 12px; text-align:left; font-weight:bold; color:#333; width:35%;">ROLE</th>';
+                            html += '<th style="padding:10px 12px; text-align:right; font-weight:bold; color:#333; width:30%;">TOTAL</th>';
                             html += '</tr></thead><tbody>';
                             
                             displayList.forEach((item, idx) => {
@@ -748,18 +727,18 @@ def get_dashboard_screen_html():
                                 const role = (item.role || 'labor').toUpperCase();
                                 const hours = item.hours || '0.0';
                                 const isUnassigned = item.type === 'unassigned';
-                                const bgColor = idx % 2 === 0 ? '#fff' : '#f9f9f9';
+                                const bgColor = '#fff';
                                 const textColor = isUnassigned ? '#d32f2f' : '#333';
                                 const fontWeight = isUnassigned ? 'bold' : 'normal';
                                 const cursor = isUnassigned ? 'default' : 'pointer';
-                                const textDecoration = isUnassigned ? 'none' : 'underline';
-                                const clickHandler = isUnassigned ? '' : `onclick="openTechDetailModal('${roNumber}', ${item.tech_id}, '${item.tech_name}', '${item.role}')"`;
+                                const hoverBg = isUnassigned ? '#fff' : '#f5f5f5';
+                                const clickHandler = isUnassigned ? '' : `onclick="openTechDetailModal('${roNumber}', ${item.tech_id}, '${item.tech_name}', '${item.role}')" onmouseover="this.style.backgroundColor='${hoverBg}'" onmouseout="this.style.backgroundColor='${bgColor}'"`;
                                 
                                 html += `
                                     <tr style="background:${bgColor}; border-bottom:1px solid #ddd; cursor:${cursor};" ${clickHandler}>
-                                        <td style="padding:10px; color:${textColor}; font-weight:${fontWeight}; text-decoration:${textDecoration};">${techName}</td>
-                                        <td style="padding:10px; color:#666;">${role}</td>
-                                        <td style="padding:10px; text-align:right; font-weight:bold; color:${textColor};">${hours}</td>
+                                        <td style="padding:10px 12px; color:${textColor}; font-weight:${fontWeight};">${techName}</td>
+                                        <td style="padding:10px 12px; color:${textColor}; font-weight:${fontWeight};">${role}</td>
+                                        <td style="padding:10px 12px; text-align:right; color:${textColor}; font-weight:bold;">${hours}</td>
                                     </tr>
                                 `;
                             });
@@ -770,8 +749,8 @@ def get_dashboard_screen_html():
                         listEl.innerHTML = html;
                     })
                     .catch(err => {
-                        console.error('Error loading tech assignments:', err);
-                        listEl.innerHTML = '<div style="color:red;">Error loading data.</div>';
+                        console.error('Error loading tech assignments for RO:', roNumber, err);
+                        listEl.innerHTML = '<div style="color:red; padding:12px;">Error loading assignments.</div>';
                     });
             }
 
