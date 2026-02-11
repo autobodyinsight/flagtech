@@ -122,7 +122,7 @@ def detect_anchors_and_vehicle_info(
 
     def _extract_claim_number_from_text(text: str) -> str:
         match = re.search(
-            r"\bCLAIM\b\s*(?:NUMBER|NO\.?|#)?\s*[:#]?\s*([0-9][0-9-]{3,})",
+            r"\bCLAIM\b\s*(?:NUMBER|NO\.?|#)?\s*[:#]?\s*([A-Za-z0-9-]{4,})",
             text,
             re.IGNORECASE,
         )
@@ -130,7 +130,7 @@ def detect_anchors_and_vehicle_info(
             return match.group(1)
         compact = re.sub(r"\s+", "", text)
         match = re.search(
-            r"CLAIM(?:NUMBER|NO|#)?[:#]?([0-9][0-9-]{3,})",
+            r"CLAIM(?:NUMBER|NO|#)?[:#]?([A-Za-z0-9-]{4,})",
             compact,
             re.IGNORECASE,
         )
