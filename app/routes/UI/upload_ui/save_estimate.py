@@ -242,9 +242,9 @@ function parseVehicleInfo(vehicleStr) {{
   const remaining = yearMatch ? vehicleStr.replace(yearMatch[0], '').trim() : vehicleStr.trim();
   
   // Split remaining text - typically: Make Model [trim/body info]
-  const parts = remaining.split(/\\s+/);
+  const parts = remaining.split(/\s+/);
   const make = parts.length > 0 ? parts[0] : null;
-  const model = parts.length > 1 ? parts[1] : null;
+  const model = parts.length > 1 ? parts.slice(1, 3).join(' ') : null;
   
   return {{year, make, model}};
 }}
