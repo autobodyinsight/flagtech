@@ -635,6 +635,8 @@ async def get_dashboard_data(request: Request):
             assigned_labor_hours = labor_assignment.get("assigned_hours")
             if assigned_labor_hours is None:
                 assigned_labor_hours = _sum_assigned_hours(labor_repairs, labor_assignment.get("excluded_lines"))
+            # Ensure it's a float to avoid mixing Decimal and float
+            assigned_labor_hours = _parse_float_value(assigned_labor_hours)
             labor_hours_by_tech[labor_tech] = labor_hours_by_tech.get(labor_tech, 0.0) + assigned_labor_hours
             ros_by_tech[labor_tech] = ros_by_tech.get(labor_tech, 0) + 1
 
