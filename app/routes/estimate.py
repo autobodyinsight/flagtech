@@ -533,6 +533,8 @@ async def get_dashboard_data(request: Request):
         total_parts = 0.0
         total_hours = 0.0
         ro_list = []
+        labor_hours_by_tech = {}
+        ros_by_tech = {}
 
         for row in rows:
             ro = row.get("ro")
@@ -595,19 +597,34 @@ async def get_dashboard_data(request: Request):
                 }
             )
 
+            labor_tech = assignment_map.get((ro, "labor"), "Unassigned")
+            if labor_tech:
+                labor_hours_by_tech[labor_tech] = labor_hours_by_tech.get(labor_tech, 0.0) + labor_hours
+                ros_by_tech[labor_tech] = ros_by_tech.get(labor_tech, 0) + 1
+
         ro_count = len(rows)
         average_hours = total_hours / ro_count if ro_count else 0.0
         average_ro = total_sales / ro_count if ro_count else 0.0
 
+        hours_per_tech = [
+            {"tech": tech, "hours": hours}
+            for tech, hours in labor_hours_by_tech.items()
+        ]
+        hours_per_tech.sort(key=lambda item: item["hours"], reverse=True)
+
+        ros_per_tech = [
+            {"tech": tech, "ros": count}
+            for tech, count in ros_by_tech.items()
+        ]
+        ros_per_tech.sort(key=lambda item: item["ros"], reverse=True)
+
         return {
             "totalSales": total_sales,
             "pendingPayments": 0.0,
-            "currentGP": 0.0,
-            "partsCost": total_parts,
             "averageHrs": average_hours,
             "averageRO": average_ro,
-            "hoursPerTech": [],
-            "rosPerTech": [],
+            "hoursPerTech": hours_per_tech,
+            "rosPerTech": ros_per_tech,
             "roList": ro_list,
         }
     finally:

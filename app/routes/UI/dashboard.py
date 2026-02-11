@@ -38,23 +38,8 @@ def get_dashboard_screen_html():
                     </div>
                 </div>
                 
-                <!-- Right Side: 6 Display Cards in 2 Columns -->
+                <!-- Right Side: 4 Display Cards in 2 Columns -->
                 <div style="flex:1; display:grid; grid-template-columns:1fr 1fr; gap:20px; align-content:start;">
-                    <!-- Current GP Card -->
-                    <div style="background:#fff; padding:20px; border-radius:8px; border:2px solid #2196f3; box-shadow:0 2px 4px rgba(0,0,0,0.1);">
-                        <h4 style="margin:0 0 15px 0; color:#666; font-size:14px;">Current GP</h4>
-                        <div id="currentGP" style="font-size:32px; font-weight:bold; color:#2196f3;">
-                            0%
-                        </div>
-                    </div>
-                    
-                    <!-- Parts Cost Card -->
-                    <div style="background:#fff; padding:20px; border-radius:8px; border:2px solid #e91e63; box-shadow:0 2px 4px rgba(0,0,0,0.1);">
-                        <h4 style="margin:0 0 15px 0; color:#666; font-size:14px;">Parts Cost</h4>
-                        <div id="partsCost" style="font-size:32px; font-weight:bold; color:#e91e63;">
-                            $0
-                        </div>
-                    </div>
                     
                     <!-- Average Hours Card -->
                     <div style="background:#fff; padding:20px; border-radius:8px; border:2px solid #9c27b0; box-shadow:0 2px 4px rgba(0,0,0,0.1);">
@@ -192,8 +177,6 @@ def get_dashboard_screen_html():
                 const fallback = {
                     totalSales: 0,
                     pendingPayments: 0,
-                    currentGP: 0,
-                    partsCost: 0,
                     averageHrs: 0,
                     averageRO: 0,
                     hoursPerTech: [],
@@ -234,12 +217,6 @@ def get_dashboard_screen_html():
                 const pendingPercent = (data.pendingPayments / maxSales) * 100;
                 document.getElementById('pendingPaymentsBar').style.height = pendingPercent + '%';
                 document.getElementById('pendingPaymentsValue').innerText = '$' + data.pendingPayments.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
-                
-                // Update Current GP
-                document.getElementById('currentGP').innerText = data.currentGP.toFixed(1) + '%';
-                
-                // Update Parts Cost
-                document.getElementById('partsCost').innerText = '$' + data.partsCost.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
                 
                 // Update Average Hours
                 document.getElementById('averageHrs').innerText = data.averageHrs.toFixed(1);
