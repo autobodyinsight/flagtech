@@ -632,7 +632,7 @@ async def get_dashboard_data(request: Request):
 
         return {
             "totalSales": total_sales,
-            "pendingPayments": 0.0,
+            "totalROs": ro_count,
             "averageHrs": average_hours,
             "averageRO": average_ro,
             "hoursPerTech": hours_per_tech,

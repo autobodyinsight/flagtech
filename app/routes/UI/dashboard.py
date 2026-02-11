@@ -24,6 +24,18 @@ def get_dashboard_screen_html():
                             $0
                         </div>
                     </div>
+
+                    <!-- Total ROs Bar -->
+                    <div style="background:#f9f9f9; padding:20px; border-radius:8px; border:1px solid #ddd; flex:1; display:flex; flex-direction:column; height:calc((100% - 20px) / 2);">
+                        <h3 style="margin:0 0 10px 0; text-align:center; color:#333;">Total RO's</h3>
+                        <div style="position:relative; flex:1; background:#e0e0e0; border-radius:4px; overflow:hidden;">
+                            <div id="totalRosBar" style="position:absolute; bottom:0; width:100%; background:linear-gradient(to top, #42a5f5, #90caf9); transition:height 0.5s ease;">
+                            </div>
+                        </div>
+                        <div id="totalRosValue" style="text-align:center; font-size:20px; font-weight:bold; color:#42a5f5; margin-top:10px;">
+                            0
+                        </div>
+                    </div>
                     
                 </div>
                 
@@ -165,6 +177,7 @@ def get_dashboard_screen_html():
 
                 const fallback = {
                     totalSales: 0,
+                    totalROs: 0,
                     averageHrs: 0,
                     averageRO: 0,
                     hoursPerTech: [],
@@ -200,6 +213,11 @@ def get_dashboard_screen_html():
                 const salesPercent = (data.totalSales / maxSales) * 100;
                 document.getElementById('totalSalesBar').style.height = salesPercent + '%';
                 document.getElementById('totalSalesValue').innerText = '$' + data.totalSales.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+
+                const maxRos = Math.max(data.totalROs, 1);
+                const rosPercent = (data.totalROs / maxRos) * 100;
+                document.getElementById('totalRosBar').style.height = rosPercent + '%';
+                document.getElementById('totalRosValue').innerText = data.totalROs.toLocaleString('en-US');
                 
                 // Update Average Hours
                 document.getElementById('averageHrs').innerText = data.averageHrs.toFixed(1);
