@@ -111,41 +111,55 @@ def detect_anchors_and_vehicle_info(
     claim_number = ""
     vin_row_idx = None
 
-    def _extract_claim_number() -> str:
-        words = [w for page in pages for w in page.get("words", [])]
-        claim_tokens = []
-        for w in words:
-            text = str(w.get("text", "")).lower().replace(" ", "")
-            if text.startswith("claim"):
-                claim_tokens.append(w)
+    def _clean_claim_candidate(candidate: str) -> str:
+        cleaned = re.sub(r"[^A-Za-z0-9-]", "", candidate.strip())
+        if len(cleaned) < 4:
+            return ""
+        return cleaned
 
-        for w in claim_tokens:
-            raw = str(w.get("text", ""))
-            match = re.search(r"claim[:#]?\s*([A-Za-z0-9-]+)", raw, re.IGNORECASE)
+    def _extract_claim_number_from_text(text: str) -> str:
+        if not text:
+            return ""
+        claim_patterns = [
+            r"\bCLAIM(?:\s*NUMBER|\s*NO\.?|\s*#)?\s*[:#-]?\s*([A-Za-z0-9-]{4,})\b",
+            r"\bCLM(?:\s*NUMBER|\s*NO\.?|\s*#)?\s*[:#-]?\s*([A-Za-z0-9-]{4,})\b",
+        ]
+        for pattern in claim_patterns:
+            match = re.search(pattern, text, re.IGNORECASE)
             if match:
-                return match.group(1)
+                candidate = _clean_claim_candidate(match.group(1))
+                if candidate:
+                    return candidate
 
-        for w in claim_tokens:
-            y0 = w.get("y0", 0)
-            same_line = [
-                x
-                for x in words
-                if abs(x.get("y0", 0) - y0) < 3 and x.get("x0", 0) > w.get("x1", 0)
-            ]
-            same_line_sorted = sorted(same_line, key=lambda x: x.get("x0", 0))
-            if same_line_sorted:
-                candidate = str(same_line_sorted[0].get("text", "")).strip()
-                if re.match(r"^[A-Za-z0-9-]+$", candidate):
+        compact = re.sub(r"\s+", "", text)
+        compact_patterns = [
+            r"CLAIM(?:NUMBER|NO|#)?[:#-]?([A-Za-z0-9-]{4,})",
+            r"CLM(?:NUMBER|NO|#)?[:#-]?([A-Za-z0-9-]{4,})",
+        ]
+        for pattern in compact_patterns:
+            match = re.search(pattern, compact, re.IGNORECASE)
+            if match:
+                candidate = _clean_claim_candidate(match.group(1))
+                if candidate:
                     return candidate
 
         return ""
 
-    claim_number = _extract_claim_number()
+    def _extract_claim_number_from_row(row: Dict) -> str:
+        row_text = " ".join(w.get("text", "") for w in row.get("words", [])).strip()
+        if not row_text:
+            return ""
+        return _extract_claim_number_from_text(row_text)
 
     for pi, page in enumerate(pages, start=1):
         rows = group_rows(page.get("words", []), y_thresh=6.0)
         for idx, r in enumerate(rows):
             row_text = " ".join(w.get("text", "") for w in r["words"]).strip()
+
+            if not claim_number and ro_count == 0:
+                candidate = _extract_claim_number_from_row(r)
+                if candidate:
+                    claim_number = candidate
 
             # Extract first RO
             if re.search(r"\bRO\b", row_text):
