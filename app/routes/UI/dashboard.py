@@ -162,15 +162,10 @@ def get_dashboard_screen_html():
             let dashboardData = null;
             let hoursPerTechChartInstance = null;
             
-            // Check if BACKEND_BASE is already defined, if not, define it
-            if (typeof BACKEND_BASE === 'undefined') {
-                var BACKEND_BASE = "https://flagtech1.onrender.com";
-            }
-            
             // Load dashboard data
             async function loadDashboardData() {
                 try {
-                    const response = await fetch(BACKEND_BASE + '/api/dashboard-data', { credentials: 'include' });
+                    const response = await fetch('/api/dashboard-data', { credentials: 'include' });
                     const data = await response.json();
                     if (data && !data.error) {
                         dashboardData = data;
@@ -199,7 +194,7 @@ def get_dashboard_screen_html():
                 if (!confirmed) return;
 
                 try {
-                    const response = await fetch(BACKEND_BASE + '/api/flash', { method: 'POST' });
+                    const response = await fetch('/api/flash', { method: 'POST', credentials: 'include' });
                     const result = await response.json();
                     if (result.status === 'success') {
                         await loadDashboardData();
@@ -457,7 +452,7 @@ def get_dashboard_screen_html():
                     return;
                 }
 
-                fetch(BACKEND_BASE + '/api/ro-phone', {
+                fetch('/api/ro-phone', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     credentials: 'include',

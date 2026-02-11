@@ -102,11 +102,6 @@ def get_techs_screen_html():
 
         <script>
 
-        // Check if BACKEND_BASE is already defined, if not, define it
-        if (typeof BACKEND_BASE === 'undefined') {
-            var BACKEND_BASE = "https://flagtech1.onrender.com";
-        }
-
         // -----------------------------
         // Add Tech Modal
         // -----------------------------
@@ -132,7 +127,7 @@ def get_techs_screen_html():
                 return;
             }
 
-            fetch(`${BACKEND_BASE}/api/techs/add`, {
+            fetch('/api/techs/add', {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
@@ -158,7 +153,7 @@ def get_techs_screen_html():
             const tableContainer = document.getElementById('techsListContainer');
             tableContainer.innerHTML = "<p style='color:#777; text-align:center; padding:12px;'>Loading...</p>";
 
-            fetch(`${BACKEND_BASE}/api/techs/list`)
+            fetch('/api/techs/list', { credentials: 'include' })
             .then(r => r.json())
             .then(techsRes => {
                 tableContainer.innerHTML = "";
@@ -258,7 +253,7 @@ def get_techs_screen_html():
         function loadTechAssignments(techId, techName, container) {
             container.innerHTML = '<div style="color:#777;">Loading assignments...</div>';
 
-            fetch(`${BACKEND_BASE}/api/tech-assignments?tech_id=${encodeURIComponent(techId)}`, { credentials: 'include' })
+            fetch(`/api/tech-assignments?tech_id=${encodeURIComponent(techId)}`, { credentials: 'include' })
                 .then(r => r.json())
                 .then(res => {
                     if (res.error) {
@@ -325,7 +320,7 @@ def get_techs_screen_html():
             body.innerHTML = '<div style="color:#777;">Loading...</div>';
             modal.style.display = 'block';
 
-            fetch(`${BACKEND_BASE}/api/ro-repairs?ro=${encodeURIComponent(roNumber)}`, { credentials: 'include' })
+            fetch(`/api/ro-repairs?ro=${encodeURIComponent(roNumber)}`, { credentials: 'include' })
                 .then(r => r.json())
                 .then(res => {
                     if (res.error) {
@@ -395,7 +390,7 @@ def get_techs_screen_html():
                 return;
             }
 
-            fetch(`${BACKEND_BASE}/api/techs/delete`, {
+            fetch('/api/techs/delete', {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ id: techId })

@@ -173,6 +173,27 @@ def _ensure_ro_assignments_table(cur) -> None:
     )
 
 
+def _ensure_techs_table(cur) -> None:
+    """Create techs table if it doesn't exist."""
+    cur.execute(
+        """
+        CREATE TABLE IF NOT EXISTS techs (
+            id SERIAL PRIMARY KEY,
+            first_name VARCHAR(100) NOT NULL,
+            last_name VARCHAR(100) NOT NULL,
+            pay_rate NUMERIC(10, 2) NOT NULL,
+            domain VARCHAR(255),
+            active BOOLEAN DEFAULT TRUE,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+        """
+    )
+    cur.execute("ALTER TABLE techs ADD COLUMN IF NOT EXISTS domain VARCHAR(255)")
+    cur.execute("ALTER TABLE techs ADD COLUMN IF NOT EXISTS active BOOLEAN DEFAULT TRUE")
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_techs_domain ON techs(domain)")
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_techs_active ON techs(active)")
+
+
 def _parse_json_field(value):
     if value is None:
         return []
@@ -265,6 +286,7 @@ async def add_tech(request: Request):
     cur = conn.cursor()
 
     try:
+        _ensure_techs_table(cur)
         cur.execute("""
             INSERT INTO techs (first_name, last_name, pay_rate)
             VALUES (%s, %s, %s)
@@ -298,6 +320,7 @@ async def list_techs(request: Request):
     cur = conn.cursor()
     
     try:
+        _ensure_techs_table(cur)
         cur.execute("""
             SELECT id, first_name, last_name, pay_rate, active
             FROM techs
@@ -335,6 +358,7 @@ async def delete_tech(request: Request):
     cur = conn.cursor()
 
     try:
+        _ensure_techs_table(cur)
         cur.execute(
             """
             UPDATE techs
@@ -775,6 +799,7 @@ async def save_ro_assignments(request: Request):
     try:
         _ensure_saved_estimates_table(cur)
         _ensure_ro_assignments_table(cur)
+        _ensure_techs_table(cur)
 
         cur.execute(
             """
