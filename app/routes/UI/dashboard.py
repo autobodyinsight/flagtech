@@ -423,7 +423,7 @@ def get_dashboard_screen_html():
                     const painterLabel = ro.painter || 'Unassigned';
                     const customerDisplay = ro.customer || '-';
                     const phoneDisplay = ro.phone || '-';
-                    const insuranceDisplay = ro.insurance || '-';
+                    const insuranceDisplay = (ro.insurance || '-').split(/\s+/).slice(0, 2).join(' ');
                     const claimDisplay = ro.claim_number || '-';
                     html += `
                         <tr style="background:${rowBg}; cursor:pointer;" onclick="toggleRoNotes('${ro.ro}')">
