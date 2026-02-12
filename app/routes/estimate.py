@@ -165,12 +165,36 @@ def _ensure_ro_assignments_table(cur) -> None:
         """
     )
     cur.execute("ALTER TABLE ro_assignments ADD COLUMN IF NOT EXISTS assigned_hours NUMERIC")
+    
+    # Check if unique index exists
     cur.execute(
         """
-        CREATE UNIQUE INDEX IF NOT EXISTS idx_ro_assignments_ro_role_domain
-        ON ro_assignments(ro, role, domain)
+        SELECT indexname FROM pg_indexes 
+        WHERE indexname = 'idx_ro_assignments_ro_role_domain'
         """
     )
+    index_exists = cur.fetchone()
+    
+    if not index_exists:
+        # Clean up duplicates before creating unique index
+        # Keep the most recent record for each (ro, role, domain) combination
+        cur.execute(
+            """
+            DELETE FROM ro_assignments a
+            WHERE id NOT IN (
+                SELECT MAX(id) FROM ro_assignments
+                GROUP BY ro, role, domain
+            )
+            """
+        )
+        
+        # Now create the unique index
+        cur.execute(
+            """
+            CREATE UNIQUE INDEX idx_ro_assignments_ro_role_domain
+            ON ro_assignments(ro, role, domain)
+            """
+        )
 
 
 def _ensure_techs_table(cur) -> None:
