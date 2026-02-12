@@ -197,6 +197,40 @@ def _ensure_ro_assignments_table(cur) -> None:
         )
 
 
+def _ensure_ro_line_assignments_table(cur) -> None:
+    cur.execute(
+        """
+        CREATE TABLE IF NOT EXISTS ro_line_assignments (
+            id SERIAL PRIMARY KEY,
+            ro VARCHAR(255) NOT NULL,
+            repair_type VARCHAR(20) NOT NULL,
+            line_key VARCHAR(64) NOT NULL,
+            line_number VARCHAR(64),
+            description TEXT,
+            hours NUMERIC,
+            tech_id INTEGER,
+            tech_name VARCHAR(255),
+            is_pending BOOLEAN DEFAULT FALSE,
+            domain VARCHAR(255) NOT NULL,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+        """
+    )
+    cur.execute("ALTER TABLE ro_line_assignments ADD COLUMN IF NOT EXISTS is_pending BOOLEAN DEFAULT FALSE")
+    cur.execute(
+        """
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_ro_line_assignments_unique
+        ON ro_line_assignments(ro, repair_type, line_key, domain)
+        """
+    )
+    cur.execute(
+        """
+        CREATE INDEX IF NOT EXISTS idx_ro_line_assignments_ro_domain
+        ON ro_line_assignments(ro, domain)
+        """
+    )
+
+
 def _ensure_techs_table(cur) -> None:
     """Create techs table if it doesn't exist."""
     cur.execute(
@@ -268,6 +302,130 @@ def _line_key(item: dict, index: int) -> str:
     if line is None or line == "":
         return str(index + 1)
     return str(line)
+
+
+def _normalize_repair_type(value: str) -> str:
+    normalized = (value or "").strip().lower()
+    if normalized == "labor":
+        return "body"
+    if normalized in {"body", "paint", "mech", "frame"}:
+        return normalized
+    return "body"
+
+
+def _load_latest_repairs_for_ro(cur, domain: str, ro_value: str) -> tuple[list, list]:
+    cur.execute(
+        """
+        SELECT labor_repairs, paint_repairs
+        FROM saved_estimates
+        WHERE domain = %s AND ro = %s
+        ORDER BY saved_at DESC, id DESC
+        LIMIT 1
+        """,
+        (domain, ro_value),
+    )
+    row = cur.fetchone() or {}
+    labor_repairs = _parse_json_field(row.get("labor_repairs"))
+    paint_repairs = _parse_json_field(row.get("paint_repairs"))
+    if not isinstance(labor_repairs, list):
+        labor_repairs = []
+    if not isinstance(paint_repairs, list):
+        paint_repairs = []
+    return labor_repairs, paint_repairs
+
+
+def _upsert_ro_lines(cur, domain: str, ro_value: str, repair_type: str, lines: list) -> None:
+    normalized_type = _normalize_repair_type(repair_type)
+    if not isinstance(lines, list):
+        return
+    for idx, item in enumerate(lines):
+        if not isinstance(item, dict):
+            continue
+        line_key = _line_key(item, idx)
+        line_number = str(item.get("line") or line_key)
+        description = (item.get("description") or "").strip()
+        hours = _parse_float_value(item.get("value"))
+        cur.execute(
+            """
+            INSERT INTO ro_line_assignments (
+                ro,
+                repair_type,
+                line_key,
+                line_number,
+                description,
+                hours,
+                tech_id,
+                tech_name,
+                is_pending,
+                domain
+            )
+            VALUES (%s, %s, %s, %s, %s, %s, NULL, NULL, FALSE, %s)
+            ON CONFLICT (ro, repair_type, line_key, domain)
+            DO UPDATE SET
+                line_number = EXCLUDED.line_number,
+                description = EXCLUDED.description,
+                hours = EXCLUDED.hours,
+                updated_at = CURRENT_TIMESTAMP
+            """,
+            (ro_value, normalized_type, line_key, line_number, description, hours, domain),
+        )
+
+
+def _ensure_ro_line_assignments_for_ro(cur, domain: str, ro_value: str) -> None:
+    labor_repairs, paint_repairs = _load_latest_repairs_for_ro(cur, domain, ro_value)
+    _upsert_ro_lines(cur, domain, ro_value, "body", labor_repairs)
+    _upsert_ro_lines(cur, domain, ro_value, "paint", paint_repairs)
+
+
+def _get_scope_rows(cur, domain: str, ro_value: str, source: dict) -> list:
+    mode = (source.get("mode") or "").strip().lower()
+    if mode == "unassigned":
+        repair_type = _normalize_repair_type(source.get("repair_type"))
+        cur.execute(
+            """
+            SELECT id, repair_type, line_key
+            FROM ro_line_assignments
+            WHERE domain = %s
+              AND ro = %s
+              AND tech_name IS NULL
+              AND COALESCE(is_pending, FALSE) = FALSE
+              AND repair_type = %s
+            """,
+            (domain, ro_value, repair_type),
+        )
+        return cur.fetchall()
+
+    if mode == "pending":
+        cur.execute(
+            """
+            SELECT id, repair_type, line_key
+            FROM ro_line_assignments
+            WHERE domain = %s
+              AND ro = %s
+              AND tech_name IS NULL
+              AND COALESCE(is_pending, FALSE) = TRUE
+            """,
+            (domain, ro_value),
+        )
+        return cur.fetchall()
+
+    if mode == "tech":
+        repair_type = _normalize_repair_type(source.get("repair_type"))
+        tech_name = (source.get("tech_name") or "").strip()
+        cur.execute(
+            """
+            SELECT id, repair_type, line_key
+            FROM ro_line_assignments
+            WHERE domain = %s
+              AND ro = %s
+              AND tech_name = %s
+              AND repair_type = %s
+            """,
+            (domain, ro_value, tech_name, repair_type),
+        )
+        return cur.fetchall()
+
+    return []
 
 
 def _sum_assigned_hours(items, excluded_lines) -> float:
@@ -503,6 +661,8 @@ async def flash_data():
         "parts_vendors",
         "ro_notes",
         "ro_phases",
+        "ro_assignments",
+        "ro_line_assignments",
         "estimate_uploads",
         "saved_estimates",
         "techs",
@@ -538,6 +698,7 @@ async def get_dashboard_data(request: Request):
     try:
         _ensure_saved_estimates_table(cur)
         _ensure_ro_assignments_table(cur)
+        _ensure_ro_line_assignments_table(cur)
         cur.execute(
             """
             SELECT DISTINCT ON (ro)
@@ -565,23 +726,6 @@ async def get_dashboard_data(request: Request):
             (domain,),
         )
         rows = cur.fetchall()
-
-        cur.execute(
-            """
-            SELECT ro, role, tech_name, excluded_lines, assigned_hours
-            FROM ro_assignments
-            WHERE domain = %s
-            """,
-            (domain,),
-        )
-        assignment_rows = cur.fetchall()
-        assignment_map = {}
-        for row in assignment_rows:
-            assignment_map[(row.get("ro"), row.get("role"))] = {
-                "tech_name": row.get("tech_name"),
-                "excluded_lines": row.get("excluded_lines") or [],
-                "assigned_hours": row.get("assigned_hours"),
-            }
 
         total_sales = 0.0
         total_parts = 0.0
@@ -635,10 +779,29 @@ async def get_dashboard_data(request: Request):
             phone_original = (row.get("phone_original") or customer_phone).strip()
             current_phone = phone_override or customer_phone
 
-            labor_assignment = assignment_map.get((ro, "labor")) or {}
-            paint_assignment = assignment_map.get((ro, "paint")) or {}
-            labor_tech = labor_assignment.get("tech_name") or "Unassigned"
-            paint_tech = paint_assignment.get("tech_name") or "Unassigned"
+            _ensure_ro_line_assignments_for_ro(cur, domain, ro)
+
+            cur.execute(
+                """
+                SELECT repair_type, tech_name, COALESCE(SUM(hours), 0) AS total_hours
+                FROM ro_line_assignments
+                WHERE domain = %s
+                  AND ro = %s
+                GROUP BY repair_type, tech_name
+                """,
+                (domain, ro),
+            )
+            grouped_lines = cur.fetchall()
+
+            labor_tech = "Unassigned"
+            paint_tech = "Unassigned"
+            for group in grouped_lines:
+                repair_type = _normalize_repair_type(group.get("repair_type"))
+                tech_name = group.get("tech_name")
+                if repair_type == "body" and tech_name:
+                    labor_tech = tech_name
+                if repair_type == "paint" and tech_name:
+                    paint_tech = tech_name
 
             ro_list.append(
                 {
@@ -656,13 +819,14 @@ async def get_dashboard_data(request: Request):
                 }
             )
 
-            assigned_labor_hours = labor_assignment.get("assigned_hours")
-            if assigned_labor_hours is None:
-                assigned_labor_hours = _sum_assigned_hours(labor_repairs, labor_assignment.get("excluded_lines"))
-            # Ensure it's a float to avoid mixing Decimal and float
-            assigned_labor_hours = _parse_float_value(assigned_labor_hours)
-            labor_hours_by_tech[labor_tech] = labor_hours_by_tech.get(labor_tech, 0.0) + assigned_labor_hours
-            ros_by_tech[labor_tech] = ros_by_tech.get(labor_tech, 0) + 1
+            ro_seen_for_tech = set()
+            for group in grouped_lines:
+                tech_name = (group.get("tech_name") or "").strip() or "Unassigned"
+                group_hours = _parse_float_value(group.get("total_hours"))
+                labor_hours_by_tech[tech_name] = labor_hours_by_tech.get(tech_name, 0.0) + group_hours
+                if tech_name not in ro_seen_for_tech:
+                    ros_by_tech[tech_name] = ros_by_tech.get(tech_name, 0) + 1
+                    ro_seen_for_tech.add(tech_name)
 
         ro_count = len(rows)
         average_hours = total_hours / ro_count if ro_count else 0.0
@@ -804,6 +968,330 @@ async def get_ro_repairs(request: Request, ro: str):
         cur.close()
 
 
+@router.get("/ro-tech-lines")
+async def get_ro_tech_lines(request: Request, ro: str):
+    domain = get_user_domain(request)
+    if not domain:
+        return JSONResponse(status_code=401, content={"error": "Not authenticated"})
+
+    ro_value = (ro or "").strip()
+    if not ro_value:
+        return JSONResponse(status_code=400, content={"error": "ro is required"})
+
+    conn = get_conn()
+    cur = conn.cursor()
+    try:
+        _ensure_saved_estimates_table(cur)
+        _ensure_ro_line_assignments_table(cur)
+        _ensure_ro_line_assignments_for_ro(cur, domain, ro_value)
+
+        cur.execute(
+            """
+            SELECT
+                repair_type,
+                tech_id,
+                tech_name,
+                COALESCE(is_pending, FALSE) AS is_pending,
+                COALESCE(SUM(hours), 0) AS hours,
+                COUNT(*) AS line_count
+            FROM ro_line_assignments
+            WHERE domain = %s
+              AND ro = %s
+            GROUP BY repair_type, tech_id, tech_name, COALESCE(is_pending, FALSE)
+            ORDER BY tech_name NULLS FIRST, repair_type
+            """,
+            (domain, ro_value),
+        )
+        rows = cur.fetchall()
+
+        tech_lines = []
+        pending_hours = 0.0
+        pending_count = 0
+
+        for row in rows:
+            repair_type = _normalize_repair_type(row.get("repair_type"))
+            hours = _parse_float_value(row.get("hours"))
+            line_count = int(row.get("line_count") or 0)
+            tech_name = (row.get("tech_name") or "").strip()
+            is_pending = bool(row.get("is_pending"))
+
+            if not tech_name and is_pending:
+                pending_hours += hours
+                pending_count += line_count
+                continue
+
+            if not tech_name:
+                tech_lines.append(
+                    {
+                        "tech": "unassigned",
+                        "type": repair_type,
+                        "hours": hours,
+                        "line_count": line_count,
+                        "mode": "unassigned",
+                        "repair_type": repair_type,
+                    }
+                )
+                continue
+
+            tech_lines.append(
+                {
+                    "tech": tech_name,
+                    "type": repair_type,
+                    "hours": hours,
+                    "line_count": line_count,
+                    "mode": "tech",
+                    "repair_type": repair_type,
+                    "tech_id": row.get("tech_id"),
+                    "tech_name": tech_name,
+                }
+            )
+
+        if pending_count > 0:
+            tech_lines.append(
+                {
+                    "tech": "PENDING",
+                    "type": "?",
+                    "hours": pending_hours,
+                    "line_count": pending_count,
+                    "mode": "pending",
+                }
+            )
+
+        def _sort_key(item: dict) -> tuple:
+            mode = item.get("mode")
+            if mode == "unassigned":
+                return (0, item.get("type") or "")
+            if mode == "tech":
+                return (1, (item.get("tech") or "").lower(), item.get("type") or "")
+            if mode == "pending":
+                return (2, "")
+            return (3, "")
+
+        tech_lines.sort(key=_sort_key)
+        return {"tech_lines": tech_lines}
+    finally:
+        cur.close()
+
+
+@router.get("/ro-assignment-lines")
+async def get_ro_assignment_lines(
+    request: Request,
+    ro: str,
+    mode: str,
+    repair_type: str = "",
+    tech_name: str = "",
+):
+    domain = get_user_domain(request)
+    if not domain:
+        return JSONResponse(status_code=401, content={"error": "Not authenticated"})
+
+    ro_value = (ro or "").strip()
+    mode_value = (mode or "").strip().lower()
+    if not ro_value:
+        return JSONResponse(status_code=400, content={"error": "ro is required"})
+    if mode_value not in {"unassigned", "pending", "tech"}:
+        return JSONResponse(status_code=400, content={"error": "mode is invalid"})
+
+    conn = get_conn()
+    cur = conn.cursor()
+    try:
+        _ensure_saved_estimates_table(cur)
+        _ensure_ro_line_assignments_table(cur)
+        _ensure_techs_table(cur)
+        _ensure_ro_line_assignments_for_ro(cur, domain, ro_value)
+
+        if mode_value == "unassigned":
+            filter_type = _normalize_repair_type(repair_type)
+            cur.execute(
+                """
+                SELECT repair_type, line_key, line_number, description, hours
+                FROM ro_line_assignments
+                WHERE domain = %s
+                  AND ro = %s
+                  AND tech_name IS NULL
+                  AND COALESCE(is_pending, FALSE) = FALSE
+                  AND repair_type = %s
+                ORDER BY line_number
+                """,
+                (domain, ro_value, filter_type),
+            )
+        elif mode_value == "pending":
+            cur.execute(
+                """
+                SELECT repair_type, line_key, line_number, description, hours
+                FROM ro_line_assignments
+                WHERE domain = %s
+                  AND ro = %s
+                  AND tech_name IS NULL
+                  AND COALESCE(is_pending, FALSE) = TRUE
+                ORDER BY repair_type, line_number
+                """,
+                (domain, ro_value),
+            )
+        else:
+            filter_type = _normalize_repair_type(repair_type)
+            selected_tech = (tech_name or "").strip()
+            cur.execute(
+                """
+                SELECT repair_type, line_key, line_number, description, hours
+                FROM ro_line_assignments
+                WHERE domain = %s
+                  AND ro = %s
+                  AND tech_name = %s
+                  AND repair_type = %s
+                ORDER BY line_number
+                """,
+                (domain, ro_value, selected_tech, filter_type),
+            )
+
+        line_rows = cur.fetchall()
+
+        cur.execute(
+            """
+            SELECT id, first_name, last_name, pay_rate
+            FROM techs
+            WHERE active = TRUE
+              AND (domain = %s OR domain IS NULL)
+            ORDER BY first_name, last_name
+            """,
+            (domain,),
+        )
+        tech_rows = cur.fetchall()
+
+        lines = []
+        for row in line_rows:
+            lines.append(
+                {
+                    "repair_type": _normalize_repair_type(row.get("repair_type")),
+                    "line_key": str(row.get("line_key") or ""),
+                    "line_number": row.get("line_number") or "",
+                    "description": row.get("description") or "",
+                    "hours": _parse_float_value(row.get("hours")),
+                }
+            )
+
+        techs = []
+        for row in tech_rows:
+            first_name = (row.get("first_name") or "").strip()
+            last_name = (row.get("last_name") or "").strip()
+            label = " ".join(part for part in [first_name, last_name] if part)
+            techs.append(
+                {
+                    "id": row.get("id"),
+                    "name": label,
+                    "pay_rate": _parse_float_value(row.get("pay_rate")),
+                }
+            )
+
+        return {
+            "lines": lines,
+            "techs": techs,
+            "types": ["body", "paint", "mech", "frame"],
+        }
+    finally:
+        cur.close()
+
+
+@router.post("/ro-assignment-save")
+async def save_ro_assignment_lines(request: Request):
+    domain = get_user_domain(request)
+    if not domain:
+        return JSONResponse(status_code=401, content={"error": "Not authenticated"})
+
+    data = await request.json()
+    ro_value = (data.get("ro") or "").strip()
+    source = data.get("source") or {}
+    target = data.get("target") or {}
+    selected_lines = data.get("selected_lines") or []
+
+    if not ro_value:
+        return JSONResponse(status_code=400, content={"error": "ro is required"})
+
+    target_tech_id = target.get("tech_id")
+    target_tech_name = (target.get("tech_name") or "").strip()
+    target_type = _normalize_repair_type(target.get("repair_type"))
+
+    if not target_tech_name and not target_tech_id:
+        return JSONResponse(status_code=400, content={"error": "tech is required"})
+
+    conn = get_conn()
+    cur = conn.cursor()
+    try:
+        _ensure_saved_estimates_table(cur)
+        _ensure_ro_line_assignments_table(cur)
+        _ensure_techs_table(cur)
+        _ensure_ro_line_assignments_for_ro(cur, domain, ro_value)
+
+        if target_tech_id and not target_tech_name:
+            cur.execute(
+                """
+                SELECT first_name, last_name
+                FROM techs
+                WHERE id = %s
+                """,
+                (target_tech_id,),
+            )
+            row = cur.fetchone() or {}
+            target_tech_name = " ".join(part for part in [row.get("first_name"), row.get("last_name")] if part)
+
+        scope_rows = _get_scope_rows(cur, domain, ro_value, source)
+        if not scope_rows:
+            return {"status": "ok"}
+
+        scope_keys = {
+            (str(row.get("repair_type") or ""), str(row.get("line_key") or "")): int(row.get("id"))
+            for row in scope_rows
+        }
+
+        selected_keys = set()
+        for item in selected_lines:
+            if not isinstance(item, dict):
+                continue
+            repair_type = _normalize_repair_type(item.get("repair_type"))
+            line_key = str(item.get("line_key") or "")
+            selected_keys.add((repair_type, line_key))
+
+        selected_ids = []
+        remainder_ids = []
+        for key, row_id in scope_keys.items():
+            if key in selected_keys:
+                selected_ids.append(row_id)
+            else:
+                remainder_ids.append(row_id)
+
+        if selected_ids:
+            cur.execute(
+                """
+                UPDATE ro_line_assignments
+                SET tech_id = %s,
+                    tech_name = %s,
+                    repair_type = %s,
+                    is_pending = FALSE,
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE id = ANY(%s)
+                """,
+                (target_tech_id, target_tech_name or None, target_type, selected_ids),
+            )
+
+        if remainder_ids:
+            cur.execute(
+                """
+                UPDATE ro_line_assignments
+                SET tech_id = NULL,
+                    tech_name = NULL,
+                    is_pending = TRUE,
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE id = ANY(%s)
+                """,
+                (remainder_ids,),
+            )
+
+        conn.commit()
+        return {"status": "ok"}
+    finally:
+        cur.close()
+
+
 @router.post("/ro-assignments")
 async def save_ro_assignments(request: Request):
     domain = get_user_domain(request)
@@ -902,56 +1390,30 @@ async def get_tech_assignments(request: Request, tech_id: int):
     cur = conn.cursor()
     try:
         _ensure_saved_estimates_table(cur)
-        _ensure_ro_assignments_table(cur)
+        _ensure_ro_line_assignments_table(cur)
 
         cur.execute(
             """
-            SELECT ro, role, excluded_lines
-            FROM ro_assignments
-            WHERE domain = %s AND tech_id = %s
+            SELECT ro, repair_type, COALESCE(SUM(hours), 0) AS total_hours
+            FROM ro_line_assignments
+            WHERE domain = %s
+              AND tech_id = %s
+              AND tech_name IS NOT NULL
+            GROUP BY ro, repair_type
+            ORDER BY ro
             """,
             (domain, tech_id),
         )
         assignment_rows = cur.fetchall()
 
-        ros = [row.get("ro") for row in assignment_rows if row.get("ro")]
-        if not ros:
-            return {"assignments": []}
-
-        cur.execute(
-            """
-            SELECT DISTINCT ON (ro)
-                   ro,
-                   labor_repairs,
-                   paint_repairs
-            FROM saved_estimates
-            WHERE domain = %s AND ro = ANY(%s)
-            ORDER BY ro, saved_at DESC, id DESC
-            """,
-            (domain, ros),
-        )
-        estimate_rows = cur.fetchall()
-        repairs_map = {row.get("ro"): row for row in estimate_rows}
-
         assignments = []
         for row in assignment_rows:
-            ro = row.get("ro")
-            role = row.get("role")
-            excluded_lines = row.get("excluded_lines") or []
-            repairs = repairs_map.get(ro) or {}
-
-            if role == "paint":
-                items = _parse_json_field(repairs.get("paint_repairs"))
-            else:
-                items = _parse_json_field(repairs.get("labor_repairs"))
-
-            total_hours = _sum_assigned_hours(items, excluded_lines)
             assignments.append(
                 {
-                    "ro": ro,
-                    "role": role,
-                    "total_hours": total_hours,
-                    "excluded_lines": excluded_lines,
+                    "ro": row.get("ro"),
+                    "role": _normalize_repair_type(row.get("repair_type")),
+                    "total_hours": _parse_float_value(row.get("total_hours")),
+                    "excluded_lines": [],
                 }
             )
 
