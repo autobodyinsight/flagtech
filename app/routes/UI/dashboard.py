@@ -123,6 +123,22 @@ def get_dashboard_screen_html():
             </div>
         </div>
 
+        <div id="assignmentModal" class="modal" style="display:none;">
+            <div class="modal-content" style="max-width:900px; max-height:85vh; overflow-y:auto;">
+                <span class="close" onclick="closeAssignmentModal()">&times;</span>
+                <h2 id="assignmentModalTitle" style="margin-bottom:16px;">Assign Tech</h2>
+                <div style="margin-bottom:12px;">
+                    <label for="assignmentTechSelect" style="font-weight:bold; font-size:12px; color:#666;">TECH</label>
+                    <select id="assignmentTechSelect" style="width:100%; padding:8px; margin-top:6px;"></select>
+                </div>
+                <div id="assignmentModalBody"></div>
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-top:12px;">
+                    <div id="assignmentModalTotal" style="font-weight:bold;">Total: 0.0 hrs</div>
+                    <button id="assignmentModalSave" onclick="saveAssignmentModal()" style="padding:8px 16px; background:#505050; color:#fff; border:none; border-radius:4px; cursor:pointer;">Save</button>
+                </div>
+            </div>
+        </div>
+
         <div id="techDetailModal" class="modal" style="display:none;">
             <div class="modal-content" style="max-width:800px; max-height:80vh; overflow-y:auto;">
                 <span class="close" onclick="closeTechDetailModal()" style="color:#d32f2f; font-size:32px;">&times;</span>
@@ -555,7 +571,6 @@ def get_dashboard_screen_html():
                                     <div id="tech-assignment-list-${rowId}" style="margin-top:12px;">
                                         <div style="color:#777;">Loading...</div>
                                     </div>
-                                    <div id="tech-assignment-detail-${rowId}" style="margin-top:12px; display:none;"></div>
                                 </div>
                             </td>
                         </tr>
@@ -599,6 +614,14 @@ def get_dashboard_screen_html():
                 return Number.isFinite(val) ? val : 0;
             }
 
+            function calculateTotalHours(lines) {
+                let total = 0.0;
+                (lines || []).forEach(line => {
+                    total += getLineHours(line);
+                });
+                return total;
+            }
+
             function calculateAssignedHours(lines, excludedLines) {
                 const excluded = new Set((excludedLines || []).map(String));
                 let total = 0.0;
@@ -632,31 +655,77 @@ def get_dashboard_screen_html():
                         const laborExcluded = assignments.labor?.excluded_lines || [];
                         const paintExcluded = assignments.paint?.excluded_lines || [];
 
-                        const laborTotal = calculateAssignedHours(labor, laborExcluded);
-                        const paintTotal = calculateAssignedHours(paint, paintExcluded);
+                        const laborTotalAll = calculateTotalHours(labor);
+                        const paintTotalAll = calculateTotalHours(paint);
+                        const laborAssigned = calculateAssignedHours(labor, laborExcluded);
+                        const paintAssigned = calculateAssignedHours(paint, paintExcluded);
+                        const laborUnassigned = Math.max(0, laborTotalAll - laborAssigned);
+                        const paintUnassigned = Math.max(0, paintTotalAll - paintAssigned);
 
                         const displayList = [];
 
                         if (labor.length > 0) {
-                            displayList.push({
-                                role: 'labor',
-                                tech_name: assignments.labor?.tech_name || 'unassigned',
-                                type_label: 'body',
-                                hours: laborTotal.toFixed(1),
-                                is_assigned: !!assignments.labor?.tech_name,
-                                tech_id: assignments.labor?.tech_id
-                            });
+                            if (assignments.labor?.tech_name) {
+                                displayList.push({
+                                    role: 'labor',
+                                    tech_name: assignments.labor.tech_name,
+                                    type_label: 'body',
+                                    hours: laborAssigned.toFixed(1),
+                                    is_assigned: true,
+                                    tech_id: assignments.labor.tech_id
+                                });
+                                if (laborUnassigned > 0) {
+                                    displayList.push({
+                                        role: 'labor',
+                                        tech_name: 'unassigned',
+                                        type_label: 'body',
+                                        hours: laborUnassigned.toFixed(1),
+                                        is_assigned: false,
+                                        tech_id: null
+                                    });
+                                }
+                            } else {
+                                displayList.push({
+                                    role: 'labor',
+                                    tech_name: 'unassigned',
+                                    type_label: 'body',
+                                    hours: laborTotalAll.toFixed(1),
+                                    is_assigned: false,
+                                    tech_id: null
+                                });
+                            }
                         }
 
                         if (paint.length > 0) {
-                            displayList.push({
-                                role: 'paint',
-                                tech_name: assignments.paint?.tech_name || 'unassigned',
-                                type_label: 'paint',
-                                hours: paintTotal.toFixed(1),
-                                is_assigned: !!assignments.paint?.tech_name,
-                                tech_id: assignments.paint?.tech_id
-                            });
+                            if (assignments.paint?.tech_name) {
+                                displayList.push({
+                                    role: 'paint',
+                                    tech_name: assignments.paint.tech_name,
+                                    type_label: 'paint',
+                                    hours: paintAssigned.toFixed(1),
+                                    is_assigned: true,
+                                    tech_id: assignments.paint.tech_id
+                                });
+                                if (paintUnassigned > 0) {
+                                    displayList.push({
+                                        role: 'paint',
+                                        tech_name: 'unassigned',
+                                        type_label: 'paint',
+                                        hours: paintUnassigned.toFixed(1),
+                                        is_assigned: false,
+                                        tech_id: null
+                                    });
+                                }
+                            } else {
+                                displayList.push({
+                                    role: 'paint',
+                                    tech_name: 'unassigned',
+                                    type_label: 'paint',
+                                    hours: paintTotalAll.toFixed(1),
+                                    is_assigned: false,
+                                    tech_id: null
+                                });
+                            }
                         }
 
                         let html = '';
@@ -677,7 +746,7 @@ def get_dashboard_screen_html():
 
                                 html += `<tr style="background:#fff; border-bottom:1px solid #ddd;">`;
                                 html += `<td style="padding:8px 12px; color:${textColor}; font-weight:${fontWeight};">`;
-                                html += `<button type="button" onclick="openAssignmentDetail(event, '${roNumber}', '${item.role}')" style="background:none; border:none; color:${textColor}; text-decoration:underline; cursor:pointer; padding:0; font:inherit; font-weight:${fontWeight};">${item.tech_name}</button>`;
+                                html += `<button type="button" onclick="openAssignmentModal(event, '${roNumber}', '${item.role}')" style="background:none; border:none; color:${textColor}; text-decoration:underline; cursor:pointer; padding:0; font:inherit; font-weight:${fontWeight};">${item.tech_name}</button>`;
                                 html += `</td>`;
                                 html += `<td style="padding:8px 12px; color:#333; text-transform:capitalize;">${item.type_label}</td>`;
                                 html += `<td style="padding:8px 12px; text-align:right; color:#333; font-weight:bold;">${item.hours}</td>`;
@@ -699,40 +768,86 @@ def get_dashboard_screen_html():
                     });
             }
 
-            function openAssignmentDetail(event, roNumber, role) {
+            let currentAssignmentModal = {
+                ro: '',
+                role: '',
+                lines: [],
+                assignment: null
+            };
+
+            function closeAssignmentModal() {
+                const modal = document.getElementById('assignmentModal');
+                if (modal) modal.style.display = 'none';
+            }
+
+            function openAssignmentModal(event, roNumber, role) {
                 if (event) event.stopPropagation();
-                const detailEl = document.getElementById(`tech-assignment-detail-${safeId(roNumber)}`);
-                if (!detailEl) return;
+                const modal = document.getElementById('assignmentModal');
+                const title = document.getElementById('assignmentModalTitle');
+                const body = document.getElementById('assignmentModalBody');
 
-                detailEl.style.display = 'block';
-                detailEl.innerHTML = '<div style="color:#777;">Loading repair lines...</div>';
+                if (!modal || !title || !body) return;
 
-                fetch(`/api/ro-repairs?ro=${encodeURIComponent(roNumber)}`, { credentials: 'include' })
-                    .then(r => r.json())
-                    .then(data => {
-                        if (data.error) {
-                            throw new Error(data.error);
+                const roleLabel = role === 'paint' ? 'Paint' : 'Body';
+                title.textContent = `${roleLabel} Assignments - RO# ${roNumber}`;
+                body.innerHTML = '<div style="color:#777;">Loading repair lines...</div>';
+                modal.style.display = 'block';
+
+                Promise.all([
+                    fetch(`/api/ro-repairs?ro=${encodeURIComponent(roNumber)}`, { credentials: 'include' }).then(r => r.json()),
+                    fetch('/api/techs/list', { credentials: 'include' }).then(r => r.json())
+                ])
+                    .then(([repairsRes, techsRes]) => {
+                        if (repairsRes.error) {
+                            throw new Error(repairsRes.error);
                         }
-                        const lines = role === 'paint' ? (data.paint || []) : (data.labor || []);
-                        const assignment = data.assignments ? data.assignments[role] : null;
+                        const lines = role === 'paint' ? (repairsRes.paint || []) : (repairsRes.labor || []);
+                        const assignment = repairsRes.assignments ? repairsRes.assignments[role] : null;
+                        const techs = techsRes.techs || [];
 
-                        detailEl.dataset.techId = assignment && assignment.tech_id ? String(assignment.tech_id) : '';
-                        detailEl.dataset.techName = assignment && assignment.tech_name ? assignment.tech_name : '';
+                        currentAssignmentModal = {
+                            ro: roNumber,
+                            role: role,
+                            lines: Array.isArray(lines) ? lines : [],
+                            assignment: assignment
+                        };
 
-                        renderAssignmentDetail(detailEl, roNumber, role, lines, assignment);
+                        populateAssignmentTechSelect(techs, assignment);
+                        renderAssignmentModalBody(currentAssignmentModal.lines, assignment);
                     })
                     .catch(err => {
-                        console.error('Error loading assignment detail:', err);
-                        detailEl.innerHTML = '<div style="color:red;">Error loading repair lines.</div>';
+                        console.error('Error loading assignment modal:', err);
+                        body.innerHTML = '<div style="color:red;">Error loading repair lines.</div>';
                     });
             }
 
-            function renderAssignmentDetail(container, roNumber, role, lines, assignment) {
+            function populateAssignmentTechSelect(techs, assignment) {
+                const select = document.getElementById('assignmentTechSelect');
+                if (!select) return;
+
+                const options = ['<option value="">unassigned</option>'];
+                (techs || []).forEach(tech => {
+                    const label = `${tech.first_name || ''} ${tech.last_name || ''}`.trim() || `Tech #${tech.id}`;
+                    options.push(`<option value="${tech.id}" data-name="${label}">${label}</option>`);
+                });
+                select.innerHTML = options.join('');
+
+                if (assignment && assignment.tech_id) {
+                    select.value = String(assignment.tech_id);
+                } else {
+                    select.value = '';
+                }
+            }
+
+            function renderAssignmentModalBody(lines, assignment) {
+                const body = document.getElementById('assignmentModalBody');
+                if (!body) return;
+
                 const excluded = Array.isArray(assignment?.excluded_lines) ? assignment.excluded_lines.map(String) : [];
-                const roleLabel = role === 'paint' ? 'Paint' : 'Body';
 
                 if (!lines || lines.length === 0) {
-                    container.innerHTML = '<div style="color:#777;">No repair lines found.</div>';
+                    body.innerHTML = '<div style="color:#777;">No repair lines found.</div>';
+                    updateAssignmentModalTotal();
                     return;
                 }
 
@@ -747,7 +862,7 @@ def get_dashboard_screen_html():
                     return `
                         <div style="display:flex; align-items:center; gap:12px; padding:10px 12px; border-bottom:1px solid #eee; background:#fff;">
                             <div style="width:24px;">
-                                <input type="checkbox" class="assignment-omit" data-line="${lineKey}" data-hrs="${value}" ${isOmitted ? 'checked' : ''} onchange="updateAssignmentDetailTotal('${roNumber}', '${role}')" />
+                                <input type="checkbox" class="assignment-omit" data-line="${lineKey}" data-hrs="${value}" ${isOmitted ? 'checked' : ''} onchange="updateAssignmentModalTotal()" />
                             </div>
                             <div style="flex:1;">
                                 <div style="font-weight:bold; font-size:13px;">Line ${line}</div>
@@ -758,28 +873,22 @@ def get_dashboard_screen_html():
                     `;
                 }).join('');
 
-                container.innerHTML = `
-                    <div style="font-weight:bold; margin-bottom:8px;">${roleLabel} Repair Lines</div>
+                body.innerHTML = `
                     <div style="border:1px solid #ddd; border-radius:4px; background:#fff; max-height:220px; overflow-y:auto;">
                         ${rows}
                     </div>
-                    <div style="display:flex; justify-content:space-between; align-items:center; margin-top:10px;">
-                        <div class="assignment-detail-total" style="font-weight:bold;">Total: 0.0 hrs</div>
-                        <button type="button" onclick="saveAssignmentDetail('${roNumber}', '${role}')" style="padding:8px 14px; background:#505050; color:#fff; border:none; border-radius:4px; cursor:pointer;">Save</button>
-                    </div>
                 `;
 
-                updateAssignmentDetailTotal(roNumber, role);
+                updateAssignmentModalTotal();
             }
 
-            function updateAssignmentDetailTotal(roNumber, role) {
-                const detailEl = document.getElementById(`tech-assignment-detail-${safeId(roNumber)}`);
-                if (!detailEl) return;
-                const totalEl = detailEl.querySelector('.assignment-detail-total');
-                if (!totalEl) return;
+            function updateAssignmentModalTotal() {
+                const totalEl = document.getElementById('assignmentModalTotal');
+                const body = document.getElementById('assignmentModalBody');
+                if (!totalEl || !body) return;
 
                 let total = 0.0;
-                detailEl.querySelectorAll('input.assignment-omit').forEach(checkbox => {
+                body.querySelectorAll('input.assignment-omit').forEach(checkbox => {
                     if (!checkbox.checked) {
                         const hrs = parseFloat(checkbox.getAttribute('data-hrs'));
                         if (Number.isFinite(hrs)) {
@@ -791,26 +900,31 @@ def get_dashboard_screen_html():
                 totalEl.textContent = `Total: ${total.toFixed(1)} hrs`;
             }
 
-            function saveAssignmentDetail(roNumber, role) {
-                const detailEl = document.getElementById(`tech-assignment-detail-${safeId(roNumber)}`);
-                if (!detailEl) return;
+            function saveAssignmentModal() {
+                if (!currentAssignmentModal.ro || !currentAssignmentModal.role) return;
+
+                const body = document.getElementById('assignmentModalBody');
+                const select = document.getElementById('assignmentTechSelect');
+                if (!body || !select) return;
 
                 const excludedLines = [];
-                detailEl.querySelectorAll('input.assignment-omit:checked').forEach(checkbox => {
+                body.querySelectorAll('input.assignment-omit:checked').forEach(checkbox => {
                     excludedLines.push(checkbox.getAttribute('data-line'));
                 });
 
-                const techIdRaw = detailEl.dataset.techId;
+                const techIdRaw = select.value;
                 const techId = techIdRaw ? parseInt(techIdRaw, 10) : null;
-                const techName = detailEl.dataset.techName || '';
+                const techName = techIdRaw
+                    ? (select.options[select.selectedIndex]?.dataset?.name || '')
+                    : '';
 
                 fetch('/api/ro-assignments', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     credentials: 'include',
                     body: JSON.stringify({
-                        ro: roNumber,
-                        role: role,
+                        ro: currentAssignmentModal.ro,
+                        role: currentAssignmentModal.role,
                         tech_id: Number.isFinite(techId) ? techId : null,
                         tech_name: techName,
                         excluded_lines: excludedLines
@@ -821,11 +935,12 @@ def get_dashboard_screen_html():
                         if (res.error) {
                             throw new Error(res.error);
                         }
-                        loadRoAssignmentsSummary(roNumber);
+                        closeAssignmentModal();
+                        loadRoAssignmentsSummary(currentAssignmentModal.ro);
                         loadDashboardData();
                     })
                     .catch(err => {
-                        console.error('Error saving assignment detail:', err);
+                        console.error('Error saving assignment modal:', err);
                         alert('Error saving assignment.');
                     });
             }
