@@ -771,8 +771,8 @@ def get_dashboard_screen_html():
                             [],
                             paint
                         );
-                        const laborUnassigned = Math.max(0, laborTotalAll - laborAssigned - pendingLaborHours);
-                        const paintUnassigned = Math.max(0, paintTotalAll - paintAssigned - pendingPaintHours);
+                        const laborUnassigned = Math.max(0, laborTotalAll - pendingLaborHours);
+                        const paintUnassigned = Math.max(0, paintTotalAll - pendingPaintHours);
 
                         const displayList = [];
 
@@ -786,23 +786,13 @@ def get_dashboard_screen_html():
                                     is_assigned: true,
                                     tech_id: assignments.labor.tech_id
                                 });
+                            } else {
                                 if (laborUnassigned > 0) {
                                     displayList.push({
                                         role: 'labor',
                                         tech_name: 'unassigned',
                                         type_label: 'body',
                                         hours: laborUnassigned.toFixed(1),
-                                        is_assigned: false,
-                                        tech_id: null
-                                    });
-                                }
-                            } else {
-                                if (laborTotalAll - pendingLaborHours > 0) {
-                                    displayList.push({
-                                        role: 'labor',
-                                        tech_name: 'unassigned',
-                                        type_label: 'body',
-                                        hours: (laborTotalAll - pendingLaborHours).toFixed(1),
                                         is_assigned: false,
                                         tech_id: null
                                     });
@@ -820,23 +810,13 @@ def get_dashboard_screen_html():
                                     is_assigned: true,
                                     tech_id: assignments.paint.tech_id
                                 });
+                            } else {
                                 if (paintUnassigned > 0) {
                                     displayList.push({
                                         role: 'paint',
                                         tech_name: 'unassigned',
                                         type_label: 'paint',
                                         hours: paintUnassigned.toFixed(1),
-                                        is_assigned: false,
-                                        tech_id: null
-                                    });
-                                }
-                            } else {
-                                if (paintTotalAll - pendingPaintHours > 0) {
-                                    displayList.push({
-                                        role: 'paint',
-                                        tech_name: 'unassigned',
-                                        type_label: 'paint',
-                                        hours: (paintTotalAll - pendingPaintHours).toFixed(1),
                                         is_assigned: false,
                                         tech_id: null
                                     });
