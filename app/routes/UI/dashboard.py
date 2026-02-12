@@ -730,18 +730,31 @@ def get_dashboard_screen_html():
                     return;
                 }
 
-                container.innerHTML = lines.map((line, index) => {
+                const parseLineSortValue = (value, fallback) => {
+                    const text = value === null || value === undefined ? String(fallback) : String(value);
+                    const match = text.match(/\d+/);
+                    return match ? parseInt(match[0], 10) : Number.MAX_SAFE_INTEGER;
+                };
+
+                const sortedLines = [...lines].sort((a, b) => {
+                    const aLine = parseLineSortValue(a.line_number || a.line_key, 0);
+                    const bLine = parseLineSortValue(b.line_number || b.line_key, 0);
+                    if (aLine !== bLine) return aLine - bLine;
+                    const aDesc = String(a.description || '').toLowerCase();
+                    const bDesc = String(b.description || '').toLowerCase();
+                    return aDesc.localeCompare(bDesc);
+                });
+
+                container.innerHTML = sortedLines.map((line, index) => {
                     const lineNumber = line.line_number || line.line_key || String(index + 1);
-                    const description = line.description || '';
+                    const description = String(line.description || '').trim().toLowerCase();
                     const hours = Number(line.hours || 0).toFixed(1);
                     const lineType = normalizeTypeLabel(line.repair_type);
                     return `
-                        <div style="display:flex; align-items:flex-start; gap:10px; padding:10px 12px; border-bottom:1px solid #eee;">
-                            <input type="checkbox" class="tech-assign-line-checkbox" checked data-repair-type="${lineType}" data-line-key="${line.line_key}" data-hours="${hours}" onchange="updateTechAssignTotal()" style="margin-top:2px; width:16px; height:16px; cursor:pointer;" />
-                            <div style="flex:1;">
-                                <div style="font-weight:bold; color:#333;">${lineType.toUpperCase()} · Line ${lineNumber}</div>
-                                <div style="font-size:12px; color:#666;">${description}</div>
-                            </div>
+                        <div style="display:flex; align-items:center; gap:10px; padding:10px 12px; border-bottom:1px solid #eee;">
+                            <input type="checkbox" class="tech-assign-line-checkbox" checked data-repair-type="${lineType}" data-line-key="${line.line_key}" data-line-number="${lineNumber}" data-description="${description}" data-hours="${hours}" onchange="updateTechAssignTotal()" style="width:16px; height:16px; cursor:pointer;" />
+                            <div style="flex:1; color:#333;">Line ${lineNumber} ${description}</div>
+                            <div style="min-width:70px; text-align:right; color:#555; text-transform:lowercase;">${lineType.toLowerCase()}</div>
                             <div style="min-width:80px; text-align:right; font-weight:bold;">${hours} hrs</div>
                         </div>
                     `;
@@ -872,17 +885,26 @@ def get_dashboard_screen_html():
                 const roNumber = currentTechAssignContext.ro;
 
                 let total = 0;
-                const linesHtml = selectedRows.map((checkbox) => {
-                    const row = checkbox.closest('div');
-                    const meta = row?.querySelector('div > div')?.textContent || '';
-                    const desc = row?.querySelector('div > div:nth-child(2)')?.textContent || '';
+                const sortedRows = [...selectedRows].sort((a, b) => {
+                    const aLine = parseInt((a.getAttribute('data-line-number') || '').match(/\d+/)?.[0] || '0', 10);
+                    const bLine = parseInt((b.getAttribute('data-line-number') || '').match(/\d+/)?.[0] || '0', 10);
+                    if (aLine !== bLine) return aLine - bLine;
+                    const aDesc = (a.getAttribute('data-description') || '').toLowerCase();
+                    const bDesc = (b.getAttribute('data-description') || '').toLowerCase();
+                    return aDesc.localeCompare(bDesc);
+                });
+
+                const linesHtml = sortedRows.map((checkbox) => {
+                    const lineNumber = checkbox.getAttribute('data-line-number') || '—';
+                    const desc = checkbox.getAttribute('data-description') || '';
+                    const type = (checkbox.getAttribute('data-repair-type') || '').toLowerCase();
                     const hours = parseFloat(checkbox.getAttribute('data-hours') || '0');
                     total += Number.isFinite(hours) ? hours : 0;
                     return `
                         <tr>
-                            <td style="padding:10px; border-bottom:1px solid #eee;">${meta}</td>
-                            <td style="padding:10px; border-bottom:1px solid #eee;">${desc}</td>
-                            <td style="padding:10px; border-bottom:1px solid #eee; text-align:right; font-weight:bold;">${hours.toFixed(1)}</td>
+                            <td style="padding:10px; border-bottom:1px solid #eee;">Line ${lineNumber} ${desc}</td>
+                            <td style="padding:10px; border-bottom:1px solid #eee; text-transform:lowercase;">${type}</td>
+                            <td style="padding:10px; border-bottom:1px solid #eee; text-align:right; font-weight:bold;">${hours.toFixed(1)} hrs</td>
                         </tr>
                     `;
                 }).join('');
@@ -911,7 +933,7 @@ def get_dashboard_screen_html():
                             </div>
                             <table>
                                 <thead>
-                                    <tr><th>Repair Line</th><th>Description</th><th style="text-align:right;">HRS</th></tr>
+                                    <tr><th>Repair Line</th><th>Type</th><th style="text-align:right;">HRS</th></tr>
                                 </thead>
                                 <tbody>${linesHtml}</tbody>
                             </table>
