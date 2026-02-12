@@ -762,8 +762,6 @@ def get_dashboard_screen_html():
                         const paintAssigned = calculateAssignedHours(paint, paintExcluded);
                         const laborUnassigned = Math.max(0, laborTotalAll - laborAssigned);
                         const paintUnassigned = Math.max(0, paintTotalAll - paintAssigned);
-                        const pendingTotal = sumPendingHours(pendingLines, labor, paint);
-                        const showUnassigned = pendingTotal <= 0;
 
                         const displayList = [];
 
@@ -777,7 +775,7 @@ def get_dashboard_screen_html():
                                     is_assigned: true,
                                     tech_id: assignments.labor.tech_id
                                 });
-                                if (showUnassigned && laborUnassigned > 0) {
+                                if (laborUnassigned > 0) {
                                     displayList.push({
                                         role: 'labor',
                                         tech_name: 'unassigned',
@@ -788,16 +786,14 @@ def get_dashboard_screen_html():
                                     });
                                 }
                             } else {
-                                if (showUnassigned) {
-                                    displayList.push({
-                                        role: 'labor',
-                                        tech_name: 'unassigned',
-                                        type_label: 'body',
-                                        hours: laborTotalAll.toFixed(1),
-                                        is_assigned: false,
-                                        tech_id: null
-                                    });
-                                }
+                                displayList.push({
+                                    role: 'labor',
+                                    tech_name: 'unassigned',
+                                    type_label: 'body',
+                                    hours: laborTotalAll.toFixed(1),
+                                    is_assigned: false,
+                                    tech_id: null
+                                });
                             }
                         }
 
@@ -811,7 +807,7 @@ def get_dashboard_screen_html():
                                     is_assigned: true,
                                     tech_id: assignments.paint.tech_id
                                 });
-                                if (showUnassigned && paintUnassigned > 0) {
+                                if (paintUnassigned > 0) {
                                     displayList.push({
                                         role: 'paint',
                                         tech_name: 'unassigned',
@@ -822,18 +818,18 @@ def get_dashboard_screen_html():
                                     });
                                 }
                             } else {
-                                if (showUnassigned) {
-                                    displayList.push({
-                                        role: 'paint',
-                                        tech_name: 'unassigned',
-                                        type_label: 'paint',
-                                        hours: paintTotalAll.toFixed(1),
-                                        is_assigned: false,
-                                        tech_id: null
-                                    });
-                                }
+                                displayList.push({
+                                    role: 'paint',
+                                    tech_name: 'unassigned',
+                                    type_label: 'paint',
+                                    hours: paintTotalAll.toFixed(1),
+                                    is_assigned: false,
+                                    tech_id: null
+                                });
                             }
                         }
+
+                        const pendingTotal = sumPendingHours(pendingLines, labor, paint);
                         if (pendingTotal > 0) {
                             displayList.push({
                                 role: 'pending',
