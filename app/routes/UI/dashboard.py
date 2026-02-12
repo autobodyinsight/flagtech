@@ -402,6 +402,7 @@ def get_dashboard_screen_html():
                 fetch(`/api/ro-notes?ro=${encodeURIComponent(roNumber)}`, { credentials: 'include' })
                     .then(r => r.json())
                     .then(res => {
+                        if (!listEl) return;
                         if (!res.notes || res.notes.length === 0) {
                             listEl.innerHTML = '<div style="color:#999;">No notes yet.</div>';
                             return;
@@ -418,7 +419,9 @@ def get_dashboard_screen_html():
                     })
                     .catch(err => {
                         console.error('Error loading notes:', err);
-                        listEl.innerHTML = '<div style="color:red;">Error loading notes.</div>';
+                        if (listEl) {
+                            listEl.innerHTML = '<div style="color:red;">Error loading notes.</div>';
+                        }
                     });
             }
 
@@ -710,11 +713,15 @@ def get_dashboard_screen_html():
                             html += '</tbody></table>';
                         }
                         
-                        listEl.innerHTML = html;
+                        if (listEl) {
+                            listEl.innerHTML = html;
+                        }
                     })
                     .catch(err => {
                         console.error('Error loading repair data:', err);
-                        listEl.innerHTML = '<div style="color:red; padding:12px;">Error loading data. Check console.</div>';
+                        if (listEl) {
+                            listEl.innerHTML = '<div style="color:red; padding:12px;">Error loading data. Check console.</div>';
+                        }
                     });
             }
 
@@ -957,43 +964,47 @@ def get_dashboard_screen_html():
                         const lines = res.repair_lines || [];
                         let totalHrs = 0;
                         
-                        if (lines.length === 0) {
-                            body.innerHTML = '<div style="color:#999;">No repair lines assigned.</div>';
-                        } else {
-                            let html = '<table style="width:100%; border-collapse:collapse;">';
-                            html += '<thead><tr style="background:#f5f5f5; text-align:left;">';
-                            html += '<th style="padding:8px; font-weight:bold; color:#555;">Line</th>';
-                            html += '<th style="padding:8px; font-weight:bold; color:#555;">Description</th>';
-                            html += '<th style="padding:8px; font-weight:bold; color:#555; text-align:right;">Hours</th>';
-                            html += '</tr></thead><tbody>';
-                            
-                            lines.forEach(line => {
-                                const lineNum = line.line || '—';
-                                const desc = line.description || '';
-                                const hours = line.value ? parseFloat(line.value).toFixed(1) : '0.0';
-                                totalHrs += parseFloat(hours);
+                        if (body) {
+                            if (lines.length === 0) {
+                                body.innerHTML = '<div style="color:#999;">No repair lines assigned.</div>';
+                            } else {
+                                let html = '<table style="width:100%; border-collapse:collapse;">';
+                                html += '<thead><tr style="background:#f5f5f5; text-align:left;">';
+                                html += '<th style="padding:8px; font-weight:bold; color:#555;">Line</th>';
+                                html += '<th style="padding:8px; font-weight:bold; color:#555;">Description</th>';
+                                html += '<th style="padding:8px; font-weight:bold; color:#555; text-align:right;">Hours</th>';
+                                html += '</tr></thead><tbody>';
                                 
-                                html += `
-                                    <tr style="border-bottom:1px solid #eee;">
-                                        <td style="padding:10px;">${lineNum}</td>
-                                        <td style="padding:10px;">${desc}</td>
-                                        <td style="padding:10px; text-align:right; font-weight:bold;">${hours}</td>
-                                    </tr>
-                                `;
-                            });
+                                lines.forEach(line => {
+                                    const lineNum = line.line || '—';
+                                    const desc = line.description || '';
+                                    const hours = line.value ? parseFloat(line.value).toFixed(1) : '0.0';
+                                    totalHrs += parseFloat(hours);
+                                    
+                                    html += `
+                                        <tr style="border-bottom:1px solid #eee;">
+                                            <td style="padding:10px;">${lineNum}</td>
+                                            <td style="padding:10px;">${desc}</td>
+                                            <td style="padding:10px; text-align:right; font-weight:bold;">${hours}</td>
+                                        </tr>
+                                    `;
+                                });
+                                
+                                html += '</tbody></table>';
+                                body.innerHTML = html;
+                            }
                             
-                            html += '</tbody></table>';
-                            body.innerHTML = html;
-                        }
-                        
-                        const totalEl = document.getElementById('techDetailTotal');
-                        if (totalEl) {
-                            totalEl.textContent = `Total: ${totalHrs.toFixed(1)} hrs`;
+                            const totalEl = document.getElementById('techDetailTotal');
+                            if (totalEl) {
+                                totalEl.textContent = `Total: ${totalHrs.toFixed(1)} hrs`;
+                            }
                         }
                     })
                     .catch(err => {
                         console.error('Error loading tech detail:', err);
-                        body.innerHTML = '<div style="color:red;">Error loading repair lines.</div>';
+                        if (body) {
+                            body.innerHTML = '<div style="color:red;">Error loading repair lines.</div>';
+                        }
                     });
             }
 
@@ -1133,6 +1144,7 @@ def get_dashboard_screen_html():
                         if (repairsRes.error) {
                             throw new Error(repairsRes.error);
                         }
+                        if (!container) return;
                         const lines = currentRepairMode === 'paint' ? repairsRes.paint : repairsRes.labor;
                         const assignment = repairsRes.assignments ? repairsRes.assignments[currentRepairMode] : null;
                         const techs = techsRes.techs || [];
@@ -1141,7 +1153,9 @@ def get_dashboard_screen_html():
                     })
                     .catch(err => {
                         console.error('Error loading repair lines:', err);
-                        container.innerHTML = '<div style="color:red;">Error loading repair lines.</div>';
+                        if (container) {
+                            container.innerHTML = '<div style="color:red;">Error loading repair lines.</div>';
+                        }
                     });
             }
 

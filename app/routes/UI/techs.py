@@ -259,6 +259,7 @@ def get_techs_screen_html():
                     if (res.error) {
                         throw new Error(res.error);
                     }
+                    if (!container) return;
                     const assignments = res.assignments || [];
                     if (assignments.length === 0) {
                         container.innerHTML = '<div style="color:#999;">No assignments yet.</div>';
@@ -300,7 +301,9 @@ def get_techs_screen_html():
                 })
                 .catch(err => {
                     console.error('Error loading assignments:', err);
-                    container.innerHTML = '<div style="color:red;">Error loading assignments.</div>';
+                    if (container) {
+                        container.innerHTML = '<div style="color:red;">Error loading assignments.</div>';
+                    }
                 });
         }
 
@@ -326,6 +329,7 @@ def get_techs_screen_html():
                     if (res.error) {
                         throw new Error(res.error);
                     }
+                    if (!body) return;
                     const lines = role === 'paint' ? res.paint : res.labor;
                     const excluded = Array.isArray(excludedLines) ? excludedLines.map(String) : [];
                     const visible = (lines || []).filter((item, index) => {
@@ -352,7 +356,9 @@ def get_techs_screen_html():
                 })
                 .catch(err => {
                     console.error('Error loading repair lines:', err);
-                    body.innerHTML = '<div style="color:red;">Error loading repair lines.</div>';
+                    if (body) {
+                        body.innerHTML = '<div style="color:red;">Error loading repair lines.</div>';
+                    }
                     currentAssignmentPrintHtml = '<div>Error loading repair lines.</div>';
                 });
         }
