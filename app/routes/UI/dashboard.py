@@ -518,6 +518,8 @@ def get_dashboard_screen_html():
                 return digits;
             }
 
+            let keepOpenRo = '';
+
             // Update RO list table
             function updateRoListTable(roList) {
                 const tbody = document.getElementById('roListBody');
@@ -593,6 +595,14 @@ def get_dashboard_screen_html():
                 });
                 
                 tbody.innerHTML = html;
+
+                if (keepOpenRo) {
+                    const openRow = document.getElementById(`tech-assignment-row-${safeId(keepOpenRo)}`);
+                    if (openRow) {
+                        openRow.style.display = 'table-row';
+                        loadRoAssignmentsSummary(keepOpenRo);
+                    }
+                }
             }
 
             function closeRepairLinesModal() {
@@ -607,7 +617,10 @@ def get_dashboard_screen_html():
                 const isHidden = assignmentRow.style.display === 'none' || assignmentRow.style.display === '';
                 assignmentRow.style.display = isHidden ? 'table-row' : 'none';
                 if (isHidden) {
+                    keepOpenRo = roNumber;
                     loadRoAssignmentsSummary(roNumber);
+                } else if (keepOpenRo === roNumber) {
+                    keepOpenRo = '';
                 }
             }
 
@@ -938,6 +951,7 @@ def get_dashboard_screen_html():
                             throw new Error(res.error);
                         }
                         closeAssignmentModal();
+                        keepOpenRo = currentAssignmentModal.ro;
                         loadRoAssignmentsSummary(currentAssignmentModal.ro);
                         loadDashboardData();
                     })
@@ -952,10 +966,14 @@ def get_dashboard_screen_html():
 
                 const body = document.getElementById('assignmentModalBody');
                 const totalEl = document.getElementById('assignmentModalTotal');
+                const techSelect = document.getElementById('assignmentTechSelect');
                 if (!body || !totalEl) return;
 
                 const roleLabel = currentAssignmentModal.role === 'paint' ? 'Paint' : 'Body';
                 const titleText = `${roleLabel} Assignments - RO# ${currentAssignmentModal.ro}`;
+                const techName = techSelect && techSelect.value
+                    ? (techSelect.options[techSelect.selectedIndex]?.dataset?.name || '')
+                    : 'unassigned';
 
                 const rows = currentAssignmentModal.lines.map((item, index) => {
                     const lineKey = normalizeLineKey(item, index);
@@ -1069,7 +1087,7 @@ def get_dashboard_screen_html():
                                 <div class="header">
                                     <div>
                                         <h1 class="title">${titleText}</h1>
-                                        <div class="subtitle">Assigned repair lines report</div>
+                                        <div class="subtitle">Tech: ${techName}</div>
                                     </div>
                                     <div class="total-card">${totalEl.textContent}</div>
                                 </div>
