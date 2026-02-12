@@ -36,6 +36,8 @@ All FlagTech data is now persisted to Render PostgreSQL database and follows a c
 - Input: ro, role (labor/paint), tech_id, tech_name, excluded_lines
 - Calculates assigned_hours based on line exclusions
 - Saves to `ro_assignments` table with **domain**
+- Uses **INSERT ... ON CONFLICT ... DO UPDATE SET** to consolidate assignments
+- When tech already has assignments, new assignment replaces old one at database level
 
 ✅ **Get Assignments endpoint**: `/api/ro-repairs` (GET)
 - Retrieves repair lines and existing assignments for RO
@@ -46,6 +48,27 @@ All FlagTech data is now persisted to Render PostgreSQL database and follows a c
 - Lists all ROs assigned to a specific tech
 - Filters by domain and tech_id
 - Returns: ro, role, total_hours, excluded_lines
+- **IMPORTANT**: Repair lines shown are FILTERED by excluded_lines
+  - Only lines NOT in excluded_lines are displayed (these are the assigned lines)
+  - This ensures tech modal shows only lines assigned to that tech
+
+### 3a. PENDING ASSIGNMENT CONSOLIDATION (NEW)
+✅ **Frontend Consolidation Logic** (dashboard.py)
+- When assigning PENDING lines to a tech that already has assignments:
+  1. Fetches current repair data and existing assignment state
+  2. Identifies previously assigned lines (those not in old excluded_lines)
+  3. Combines previously assigned lines + newly selected pending lines
+  4. Sends complete merged state to backend as excluded_lines
+  5. Backend applies single INSERT ... ON CONFLICT update
+- **Result**: No duplicate tech entries; existing assignments are expanded with new lines
+
+✅ **Direct Assignment Flow** (Labor/Paint)
+- When assigning directly from Labor/Paint modal:
+  1. Modal shows ALL lines for that role
+  2. Pre-fills with current excluded_lines state
+  3. User modifies selection to indicate desired assignments
+  4. Sends new excluded_lines which COMPLETELY REPLACES old state
+  5. This is correct because modal shows all lines and represents complete new state
 
 ### 4. DASHBOARD DATA AGGREGATION
 ✅ **Dashboard Data endpoint**: `/api/dashboard-data` (GET)
@@ -169,18 +192,38 @@ This ensures complete data isolation between companies.
    → Modal opens for tech assignment
    → Selects tech and lines to exclude
    → POST /api/ro-assignments → Saves assignment (domain: user's domain)
+   → Assignment consolidates with existing assignments (no duplicates)
    → GET /api/dashboard-data → Recalculates metrics for user's domain
 
 4. Dashboard displays:
    → Total Hours Per Tech (aggregated from ro_assignments)
    → Total ROs Per Tech (count unique ROs per tech)
    → RO list with assigned techs
+   → Tech modal filters repair lines (shows only assigned lines)
 
 5. Next session:
    → User logs in with same domain
    → Dashboard loads all persisted data
    → Techs list shows all saved technicians
    → All previous assignments visible and editable
+
+## Data Cleanup & Consistency
+
+✅ **Flash Endpoint** (`/api/flash` - POST)
+- Clears all uploaded estimate data for consistency
+- Deletes from these tables (in order):
+  - parts_received
+  - parts_orders
+  - parts_vendors
+  - ro_notes
+  - ro_phases
+  - **ro_assignments** ✅ (FIXED - included to prevent orphaned assignments)
+  - estimate_uploads
+  - saved_estimates
+  - techs
+- **IMPORTANT**: Flash now properly clears ro_assignments to maintain data consistency
+- Techs table is preserved only during upload processing, cleared during flash
+
 ```
 
 ## Critical Implementation Details

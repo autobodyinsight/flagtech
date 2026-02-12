@@ -1103,7 +1103,8 @@ def get_dashboard_screen_html():
                             return {
                                 key: lineKey,
                                 role: item.pending_role,
-                                line: item.pending_line_key || normalizeLineKey(item, index)
+                                line: item.pending_line_key || normalizeLineKey(item, index),
+                                item: item
                             };
                         })
                         .filter(item => !excludedLines.includes(item.key));
@@ -1123,40 +1124,89 @@ def get_dashboard_screen_html():
                         }
                     });
 
-                    const updates = [];
-                    ['labor', 'paint'].forEach(role => {
-                        if (byRole[role].size === 0) return;
-                        const payload = {
-                            ro: currentAssignmentModal.ro,
-                            role: role,
-                            tech_id: Number.isFinite(techId) ? techId : null,
-                            tech_name: techIdRaw ? techName : '',
-                            included_lines: Array.from(byRole[role]),
-                            pending_type: pendingType
-                        };
-                        updates.push(fetch('/api/ro-assignments', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            credentials: 'include',
-                            body: JSON.stringify(payload)
-                        }).then(r => r.json()));
-                    });
+                    // Fetch existing assignment data to properly merge assignments
+                    const fetchExistingAssignments = Promise.all(
+                        ['labor', 'paint'].map(role => 
+                            fetch(`/api/ro-repairs?ro=${encodeURIComponent(currentAssignmentModal.ro)}`, 
+                                { credentials: 'include' })
+                                .then(r => r.json())
+                        )
+                    ).then(([repairsData]) => repairsData);
 
-                    updates.push(fetch('/api/ro-assignments', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        credentials: 'include',
-                        body: JSON.stringify({
-                            ro: currentAssignmentModal.ro,
-                            role: 'pending',
-                            tech_id: null,
-                            tech_name: '',
-                            excluded_lines: pendingKeep,
-                            pending_type: pendingType
+                    fetchExistingAssignments
+                        .then(repairsData => {
+                            const updates = [];
+                            ['labor', 'paint'].forEach(role => {
+                                if (byRole[role].size === 0) return;
+                                
+                                // Get existing assignment for this tech and role if it exists
+                                const assignmentsByRole = repairsData.assignments || {};
+                                const existingAssignment = assignmentsByRole[role];
+                                const existingExcludedLines = existingAssignment?.excluded_lines || [];
+                                
+                                // Compute new excluded lines by removing newly assigned lines from all lines
+                                const allLines = role === 'labor' ? (repairsData.labor || []) : (repairsData.paint || []);
+                                const newExcludedLines = [];
+                                
+                                // Compute all assigned lines (old + new)
+                                const allAssignedLines = new Set();
+                                
+                                // Add previously assigned lines from existing assignment
+                                if (existingAssignment && existingExcludedLines) {
+                                    allLines.forEach((item, index) => {
+                                        const lineKey = normalizeLineKey(item, index);
+                                        // If not in excluded_lines, it was assigned
+                                        if (!existingExcludedLines.map(String).includes(lineKey)) {
+                                            allAssignedLines.add(String(lineKey));
+                                        }
+                                    });
+                                }
+                                
+                                // Add newly assigned lines from pending selection
+                                byRole[role].forEach(lineKey => {
+                                    allAssignedLines.add(String(lineKey));
+                                });
+                                
+                                // Build new excluded_lines: all lines not in allAssignedLines
+                                allLines.forEach((item, index) => {
+                                    const lineKey = normalizeLineKey(item, index);
+                                    if (!allAssignedLines.has(String(lineKey))) {
+                                        newExcludedLines.push(lineKey);
+                                    }
+                                });
+                                
+                                const payload = {
+                                    ro: currentAssignmentModal.ro,
+                                    role: role,
+                                    tech_id: Number.isFinite(techId) ? techId : null,
+                                    tech_name: techIdRaw ? techName : '',
+                                    excluded_lines: newExcludedLines,
+                                    pending_type: pendingType
+                                };
+                                updates.push(fetch('/api/ro-assignments', {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    credentials: 'include',
+                                    body: JSON.stringify(payload)
+                                }).then(r => r.json()));
+                            });
+
+                            updates.push(fetch('/api/ro-assignments', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                credentials: 'include',
+                                body: JSON.stringify({
+                                    ro: currentAssignmentModal.ro,
+                                    role: 'pending',
+                                    tech_id: null,
+                                    tech_name: '',
+                                    excluded_lines: pendingKeep,
+                                    pending_type: pendingType
+                                })
+                            }).then(r => r.json()));
+
+                            return Promise.all(updates);
                         })
-                    }).then(r => r.json()));
-
-                    Promise.all(updates)
                         .then(results => {
                             if (results.some(res => res.error)) {
                                 throw new Error('One or more assignments failed');
