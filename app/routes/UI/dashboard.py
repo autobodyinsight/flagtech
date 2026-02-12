@@ -137,6 +137,7 @@ def get_dashboard_screen_html():
                         <option value="body">body</option>
                         <option value="mech">mech</option>
                         <option value="other">other</option>
+                        <option value="paint">paint</option>
                     </select>
                 </div>
                 <div style="margin-bottom:12px; display:flex; align-items:center; gap:8px;">
