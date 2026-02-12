@@ -751,6 +751,7 @@ def get_dashboard_screen_html():
                         const labor = data.labor || [];
                         const paint = data.paint || [];
                         const assignments = data.assignments || {};
+                        const assignmentRows = data.assignment_rows || [];
 
                         const laborExcluded = assignments.labor?.excluded_lines || [];
                         const paintExcluded = assignments.paint?.excluded_lines || [];
@@ -771,57 +772,57 @@ def get_dashboard_screen_html():
                             [],
                             paint
                         );
-                        const laborUnassigned = Math.max(0, laborTotalAll - pendingLaborHours);
-                        const paintUnassigned = Math.max(0, paintTotalAll - pendingPaintHours);
+                        const laborUnassigned = Math.max(
+                            0,
+                            laborTotalAll - pendingLaborHours - assignedTotals.labor
+                        );
+                        const paintUnassigned = Math.max(
+                            0,
+                            paintTotalAll - pendingPaintHours - assignedTotals.paint
+                        );
 
                         const displayList = [];
+                        const assignedTotals = { labor: 0.0, paint: 0.0 };
 
-                        if (labor.length > 0) {
-                            if (assignments.labor?.tech_name) {
-                                displayList.push({
-                                    role: 'labor',
-                                    tech_name: assignments.labor.tech_name,
-                                    type_label: 'body',
-                                    hours: laborAssigned.toFixed(1),
-                                    is_assigned: true,
-                                    tech_id: assignments.labor.tech_id
-                                });
-                            } else {
-                                if (laborUnassigned > 0) {
-                                    displayList.push({
-                                        role: 'labor',
-                                        tech_name: 'unassigned',
-                                        type_label: 'body',
-                                        hours: laborUnassigned.toFixed(1),
-                                        is_assigned: false,
-                                        tech_id: null
-                                    });
-                                }
-                            }
+                        assignmentRows.forEach(row => {
+                            const role = String(row.role || '').toLowerCase();
+                            if (role !== 'labor' && role !== 'paint') return;
+                            if (!row.tech_name) return;
+                            const typeLabel = row.pending_type || (role === 'paint' ? 'paint' : 'body');
+                            const hours = Number.isFinite(parseFloat(row.assigned_hours))
+                                ? parseFloat(row.assigned_hours)
+                                : 0.0;
+                            assignedTotals[role] += hours;
+                            displayList.push({
+                                role: role,
+                                tech_name: row.tech_name,
+                                type_label: typeLabel,
+                                hours: hours.toFixed(1),
+                                is_assigned: true,
+                                tech_id: row.tech_id
+                            });
+                        });
+
+                        if (labor.length > 0 && laborUnassigned > 0) {
+                            displayList.push({
+                                role: 'labor',
+                                tech_name: 'unassigned',
+                                type_label: 'body',
+                                hours: laborUnassigned.toFixed(1),
+                                is_assigned: false,
+                                tech_id: null
+                            });
                         }
 
-                        if (paint.length > 0) {
-                            if (assignments.paint?.tech_name) {
-                                displayList.push({
-                                    role: 'paint',
-                                    tech_name: assignments.paint.tech_name,
-                                    type_label: 'paint',
-                                    hours: paintAssigned.toFixed(1),
-                                    is_assigned: true,
-                                    tech_id: assignments.paint.tech_id
-                                });
-                            } else {
-                                if (paintUnassigned > 0) {
-                                    displayList.push({
-                                        role: 'paint',
-                                        tech_name: 'unassigned',
-                                        type_label: 'paint',
-                                        hours: paintUnassigned.toFixed(1),
-                                        is_assigned: false,
-                                        tech_id: null
-                                    });
-                                }
-                            }
+                        if (paint.length > 0 && paintUnassigned > 0) {
+                            displayList.push({
+                                role: 'paint',
+                                tech_name: 'unassigned',
+                                type_label: 'paint',
+                                hours: paintUnassigned.toFixed(1),
+                                is_assigned: false,
+                                tech_id: null
+                            });
                         }
 
                         const pendingTotal = sumPendingHours(pendingLines, labor, paint);
@@ -1127,17 +1128,13 @@ def get_dashboard_screen_html():
                     const updates = [];
                     ['labor', 'paint'].forEach(role => {
                         if (byRole[role].size === 0) return;
-                        const existing = currentAssignmentModal.assignmentsByRole[role] || {};
-                        const existingExcluded = Array.isArray(existing.excluded_lines)
-                            ? existing.excluded_lines.map(String)
-                            : [];
-                        const newExcluded = existingExcluded.filter(line => !byRole[role].has(String(line)));
                         const payload = {
                             ro: currentAssignmentModal.ro,
                             role: role,
-                            tech_id: Number.isFinite(techId) ? techId : existing.tech_id || null,
-                            tech_name: techIdRaw ? techName : (existing.tech_name || ''),
-                            excluded_lines: newExcluded
+                            tech_id: Number.isFinite(techId) ? techId : null,
+                            tech_name: techIdRaw ? techName : '',
+                            included_lines: Array.from(byRole[role]),
+                            pending_type: pendingType
                         };
                         updates.push(fetch('/api/ro-assignments', {
                             method: 'POST',
