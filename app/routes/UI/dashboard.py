@@ -131,6 +131,10 @@ def get_dashboard_screen_html():
                     <label for="assignmentTechSelect" style="font-weight:bold; font-size:12px; color:#666;">TECH</label>
                     <select id="assignmentTechSelect" style="width:100%; padding:8px; margin-top:6px;"></select>
                 </div>
+                <div style="margin-bottom:12px; display:flex; align-items:center; gap:8px;">
+                    <input type="checkbox" id="assignmentSelectAll" onchange="toggleAssignmentSelectAll()" />
+                    <label for="assignmentSelectAll" style="font-weight:bold; font-size:12px;">Select all</label>
+                </div>
                 <div id="assignmentModalBody"></div>
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-top:12px;">
                     <div id="assignmentModalTotal" style="font-weight:bold;">Total: 0.0 hrs</div>
@@ -172,6 +176,21 @@ def get_dashboard_screen_html():
                 border: 1px solid #888;
                 width: 95%;
                 border-radius: 6px;
+                color: #000;
+            }
+            .modal-content * {
+                color: #000;
+            }
+            .modal-content button {
+                color: #fff !important;
+            }
+            .modal-content .close {
+                color: #000 !important;
+            }
+            button {
+                background: #b22222 !important;
+                color: #fff !important;
+                border: none !important;
             }
             .close {
                 color: #aaa;
@@ -858,11 +877,16 @@ def get_dashboard_screen_html():
             function renderAssignmentModalBody(lines, assignment) {
                 const body = document.getElementById('assignmentModalBody');
                 if (!body) return;
+                const selectAll = document.getElementById('assignmentSelectAll');
 
                 const excluded = Array.isArray(assignment?.excluded_lines) ? assignment.excluded_lines.map(String) : [];
 
                 if (!lines || lines.length === 0) {
                     body.innerHTML = '<div style="color:#777;">No repair lines found.</div>';
+                    if (selectAll) {
+                        selectAll.checked = false;
+                        selectAll.disabled = true;
+                    }
                     updateAssignmentModalTotal();
                     return;
                 }
@@ -883,7 +907,7 @@ def get_dashboard_screen_html():
                             <div style="flex:1; font-size:13px; color:#333;">
                                 <strong>Line ${line}</strong> - ${desc}
                             </div>
-                            <div style="min-width:70px; text-align:right; font-weight:bold; font-size:13px; color:#d32f2f;">${value} hrs</div>
+                            <div style="min-width:70px; text-align:right; font-weight:bold; font-size:13px;">${value} hrs</div>
                         </div>
                     `;
                 }).join('');
@@ -894,6 +918,23 @@ def get_dashboard_screen_html():
                     </div>
                 `;
 
+                if (selectAll) {
+                    selectAll.disabled = false;
+                    const totalBoxes = body.querySelectorAll('input.assignment-omit').length;
+                    const checkedBoxes = body.querySelectorAll('input.assignment-omit:checked').length;
+                    selectAll.checked = totalBoxes > 0 && totalBoxes === checkedBoxes;
+                }
+
+                updateAssignmentModalTotal();
+            }
+
+            function toggleAssignmentSelectAll() {
+                const body = document.getElementById('assignmentModalBody');
+                const selectAll = document.getElementById('assignmentSelectAll');
+                if (!body || !selectAll) return;
+                body.querySelectorAll('input.assignment-omit').forEach(checkbox => {
+                    checkbox.checked = selectAll.checked;
+                });
                 updateAssignmentModalTotal();
             }
 
@@ -913,6 +954,13 @@ def get_dashboard_screen_html():
                 });
 
                 totalEl.textContent = `Total: ${total.toFixed(1)} hrs`;
+
+                const selectAll = document.getElementById('assignmentSelectAll');
+                if (selectAll && !selectAll.disabled) {
+                    const totalBoxes = body.querySelectorAll('input.assignment-omit').length;
+                    const checkedBoxes = body.querySelectorAll('input.assignment-omit:checked').length;
+                    selectAll.checked = totalBoxes > 0 && totalBoxes === checkedBoxes;
+                }
             }
 
             function saveAssignmentModal() {
