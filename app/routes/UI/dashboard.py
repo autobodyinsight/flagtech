@@ -760,8 +760,6 @@ def get_dashboard_screen_html():
 
                         const laborTotalAll = calculateTotalHours(labor);
                         const paintTotalAll = calculateTotalHours(paint);
-                        const laborAssigned = calculateAssignedHours(labor, laborExcluded);
-                        const paintAssigned = calculateAssignedHours(paint, paintExcluded);
                         const pendingLaborHours = sumPendingHours(
                             (pendingLines || []).filter(entry => String(entry?.role || '').toLowerCase() === 'labor'),
                             labor,
@@ -772,15 +770,6 @@ def get_dashboard_screen_html():
                             [],
                             paint
                         );
-                        const laborUnassigned = Math.max(
-                            0,
-                            laborTotalAll - pendingLaborHours - assignedTotals.labor
-                        );
-                        const paintUnassigned = Math.max(
-                            0,
-                            paintTotalAll - pendingPaintHours - assignedTotals.paint
-                        );
-
                         const displayList = [];
                         const assignedTotals = { labor: 0.0, paint: 0.0 };
 
@@ -802,6 +791,15 @@ def get_dashboard_screen_html():
                                 tech_id: row.tech_id
                             });
                         });
+
+                        const laborUnassigned = Math.max(
+                            0,
+                            laborTotalAll - pendingLaborHours - assignedTotals.labor
+                        );
+                        const paintUnassigned = Math.max(
+                            0,
+                            paintTotalAll - pendingPaintHours - assignedTotals.paint
+                        );
 
                         if (labor.length > 0 && laborUnassigned > 0) {
                             displayList.push({
