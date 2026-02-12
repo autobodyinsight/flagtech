@@ -158,6 +158,7 @@ def _ensure_ro_assignments_table(cur) -> None:
             tech_id INTEGER,
             tech_name VARCHAR(255),
             excluded_lines JSONB,
+            pending_type VARCHAR(32),
             assigned_hours NUMERIC,
             domain VARCHAR(255) NOT NULL,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -165,6 +166,7 @@ def _ensure_ro_assignments_table(cur) -> None:
         """
     )
     cur.execute("ALTER TABLE ro_assignments ADD COLUMN IF NOT EXISTS assigned_hours NUMERIC")
+    cur.execute("ALTER TABLE ro_assignments ADD COLUMN IF NOT EXISTS pending_type VARCHAR(32)")
     cur.execute(
         """
         CREATE UNIQUE INDEX IF NOT EXISTS idx_ro_assignments_ro_role_domain
@@ -203,6 +205,43 @@ def _parse_json_field(value):
         return json.loads(value)
     except Exception:
         return []
+
+
+def _line_key(item, index: int) -> str:
+    value = item.get("line") if isinstance(item, dict) else None
+    if value is None:
+        return str(index + 1)
+    return str(value)
+
+
+def _sum_pending_hours(pending_lines, labor_repairs, paint_repairs) -> float:
+    total = 0.0
+    labor_map = {}
+    paint_map = {}
+
+    for idx, item in enumerate(labor_repairs or []):
+        labor_map[_line_key(item, idx)] = item
+
+    for idx, item in enumerate(paint_repairs or []):
+        paint_map[_line_key(item, idx)] = item
+
+    for entry in pending_lines or []:
+        if not isinstance(entry, dict):
+            continue
+        role = (entry.get("role") or "").strip().lower()
+        line_key = str(entry.get("line") or "")
+        if not line_key:
+            continue
+        if role == "labor":
+            line_item = labor_map.get(line_key)
+        elif role == "paint":
+            line_item = paint_map.get(line_key)
+        else:
+            continue
+        if line_item:
+            total += _parse_float_value(line_item.get("value") or line_item.get("hours"))
+
+    return total
 
 
 def _parse_float_value(value) -> float:
@@ -791,7 +830,7 @@ async def get_ro_repairs(request: Request, ro: str):
 
         cur.execute(
             """
-            SELECT role, tech_id, tech_name, excluded_lines
+            SELECT role, tech_id, tech_name, excluded_lines, pending_type
             FROM ro_assignments
             WHERE domain = %s AND ro = %s
             """,
@@ -801,6 +840,7 @@ async def get_ro_repairs(request: Request, ro: str):
         assignments = {
             "labor": {},
             "paint": {},
+            "pending": {},
         }
         for assignment in assignment_rows:
             role = assignment.get("role")
@@ -810,6 +850,7 @@ async def get_ro_repairs(request: Request, ro: str):
                 "tech_id": assignment.get("tech_id"),
                 "tech_name": assignment.get("tech_name"),
                 "excluded_lines": assignment.get("excluded_lines") or [],
+                "pending_type": assignment.get("pending_type"),
             }
 
         return {"labor": labor_repairs, "paint": paint_repairs, "assignments": assignments}
@@ -829,8 +870,9 @@ async def save_ro_assignments(request: Request):
     tech_id = data.get("tech_id")
     tech_name = (data.get("tech_name") or "").strip()
     excluded_lines = data.get("excluded_lines") or []
+    pending_type = (data.get("pending_type") or "").strip().lower() or None
 
-    if not ro_value or role not in {"labor", "paint"}:
+    if not ro_value or role not in {"labor", "paint", "pending"}:
         return JSONResponse(status_code=400, content={"error": "ro and role are required"})
 
     conn = get_conn()
@@ -858,8 +900,11 @@ async def save_ro_assignments(request: Request):
         if not isinstance(paint_repairs, list):
             paint_repairs = []
 
-        lines = labor_repairs if role == "labor" else paint_repairs
-        assigned_hours = _sum_assigned_hours(lines, excluded_lines)
+        if role == "pending":
+            assigned_hours = _sum_pending_hours(excluded_lines, labor_repairs, paint_repairs)
+        else:
+            lines = labor_repairs if role == "labor" else paint_repairs
+            assigned_hours = _sum_assigned_hours(lines, excluded_lines)
 
         if tech_id and not tech_name:
             cur.execute(
@@ -876,13 +921,14 @@ async def save_ro_assignments(request: Request):
 
         cur.execute(
             """
-            INSERT INTO ro_assignments (ro, role, tech_id, tech_name, excluded_lines, assigned_hours, domain)
-            VALUES (%s, %s, %s, %s, %s, %s, %s)
+            INSERT INTO ro_assignments (ro, role, tech_id, tech_name, excluded_lines, pending_type, assigned_hours, domain)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
             ON CONFLICT (ro, role, domain)
             DO UPDATE SET
                 tech_id = EXCLUDED.tech_id,
                 tech_name = EXCLUDED.tech_name,
                 excluded_lines = EXCLUDED.excluded_lines,
+                pending_type = EXCLUDED.pending_type,
                 assigned_hours = EXCLUDED.assigned_hours,
                 updated_at = CURRENT_TIMESTAMP
             """,
@@ -892,6 +938,7 @@ async def save_ro_assignments(request: Request):
                 tech_id,
                 tech_name or None,
                 json.dumps(excluded_lines),
+                pending_type,
                 assigned_hours,
                 domain,
             ),

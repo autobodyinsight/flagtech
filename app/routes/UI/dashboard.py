@@ -131,6 +131,14 @@ def get_dashboard_screen_html():
                     <label for="assignmentTechSelect" style="font-weight:bold; font-size:12px; color:#666;">TECH</label>
                     <select id="assignmentTechSelect" style="width:100%; padding:8px; margin-top:6px;"></select>
                 </div>
+                <div id="assignmentTypeWrap" style="margin-bottom:12px; display:none;">
+                    <label for="assignmentTypeSelect" style="font-weight:bold; font-size:12px; color:#666;">TYPE</label>
+                    <select id="assignmentTypeSelect" style="width:100%; padding:8px; margin-top:6px;">
+                        <option value="body">body</option>
+                        <option value="mech">mech</option>
+                        <option value="other">other</option>
+                    </select>
+                </div>
                 <div style="margin-bottom:12px; display:flex; align-items:center; gap:8px;">
                     <input type="checkbox" id="assignmentSelectAll" onchange="toggleAssignmentSelectAll()" />
                     <label for="assignmentSelectAll" style="font-weight:bold; font-size:12px;">Select all</label>
@@ -670,6 +678,62 @@ def get_dashboard_screen_html():
                 return total;
             }
 
+            function sumPendingHours(pendingLines, labor, paint) {
+                const laborMap = {};
+                const paintMap = {};
+
+                (labor || []).forEach((item, index) => {
+                    laborMap[normalizeLineKey(item, index)] = item;
+                });
+                (paint || []).forEach((item, index) => {
+                    paintMap[normalizeLineKey(item, index)] = item;
+                });
+
+                let total = 0.0;
+                (pendingLines || []).forEach(entry => {
+                    if (!entry || typeof entry !== 'object') return;
+                    const role = String(entry.role || '').toLowerCase();
+                    const lineKey = String(entry.line || '');
+                    if (!lineKey) return;
+                    const source = role === 'paint' ? paintMap : laborMap;
+                    const item = source[lineKey];
+                    if (!item) return;
+                    total += getLineHours(item);
+                });
+                return total;
+            }
+
+            function buildPendingLines(pendingLines, labor, paint) {
+                const laborMap = {};
+                const paintMap = {};
+
+                (labor || []).forEach((item, index) => {
+                    laborMap[normalizeLineKey(item, index)] = item;
+                });
+                (paint || []).forEach((item, index) => {
+                    paintMap[normalizeLineKey(item, index)] = item;
+                });
+
+                const results = [];
+                (pendingLines || []).forEach(entry => {
+                    if (!entry || typeof entry !== 'object') return;
+                    const role = String(entry.role || '').toLowerCase();
+                    const lineKey = String(entry.line || '');
+                    if (!lineKey) return;
+                    const source = role === 'paint' ? paintMap : laborMap;
+                    const item = source[lineKey];
+                    if (!item) return;
+                    results.push({
+                        pending_role: role,
+                        pending_line_key: lineKey,
+                        line: item.line || lineKey,
+                        description: item.description || '',
+                        value: item.value || item.hours || 0
+                    });
+                });
+                return results;
+            }
+
             function loadRoAssignmentsSummary(roNumber) {
                 const listEl = document.getElementById(`tech-assignment-list-${safeId(roNumber)}`);
                 if (!listEl) {
@@ -689,6 +753,8 @@ def get_dashboard_screen_html():
 
                         const laborExcluded = assignments.labor?.excluded_lines || [];
                         const paintExcluded = assignments.paint?.excluded_lines || [];
+                        const pendingLines = assignments.pending?.excluded_lines || [];
+                        const pendingType = assignments.pending?.pending_type || 'body';
 
                         const laborTotalAll = calculateTotalHours(labor);
                         const paintTotalAll = calculateTotalHours(paint);
@@ -763,6 +829,18 @@ def get_dashboard_screen_html():
                             }
                         }
 
+                        const pendingTotal = sumPendingHours(pendingLines, labor, paint);
+                        if (pendingTotal > 0) {
+                            displayList.push({
+                                role: 'pending',
+                                tech_name: 'Pending',
+                                type_label: pendingType,
+                                hours: pendingTotal.toFixed(1),
+                                is_assigned: false,
+                                tech_id: null
+                            });
+                        }
+
                         let html = '';
 
                         if (displayList.length === 0) {
@@ -807,7 +885,10 @@ def get_dashboard_screen_html():
                 ro: '',
                 role: '',
                 lines: [],
-                assignment: null
+                assignment: null,
+                pendingLines: [],
+                pendingType: 'body',
+                assignmentsByRole: {}
             };
 
             function closeAssignmentModal() {
@@ -820,11 +901,15 @@ def get_dashboard_screen_html():
                 const modal = document.getElementById('assignmentModal');
                 const title = document.getElementById('assignmentModalTitle');
                 const body = document.getElementById('assignmentModalBody');
+                const typeWrap = document.getElementById('assignmentTypeWrap');
+                const typeSelect = document.getElementById('assignmentTypeSelect');
 
                 if (!modal || !title || !body) return;
 
                 const roleLabel = role === 'paint' ? 'Paint' : 'Body';
-                title.textContent = `${roleLabel} Assignments - RO# ${roNumber}`;
+                title.textContent = role === 'pending'
+                    ? `Pending Assignments - RO# ${roNumber}`
+                    : `${roleLabel} Assignments - RO# ${roNumber}`;
                 body.innerHTML = '<div style="color:#777;">Loading repair lines...</div>';
                 modal.style.display = 'block';
 
@@ -837,17 +922,37 @@ def get_dashboard_screen_html():
                             throw new Error(repairsRes.error);
                         }
                         const lines = role === 'paint' ? (repairsRes.paint || []) : (repairsRes.labor || []);
-                        const assignment = repairsRes.assignments ? repairsRes.assignments[role] : null;
+                        const assignmentsByRole = repairsRes.assignments || {};
+                        const assignment = assignmentsByRole ? assignmentsByRole[role] : null;
                         const techs = techsRes.techs || [];
+                        const pendingAssignment = assignmentsByRole.pending || {};
+                        const pendingLines = pendingAssignment.excluded_lines || [];
+                        const pendingType = pendingAssignment.pending_type || 'body';
+
+                        let modalLines = lines;
+                        if (role === 'pending') {
+                            modalLines = buildPendingLines(pendingLines, repairsRes.labor || [], repairsRes.paint || []);
+                        }
 
                         currentAssignmentModal = {
                             ro: roNumber,
                             role: role,
-                            lines: Array.isArray(lines) ? lines : [],
-                            assignment: assignment
+                            lines: Array.isArray(modalLines) ? modalLines : [],
+                            assignment: assignment,
+                            pendingLines: Array.isArray(pendingLines) ? pendingLines : [],
+                            pendingType: pendingType,
+                            assignmentsByRole: assignmentsByRole
                         };
 
                         populateAssignmentTechSelect(techs, assignment);
+                        if (typeWrap && typeSelect) {
+                            if (role === 'pending') {
+                                typeWrap.style.display = 'block';
+                                typeSelect.value = pendingType || 'body';
+                            } else {
+                                typeWrap.style.display = 'none';
+                            }
+                        }
                         renderAssignmentModalBody(currentAssignmentModal.lines, assignment);
                     })
                     .catch(err => {
@@ -892,12 +997,16 @@ def get_dashboard_screen_html():
                 }
 
                 const rows = lines.map((item, index) => {
-                    const lineKey = normalizeLineKey(item, index);
+                    const lineKey = item.pending_role
+                        ? `${item.pending_role}:${item.pending_line_key}`
+                        : normalizeLineKey(item, index);
                     const line = item.line || lineKey || '—';
                     const desc = item.description || '';
                     const hours = getLineHours(item);
                     const value = hours.toFixed(1);
-                    const isOmitted = excluded.includes(String(lineKey));
+                    const isOmitted = currentAssignmentModal.role === 'pending'
+                        ? false
+                        : excluded.includes(String(lineKey));
 
                     return `
                         <div style="display:flex; align-items:center; gap:12px; padding:10px 12px; border-bottom:1px solid #eee; background:#fff;">
@@ -968,6 +1077,7 @@ def get_dashboard_screen_html():
 
                 const body = document.getElementById('assignmentModalBody');
                 const select = document.getElementById('assignmentTechSelect');
+                const typeSelect = document.getElementById('assignmentTypeSelect');
                 if (!body || !select) return;
 
                 const excludedLines = [];
@@ -981,22 +1091,137 @@ def get_dashboard_screen_html():
                     ? (select.options[select.selectedIndex]?.dataset?.name || '')
                     : '';
 
-                fetch('/api/ro-assignments', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    credentials: 'include',
-                    body: JSON.stringify({
-                        ro: currentAssignmentModal.ro,
-                        role: currentAssignmentModal.role,
-                        tech_id: Number.isFinite(techId) ? techId : null,
-                        tech_name: techName,
-                        excluded_lines: excludedLines
-                    })
-                })
-                    .then(r => r.json())
-                    .then(res => {
-                        if (res.error) {
-                            throw new Error(res.error);
+                const pendingType = typeSelect && currentAssignmentModal.role === 'pending'
+                    ? (typeSelect.value || 'body')
+                    : (currentAssignmentModal.pendingType || 'body');
+
+                if (currentAssignmentModal.role === 'pending') {
+                    const pendingKeep = excludedLines.map(entry => {
+                        const parts = String(entry).split(':');
+                        return { role: parts[0], line: parts[1] };
+                    });
+
+                    const uncheckedLines = currentAssignmentModal.lines
+                        .map((item, index) => {
+                            const lineKey = item.pending_role
+                                ? `${item.pending_role}:${item.pending_line_key}`
+                                : normalizeLineKey(item, index);
+                            return {
+                                key: lineKey,
+                                role: item.pending_role,
+                                line: item.pending_line_key || normalizeLineKey(item, index)
+                            };
+                        })
+                        .filter(item => !excludedLines.includes(item.key));
+
+                    if (uncheckedLines.length > 0 && !techIdRaw) {
+                        alert('Please select a tech to assign pending lines.');
+                        return;
+                    }
+
+                    const byRole = {
+                        labor: new Set(),
+                        paint: new Set()
+                    };
+                    uncheckedLines.forEach(item => {
+                        if (item.role === 'labor' || item.role === 'paint') {
+                            byRole[item.role].add(String(item.line));
+                        }
+                    });
+
+                    const updates = [];
+                    ['labor', 'paint'].forEach(role => {
+                        if (byRole[role].size === 0) return;
+                        const existing = currentAssignmentModal.assignmentsByRole[role] || {};
+                        const existingExcluded = Array.isArray(existing.excluded_lines)
+                            ? existing.excluded_lines.map(String)
+                            : [];
+                        const newExcluded = existingExcluded.filter(line => !byRole[role].has(String(line)));
+                        const payload = {
+                            ro: currentAssignmentModal.ro,
+                            role: role,
+                            tech_id: Number.isFinite(techId) ? techId : existing.tech_id || null,
+                            tech_name: techIdRaw ? techName : (existing.tech_name || ''),
+                            excluded_lines: newExcluded
+                        };
+                        updates.push(fetch('/api/ro-assignments', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            credentials: 'include',
+                            body: JSON.stringify(payload)
+                        }).then(r => r.json()));
+                    });
+
+                    updates.push(fetch('/api/ro-assignments', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        credentials: 'include',
+                        body: JSON.stringify({
+                            ro: currentAssignmentModal.ro,
+                            role: 'pending',
+                            tech_id: null,
+                            tech_name: '',
+                            excluded_lines: pendingKeep,
+                            pending_type: pendingType
+                        })
+                    }).then(r => r.json()));
+
+                    Promise.all(updates)
+                        .then(results => {
+                            if (results.some(res => res.error)) {
+                                throw new Error('One or more assignments failed');
+                            }
+                            closeAssignmentModal();
+                            keepOpenRo = currentAssignmentModal.ro;
+                            loadRoAssignmentsSummary(currentAssignmentModal.ro);
+                            loadDashboardData();
+                        })
+                        .catch(err => {
+                            console.error('Error saving assignment modal:', err);
+                            alert('Error saving assignment.');
+                        });
+                    return;
+                }
+
+                const pendingFiltered = (currentAssignmentModal.pendingLines || []).filter(entry => {
+                    return entry && entry.role && entry.role !== currentAssignmentModal.role;
+                });
+                const pendingMerged = pendingFiltered.concat(
+                    excludedLines.map(lineKey => ({ role: currentAssignmentModal.role, line: lineKey }))
+                );
+
+                const requests = [
+                    fetch('/api/ro-assignments', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        credentials: 'include',
+                        body: JSON.stringify({
+                            ro: currentAssignmentModal.ro,
+                            role: currentAssignmentModal.role,
+                            tech_id: Number.isFinite(techId) ? techId : null,
+                            tech_name: techName,
+                            excluded_lines: excludedLines
+                        })
+                    }).then(r => r.json()),
+                    fetch('/api/ro-assignments', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        credentials: 'include',
+                        body: JSON.stringify({
+                            ro: currentAssignmentModal.ro,
+                            role: 'pending',
+                            tech_id: null,
+                            tech_name: '',
+                            excluded_lines: pendingMerged,
+                            pending_type: pendingType
+                        })
+                    }).then(r => r.json())
+                ];
+
+                Promise.all(requests)
+                    .then(results => {
+                        if (results.some(res => res.error)) {
+                            throw new Error('One or more assignments failed');
                         }
                         closeAssignmentModal();
                         keepOpenRo = currentAssignmentModal.ro;
@@ -1024,7 +1249,9 @@ def get_dashboard_screen_html():
                     : 'unassigned';
 
                 const rows = currentAssignmentModal.lines.map((item, index) => {
-                    const lineKey = normalizeLineKey(item, index);
+                    const lineKey = item.pending_role
+                        ? `${item.pending_role}:${item.pending_line_key}`
+                        : normalizeLineKey(item, index);
                     const line = item.line || lineKey || '—';
                     const desc = item.description || '';
                     const hours = getLineHours(item).toFixed(1);
