@@ -134,7 +134,10 @@ def get_dashboard_screen_html():
                 <div id="assignmentModalBody"></div>
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-top:12px;">
                     <div id="assignmentModalTotal" style="font-weight:bold;">Total: 0.0 hrs</div>
-                    <button id="assignmentModalSave" onclick="saveAssignmentModal()" style="padding:8px 16px; background:#505050; color:#fff; border:none; border-radius:4px; cursor:pointer;">Save</button>
+                    <div style="display:flex; gap:8px;">
+                        <button type="button" onclick="printAssignmentModal()" style="padding:8px 16px; background:#9c27b0; color:#fff; border:none; border-radius:4px; cursor:pointer;">Print</button>
+                        <button id="assignmentModalSave" onclick="saveAssignmentModal()" style="padding:8px 16px; background:#505050; color:#fff; border:none; border-radius:4px; cursor:pointer;">Save</button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -864,11 +867,10 @@ def get_dashboard_screen_html():
                             <div style="width:24px;">
                                 <input type="checkbox" class="assignment-omit" data-line="${lineKey}" data-hrs="${value}" ${isOmitted ? 'checked' : ''} onchange="updateAssignmentModalTotal()" />
                             </div>
-                            <div style="flex:1;">
-                                <div style="font-weight:bold; font-size:13px;">Line ${line}</div>
-                                <div style="font-size:12px; color:#666;">${desc}</div>
+                            <div style="flex:1; font-size:13px; color:#333;">
+                                <strong>Line ${line}</strong> - ${desc}
                             </div>
-                            <div style="min-width:70px; text-align:right; font-weight:bold; color:#d32f2f;">${value} hrs</div>
+                            <div style="min-width:70px; text-align:right; font-weight:bold; font-size:13px; color:#d32f2f;">${value} hrs</div>
                         </div>
                     `;
                 }).join('');
@@ -943,6 +945,152 @@ def get_dashboard_screen_html():
                         console.error('Error saving assignment modal:', err);
                         alert('Error saving assignment.');
                     });
+            }
+
+            function printAssignmentModal() {
+                if (!currentAssignmentModal.ro || !currentAssignmentModal.role) return;
+
+                const body = document.getElementById('assignmentModalBody');
+                const totalEl = document.getElementById('assignmentModalTotal');
+                if (!body || !totalEl) return;
+
+                const roleLabel = currentAssignmentModal.role === 'paint' ? 'Paint' : 'Body';
+                const titleText = `${roleLabel} Assignments - RO# ${currentAssignmentModal.ro}`;
+
+                const rows = currentAssignmentModal.lines.map((item, index) => {
+                    const lineKey = normalizeLineKey(item, index);
+                    const line = item.line || lineKey || '—';
+                    const desc = item.description || '';
+                    const hours = getLineHours(item).toFixed(1);
+                    const checkbox = body.querySelector(`input.assignment-omit[data-line="${lineKey}"]`);
+                    const omitted = checkbox && checkbox.checked;
+                    return {
+                        line,
+                        desc,
+                        hours,
+                        omitted
+                    };
+                }).filter(row => !row.omitted);
+
+                const printWindow = window.open('', '_blank');
+                const rowsHtml = rows.map(row => {
+                    return `
+                        <tr style="border-bottom:1px solid #eee;">
+                            <td style="padding:8px;">Line ${row.line}</td>
+                            <td style="padding:8px;">${row.desc}</td>
+                            <td style="padding:8px; text-align:right; font-weight:bold;">${row.hours} hrs</td>
+                        </tr>
+                    `;
+                }).join('');
+
+                printWindow.document.write(`
+                    <html>
+                        <head>
+                            <title>${titleText}</title>
+                            <style>
+                                @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;600;700&display=swap');
+                                * { box-sizing: border-box; }
+                                body {
+                                    font-family: 'DM Sans', 'Segoe UI', Tahoma, Arial, sans-serif;
+                                    padding: 28px;
+                                    color: #1f2933;
+                                    background: #f6f7f9;
+                                }
+                                .sheet {
+                                    background: #ffffff;
+                                    border: 1px solid #e3e7ee;
+                                    border-radius: 12px;
+                                    padding: 24px;
+                                    box-shadow: 0 8px 24px rgba(15, 23, 42, 0.08);
+                                }
+                                .header {
+                                    display: flex;
+                                    align-items: flex-end;
+                                    justify-content: space-between;
+                                    gap: 16px;
+                                    border-bottom: 1px solid #e3e7ee;
+                                    padding-bottom: 14px;
+                                    margin-bottom: 18px;
+                                }
+                                .title {
+                                    margin: 0;
+                                    font-size: 22px;
+                                    font-weight: 700;
+                                    color: #0f172a;
+                                }
+                                .subtitle {
+                                    margin: 6px 0 0;
+                                    font-size: 13px;
+                                    color: #64748b;
+                                }
+                                .total-card {
+                                    background: #111827;
+                                    color: #ffffff;
+                                    padding: 10px 14px;
+                                    border-radius: 10px;
+                                    font-weight: 700;
+                                    font-size: 14px;
+                                    white-space: nowrap;
+                                }
+                                table {
+                                    width: 100%;
+                                    border-collapse: collapse;
+                                    font-size: 13px;
+                                }
+                                thead th {
+                                    text-align: left;
+                                    font-weight: 700;
+                                    color: #334155;
+                                    background: #f1f5f9;
+                                    padding: 10px 12px;
+                                    border-bottom: 1px solid #e2e8f0;
+                                }
+                                tbody td {
+                                    padding: 10px 12px;
+                                    border-bottom: 1px solid #eef2f7;
+                                }
+                                tbody tr:nth-child(even) td {
+                                    background: #fafbfc;
+                                }
+                                .hrs {
+                                    text-align: right;
+                                    font-weight: 700;
+                                    color: #0f172a;
+                                }
+                                .empty {
+                                    color: #64748b;
+                                    text-align: center;
+                                    padding: 14px;
+                                }
+                            </style>
+                        </head>
+                        <body>
+                            <div class="sheet">
+                                <div class="header">
+                                    <div>
+                                        <h1 class="title">${titleText}</h1>
+                                        <div class="subtitle">Assigned repair lines report</div>
+                                    </div>
+                                    <div class="total-card">${totalEl.textContent}</div>
+                                </div>
+                                <table>
+                                    <thead>
+                                        <tr>
+                                            <th style="width:110px;">Line</th>
+                                            <th>Description</th>
+                                            <th class="hrs" style="width:110px;">Hours</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        ${rowsHtml || '<tr><td colspan="3" class="empty">No assigned lines.</td></tr>'}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </body>
+                    </html>
+                `);
+                printWindow.document.close();
+                printWindow.print();
             }
 
             let currentTechDetailData = null;
