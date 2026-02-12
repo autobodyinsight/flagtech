@@ -762,7 +762,7 @@ def get_dashboard_screen_html():
 
                                 html += `<tr style="background:#fff; border-bottom:1px solid #ddd;">`;
                                 html += `<td style="padding:8px 12px; color:${textColor}; font-weight:${fontWeight};">`;
-                                html += `<button type="button" onclick="openAssignmentModal(event, '${roNumber}', '${item.role}')" style="background:none; border:none; color:${textColor}; text-decoration:underline; cursor:pointer; padding:0; font:inherit; font-weight:${fontWeight};">${item.tech_name}</button>`;
+                                html += `<button type="button" onclick="openAssignmentModal(event, '${roNumber}', '${item.role}', ${item.tech_name === 'unassigned'})" style="background:none; border:none; color:${textColor}; text-decoration:underline; cursor:pointer; padding:0; font:inherit; font-weight:${fontWeight};">${item.tech_name}</button>`;
                                 html += `</td>`;
                                 html += `<td style="padding:8px 12px; color:#333; text-transform:capitalize;">${item.type_label}</td>`;
                                 html += `<td style="padding:8px 12px; text-align:right; color:#333; font-weight:bold;">${item.hours}</td>`;
@@ -788,7 +788,8 @@ def get_dashboard_screen_html():
                 ro: '',
                 role: '',
                 lines: [],
-                assignment: null
+                assignment: null,
+                showOmittedOnly: false
             };
 
             function closeAssignmentModal() {
@@ -796,7 +797,7 @@ def get_dashboard_screen_html():
                 if (modal) modal.style.display = 'none';
             }
 
-            function openAssignmentModal(event, roNumber, role) {
+            function openAssignmentModal(event, roNumber, role, showOmittedOnly) {
                 if (event) event.stopPropagation();
                 const modal = document.getElementById('assignmentModal');
                 const title = document.getElementById('assignmentModalTitle');
@@ -825,7 +826,8 @@ def get_dashboard_screen_html():
                             ro: roNumber,
                             role: role,
                             lines: Array.isArray(lines) ? lines : [],
-                            assignment: assignment
+                            assignment: assignment,
+                            showOmittedOnly: !!showOmittedOnly
                         };
 
                         populateAssignmentTechSelect(techs, assignment);
@@ -860,14 +862,19 @@ def get_dashboard_screen_html():
                 if (!body) return;
 
                 const excluded = Array.isArray(assignment?.excluded_lines) ? assignment.excluded_lines.map(String) : [];
+                const visibleLines = currentAssignmentModal.showOmittedOnly
+                    ? (lines || []).filter((item, index) => excluded.includes(String(normalizeLineKey(item, index))))
+                    : (lines || []);
 
-                if (!lines || lines.length === 0) {
-                    body.innerHTML = '<div style="color:#777;">No repair lines found.</div>';
+                if (!visibleLines || visibleLines.length === 0) {
+                    body.innerHTML = currentAssignmentModal.showOmittedOnly
+                        ? '<div style="color:#777;">No omitted lines.</div>'
+                        : '<div style="color:#777;">No repair lines found.</div>';
                     updateAssignmentModalTotal();
                     return;
                 }
 
-                const rows = lines.map((item, index) => {
+                const rows = visibleLines.map((item, index) => {
                     const lineKey = normalizeLineKey(item, index);
                     const line = item.line || lineKey || '—';
                     const desc = item.description || '';
@@ -904,11 +911,18 @@ def get_dashboard_screen_html():
 
                 let total = 0.0;
                 body.querySelectorAll('input.assignment-omit').forEach(checkbox => {
-                    if (!checkbox.checked) {
-                        const hrs = parseFloat(checkbox.getAttribute('data-hrs'));
-                        if (Number.isFinite(hrs)) {
+                    const hrs = parseFloat(checkbox.getAttribute('data-hrs'));
+                    if (!Number.isFinite(hrs)) {
+                        return;
+                    }
+                    if (currentAssignmentModal.showOmittedOnly) {
+                        if (checkbox.checked) {
                             total += hrs;
                         }
+                        return;
+                    }
+                    if (!checkbox.checked) {
+                        total += hrs;
                     }
                 });
 
