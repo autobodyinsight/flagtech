@@ -628,119 +628,83 @@ def get_dashboard_screen_html():
             function loadTechAssignments(roNumber) {
                 const listEl = document.getElementById(`tech-assignment-list-${safeId(roNumber)}`);
                 if (!listEl) {
-                    console.error('Could not find tech assignment list element for RO:', roNumber, 'Safe ID:', safeId(roNumber));
+                    console.error('Could not find element:', `tech-assignment-list-${safeId(roNumber)}`);
                     return;
                 }
-                listEl.innerHTML = '<div style="color:#777;">Loading...</div>';
 
-                Promise.all([
-                    fetch(`/api/ro-tech-assignments?ro=${encodeURIComponent(roNumber)}`, { credentials: 'include' }).then(r => r.json()),
-                    fetch(`/api/ro-repairs?ro=${encodeURIComponent(roNumber)}`, { credentials: 'include' }).then(r => r.json())
-                ])
-                    .then(([assignRes, repairsRes]) => {
-                        let html = '';
-                        let displayList = [];
+                // Fetch repair data with assignments
+                fetch(`/api/ro-repairs?ro=${encodeURIComponent(roNumber)}`, { credentials: 'include' })
+                    .then(r => r.json())
+                    .then(data => {
+                        console.log('Loaded repair data:', data);
                         
-                        // Organize assignments by tech for easy lookup
-                        if (assignRes.assignments && assignRes.assignments.length > 0) {
-                            assignRes.assignments.forEach(assignment => {
-                                const totalHrs = assignment.total_hours ? parseFloat(assignment.total_hours).toFixed(1) : '0.0';
-                                displayList.push({
-                                    type: 'tech',
-                                    tech_id: assignment.tech_id,
-                                    tech_name: assignment.tech_name || 'Unknown',
-                                    role: assignment.role || 'labor',
-                                    hours: totalHrs
-                                });
+                        const labor = data.labor || [];
+                        const paint = data.paint || [];
+                        const assignments = data.assignments || {};
+                        
+                        // Calculate labor total
+                        let laborTotal = 0;
+                        labor.forEach(line => {
+                            const hrs = parseFloat(line.hours) || parseFloat(line.value) || 0;
+                            laborTotal += hrs;
+                        });
+                        
+                        // Calculate paint total
+                        let paintTotal = 0;
+                        paint.forEach(line => {
+                            const hrs = parseFloat(line.hours) || parseFloat(line.value) || 0;
+                            paintTotal += hrs;
+                        });
+                        
+                        // Build display list
+                        const displayList = [];
+                        
+                        if (laborTotal > 0) {
+                            displayList.push({
+                                type: 'labor',
+                                tech_name: assignments.labor?.tech_name || 'UNASSIGNED',
+                                category: 'BODY',
+                                hours: laborTotal.toFixed(1),
+                                is_assigned: !!assignments.labor?.tech_name,
+                                tech_id: assignments.labor?.tech_id
                             });
                         }
                         
-                        // Calculate unassigned hours for labor
-                        let unassignedLaborHrs = 0;
-                        if (repairsRes.labor && repairsRes.labor.length > 0) {
-                            repairsRes.labor.forEach(line => {
-                                const hrs = line.hours ? parseFloat(line.hours) : 0;
-                                unassignedLaborHrs += hrs;
+                        if (paintTotal > 0) {
+                            displayList.push({
+                                type: 'paint',
+                                tech_name: assignments.paint?.tech_name || 'UNASSIGNED',
+                                category: 'PAINT',
+                                hours: paintTotal.toFixed(1),
+                                is_assigned: !!assignments.paint?.tech_name,
+                                tech_id: assignments.paint?.tech_id
                             });
-                            
-                            // Subtract assigned labor hours
-                            if (assignRes.assignments) {
-                                assignRes.assignments.forEach(assignment => {
-                                    if (assignment.role === 'labor') {
-                                        const assignedHrs = assignment.total_hours ? parseFloat(assignment.total_hours) : 0;
-                                        unassignedLaborHrs -= assignedHrs;
-                                    }
-                                });
-                            }
-                            
-                            if (unassignedLaborHrs > 0.05) {
-                                displayList.push({
-                                    type: 'unassigned',
-                                    role: 'labor',
-                                    tech_name: 'UNASSIGNED',
-                                    hours: unassignedLaborHrs.toFixed(1)
-                                });
-                            }
                         }
                         
-                        // Calculate unassigned hours for paint
-                        let unassignedPaintHrs = 0;
-                        if (repairsRes.paint && repairsRes.paint.length > 0) {
-                            repairsRes.paint.forEach(line => {
-                                const hrs = line.hours ? parseFloat(line.hours) : 0;
-                                unassignedPaintHrs += hrs;
-                            });
-                            
-                            // Subtract assigned paint hours
-                            if (assignRes.assignments) {
-                                assignRes.assignments.forEach(assignment => {
-                                    if (assignment.role === 'paint') {
-                                        const assignedHrs = assignment.total_hours ? parseFloat(assignment.total_hours) : 0;
-                                        unassignedPaintHrs -= assignedHrs;
-                                    }
-                                });
-                            }
-                            
-                            if (unassignedPaintHrs > 0.05) {
-                                displayList.push({
-                                    type: 'unassigned',
-                                    role: 'paint',
-                                    tech_name: 'UNASSIGNED',
-                                    hours: unassignedPaintHrs.toFixed(1)
-                                });
-                            }
-                        }
+                        console.log('Display list:', displayList);
                         
                         // Render table
+                        let html = '';
+                        
                         if (displayList.length === 0) {
-                            html = '<div style="color:#999; padding:12px;">No assignments yet.</div>';
+                            html = '<div style="color:#999; padding:12px;">No repair data found.</div>';
                         } else {
-                            html = '<table style="width:100%; border-collapse:collapse; margin:0;">';
-                            html += '<thead><tr style="background:#e8e8e8; border-bottom:2px solid #999;">';
-                            html += '<th style="padding:10px 12px; text-align:left; font-weight:bold; color:#333; width:35%;">TECH</th>';
-                            html += '<th style="padding:10px 12px; text-align:left; font-weight:bold; color:#333; width:35%;">ROLE</th>';
-                            html += '<th style="padding:10px 12px; text-align:right; font-weight:bold; color:#333; width:30%;">TOTAL</th>';
+                            html = '<table style="width:100%; border-collapse:collapse; margin-top:8px;">';
+                            html += '<thead><tr style="background:#d9d9d9; border-bottom:2px solid #999;">';
+                            html += '<th style="padding:8px 12px; text-align:left; font-weight:bold; color:#333;">TECH</th>';
+                            html += '<th style="padding:8px 12px; text-align:left; font-weight:bold; color:#333;">LABOR</th>';
+                            html += '<th style="padding:8px 12px; text-align:right; font-weight:bold; color:#333;">HRS</th>';
                             html += '</tr></thead><tbody>';
                             
-                            displayList.forEach((item, idx) => {
-                                const techName = item.tech_name;
-                                const role = (item.role || 'labor').toUpperCase();
-                                const hours = item.hours || '0.0';
-                                const isUnassigned = item.type === 'unassigned';
-                                const bgColor = '#fff';
-                                const textColor = isUnassigned ? '#d32f2f' : '#333';
-                                const fontWeight = isUnassigned ? 'bold' : 'normal';
-                                const cursor = isUnassigned ? 'default' : 'pointer';
-                                const hoverBg = isUnassigned ? '#fff' : '#f5f5f5';
-                                const clickHandler = isUnassigned ? '' : `onclick="openTechDetailModal('${roNumber}', ${item.tech_id}, '${item.tech_name}', '${item.role}')" onmouseover="this.style.backgroundColor='${hoverBg}'" onmouseout="this.style.backgroundColor='${bgColor}'"`;
+                            displayList.forEach((item) => {
+                                const textColor = item.is_assigned ? '#333' : '#d32f2f';
+                                const fontWeight = item.is_assigned ? 'normal' : 'bold';
                                 
-                                html += `
-                                    <tr style="background:${bgColor}; border-bottom:1px solid #ddd; cursor:${cursor};" ${clickHandler}>
-                                        <td style="padding:10px 12px; color:${textColor}; font-weight:${fontWeight};">${techName}</td>
-                                        <td style="padding:10px 12px; color:${textColor}; font-weight:${fontWeight};">${role}</td>
-                                        <td style="padding:10px 12px; text-align:right; color:${textColor}; font-weight:bold;">${hours}</td>
-                                    </tr>
-                                `;
+                                html += `<tr style="background:#fff; border-bottom:1px solid #ddd;">`;
+                                html += `<td style="padding:8px 12px; color:${textColor}; font-weight:${fontWeight};">${item.tech_name}</td>`;
+                                html += `<td style="padding:8px 12px; color:#333;">${item.category}</td>`;
+                                html += `<td style="padding:8px 12px; text-align:right; color:#333; font-weight:bold;">${item.hours}</td>`;
+                                html += '</tr>';
                             });
                             
                             html += '</tbody></table>';
@@ -749,8 +713,8 @@ def get_dashboard_screen_html():
                         listEl.innerHTML = html;
                     })
                     .catch(err => {
-                        console.error('Error loading tech assignments for RO:', roNumber, err);
-                        listEl.innerHTML = '<div style="color:red; padding:12px;">Error loading assignments.</div>';
+                        console.error('Error loading repair data:', err);
+                        listEl.innerHTML = '<div style="color:red; padding:12px;">Error loading data. Check console.</div>';
                     });
             }
 
