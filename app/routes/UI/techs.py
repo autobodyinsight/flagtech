@@ -246,11 +246,12 @@ def get_techs_screen_html():
             const isVisible = container.style.display === 'block';
             container.style.display = isVisible ? 'none' : 'block';
             if (!isVisible) {
-                loadTechAssignments(techId, techName, container);
+                loadTechAssignmentsForTech(techId, techName, container);
             }
         }
 
-        function loadTechAssignments(techId, techName, container) {
+        function loadTechAssignmentsForTech(techId, techName, container) {
+            if (!container) return;
             container.innerHTML = '<div style="color:#777;">Loading assignments...</div>';
 
             fetch(`/api/tech-assignments?tech_id=${encodeURIComponent(techId)}`, { credentials: 'include' })
