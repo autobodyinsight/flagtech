@@ -281,6 +281,10 @@ async def parse_paint(file: UploadFile = File(...)):
 @router.post("/techs/add")
 async def add_tech(request: Request):
     """Add a new technician."""
+    domain = get_user_domain(request)
+    if not domain:
+        return JSONResponse(status_code=401, content={"error": "Not authenticated"})
+    
     data = await request.json()
     conn = get_conn()
     cur = conn.cursor()
@@ -288,13 +292,14 @@ async def add_tech(request: Request):
     try:
         _ensure_techs_table(cur)
         cur.execute("""
-            INSERT INTO techs (first_name, last_name, pay_rate)
-            VALUES (%s, %s, %s)
+            INSERT INTO techs (first_name, last_name, pay_rate, domain)
+            VALUES (%s, %s, %s, %s)
             RETURNING id, first_name, last_name, pay_rate, active
         """, (
             data["first_name"],
             data["last_name"],
-            data["pay_rate"]
+            data["pay_rate"],
+            domain
         ))
 
         row = cur.fetchone()
@@ -316,6 +321,10 @@ async def add_tech(request: Request):
 @router.get("/techs/list")
 async def list_techs(request: Request):
     """Get list of all active technicians."""
+    domain = get_user_domain(request)
+    if not domain:
+        return JSONResponse(status_code=401, content={"error": "Not authenticated", "techs": []})
+    
     conn = get_conn()
     cur = conn.cursor()
     
@@ -324,9 +333,9 @@ async def list_techs(request: Request):
         cur.execute("""
             SELECT id, first_name, last_name, pay_rate, active
             FROM techs
-            WHERE active = true
+            WHERE active = true AND domain = %s
             ORDER BY first_name, last_name
-        """)
+        """, (domain,))
         
         rows = cur.fetchall()
         
@@ -348,6 +357,10 @@ async def list_techs(request: Request):
 @router.post("/techs/delete")
 async def delete_tech(request: Request):
     """Soft delete a technician (set active=false)."""
+    domain = get_user_domain(request)
+    if not domain:
+        return JSONResponse(status_code=401, content={"error": "Not authenticated"})
+    
     data = await request.json()
     tech_id = data.get("id")
 
@@ -363,10 +376,10 @@ async def delete_tech(request: Request):
             """
             UPDATE techs
             SET active = false
-            WHERE id = %s
+            WHERE id = %s AND domain = %s
             RETURNING id
             """,
-            (tech_id,),
+            (tech_id, domain),
         )
         row = cur.fetchone()
         conn.commit()
@@ -565,6 +578,7 @@ async def get_dashboard_data(request: Request):
         ro_list = []
         labor_hours_by_tech = {}
         ros_by_tech = {}
+        processed_ro_by_tech = {}  # Track which ROs we've counted for each tech
 
         for row in rows:
             ro = row.get("ro")
@@ -632,13 +646,36 @@ async def get_dashboard_data(request: Request):
                 }
             )
 
+            # Calculate assigned labor hours
             assigned_labor_hours = labor_assignment.get("assigned_hours")
             if assigned_labor_hours is None:
                 assigned_labor_hours = _sum_assigned_hours(labor_repairs, labor_assignment.get("excluded_lines"))
             # Ensure it's a float to avoid mixing Decimal and float
             assigned_labor_hours = _parse_float_value(assigned_labor_hours)
             labor_hours_by_tech[labor_tech] = labor_hours_by_tech.get(labor_tech, 0.0) + assigned_labor_hours
-            ros_by_tech[labor_tech] = ros_by_tech.get(labor_tech, 0) + 1
+            
+            # Also include assigned paint hours in total hours per tech
+            assigned_paint_hours = paint_assignment.get("assigned_hours")
+            if assigned_paint_hours is None:
+                assigned_paint_hours = _sum_assigned_hours(paint_repairs, paint_assignment.get("excluded_lines"))
+            assigned_paint_hours = _parse_float_value(assigned_paint_hours)
+            if assigned_paint_hours > 0 and paint_tech != "Unassigned":
+                labor_hours_by_tech[paint_tech] = labor_hours_by_tech.get(paint_tech, 0.0) + assigned_paint_hours
+            
+            # Count each tech for this RO only once
+            if labor_tech != "Unassigned":
+                if labor_tech not in processed_ro_by_tech:
+                    processed_ro_by_tech[labor_tech] = set()
+                if ro not in processed_ro_by_tech[labor_tech]:
+                    processed_ro_by_tech[labor_tech].add(ro)
+                    ros_by_tech[labor_tech] = ros_by_tech.get(labor_tech, 0) + 1
+            
+            if paint_tech != "Unassigned" and paint_tech != labor_tech:
+                if paint_tech not in processed_ro_by_tech:
+                    processed_ro_by_tech[paint_tech] = set()
+                if ro not in processed_ro_by_tech[paint_tech]:
+                    processed_ro_by_tech[paint_tech].add(ro)
+                    ros_by_tech[paint_tech] = ros_by_tech.get(paint_tech, 0) + 1
 
         ro_count = len(rows)
         average_hours = total_hours / ro_count if ro_count else 0.0

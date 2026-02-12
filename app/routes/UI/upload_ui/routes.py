@@ -19,15 +19,41 @@ def _ensure_saved_estimates_table(cur) -> None:
             year VARCHAR(10),
             make VARCHAR(50),
             model VARCHAR(50),
-            labor_repairs JSONB,
-            paint_repairs JSONB,
-            estimate_totals JSONB,
+            owner_info TEXT,
+            insurance_company TEXT,
+            claim_number VARCHAR(64),
             phone_original TEXT,
             phone_override TEXT,
+            vin VARCHAR(32),
+            labor_repairs JSONB,
+            paint_repairs JSONB,
+            parts_repairs JSONB,
+            estimate_totals JSONB,
+            parts_total NUMERIC,
+            grand_total NUMERIC,
+            deductible NUMERIC,
+            customer_pay NUMERIC,
+            insurance_pay NUMERIC,
+            domain VARCHAR(255),
             saved_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
         """
     )
+    cur.execute("ALTER TABLE saved_estimates ADD COLUMN IF NOT EXISTS parts_repairs JSONB")
+    cur.execute("ALTER TABLE saved_estimates ADD COLUMN IF NOT EXISTS estimate_totals JSONB")
+    cur.execute("ALTER TABLE saved_estimates ADD COLUMN IF NOT EXISTS parts_total NUMERIC")
+    cur.execute("ALTER TABLE saved_estimates ADD COLUMN IF NOT EXISTS grand_total NUMERIC")
+    cur.execute("ALTER TABLE saved_estimates ADD COLUMN IF NOT EXISTS deductible NUMERIC")
+    cur.execute("ALTER TABLE saved_estimates ADD COLUMN IF NOT EXISTS customer_pay NUMERIC")
+    cur.execute("ALTER TABLE saved_estimates ADD COLUMN IF NOT EXISTS insurance_pay NUMERIC")
+    cur.execute("ALTER TABLE saved_estimates ADD COLUMN IF NOT EXISTS owner_info TEXT")
+    cur.execute("ALTER TABLE saved_estimates ADD COLUMN IF NOT EXISTS insurance_company TEXT")
+    cur.execute("ALTER TABLE saved_estimates ADD COLUMN IF NOT EXISTS claim_number VARCHAR(64)")
+    cur.execute("ALTER TABLE saved_estimates ADD COLUMN IF NOT EXISTS phone_original TEXT")
+    cur.execute("ALTER TABLE saved_estimates ADD COLUMN IF NOT EXISTS phone_override TEXT")
+    cur.execute("ALTER TABLE saved_estimates ADD COLUMN IF NOT EXISTS vin VARCHAR(32)")
+    cur.execute("ALTER TABLE saved_estimates ADD COLUMN IF NOT EXISTS domain VARCHAR(255)")
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_saved_estimates_ro_domain ON saved_estimates(ro, domain)")
 
 # ============================================================
 # UPLOAD + PARSE UI

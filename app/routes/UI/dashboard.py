@@ -3,7 +3,7 @@
 
 def get_dashboard_screen_html():
     """Return the HTML content for the Dashboard screen."""
-    return """
+    return r"""
         <div id="dashboard" class="screen active" style="padding:20px;">
             <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:30px; gap:20px;">
                 <h1 style="text-align:center; margin:0; flex:1;">DASHBOARD</h1>
