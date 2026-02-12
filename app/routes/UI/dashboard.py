@@ -589,7 +589,7 @@ def get_dashboard_screen_html():
                 const isHidden = assignmentRow.style.display === 'none' || assignmentRow.style.display === '';
                 assignmentRow.style.display = isHidden ? 'table-row' : 'none';
                 if (isHidden) {
-                    loadTechAssignments(roNumber);
+                    loadRoAssignmentsSummary(roNumber);
                 }
             }
 
@@ -612,7 +612,7 @@ def get_dashboard_screen_html():
                 return total;
             }
 
-            function loadTechAssignments(roNumber) {
+            function loadRoAssignmentsSummary(roNumber) {
                 const listEl = document.getElementById(`tech-assignment-list-${safeId(roNumber)}`);
                 if (!listEl) {
                     console.error('Could not find element:', `tech-assignment-list-${safeId(roNumber)}`);
@@ -821,7 +821,7 @@ def get_dashboard_screen_html():
                         if (res.error) {
                             throw new Error(res.error);
                         }
-                        loadTechAssignments(roNumber);
+                        loadRoAssignmentsSummary(roNumber);
                         loadDashboardData();
                     })
                     .catch(err => {
