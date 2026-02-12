@@ -210,6 +210,7 @@ def _ensure_ro_line_assignments_table(cur) -> None:
             hours NUMERIC,
             tech_id INTEGER,
             tech_name VARCHAR(255),
+            source_repair_type VARCHAR(20),
             is_pending BOOLEAN DEFAULT FALSE,
             domain VARCHAR(255) NOT NULL,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -217,10 +218,24 @@ def _ensure_ro_line_assignments_table(cur) -> None:
         """
     )
     cur.execute("ALTER TABLE ro_line_assignments ADD COLUMN IF NOT EXISTS is_pending BOOLEAN DEFAULT FALSE")
+    cur.execute("ALTER TABLE ro_line_assignments ADD COLUMN IF NOT EXISTS source_repair_type VARCHAR(20)")
+    cur.execute(
+        """
+        UPDATE ro_line_assignments
+        SET source_repair_type = repair_type
+        WHERE source_repair_type IS NULL OR source_repair_type = ''
+        """
+    )
     cur.execute(
         """
         CREATE UNIQUE INDEX IF NOT EXISTS idx_ro_line_assignments_unique
         ON ro_line_assignments(ro, repair_type, line_key, domain)
+        """
+    )
+    cur.execute(
+        """
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_ro_line_assignments_source_unique
+        ON ro_line_assignments(ro, source_repair_type, line_key, domain)
         """
     )
     cur.execute(
@@ -350,6 +365,7 @@ def _upsert_ro_lines(cur, domain: str, ro_value: str, repair_type: str, lines: l
             INSERT INTO ro_line_assignments (
                 ro,
                 repair_type,
+                source_repair_type,
                 line_key,
                 line_number,
                 description,
@@ -359,15 +375,15 @@ def _upsert_ro_lines(cur, domain: str, ro_value: str, repair_type: str, lines: l
                 is_pending,
                 domain
             )
-            VALUES (%s, %s, %s, %s, %s, %s, NULL, NULL, FALSE, %s)
-            ON CONFLICT (ro, repair_type, line_key, domain)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, NULL, NULL, FALSE, %s)
+            ON CONFLICT (ro, source_repair_type, line_key, domain)
             DO UPDATE SET
                 line_number = EXCLUDED.line_number,
                 description = EXCLUDED.description,
                 hours = EXCLUDED.hours,
                 updated_at = CURRENT_TIMESTAMP
             """,
-            (ro_value, normalized_type, line_key, line_number, description, hours, domain),
+            (ro_value, normalized_type, normalized_type, line_key, line_number, description, hours, domain),
         )
 
 
