@@ -93,13 +93,15 @@ def get_dashboard_screen_html():
                                 <th style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold; color:#555;">Phone</th>
                                 <th style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold; color:#555;">Insurance</th>
                                 <th style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold; color:#555;">Claim #</th>
+                                <th style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold; color:#555;">In</th>
+                                <th style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold; color:#555;">ECD</th>
                                 <th style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold; color:#555; text-align:right;">HRS</th>
                                 <th style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold; color:#555; text-align:right;">Total</th>
                             </tr>
                         </thead>
                         <tbody id="roListBody">
                             <tr>
-                                <td colspan="8" style="padding:20px; text-align:center; color:#999;">Loading...</td>
+                                <td colspan="10" style="padding:20px; text-align:center; color:#999;">Loading...</td>
                             </tr>
                         </tbody>
                     </table>
@@ -141,6 +143,10 @@ def get_dashboard_screen_html():
                     </div>
                 </div>
             </div>
+        </div>
+
+        <div id="roDatePickerPopup" style="display:none; position:fixed; z-index:2001; background:#fff; border:1px solid #ccc; border-radius:6px; padding:8px; box-shadow:0 3px 8px rgba(0,0,0,0.18);">
+            <input id="roDatePickerInput" type="date" style="padding:4px 6px;" />
         </div>
 
         <style>
@@ -507,12 +513,149 @@ def get_dashboard_screen_html():
                 return digits;
             }
 
+            function formatShortDate(value) {
+                if (!value) return '-';
+                const source = String(value).trim();
+                if (!source) return '-';
+                const datePart = source.includes('T') ? source.split('T')[0] : source;
+                const parts = datePart.split('-');
+                if (parts.length !== 3) return '-';
+                const [year, month, day] = parts;
+                if (!year || !month || !day) return '-';
+                return `${month.padStart(2, '0')}/${day.padStart(2, '0')}/${year.slice(-2)}`;
+            }
+
+            function addWeekdaysIso(startIso, weekdayDays) {
+                if (!startIso) return '';
+                const [yearStr, monthStr, dayStr] = startIso.split('-');
+                let current = new Date(Number(yearStr), Number(monthStr) - 1, Number(dayStr));
+                if (Number.isNaN(current.getTime())) return '';
+                let added = 0;
+                while (added < weekdayDays) {
+                    current.setDate(current.getDate() + 1);
+                    const day = current.getDay();
+                    if (day !== 0 && day !== 6) added += 1;
+                }
+                const y = current.getFullYear();
+                const m = String(current.getMonth() + 1).padStart(2, '0');
+                const d = String(current.getDate()).padStart(2, '0');
+                return `${y}-${m}-${d}`;
+            }
+
+            function computeEcdIso(inIso, hours) {
+                if (!inIso) return '';
+                const weekdayDays = Math.max(0, Math.ceil((Number(hours || 0) / 4) + 3));
+                return addWeekdaysIso(inIso, weekdayDays);
+            }
+
+            function closeRoDatePicker() {
+                const popup = document.getElementById('roDatePickerPopup');
+                const input = document.getElementById('roDatePickerInput');
+                if (!popup || !input) return;
+                popup.style.display = 'none';
+                input.onchange = null;
+                delete popup.dataset.rowId;
+                delete popup.dataset.ro;
+                delete popup.dataset.field;
+                delete popup.dataset.hours;
+            }
+
+            function updateRoDateCell(rowId, field, isoValue) {
+                const btn = document.getElementById(`ro-date-${field}-${rowId}`);
+                if (!btn) return;
+                btn.dataset.iso = isoValue || '';
+                btn.textContent = formatShortDate(isoValue);
+            }
+
+            async function patchRoDate(roNumber, field, isoValue) {
+                const response = await fetch('/api/ro-dates', {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'include',
+                    body: JSON.stringify({ ro: roNumber, field, value: isoValue })
+                });
+                const result = await response.json();
+                if (!response.ok || result.error) {
+                    throw new Error(result.error || 'Failed to update date');
+                }
+                return result;
+            }
+
+            async function openRoDatePicker(event, rowId, roNumber, field, hours) {
+                if (event) event.stopPropagation();
+                const btn = document.getElementById(`ro-date-${field}-${rowId}`);
+                const popup = document.getElementById('roDatePickerPopup');
+                const input = document.getElementById('roDatePickerInput');
+                if (!btn || !popup || !input) return;
+
+                popup.dataset.rowId = rowId;
+                popup.dataset.ro = roNumber;
+                popup.dataset.field = field;
+                popup.dataset.hours = String(hours || 0);
+
+                const currentIso = btn.dataset.iso || '';
+                input.value = currentIso;
+
+                const rect = btn.getBoundingClientRect();
+                const popupWidth = 210;
+                const left = Math.min(window.innerWidth - popupWidth - 8, Math.max(8, rect.right + 8));
+                const top = Math.min(window.innerHeight - 60, Math.max(8, rect.top));
+                popup.style.left = `${left}px`;
+                popup.style.top = `${top}px`;
+                popup.style.display = 'block';
+
+                input.onchange = async () => {
+                    const selectedIso = input.value;
+                    if (!selectedIso) {
+                        closeRoDatePicker();
+                        return;
+                    }
+
+                    const oldIso = btn.dataset.iso || '';
+                    if (oldIso === selectedIso) {
+                        closeRoDatePicker();
+                        return;
+                    }
+
+                    try {
+                        await patchRoDate(roNumber, field, selectedIso);
+                        updateRoDateCell(rowId, field, selectedIso);
+
+                        if (field === 'in_date') {
+                            const autoEcdIso = computeEcdIso(selectedIso, Number(hours || 0));
+                            if (autoEcdIso) {
+                                await patchRoDate(roNumber, 'ecd_date', autoEcdIso);
+                                updateRoDateCell(rowId, 'ecd_date', autoEcdIso);
+                            }
+                        }
+                    } catch (error) {
+                        console.error('Error updating RO date:', error);
+                        alert('Error updating date.');
+                    } finally {
+                        closeRoDatePicker();
+                    }
+                };
+
+                input.focus();
+                if (typeof input.showPicker === 'function') {
+                    input.showPicker();
+                }
+            }
+
+            document.addEventListener('click', function(event) {
+                const popup = document.getElementById('roDatePickerPopup');
+                if (!popup || popup.style.display === 'none') return;
+                if (popup.contains(event.target)) return;
+                if (event.target && event.target.closest && event.target.closest('.ro-date-btn')) return;
+                closeRoDatePicker();
+            });
+
             // Update RO list table
             function updateRoListTable(roList) {
                 const tbody = document.getElementById('roListBody');
                 
                 if (!roList || roList.length === 0) {
-                    tbody.innerHTML = '<tr><td colspan="8" style="padding:20px; text-align:center; color:#999;">No repair orders found</td></tr>';
+                    tbody.innerHTML = '<tr><td colspan="10" style="padding:20px; text-align:center; color:#999;">No repair orders found</td></tr>';
                     return;
                 }
                 
@@ -525,6 +668,10 @@ def get_dashboard_screen_html():
                     const insuranceDisplay = (ro.insurance || '-').split(/\s+/).slice(0, 2).join(' ');
                     const claimDisplay = ro.claim_number || '-';
                     const phoneOriginal = cleanPhoneNumber(ro.phone_original) || phoneDisplay || '-';
+                    const inIso = ro.in_date || '';
+                    const ecdIso = ro.ecd_date || computeEcdIso(inIso, Number(ro.hours || 0));
+                    const inDisplay = formatShortDate(inIso);
+                    const ecdDisplay = formatShortDate(ecdIso);
                     html += `
                         <tr style="background:${rowBg};">
                             <td style="padding:12px; border-bottom:1px solid #eee;">
@@ -550,6 +697,16 @@ def get_dashboard_screen_html():
                             </td>
                             <td style="padding:12px; border-bottom:1px solid #eee; color:#333;">${insuranceDisplay}</td>
                             <td style="padding:12px; border-bottom:1px solid #eee; color:#333;">${claimDisplay}</td>
+                            <td style="padding:12px; border-bottom:1px solid #eee; color:#333;">
+                                <button id="ro-date-in_date-${rowId}" class="ro-date-btn" data-iso="${inIso}" type="button" onclick="openRoDatePicker(event, '${rowId}', '${ro.ro}', 'in_date', ${Number(ro.hours || 0)})" style="background:none; border:none; color:#0066cc; text-decoration:underline; cursor:pointer; padding:0; font:inherit;">
+                                    ${inDisplay}
+                                </button>
+                            </td>
+                            <td style="padding:12px; border-bottom:1px solid #eee; color:#333;">
+                                <button id="ro-date-ecd_date-${rowId}" class="ro-date-btn" data-iso="${ecdIso}" type="button" onclick="openRoDatePicker(event, '${rowId}', '${ro.ro}', 'ecd_date', ${Number(ro.hours || 0)})" style="background:none; border:none; color:#0066cc; text-decoration:underline; cursor:pointer; padding:0; font:inherit;">
+                                    ${ecdDisplay}
+                                </button>
+                            </td>
                             <td style="padding:12px; border-bottom:1px solid #eee; text-align:right;">
                                 <button type="button" onclick="toggleTechAssignment(event, '${ro.ro}')" style="background:none; border:none; color:#0066cc; text-decoration:underline; cursor:pointer; padding:0; font:inherit; font-weight:bold;">
                                     ${ro.hours.toFixed(1)}
@@ -558,7 +715,7 @@ def get_dashboard_screen_html():
                             <td style="padding:12px; border-bottom:1px solid #eee; color:#333; text-align:right; font-weight:bold;">$${ro.total.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
                         </tr>
                         <tr id="tech-assignment-row-${rowId}" style="display:none; background:${rowBg};">
-                            <td colspan="8" style="padding:16px; border-bottom:1px solid #eee;">
+                            <td colspan="10" style="padding:16px; border-bottom:1px solid #eee;">
                                 <div style="background:#fafafa; border:1px solid #ddd; border-radius:6px; padding:16px;">
                                     <div style="font-weight:bold; color:#333; margin-bottom:10px;">Tech List</div>
                                     <div id="tech-assignment-list-${rowId}" style="margin-top:12px;">
@@ -568,7 +725,7 @@ def get_dashboard_screen_html():
                             </td>
                         </tr>
                         <tr id="notes-row-${rowId}" style="display:none; background:${rowBg};">
-                            <td colspan="8" style="padding:12px 16px; border-bottom:1px solid #eee;">
+                            <td colspan="10" style="padding:12px 16px; border-bottom:1px solid #eee;">
                                 <div style="background:#fafafa; border:1px solid #ddd; border-radius:6px; padding:12px;">
                                     <div style="font-weight:bold; margin-bottom:8px;">Notes</div>
                                     <div id="notes-list-${rowId}" style="max-height:180px; overflow-y:auto; margin-bottom:10px;"></div>

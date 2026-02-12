@@ -1,5 +1,7 @@
 from fastapi import APIRouter, UploadFile, File, Request
 import json
+import math
+from datetime import date, datetime, timedelta
 from app.services.extractor import load_pdf
 from app.services.parser import parse_estimate_pdf
 from app.models.estimate import EstimateResponse
@@ -57,6 +59,8 @@ def _ensure_saved_estimates_table(cur) -> None:
             deductible NUMERIC,
             customer_pay NUMERIC,
             insurance_pay NUMERIC,
+            in_date DATE DEFAULT CURRENT_DATE,
+            ecd_date DATE,
             domain VARCHAR(255),
             saved_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
@@ -75,6 +79,8 @@ def _ensure_saved_estimates_table(cur) -> None:
     cur.execute("ALTER TABLE saved_estimates ADD COLUMN IF NOT EXISTS phone_original TEXT")
     cur.execute("ALTER TABLE saved_estimates ADD COLUMN IF NOT EXISTS phone_override TEXT")
     cur.execute("ALTER TABLE saved_estimates ADD COLUMN IF NOT EXISTS vin VARCHAR(32)")
+    cur.execute("ALTER TABLE saved_estimates ADD COLUMN IF NOT EXISTS in_date DATE DEFAULT CURRENT_DATE")
+    cur.execute("ALTER TABLE saved_estimates ADD COLUMN IF NOT EXISTS ecd_date DATE")
     cur.execute("ALTER TABLE saved_estimates ADD COLUMN IF NOT EXISTS domain VARCHAR(255)")
     cur.execute("CREATE INDEX IF NOT EXISTS idx_saved_estimates_ro_domain ON saved_estimates(ro, domain)")
 
@@ -287,6 +293,47 @@ def _parse_float_value(value) -> float:
         return float(str(value).replace(",", ""))
     except Exception:
         return 0.0
+
+
+def _coerce_date(value) -> date | None:
+    if value is None:
+        return None
+    if isinstance(value, date) and not isinstance(value, datetime):
+        return value
+    if isinstance(value, datetime):
+        return value.date()
+    if isinstance(value, str):
+        cleaned = value.strip()
+        if not cleaned:
+            return None
+        try:
+            return datetime.fromisoformat(cleaned).date()
+        except Exception:
+            return None
+    return None
+
+
+def _weekday_days_from_hours(hours: float) -> int:
+    return max(0, math.ceil((hours / 4.0) + 3.0))
+
+
+def _add_weekdays(start_date: date, weekday_days: int) -> date:
+    if weekday_days <= 0:
+        return start_date
+
+    current = start_date
+    added = 0
+    while added < weekday_days:
+        current += timedelta(days=1)
+        if current.weekday() < 5:
+            added += 1
+    return current
+
+
+def _calculate_ecd_date(in_date: date | None, hours: float) -> date | None:
+    if in_date is None:
+        return None
+    return _add_weekdays(in_date, _weekday_days_from_hours(hours))
 
 
 def _parse_owner_info(owner_info: str) -> tuple[str, str]:
@@ -718,6 +765,7 @@ async def get_dashboard_data(request: Request):
         cur.execute(
             """
             SELECT DISTINCT ON (ro)
+                     id,
                    ro,
                      vehicle,
                      year,
@@ -732,7 +780,10 @@ async def get_dashboard_data(request: Request):
                    insurance_company,
                    claim_number,
                    phone_original,
-                   phone_override
+                                     phone_override,
+                                     in_date,
+                                     ecd_date,
+                                     saved_at
             FROM saved_estimates
             WHERE domain = %s
               AND ro IS NOT NULL
@@ -794,6 +845,8 @@ async def get_dashboard_data(request: Request):
             phone_override = (row.get("phone_override") or "").strip()
             phone_original = (row.get("phone_original") or customer_phone).strip()
             current_phone = phone_override or customer_phone
+            in_date_value = _coerce_date(row.get("in_date")) or _coerce_date(row.get("saved_at"))
+            ecd_date_value = _coerce_date(row.get("ecd_date")) or _calculate_ecd_date(in_date_value, ro_hours)
 
             _ensure_ro_line_assignments_for_ro(cur, domain, ro)
 
@@ -830,6 +883,8 @@ async def get_dashboard_data(request: Request):
                     "claim_number": row.get("claim_number") or "",
                     "tech": labor_tech,
                     "painter": paint_tech,
+                    "in_date": in_date_value.isoformat() if in_date_value else None,
+                    "ecd_date": ecd_date_value.isoformat() if ecd_date_value else None,
                     "hours": ro_hours,
                     "total": grand_total,
                 }
@@ -918,6 +973,68 @@ async def update_ro_phone(request: Request):
         )
         conn.commit()
         return {"status": "success", "phone": new_phone, "phone_original": phone_original}
+    finally:
+        cur.close()
+
+
+@router.patch("/ro-dates")
+async def update_ro_dates(request: Request):
+    domain = get_user_domain(request)
+    if not domain:
+        return JSONResponse(status_code=401, content={"error": "Not authenticated"})
+
+    data = await request.json()
+    ro_value = (data.get("ro") or "").strip()
+    field = (data.get("field") or "").strip().lower()
+    value = (data.get("value") or "").strip()
+
+    if not ro_value or field not in {"in_date", "ecd_date"} or not value:
+        return JSONResponse(status_code=400, content={"error": "ro, field, and value are required"})
+
+    try:
+        parsed_date = datetime.strptime(value, "%Y-%m-%d").date()
+    except ValueError:
+        return JSONResponse(status_code=400, content={"error": "value must be YYYY-MM-DD"})
+
+    conn = get_conn()
+    cur = conn.cursor()
+    try:
+        _ensure_saved_estimates_table(cur)
+        cur.execute(
+            """
+            SELECT id
+            FROM saved_estimates
+            WHERE domain = %s AND ro = %s
+            ORDER BY saved_at DESC, id DESC
+            LIMIT 1
+            """,
+            (domain, ro_value),
+        )
+        row = cur.fetchone()
+        if not row:
+            return JSONResponse(status_code=404, content={"error": "RO not found"})
+
+        if field == "in_date":
+            cur.execute(
+                """
+                UPDATE saved_estimates
+                SET in_date = %s
+                WHERE id = %s
+                """,
+                (parsed_date, row.get("id")),
+            )
+        else:
+            cur.execute(
+                """
+                UPDATE saved_estimates
+                SET ecd_date = %s
+                WHERE id = %s
+                """,
+                (parsed_date, row.get("id")),
+            )
+
+        conn.commit()
+        return {"status": "success", "field": field, "value": parsed_date.isoformat()}
     finally:
         cur.close()
 

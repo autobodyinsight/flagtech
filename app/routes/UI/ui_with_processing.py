@@ -32,6 +32,7 @@ import math
 import re
 import json
 import hashlib
+from datetime import date, timedelta
 
 router = APIRouter()
 
@@ -76,6 +77,8 @@ def _ensure_saved_estimates_table(cur) -> None:
             deductible NUMERIC,
             customer_pay NUMERIC,
             insurance_pay NUMERIC,
+            in_date DATE DEFAULT CURRENT_DATE,
+            ecd_date DATE,
             domain VARCHAR(255),
             saved_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
@@ -94,6 +97,8 @@ def _ensure_saved_estimates_table(cur) -> None:
     cur.execute("ALTER TABLE saved_estimates ADD COLUMN IF NOT EXISTS claim_number VARCHAR(64)")
     cur.execute("ALTER TABLE saved_estimates ADD COLUMN IF NOT EXISTS phone_original TEXT")
     cur.execute("ALTER TABLE saved_estimates ADD COLUMN IF NOT EXISTS phone_override TEXT")
+    cur.execute("ALTER TABLE saved_estimates ADD COLUMN IF NOT EXISTS in_date DATE DEFAULT CURRENT_DATE")
+    cur.execute("ALTER TABLE saved_estimates ADD COLUMN IF NOT EXISTS ecd_date DATE")
     cur.execute("ALTER TABLE saved_estimates ADD COLUMN IF NOT EXISTS domain VARCHAR(255)")
     cur.execute("CREATE INDEX IF NOT EXISTS idx_saved_estimates_ro_domain ON saved_estimates(ro, domain)")
 
@@ -121,6 +126,43 @@ def _estimate_hash(payload: dict) -> str:
 
 def _safe_json(payload) -> str:
     return json.dumps(payload).replace("<", "\\u003c")
+
+
+def _weekday_days_from_hours(hours: float) -> int:
+    return max(0, math.ceil((hours / 4.0) + 3.0))
+
+
+def _add_weekdays(start_date: date, weekday_days: int) -> date:
+    if weekday_days <= 0:
+        return start_date
+
+    current = start_date
+    added = 0
+    while added < weekday_days:
+        current += timedelta(days=1)
+        if current.weekday() < 5:
+            added += 1
+    return current
+
+
+def _estimate_hours_for_ecd(payload: dict) -> float:
+    labor_repairs = payload.get("labor_repairs") or []
+    paint_repairs = payload.get("paint_repairs") or []
+    total = 0.0
+
+    def _to_float(value) -> float:
+        try:
+            return float(str(value).replace(",", ""))
+        except Exception:
+            return 0.0
+
+    for item in labor_repairs:
+        if isinstance(item, dict):
+            total += _to_float(item.get("value") or 0)
+    for item in paint_repairs:
+        if isinstance(item, dict):
+            total += _to_float(item.get("value") or 0)
+    return total
 
 @router.get("/", response_class=HTMLResponse)
 async def home_screen():
@@ -512,6 +554,8 @@ async def save_estimate(request: Request):
 
     estimate_totals = data.get("estimate_totals") or {}
     domain = get_user_domain(request)
+    in_date_value = date.today()
+    ecd_date_value = _add_weekdays(in_date_value, _weekday_days_from_hours(_estimate_hours_for_ecd(data)))
 
     try:
         _ensure_saved_estimates_table(cur)
@@ -520,8 +564,8 @@ async def save_estimate(request: Request):
             INSERT INTO saved_estimates
             (ro, vehicle, year, make, model, owner_info, insurance_company, vin, claim_number,
              labor_repairs, paint_repairs, parts_repairs,
-             estimate_totals, parts_total, grand_total, deductible, customer_pay, insurance_pay, domain)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+             estimate_totals, parts_total, grand_total, deductible, customer_pay, insurance_pay, in_date, ecd_date, domain)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             """,
             (
                 ro_value,
@@ -542,6 +586,8 @@ async def save_estimate(request: Request):
                 _parse_money(estimate_totals.get("deductible")),
                 _parse_money(estimate_totals.get("customer_pay")),
                 _parse_money(estimate_totals.get("insurance_pay")),
+                in_date_value,
+                ecd_date_value,
                 domain,
             ),
         )

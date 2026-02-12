@@ -34,6 +34,8 @@ def _ensure_saved_estimates_table(cur) -> None:
             deductible NUMERIC,
             customer_pay NUMERIC,
             insurance_pay NUMERIC,
+            in_date DATE DEFAULT CURRENT_DATE,
+            ecd_date DATE,
             domain VARCHAR(255),
             saved_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
@@ -52,6 +54,8 @@ def _ensure_saved_estimates_table(cur) -> None:
     cur.execute("ALTER TABLE saved_estimates ADD COLUMN IF NOT EXISTS phone_original TEXT")
     cur.execute("ALTER TABLE saved_estimates ADD COLUMN IF NOT EXISTS phone_override TEXT")
     cur.execute("ALTER TABLE saved_estimates ADD COLUMN IF NOT EXISTS vin VARCHAR(32)")
+    cur.execute("ALTER TABLE saved_estimates ADD COLUMN IF NOT EXISTS in_date DATE DEFAULT CURRENT_DATE")
+    cur.execute("ALTER TABLE saved_estimates ADD COLUMN IF NOT EXISTS ecd_date DATE")
     cur.execute("ALTER TABLE saved_estimates ADD COLUMN IF NOT EXISTS domain VARCHAR(255)")
     cur.execute("CREATE INDEX IF NOT EXISTS idx_saved_estimates_ro_domain ON saved_estimates(ro, domain)")
 
