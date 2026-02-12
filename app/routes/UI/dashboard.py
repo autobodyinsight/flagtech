@@ -123,34 +123,36 @@ def get_dashboard_screen_html():
             </div>
         </div>
 
-        <div id="assignmentModal" class="modal" style="display:none;">
+        <div id="assignTechModal" class="modal" style="display:none;">
             <div class="modal-content" style="max-width:900px; max-height:85vh; overflow-y:auto;">
-                <span class="close" onclick="closeAssignmentModal()">&times;</span>
-                <h2 id="assignmentModalTitle" style="margin-bottom:16px;">Assign Tech</h2>
-                <div style="margin-bottom:12px;">
-                    <label for="assignmentTechSelect" style="font-weight:bold; font-size:12px; color:#666;">TECH</label>
-                    <select id="assignmentTechSelect" style="width:100%; padding:8px; margin-top:6px;"></select>
-                </div>
-                <div id="assignmentTypeWrap" style="margin-bottom:12px; display:none;">
-                    <label for="assignmentTypeSelect" style="font-weight:bold; font-size:12px; color:#666;">TYPE</label>
-                    <select id="assignmentTypeSelect" style="width:100%; padding:8px; margin-top:6px;">
-                        <option value="body">body</option>
-                        <option value="mech">mech</option>
-                        <option value="other">other</option>
-                        <option value="paint">paint</option>
-                    </select>
-                </div>
-                <div style="margin-bottom:12px; display:flex; align-items:center; gap:8px;">
-                    <input type="checkbox" id="assignmentSelectAll" onchange="toggleAssignmentSelectAll()" />
-                    <label for="assignmentSelectAll" style="font-weight:bold; font-size:12px;">Select all</label>
-                </div>
-                <div id="assignmentModalBody"></div>
-                <div style="display:flex; justify-content:space-between; align-items:center; margin-top:12px;">
-                    <div id="assignmentModalTotal" style="font-weight:bold;">Total: 0.0 hrs</div>
-                    <div style="display:flex; gap:8px;">
-                        <button type="button" onclick="printAssignmentModal()" style="padding:8px 16px; background:#9c27b0; color:#fff; border:none; border-radius:4px; cursor:pointer;">Print</button>
-                        <button id="assignmentModalSave" onclick="saveAssignmentModal()" style="padding:8px 16px; background:#505050; color:#fff; border:none; border-radius:4px; cursor:pointer;">Save</button>
+                <span class="close" onclick="closeAssignTechModal()">&times;</span>
+                <h2 id="assignTechTitle" style="margin-bottom:20px;">Assign Tech - Repair & Paint Lines</h2>
+                
+                <!-- LABOR SECTION -->
+                <div style="margin-bottom:24px; padding:16px; background:#fafafa; border-radius:6px; border-left:4px solid #4CAF50;">
+                    <h3 style="margin:0 0 12px 0; color:#333; font-size:16px;">LABOR</h3>
+                    <div style="margin-bottom:12px;">
+                        <label for="assignTechLaborSelect" style="font-weight:bold; font-size:12px; color:#666;">SELECT TECH</label>
+                        <select id="assignTechLaborSelect" style="width:100%; padding:8px; margin-top:6px;"></select>
                     </div>
+                    <div id="laborLinesContainer" style="margin-bottom:12px; border:1px solid #ddd; border-radius:4px; background:#fff; max-height:200px; overflow-y:auto;"></div>
+                    <div id="laborTotal" style="font-weight:bold; color:#333; text-align:right;">Total Labor: 0.0 hrs</div>
+                </div>
+                
+                <!-- PAINT SECTION -->
+                <div style="margin-bottom:24px; padding:16px; background:#fafafa; border-radius:6px; border-left:4px solid #FF9800;">
+                    <h3 style="margin:0 0 12px 0; color:#333; font-size:16px;">PAINT</h3>
+                    <div style="margin-bottom:12px;">
+                        <label for="assignTechPaintSelect" style="font-weight:bold; font-size:12px; color:#666;">SELECT TECH</label>
+                        <select id="assignTechPaintSelect" style="width:100%; padding:8px; margin-top:6px;"></select>
+                    </div>
+                    <div id="paintLinesContainer" style="margin-bottom:12px; border:1px solid #ddd; border-radius:4px; background:#fff; max-height:200px; overflow-y:auto;"></div>
+                    <div id="paintTotal" style="font-weight:bold; color:#333; text-align:right;">Total Paint: 0.0 hrs</div>
+                </div>
+                
+                <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:20px; padding-top:16px; border-top:2px solid #ddd;">
+                    <button onclick="closeAssignTechModal()" style="padding:10px 20px; background:#999; color:#fff; border:none; border-radius:4px; cursor:pointer;">Cancel</button>
+                    <button onclick="saveAssignTechWithLines()" style="padding:10px 20px; background:#d32f2f; color:#fff; border:none; border-radius:4px; cursor:pointer; font-weight:bold;">SAVE ASSIGNMENTS</button>
                 </div>
             </div>
         </div>
@@ -185,21 +187,6 @@ def get_dashboard_screen_html():
                 border: 1px solid #888;
                 width: 95%;
                 border-radius: 6px;
-                color: #000;
-            }
-            .modal-content * {
-                color: #000;
-            }
-            .modal-content button {
-                color: #fff !important;
-            }
-            .modal-content .close {
-                color: #000 !important;
-            }
-            button:not(.link-button) {
-                background: #b22222 !important;
-                color: #fff !important;
-                border: none !important;
             }
             .close {
                 color: #aaa;
@@ -546,8 +533,6 @@ def get_dashboard_screen_html():
                 return digits;
             }
 
-            let keepOpenRo = '';
-
             // Update RO list table
             function updateRoListTable(roList) {
                 const tbody = document.getElementById('roListBody');
@@ -569,7 +554,7 @@ def get_dashboard_screen_html():
                     html += `
                         <tr style="background:${rowBg};">
                             <td style="padding:12px; border-bottom:1px solid #eee;">
-                                <button type="button" class="link-button" onclick="toggleRoNotesFromLink(event, '${ro.ro}')" style="background:none; border:none; color:#0066cc; text-decoration:underline; cursor:pointer; padding:0; font:inherit;">
+                                <button type="button" onclick="toggleRoNotesFromLink(event, '${ro.ro}')" style="background:none; border:none; color:#0066cc; text-decoration:underline; cursor:pointer; padding:0; font:inherit;">
                                     ${ro.ro}
                                 </button>
                             </td>
@@ -577,7 +562,7 @@ def get_dashboard_screen_html():
                             <td style="padding:12px; border-bottom:1px solid #eee; color:#333;">${customerDisplay}</td>
                             <td style="padding:12px; border-bottom:1px solid #eee; color:#333;">
                                 <span id="phone-display-${rowId}" style="display:inline-flex; align-items:center; gap:6px;">
-                                    <button type="button" class="link-button" onclick="startPhoneEdit(event, '${rowId}')" style="background:none; border:none; color:#0066cc; text-decoration:underline; cursor:pointer; padding:0; font:inherit;">
+                                    <button type="button" onclick="startPhoneEdit(event, '${rowId}')" style="background:none; border:none; color:#0066cc; text-decoration:underline; cursor:pointer; padding:0; font:inherit;">
                                         <span id="phone-current-${rowId}">${phoneDisplay}</span>
                                     </button>
                                     <button type="button" onclick="toggleOldPhone(event, '${rowId}')" style="background:#eee; border:1px solid #ccc; border-radius:3px; padding:0 6px; font-size:12px; cursor:pointer;">+</button>
@@ -592,7 +577,7 @@ def get_dashboard_screen_html():
                             <td style="padding:12px; border-bottom:1px solid #eee; color:#333;">${insuranceDisplay}</td>
                             <td style="padding:12px; border-bottom:1px solid #eee; color:#333;">${claimDisplay}</td>
                             <td style="padding:12px; border-bottom:1px solid #eee; text-align:right;">
-                                <button type="button" class="link-button" onclick="toggleTechAssignment(event, '${ro.ro}')" style="background:none; border:none; color:#0066cc; text-decoration:underline; cursor:pointer; padding:0; font:inherit; font-weight:bold;">
+                                <button type="button" onclick="toggleTechAssignment(event, '${ro.ro}')" style="background:none; border:none; color:#0066cc; text-decoration:underline; cursor:pointer; padding:0; font:inherit; font-weight:bold;">
                                     ${ro.hours.toFixed(1)}
                                 </button>
                             </td>
@@ -601,6 +586,8 @@ def get_dashboard_screen_html():
                         <tr id="tech-assignment-row-${rowId}" style="display:none; background:${rowBg};">
                             <td colspan="8" style="padding:16px; border-bottom:1px solid #eee;">
                                 <div style="background:#fafafa; border:1px solid #ddd; border-radius:6px; padding:16px;">
+                                    <button onclick="openAssignTechModal('${ro.ro}')" style="padding:10px 20px; background:#d32f2f; color:#fff; border:none; border-radius:4px; cursor:pointer; font-weight:bold; margin-bottom:12px;">ASSIGN</button>
+                                    <hr style="border:none; border-top:1px solid #ccc; margin:12px 0;">
                                     <div id="tech-assignment-list-${rowId}" style="margin-top:12px;">
                                         <div style="color:#777;">Loading...</div>
                                     </div>
@@ -623,14 +610,6 @@ def get_dashboard_screen_html():
                 });
                 
                 tbody.innerHTML = html;
-
-                if (keepOpenRo) {
-                    const openRow = document.getElementById(`tech-assignment-row-${safeId(keepOpenRo)}`);
-                    if (openRow) {
-                        openRow.style.display = 'table-row';
-                        loadRoAssignmentsSummary(keepOpenRo);
-                    }
-                }
             }
 
             function closeRepairLinesModal() {
@@ -645,97 +624,11 @@ def get_dashboard_screen_html():
                 const isHidden = assignmentRow.style.display === 'none' || assignmentRow.style.display === '';
                 assignmentRow.style.display = isHidden ? 'table-row' : 'none';
                 if (isHidden) {
-                    keepOpenRo = roNumber;
-                    loadRoAssignmentsSummary(roNumber);
-                } else if (keepOpenRo === roNumber) {
-                    keepOpenRo = '';
+                    loadTechAssignments(roNumber);
                 }
             }
 
-            function getLineHours(line) {
-                const raw = line && (line.hours !== undefined ? line.hours : line.value);
-                const val = parseFloat(raw);
-                return Number.isFinite(val) ? val : 0;
-            }
-
-            function calculateTotalHours(lines) {
-                let total = 0.0;
-                (lines || []).forEach(line => {
-                    total += getLineHours(line);
-                });
-                return total;
-            }
-
-            function calculateAssignedHours(lines, excludedLines) {
-                const excluded = new Set((excludedLines || []).map(String));
-                let total = 0.0;
-                (lines || []).forEach((line, index) => {
-                    const key = normalizeLineKey(line, index);
-                    if (excluded.has(String(key))) {
-                        return;
-                    }
-                    total += getLineHours(line);
-                });
-                return total;
-            }
-
-            function sumPendingHours(pendingLines, labor, paint) {
-                const laborMap = {};
-                const paintMap = {};
-
-                (labor || []).forEach((item, index) => {
-                    laborMap[normalizeLineKey(item, index)] = item;
-                });
-                (paint || []).forEach((item, index) => {
-                    paintMap[normalizeLineKey(item, index)] = item;
-                });
-
-                let total = 0.0;
-                (pendingLines || []).forEach(entry => {
-                    if (!entry || typeof entry !== 'object') return;
-                    const role = String(entry.role || '').toLowerCase();
-                    const lineKey = String(entry.line || '');
-                    if (!lineKey) return;
-                    const source = role === 'paint' ? paintMap : laborMap;
-                    const item = source[lineKey];
-                    if (!item) return;
-                    total += getLineHours(item);
-                });
-                return total;
-            }
-
-            function buildPendingLines(pendingLines, labor, paint) {
-                const laborMap = {};
-                const paintMap = {};
-
-                (labor || []).forEach((item, index) => {
-                    laborMap[normalizeLineKey(item, index)] = item;
-                });
-                (paint || []).forEach((item, index) => {
-                    paintMap[normalizeLineKey(item, index)] = item;
-                });
-
-                const results = [];
-                (pendingLines || []).forEach(entry => {
-                    if (!entry || typeof entry !== 'object') return;
-                    const role = String(entry.role || '').toLowerCase();
-                    const lineKey = String(entry.line || '');
-                    if (!lineKey) return;
-                    const source = role === 'paint' ? paintMap : laborMap;
-                    const item = source[lineKey];
-                    if (!item) return;
-                    results.push({
-                        pending_role: role,
-                        pending_line_key: lineKey,
-                        line: item.line || lineKey,
-                        description: item.description || '',
-                        value: item.value || item.hours || 0
-                    });
-                });
-                return results;
-            }
-
-            function loadRoAssignmentsSummary(roNumber) {
+            function loadTechAssignments(roNumber) {
                 const listEl = document.getElementById(`tech-assignment-list-${safeId(roNumber)}`);
                 if (!listEl) {
                     console.error('Could not find element:', `tech-assignment-list-${safeId(roNumber)}`);
@@ -751,115 +644,72 @@ def get_dashboard_screen_html():
                         const labor = data.labor || [];
                         const paint = data.paint || [];
                         const assignments = data.assignments || {};
-                        const assignmentRows = data.assignment_rows || [];
-
-                        const laborExcluded = assignments.labor?.excluded_lines || [];
-                        const paintExcluded = assignments.paint?.excluded_lines || [];
-                        const pendingLines = assignments.pending?.excluded_lines || [];
-                        const pendingType = assignments.pending?.pending_type || 'body';
-
-                        const laborTotalAll = calculateTotalHours(labor);
-                        const paintTotalAll = calculateTotalHours(paint);
-                        const pendingLaborHours = sumPendingHours(
-                            (pendingLines || []).filter(entry => String(entry?.role || '').toLowerCase() === 'labor'),
-                            labor,
-                            []
-                        );
-                        const pendingPaintHours = sumPendingHours(
-                            (pendingLines || []).filter(entry => String(entry?.role || '').toLowerCase() === 'paint'),
-                            [],
-                            paint
-                        );
-                        const displayList = [];
-                        const assignedTotals = { labor: 0.0, paint: 0.0 };
-
-                        assignmentRows.forEach(row => {
-                            const role = String(row.role || '').toLowerCase();
-                            if (role !== 'labor' && role !== 'paint') return;
-                            if (!row.tech_name) return;
-                            const typeLabel = row.pending_type || (role === 'paint' ? 'paint' : 'body');
-                            const hours = Number.isFinite(parseFloat(row.assigned_hours))
-                                ? parseFloat(row.assigned_hours)
-                                : 0.0;
-                            assignedTotals[role] += hours;
-                            displayList.push({
-                                role: role,
-                                tech_name: row.tech_name,
-                                type_label: typeLabel,
-                                hours: hours.toFixed(1),
-                                is_assigned: true,
-                                tech_id: row.tech_id
-                            });
+                        
+                        // Calculate labor total
+                        let laborTotal = 0;
+                        labor.forEach(line => {
+                            const hrs = parseFloat(line.hours) || parseFloat(line.value) || 0;
+                            laborTotal += hrs;
                         });
-
-                        const laborUnassigned = Math.max(
-                            0,
-                            laborTotalAll - pendingLaborHours - assignedTotals.labor
-                        );
-                        const paintUnassigned = Math.max(
-                            0,
-                            paintTotalAll - pendingPaintHours - assignedTotals.paint
-                        );
-
-                        if (labor.length > 0 && laborUnassigned > 0) {
+                        
+                        // Calculate paint total
+                        let paintTotal = 0;
+                        paint.forEach(line => {
+                            const hrs = parseFloat(line.hours) || parseFloat(line.value) || 0;
+                            paintTotal += hrs;
+                        });
+                        
+                        // Build display list
+                        const displayList = [];
+                        
+                        if (laborTotal > 0) {
                             displayList.push({
-                                role: 'labor',
-                                tech_name: 'unassigned',
-                                type_label: 'body',
-                                hours: laborUnassigned.toFixed(1),
-                                is_assigned: false,
-                                tech_id: null
+                                type: 'labor',
+                                tech_name: assignments.labor?.tech_name || 'UNASSIGNED',
+                                category: 'BODY',
+                                hours: laborTotal.toFixed(1),
+                                is_assigned: !!assignments.labor?.tech_name,
+                                tech_id: assignments.labor?.tech_id
                             });
                         }
-
-                        if (paint.length > 0 && paintUnassigned > 0) {
+                        
+                        if (paintTotal > 0) {
                             displayList.push({
-                                role: 'paint',
-                                tech_name: 'unassigned',
-                                type_label: 'paint',
-                                hours: paintUnassigned.toFixed(1),
-                                is_assigned: false,
-                                tech_id: null
+                                type: 'paint',
+                                tech_name: assignments.paint?.tech_name || 'UNASSIGNED',
+                                category: 'PAINT',
+                                hours: paintTotal.toFixed(1),
+                                is_assigned: !!assignments.paint?.tech_name,
+                                tech_id: assignments.paint?.tech_id
                             });
                         }
-
-                        const pendingTotal = sumPendingHours(pendingLines, labor, paint);
-                        if (pendingTotal > 0) {
-                            displayList.push({
-                                role: 'pending',
-                                tech_name: 'Pending',
-                                type_label: pendingType,
-                                hours: pendingTotal.toFixed(1),
-                                is_assigned: false,
-                                tech_id: null
-                            });
-                        }
-
+                        
+                        console.log('Display list:', displayList);
+                        
+                        // Render table
                         let html = '';
-
+                        
                         if (displayList.length === 0) {
                             html = '<div style="color:#999; padding:12px;">No repair data found.</div>';
                         } else {
                             html = '<table style="width:100%; border-collapse:collapse; margin-top:8px;">';
                             html += '<thead><tr style="background:#d9d9d9; border-bottom:2px solid #999;">';
                             html += '<th style="padding:8px 12px; text-align:left; font-weight:bold; color:#333;">TECH</th>';
-                            html += '<th style="padding:8px 12px; text-align:left; font-weight:bold; color:#333;">TYPE</th>';
-                            html += '<th style="padding:8px 12px; text-align:right; font-weight:bold; color:#333;">TOTAL</th>';
+                            html += '<th style="padding:8px 12px; text-align:left; font-weight:bold; color:#333;">LABOR</th>';
+                            html += '<th style="padding:8px 12px; text-align:right; font-weight:bold; color:#333;">HRS</th>';
                             html += '</tr></thead><tbody>';
-
+                            
                             displayList.forEach((item) => {
                                 const textColor = item.is_assigned ? '#333' : '#d32f2f';
                                 const fontWeight = item.is_assigned ? 'normal' : 'bold';
-
+                                
                                 html += `<tr style="background:#fff; border-bottom:1px solid #ddd;">`;
-                                html += `<td style="padding:8px 12px; color:${textColor}; font-weight:${fontWeight};">`;
-                                html += `<button type="button" class="link-button" onclick="openAssignmentModal(event, '${roNumber}', '${item.role}')" style="background:none; border:none; color:${textColor}; text-decoration:underline; cursor:pointer; padding:0; font:inherit; font-weight:${fontWeight};">${item.tech_name}</button>`;
-                                html += `</td>`;
-                                html += `<td style="padding:8px 12px; color:#333; text-transform:capitalize;">${item.type_label}</td>`;
+                                html += `<td style="padding:8px 12px; color:${textColor}; font-weight:${fontWeight};">${item.tech_name}</td>`;
+                                html += `<td style="padding:8px 12px; color:#333;">${item.category}</td>`;
                                 html += `<td style="padding:8px 12px; text-align:right; color:#333; font-weight:bold;">${item.hours}</td>`;
                                 html += '</tr>';
                             });
-
+                            
                             html += '</tbody></table>';
                         }
                         
@@ -875,555 +725,218 @@ def get_dashboard_screen_html():
                     });
             }
 
-            let currentAssignmentModal = {
-                ro: '',
-                role: '',
-                lines: [],
-                assignment: null,
-                pendingLines: [],
-                pendingType: 'body',
-                assignmentsByRole: {}
+            let currentAssignRo = '';
+            let currentAssignmentData = {
+                labor: { tech_id: null, tech_name: null, excluded_lines: [] },
+                paint: { tech_id: null, tech_name: null, excluded_lines: [] }
             };
 
-            function closeAssignmentModal() {
-                const modal = document.getElementById('assignmentModal');
-                if (modal) modal.style.display = 'none';
+            function normalizeLineKeyForAssignment(item, index) {
+                return item.line !== null && item.line !== undefined ? String(item.line) : String(index + 1);
             }
 
-            function openAssignmentModal(event, roNumber, role) {
-                if (event) event.stopPropagation();
-                const modal = document.getElementById('assignmentModal');
-                const title = document.getElementById('assignmentModalTitle');
-                const body = document.getElementById('assignmentModalBody');
-                const typeWrap = document.getElementById('assignmentTypeWrap');
-                const typeSelect = document.getElementById('assignmentTypeSelect');
+            function updateLineTotal(role) {
+                const containerId = role === 'paint' ? 'paintLinesContainer' : 'laborLinesContainer';
+                const totalId = role === 'paint' ? 'paintTotal' : 'laborTotal';
+                const container = document.getElementById(containerId);
+                const totalEl = document.getElementById(totalId);
+                if (!container || !totalEl) return;
 
-                if (!modal || !title || !body) return;
+                let total = 0.0;
+                const checkboxes = container.querySelectorAll('input[type="checkbox"]');
+                checkboxes.forEach((checkbox, index) => {
+                    if (!checkbox.checked) {
+                        const hrsEl = checkbox.closest('div').querySelector('[data-hrs]');
+                        if (hrsEl) {
+                            const hrs = parseFloat(hrsEl.getAttribute('data-hrs'));
+                            if (Number.isFinite(hrs)) {
+                                total += hrs;
+                            }
+                        }
+                    }
+                });
 
-                const roleLabel = role === 'paint' ? 'Paint' : 'Body';
-                title.textContent = role === 'pending'
-                    ? `Pending Assignments - RO# ${roNumber}`
-                    : `${roleLabel} Assignments - RO# ${roNumber}`;
-                body.innerHTML = '<div style="color:#777;">Loading repair lines...</div>';
+                const roleLabel = role === 'paint' ? 'Paint' : 'Labor';
+                totalEl.textContent = `Total ${roleLabel}: ${total.toFixed(1)} hrs`;
+            }
+
+            function renderLinesWithCheckboxes(lines, role, excludedLines = []) {
+                const containerId = role === 'paint' ? 'paintLinesContainer' : 'laborLinesContainer';
+                const container = document.getElementById(containerId);
+                if (!container) return;
+
+                if (!lines || lines.length === 0) {
+                    container.innerHTML = '<div style="padding:12px; color:#777;">No lines found</div>';
+                    updateLineTotal(role);
+                    return;
+                }
+
+                const html = lines.map((item, index) => {
+                    const lineKey = normalizeLineKeyForAssignment(item, index);
+                    const line = item.line || lineKey || '—';
+                    const desc = item.description || '';
+                    const value = Number.isFinite(parseFloat(item.value)) ? parseFloat(item.value).toFixed(1) : '0.0';
+                    const isOmitted = excludedLines.includes(lineKey);
+                    
+                    return `
+                        <div style="display:flex; align-items:center; gap:12px; padding:10px 12px; border-bottom:1px solid #eee; background:#fff;">
+                            <input type="checkbox" data-line="${lineKey}" ${isOmitted ? 'checked' : ''} data-role="${role}" onchange="updateLineTotal('${role}')" style="width:18px; height:18px; cursor:pointer;" />
+                            <div style="flex:1;">
+                                <div style="font-weight:bold; font-size:13px;">Line ${line}</div>
+                                <div style="font-size:12px; color:#666;">${desc}</div>
+                            </div>
+                            <div style="min-width:70px; text-align:right; font-weight:bold; color:#d32f2f;" data-hrs="${value}">${value} hrs</div>
+                        </div>
+                    `;
+                }).join('');
+
+                container.innerHTML = html;
+                updateLineTotal(role);
+            }
+
+            function openAssignTechModal(roNumber) {
+                currentAssignRo = roNumber;
+                const modal = document.getElementById('assignTechModal');
+                const title = document.getElementById('assignTechTitle');
+                
+                if (!modal || !title) return;
+                
+                title.textContent = `Assign Tech - RO# ${roNumber}`;
                 modal.style.display = 'block';
+                
+                // Reset assignment data
+                currentAssignmentData = {
+                    labor: { tech_id: null, tech_name: null, excluded_lines: [] },
+                    paint: { tech_id: null, tech_name: null, excluded_lines: [] }
+                };
 
+                // Load repair lines and tech list
                 Promise.all([
                     fetch(`/api/ro-repairs?ro=${encodeURIComponent(roNumber)}`, { credentials: 'include' }).then(r => r.json()),
                     fetch('/api/techs/list', { credentials: 'include' }).then(r => r.json())
                 ])
                     .then(([repairsRes, techsRes]) => {
-                        if (repairsRes.error) {
-                            throw new Error(repairsRes.error);
-                        }
-                        const lines = role === 'paint' ? (repairsRes.paint || []) : (repairsRes.labor || []);
-                        const assignmentsByRole = repairsRes.assignments || {};
-                        const assignment = assignmentsByRole ? assignmentsByRole[role] : null;
                         const techs = techsRes.techs || [];
-                        const pendingAssignment = assignmentsByRole.pending || {};
-                        const pendingLines = pendingAssignment.excluded_lines || [];
-                        const pendingType = pendingAssignment.pending_type || 'body';
-
-                        let modalLines = lines;
-                        if (role === 'pending') {
-                            modalLines = buildPendingLines(pendingLines, repairsRes.labor || [], repairsRes.paint || []);
-                        }
-
-                        currentAssignmentModal = {
-                            ro: roNumber,
-                            role: role,
-                            lines: Array.isArray(modalLines) ? modalLines : [],
-                            assignment: assignment,
-                            pendingLines: Array.isArray(pendingLines) ? pendingLines : [],
-                            pendingType: pendingType,
-                            assignmentsByRole: assignmentsByRole
-                        };
-
-                        populateAssignmentTechSelect(techs, assignment);
-                        if (typeWrap && typeSelect) {
-                            if (role === 'pending') {
-                                typeWrap.style.display = 'block';
-                                typeSelect.value = pendingType || 'body';
-                            } else {
-                                typeWrap.style.display = 'none';
-                            }
-                        }
-                        renderAssignmentModalBody(currentAssignmentModal.lines, assignment);
+                        const laborLines = repairsRes.labor || [];
+                        const paintLines = repairsRes.paint || [];
+                        
+                        // Populate tech selects
+                        populateTechSelect('assignTechLaborSelect', techs);
+                        populateTechSelect('assignTechPaintSelect', techs);
+                        
+                        // Render line checkboxes
+                        renderLinesWithCheckboxes(laborLines, 'labor', []);
+                        renderLinesWithCheckboxes(paintLines, 'paint', []);
                     })
                     .catch(err => {
-                        console.error('Error loading assignment modal:', err);
-                        body.innerHTML = '<div style="color:red;">Error loading repair lines.</div>';
+                        console.error('Error loading data for modal:', err);
+                        alert('Error loading repair lines and techs.');
                     });
             }
 
-            function populateAssignmentTechSelect(techs, assignment) {
-                const select = document.getElementById('assignmentTechSelect');
+            function populateTechSelect(selectId, techs) {
+                const select = document.getElementById(selectId);
                 if (!select) return;
-
-                const options = ['<option value="">unassigned</option>'];
-                (techs || []).forEach(tech => {
+                
+                if (techs.length === 0) {
+                    select.innerHTML = '<option value="">No techs available</option>';
+                    return;
+                }
+                
+                const options = ['<option value="">Select tech...</option>'];
+                techs.forEach(tech => {
                     const label = `${tech.first_name || ''} ${tech.last_name || ''}`.trim() || `Tech #${tech.id}`;
-                    options.push(`<option value="${tech.id}" data-name="${label}">${label}</option>`);
+                    const rate = tech.hourly_rate ? ` ($${parseFloat(tech.hourly_rate).toFixed(2)}/hr)` : '';
+                    options.push(`<option value="${tech.id}" data-name="${label}" data-rate="${tech.hourly_rate || 0}">${label}${rate}</option>`);
                 });
                 select.innerHTML = options.join('');
-
-                if (assignment && assignment.tech_id) {
-                    select.value = String(assignment.tech_id);
-                } else {
-                    select.value = '';
-                }
             }
 
-            function renderAssignmentModalBody(lines, assignment) {
-                const body = document.getElementById('assignmentModalBody');
-                if (!body) return;
-                const selectAll = document.getElementById('assignmentSelectAll');
+            function closeAssignTechModal() {
+                const modal = document.getElementById('assignTechModal');
+                if (modal) modal.style.display = 'none';
+            }
 
-                const excluded = Array.isArray(assignment?.excluded_lines) ? assignment.excluded_lines.map(String) : [];
-
-                if (!lines || lines.length === 0) {
-                    body.innerHTML = '<div style="color:#777;">No repair lines found.</div>';
-                    if (selectAll) {
-                        selectAll.checked = false;
-                        selectAll.disabled = true;
-                    }
-                    updateAssignmentModalTotal();
+            function saveAssignTechWithLines() {
+                if (!currentAssignRo) return;
+                
+                const laborSelect = document.getElementById('assignTechLaborSelect');
+                const paintSelect = document.getElementById('assignTechPaintSelect');
+                
+                if (!laborSelect || !paintSelect) return;
+                
+                // Get excluded lines for each role
+                const laborContainer = document.getElementById('laborLinesContainer');
+                const paintContainer = document.getElementById('paintLinesContainer');
+                
+                const laborExcluded = [];
+                if (laborContainer) {
+                    laborContainer.querySelectorAll('input[type="checkbox"]:checked').forEach(checkbox => {
+                        laborExcluded.push(checkbox.getAttribute('data-line'));
+                    });
+                }
+                
+                const paintExcluded = [];
+                if (paintContainer) {
+                    paintContainer.querySelectorAll('input[type="checkbox"]:checked').forEach(checkbox => {
+                        paintExcluded.push(checkbox.getAttribute('data-line'));
+                    });
+                }
+                
+                const assignments = [];
+                
+                // Add labor assignment if tech selected
+                if (laborSelect.value) {
+                    const techId = parseInt(laborSelect.value, 10);
+                    const techName = laborSelect.options[laborSelect.selectedIndex]?.dataset?.name || '';
+                    assignments.push({
+                        ro: currentAssignRo,
+                        role: 'labor',
+                        tech_id: techId,
+                        tech_name: techName,
+                        excluded_lines: laborExcluded
+                    });
+                }
+                
+                // Add paint assignment if tech selected
+                if (paintSelect.value) {
+                    const techId = parseInt(paintSelect.value, 10);
+                    const techName = paintSelect.options[paintSelect.selectedIndex]?.dataset?.name || '';
+                    assignments.push({
+                        ro: currentAssignRo,
+                        role: 'paint',
+                        tech_id: techId,
+                        tech_name: techName,
+                        excluded_lines: paintExcluded
+                    });
+                }
+                
+                if (assignments.length === 0) {
+                    alert('Please select at least one tech.');
                     return;
                 }
-
-                const rows = lines.map((item, index) => {
-                    const lineKey = item.pending_role
-                        ? `${item.pending_role}:${item.pending_line_key}`
-                        : normalizeLineKey(item, index);
-                    const line = item.line || lineKey || '—';
-                    const desc = item.description || '';
-                    const hours = getLineHours(item);
-                    const value = hours.toFixed(1);
-                    const isOmitted = currentAssignmentModal.role === 'pending'
-                        ? false
-                        : excluded.includes(String(lineKey));
-
-                    return `
-                        <div style="display:flex; align-items:center; gap:12px; padding:10px 12px; border-bottom:1px solid #eee; background:#fff;">
-                            <div style="width:24px;">
-                                <input type="checkbox" class="assignment-omit" data-line="${lineKey}" data-hrs="${value}" ${isOmitted ? 'checked' : ''} onchange="updateAssignmentModalTotal()" />
-                            </div>
-                            <div style="flex:1; font-size:13px; color:#333;">
-                                <strong>Line ${line}</strong> - ${desc}
-                            </div>
-                            <div style="min-width:70px; text-align:right; font-weight:bold; font-size:13px;">${value} hrs</div>
-                        </div>
-                    `;
-                }).join('');
-
-                body.innerHTML = `
-                    <div style="border:1px solid #ddd; border-radius:4px; background:#fff; max-height:220px; overflow-y:auto;">
-                        ${rows}
-                    </div>
-                `;
-
-                if (selectAll) {
-                    selectAll.disabled = false;
-                    const totalBoxes = body.querySelectorAll('input.assignment-omit').length;
-                    const checkedBoxes = body.querySelectorAll('input.assignment-omit:checked').length;
-                    selectAll.checked = totalBoxes > 0 && totalBoxes === checkedBoxes;
-                }
-
-                updateAssignmentModalTotal();
-            }
-
-            function toggleAssignmentSelectAll() {
-                const body = document.getElementById('assignmentModalBody');
-                const selectAll = document.getElementById('assignmentSelectAll');
-                if (!body || !selectAll) return;
-                body.querySelectorAll('input.assignment-omit').forEach(checkbox => {
-                    checkbox.checked = selectAll.checked;
-                });
-                updateAssignmentModalTotal();
-            }
-
-            function updateAssignmentModalTotal() {
-                const totalEl = document.getElementById('assignmentModalTotal');
-                const body = document.getElementById('assignmentModalBody');
-                if (!totalEl || !body) return;
-
-                let total = 0.0;
-                body.querySelectorAll('input.assignment-omit').forEach(checkbox => {
-                    if (!checkbox.checked) {
-                        const hrs = parseFloat(checkbox.getAttribute('data-hrs'));
-                        if (Number.isFinite(hrs)) {
-                            total += hrs;
-                        }
-                    }
-                });
-
-                totalEl.textContent = `Total: ${total.toFixed(1)} hrs`;
-
-                const selectAll = document.getElementById('assignmentSelectAll');
-                if (selectAll && !selectAll.disabled) {
-                    const totalBoxes = body.querySelectorAll('input.assignment-omit').length;
-                    const checkedBoxes = body.querySelectorAll('input.assignment-omit:checked').length;
-                    selectAll.checked = totalBoxes > 0 && totalBoxes === checkedBoxes;
-                }
-            }
-
-            function saveAssignmentModal() {
-                if (!currentAssignmentModal.ro || !currentAssignmentModal.role) return;
-
-                const body = document.getElementById('assignmentModalBody');
-                const select = document.getElementById('assignmentTechSelect');
-                const typeSelect = document.getElementById('assignmentTypeSelect');
-                if (!body || !select) return;
-
-                const excludedLines = [];
-                body.querySelectorAll('input.assignment-omit:checked').forEach(checkbox => {
-                    excludedLines.push(checkbox.getAttribute('data-line'));
-                });
-
-                const techIdRaw = select.value;
-                const techId = techIdRaw ? parseInt(techIdRaw, 10) : null;
-                const techName = techIdRaw
-                    ? (select.options[select.selectedIndex]?.dataset?.name || '')
-                    : '';
-
-                const pendingType = typeSelect && currentAssignmentModal.role === 'pending'
-                    ? (typeSelect.value || 'body')
-                    : (currentAssignmentModal.pendingType || 'body');
-
-                if (currentAssignmentModal.role === 'pending') {
-                    const pendingKeep = excludedLines.map(entry => {
-                        const parts = String(entry).split(':');
-                        return { role: parts[0], line: parts[1] };
-                    });
-
-                    const uncheckedLines = currentAssignmentModal.lines
-                        .map((item, index) => {
-                            const lineKey = item.pending_role
-                                ? `${item.pending_role}:${item.pending_line_key}`
-                                : normalizeLineKey(item, index);
-                            return {
-                                key: lineKey,
-                                role: item.pending_role,
-                                line: item.pending_line_key || normalizeLineKey(item, index),
-                                item: item
-                            };
-                        })
-                        .filter(item => !excludedLines.includes(item.key));
-
-                    if (uncheckedLines.length > 0 && !techIdRaw) {
-                        alert('Please select a tech to assign pending lines.');
-                        return;
-                    }
-
-                    const byRole = {
-                        labor: new Set(),
-                        paint: new Set()
-                    };
-                    uncheckedLines.forEach(item => {
-                        if (item.role === 'labor' || item.role === 'paint') {
-                            byRole[item.role].add(String(item.line));
-                        }
-                    });
-
-                    // Fetch existing assignment data to properly merge assignments
-                    const fetchExistingAssignments = Promise.all(
-                        ['labor', 'paint'].map(role => 
-                            fetch(`/api/ro-repairs?ro=${encodeURIComponent(currentAssignmentModal.ro)}`, 
-                                { credentials: 'include' })
-                                .then(r => r.json())
-                        )
-                    ).then(([repairsData]) => repairsData);
-
-                    fetchExistingAssignments
-                        .then(repairsData => {
-                            const updates = [];
-                            ['labor', 'paint'].forEach(role => {
-                                if (byRole[role].size === 0) return;
-                                
-                                // Get existing assignment for this tech and role if it exists
-                                const assignmentsByRole = repairsData.assignments || {};
-                                const existingAssignment = assignmentsByRole[role];
-                                const existingExcludedLines = existingAssignment?.excluded_lines || [];
-                                
-                                // Compute new excluded lines by removing newly assigned lines from all lines
-                                const allLines = role === 'labor' ? (repairsData.labor || []) : (repairsData.paint || []);
-                                const newExcludedLines = [];
-                                
-                                // Compute all assigned lines (old + new)
-                                const allAssignedLines = new Set();
-                                
-                                // Add previously assigned lines from existing assignment
-                                if (existingAssignment && existingExcludedLines) {
-                                    allLines.forEach((item, index) => {
-                                        const lineKey = normalizeLineKey(item, index);
-                                        // If not in excluded_lines, it was assigned
-                                        if (!existingExcludedLines.map(String).includes(lineKey)) {
-                                            allAssignedLines.add(String(lineKey));
-                                        }
-                                    });
-                                }
-                                
-                                // Add newly assigned lines from pending selection
-                                byRole[role].forEach(lineKey => {
-                                    allAssignedLines.add(String(lineKey));
-                                });
-                                
-                                // Build new excluded_lines: all lines not in allAssignedLines
-                                allLines.forEach((item, index) => {
-                                    const lineKey = normalizeLineKey(item, index);
-                                    if (!allAssignedLines.has(String(lineKey))) {
-                                        newExcludedLines.push(lineKey);
-                                    }
-                                });
-                                
-                                const payload = {
-                                    ro: currentAssignmentModal.ro,
-                                    role: role,
-                                    tech_id: Number.isFinite(techId) ? techId : null,
-                                    tech_name: techIdRaw ? techName : '',
-                                    excluded_lines: newExcludedLines,
-                                    pending_type: pendingType
-                                };
-                                updates.push(fetch('/api/ro-assignments', {
-                                    method: 'POST',
-                                    headers: { 'Content-Type': 'application/json' },
-                                    credentials: 'include',
-                                    body: JSON.stringify(payload)
-                                }).then(r => r.json()));
-                            });
-
-                            updates.push(fetch('/api/ro-assignments', {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json' },
-                                credentials: 'include',
-                                body: JSON.stringify({
-                                    ro: currentAssignmentModal.ro,
-                                    role: 'pending',
-                                    tech_id: null,
-                                    tech_name: '',
-                                    excluded_lines: pendingKeep,
-                                    pending_type: pendingType
-                                })
-                            }).then(r => r.json()));
-
-                            return Promise.all(updates);
-                        })
-                        .then(results => {
-                            if (results.some(res => res.error)) {
-                                throw new Error('One or more assignments failed');
-                            }
-                            closeAssignmentModal();
-                            keepOpenRo = currentAssignmentModal.ro;
-                            loadRoAssignmentsSummary(currentAssignmentModal.ro);
-                            loadDashboardData();
-                        })
-                        .catch(err => {
-                            console.error('Error saving assignment modal:', err);
-                            alert('Error saving assignment.');
-                        });
-                    return;
-                }
-
-                const pendingFiltered = (currentAssignmentModal.pendingLines || []).filter(entry => {
-                    return entry && entry.role && entry.role !== currentAssignmentModal.role;
-                });
-                const pendingMerged = pendingFiltered.concat(
-                    excludedLines.map(lineKey => ({ role: currentAssignmentModal.role, line: lineKey }))
-                );
-
-                const requests = [
+                
+                // Save all assignments
+                Promise.all(assignments.map(assignment =>
                     fetch('/api/ro-assignments', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         credentials: 'include',
-                        body: JSON.stringify({
-                            ro: currentAssignmentModal.ro,
-                            role: currentAssignmentModal.role,
-                            tech_id: Number.isFinite(techId) ? techId : null,
-                            tech_name: techName,
-                            excluded_lines: excludedLines
-                        })
-                    }).then(r => r.json()),
-                    fetch('/api/ro-assignments', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        credentials: 'include',
-                        body: JSON.stringify({
-                            ro: currentAssignmentModal.ro,
-                            role: 'pending',
-                            tech_id: null,
-                            tech_name: '',
-                            excluded_lines: pendingMerged,
-                            pending_type: pendingType
-                        })
+                        body: JSON.stringify(assignment)
                     }).then(r => r.json())
-                ];
-
-                Promise.all(requests)
+                ))
                     .then(results => {
                         if (results.some(res => res.error)) {
                             throw new Error('One or more assignments failed');
                         }
-                        closeAssignmentModal();
-                        keepOpenRo = currentAssignmentModal.ro;
-                        loadRoAssignmentsSummary(currentAssignmentModal.ro);
+                        closeAssignTechModal();
+                        loadTechAssignments(currentAssignRo);
                         loadDashboardData();
                     })
                     .catch(err => {
-                        console.error('Error saving assignment modal:', err);
-                        alert('Error saving assignment.');
+                        console.error('Error saving assignments:', err);
+                        alert('Error saving assignments.');
                     });
-            }
-
-            function printAssignmentModal() {
-                if (!currentAssignmentModal.ro || !currentAssignmentModal.role) return;
-
-                const body = document.getElementById('assignmentModalBody');
-                const totalEl = document.getElementById('assignmentModalTotal');
-                const techSelect = document.getElementById('assignmentTechSelect');
-                if (!body || !totalEl) return;
-
-                const roleLabel = currentAssignmentModal.role === 'paint' ? 'Paint' : 'Body';
-                const titleText = `${roleLabel} Assignments - RO# ${currentAssignmentModal.ro}`;
-                const techName = techSelect && techSelect.value
-                    ? (techSelect.options[techSelect.selectedIndex]?.dataset?.name || '')
-                    : 'unassigned';
-
-                const rows = currentAssignmentModal.lines.map((item, index) => {
-                    const lineKey = item.pending_role
-                        ? `${item.pending_role}:${item.pending_line_key}`
-                        : normalizeLineKey(item, index);
-                    const line = item.line || lineKey || '—';
-                    const desc = item.description || '';
-                    const hours = getLineHours(item).toFixed(1);
-                    const checkbox = body.querySelector(`input.assignment-omit[data-line="${lineKey}"]`);
-                    const omitted = checkbox && checkbox.checked;
-                    return {
-                        line,
-                        desc,
-                        hours,
-                        omitted
-                    };
-                }).filter(row => !row.omitted);
-
-                const printWindow = window.open('', '_blank');
-                const rowsHtml = rows.map(row => {
-                    return `
-                        <tr style="border-bottom:1px solid #eee;">
-                            <td style="padding:8px;">Line ${row.line}</td>
-                            <td style="padding:8px;">${row.desc}</td>
-                            <td style="padding:8px; text-align:right; font-weight:bold;">${row.hours} hrs</td>
-                        </tr>
-                    `;
-                }).join('');
-
-                printWindow.document.write(`
-                    <html>
-                        <head>
-                            <title>${titleText}</title>
-                            <style>
-                                @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;600;700&display=swap');
-                                * { box-sizing: border-box; }
-                                body {
-                                    font-family: 'DM Sans', 'Segoe UI', Tahoma, Arial, sans-serif;
-                                    padding: 28px;
-                                    color: #1f2933;
-                                    background: #f6f7f9;
-                                }
-                                .sheet {
-                                    background: #ffffff;
-                                    border: 1px solid #e3e7ee;
-                                    border-radius: 12px;
-                                    padding: 24px;
-                                    box-shadow: 0 8px 24px rgba(15, 23, 42, 0.08);
-                                }
-                                .header {
-                                    display: flex;
-                                    align-items: flex-end;
-                                    justify-content: space-between;
-                                    gap: 16px;
-                                    border-bottom: 1px solid #e3e7ee;
-                                    padding-bottom: 14px;
-                                    margin-bottom: 18px;
-                                }
-                                .title {
-                                    margin: 0;
-                                    font-size: 22px;
-                                    font-weight: 700;
-                                    color: #0f172a;
-                                }
-                                .subtitle {
-                                    margin: 6px 0 0;
-                                    font-size: 13px;
-                                    color: #64748b;
-                                }
-                                .total-card {
-                                    background: #111827;
-                                    color: #ffffff;
-                                    padding: 10px 14px;
-                                    border-radius: 10px;
-                                    font-weight: 700;
-                                    font-size: 14px;
-                                    white-space: nowrap;
-                                }
-                                table {
-                                    width: 100%;
-                                    border-collapse: collapse;
-                                    font-size: 13px;
-                                }
-                                thead th {
-                                    text-align: left;
-                                    font-weight: 700;
-                                    color: #334155;
-                                    background: #f1f5f9;
-                                    padding: 10px 12px;
-                                    border-bottom: 1px solid #e2e8f0;
-                                }
-                                tbody td {
-                                    padding: 10px 12px;
-                                    border-bottom: 1px solid #eef2f7;
-                                }
-                                tbody tr:nth-child(even) td {
-                                    background: #fafbfc;
-                                }
-                                .hrs {
-                                    text-align: right;
-                                    font-weight: 700;
-                                    color: #0f172a;
-                                }
-                                .empty {
-                                    color: #64748b;
-                                    text-align: center;
-                                    padding: 14px;
-                                }
-                            </style>
-                        </head>
-                        <body>
-                            <div class="sheet">
-                                <div class="header">
-                                    <div>
-                                        <h1 class="title">${titleText}</h1>
-                                        <div class="subtitle">Tech: ${techName}</div>
-                                    </div>
-                                    <div class="total-card">${totalEl.textContent}</div>
-                                </div>
-                                <table>
-                                    <thead>
-                                        <tr>
-                                            <th style="width:110px;">Line</th>
-                                            <th>Description</th>
-                                            <th class="hrs" style="width:110px;">Hours</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        ${rowsHtml || '<tr><td colspan="3" class="empty">No assigned lines.</td></tr>'}
-                                    </tbody>
-                                </table>
-                            </div>
-                        </body>
-                    </html>
-                `);
-                printWindow.document.close();
-                printWindow.print();
             }
 
             let currentTechDetailData = null;
