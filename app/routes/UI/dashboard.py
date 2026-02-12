@@ -187,7 +187,7 @@ def get_dashboard_screen_html():
             .modal-content .close {
                 color: #000 !important;
             }
-            button {
+            button:not(.link-button) {
                 background: #b22222 !important;
                 color: #fff !important;
                 border: none !important;
@@ -560,7 +560,7 @@ def get_dashboard_screen_html():
                     html += `
                         <tr style="background:${rowBg};">
                             <td style="padding:12px; border-bottom:1px solid #eee;">
-                                <button type="button" onclick="toggleRoNotesFromLink(event, '${ro.ro}')" style="background:none; border:none; color:#0066cc; text-decoration:underline; cursor:pointer; padding:0; font:inherit;">
+                                <button type="button" class="link-button" onclick="toggleRoNotesFromLink(event, '${ro.ro}')" style="background:none; border:none; color:#0066cc; text-decoration:underline; cursor:pointer; padding:0; font:inherit;">
                                     ${ro.ro}
                                 </button>
                             </td>
@@ -568,7 +568,7 @@ def get_dashboard_screen_html():
                             <td style="padding:12px; border-bottom:1px solid #eee; color:#333;">${customerDisplay}</td>
                             <td style="padding:12px; border-bottom:1px solid #eee; color:#333;">
                                 <span id="phone-display-${rowId}" style="display:inline-flex; align-items:center; gap:6px;">
-                                    <button type="button" onclick="startPhoneEdit(event, '${rowId}')" style="background:none; border:none; color:#0066cc; text-decoration:underline; cursor:pointer; padding:0; font:inherit;">
+                                    <button type="button" class="link-button" onclick="startPhoneEdit(event, '${rowId}')" style="background:none; border:none; color:#0066cc; text-decoration:underline; cursor:pointer; padding:0; font:inherit;">
                                         <span id="phone-current-${rowId}">${phoneDisplay}</span>
                                     </button>
                                     <button type="button" onclick="toggleOldPhone(event, '${rowId}')" style="background:#eee; border:1px solid #ccc; border-radius:3px; padding:0 6px; font-size:12px; cursor:pointer;">+</button>
@@ -583,7 +583,7 @@ def get_dashboard_screen_html():
                             <td style="padding:12px; border-bottom:1px solid #eee; color:#333;">${insuranceDisplay}</td>
                             <td style="padding:12px; border-bottom:1px solid #eee; color:#333;">${claimDisplay}</td>
                             <td style="padding:12px; border-bottom:1px solid #eee; text-align:right;">
-                                <button type="button" onclick="toggleTechAssignment(event, '${ro.ro}')" style="background:none; border:none; color:#0066cc; text-decoration:underline; cursor:pointer; padding:0; font:inherit; font-weight:bold;">
+                                <button type="button" class="link-button" onclick="toggleTechAssignment(event, '${ro.ro}')" style="background:none; border:none; color:#0066cc; text-decoration:underline; cursor:pointer; padding:0; font:inherit; font-weight:bold;">
                                     ${ro.hours.toFixed(1)}
                                 </button>
                             </td>
@@ -781,7 +781,7 @@ def get_dashboard_screen_html():
 
                                 html += `<tr style="background:#fff; border-bottom:1px solid #ddd;">`;
                                 html += `<td style="padding:8px 12px; color:${textColor}; font-weight:${fontWeight};">`;
-                                html += `<button type="button" onclick="openAssignmentModal(event, '${roNumber}', '${item.role}')" style="background:none; border:none; color:${textColor}; text-decoration:underline; cursor:pointer; padding:0; font:inherit; font-weight:${fontWeight};">${item.tech_name}</button>`;
+                                html += `<button type="button" class="link-button" onclick="openAssignmentModal(event, '${roNumber}', '${item.role}')" style="background:none; border:none; color:${textColor}; text-decoration:underline; cursor:pointer; padding:0; font:inherit; font-weight:${fontWeight};">${item.tech_name}</button>`;
                                 html += `</td>`;
                                 html += `<td style="padding:8px 12px; color:#333; text-transform:capitalize;">${item.type_label}</td>`;
                                 html += `<td style="padding:8px 12px; text-align:right; color:#333; font-weight:bold;">${item.hours}</td>`;

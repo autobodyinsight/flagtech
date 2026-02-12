@@ -234,12 +234,12 @@ def get_parts_script():
                                 <td style="padding:12px; border-bottom:1px solid #eee; color:#333;">${ro.ro}</td>
                                 <td style="padding:12px; border-bottom:1px solid #eee; color:#333;">${ro.vehicle || '—'}</td>
                                 <td style="padding:12px; border-bottom:1px solid #eee; color:#333;">
-                                    <button onclick="openPartsOrderModal('${ro.ro}')" style="background:none; border:none; color:#0066cc; text-decoration:underline; cursor:pointer; padding:0;">
+                                    <button class="link-button" onclick="openPartsOrderModal('${ro.ro}')" style="background:none; border:none; color:#0066cc; text-decoration:underline; cursor:pointer; padding:0;">
                                         ${ro.parts_qty || 0}
                                     </button>
                                 </td>
                                 <td style="padding:12px; border-bottom:1px solid #eee; color:#333;">
-                                    <button onclick="togglePartsReceived('${ro.ro}')" style="background:none; border:none; color:#0066cc; text-decoration:underline; cursor:pointer; padding:0;">
+                                    <button class="link-button" onclick="togglePartsReceived('${ro.ro}')" style="background:none; border:none; color:#0066cc; text-decoration:underline; cursor:pointer; padding:0;">
                                         ${ro.on_order || 0}
                                     </button>
                                 </td>

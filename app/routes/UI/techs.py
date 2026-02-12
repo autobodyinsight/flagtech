@@ -274,7 +274,7 @@ def get_techs_screen_html():
                             <div class="assignment-item">
                                 <div class="assignment-meta">
                                     <span class="assignment-role">${roleLabel}</span>
-                                    <button type="button" class="assignment-link" data-ro="${ro}" data-role="${item.role}" data-excluded="${excluded}" data-tech="${techName.replace(/"/g, '&quot;')}" style="background:none; border:none; color:#0066cc; text-decoration:underline; cursor:pointer; padding:0; font:inherit;">
+                                    <button type="button" class="assignment-link link-button" data-ro="${ro}" data-role="${item.role}" data-excluded="${excluded}" data-tech="${techName.replace(/"/g, '&quot;')}" style="background:none; border:none; color:#0066cc; text-decoration:underline; cursor:pointer; padding:0; font:inherit;">
                                         RO# ${ro}
                                     </button>
                                 </div>
