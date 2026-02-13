@@ -447,12 +447,41 @@ def get_dashboard_screen_html():
                     .toLowerCase();
             }
 
+            let currentRoSlideDown = null;
+
+            function closeRoSlideDown() {
+                if (!currentRoSlideDown) return;
+                const { roId, type } = currentRoSlideDown;
+                const rowEl = document.getElementById(`${type}-row-${roId}`);
+                if (rowEl) rowEl.style.display = 'none';
+                currentRoSlideDown = null;
+            }
+
+            function toggleRoSlideDown(roNumber, type) {
+                const roId = safeId(roNumber);
+                const rowEl = document.getElementById(`${type}-row-${roId}`);
+                if (!rowEl) return false;
+
+                const isSame = currentRoSlideDown && currentRoSlideDown.roId === roId && currentRoSlideDown.type === type;
+                if (currentRoSlideDown && !isSame) {
+                    closeRoSlideDown();
+                }
+
+                const isHidden = rowEl.style.display === 'none' || rowEl.style.display === '';
+                if (isHidden && !isSame) {
+                    rowEl.style.display = 'table-row';
+                    currentRoSlideDown = { roId, type };
+                    return true;
+                }
+
+                rowEl.style.display = 'none';
+                currentRoSlideDown = null;
+                return false;
+            }
+
             function toggleRoNotes(roNumber) {
-                const notesRow = document.getElementById(`notes-row-${safeId(roNumber)}`);
-                if (!notesRow) return;
-                const isHidden = notesRow.style.display === 'none' || notesRow.style.display === '';
-                notesRow.style.display = isHidden ? 'table-row' : 'none';
-                if (isHidden) {
+                const opened = toggleRoSlideDown(roNumber, 'notes');
+                if (opened) {
                     loadRoNotes(roNumber);
                 }
             }
@@ -889,11 +918,8 @@ def get_dashboard_screen_html():
 
             function toggleTechAssignment(event, roNumber) {
                 if (event) event.stopPropagation();
-                const assignmentRow = document.getElementById(`tech-assignment-row-${safeId(roNumber)}`);
-                if (!assignmentRow) return;
-                const isHidden = assignmentRow.style.display === 'none' || assignmentRow.style.display === '';
-                assignmentRow.style.display = isHidden ? 'table-row' : 'none';
-                if (isHidden) {
+                const opened = toggleRoSlideDown(roNumber, 'tech-assignment');
+                if (opened) {
                     loadTechAssignments(roNumber);
                 }
             }
