@@ -23,10 +23,9 @@ def get_dashboard_screen_html():
                         flex-direction:column;
                     }
                     .dash-matrix {
-                        display:grid;
+                        display:flex;
+                        flex-direction:column;
                         gap:16px;
-                        grid-template-columns: 1fr minmax(320px, 1.2fr) 1fr;
-                        grid-template-rows: auto auto auto;
                         align-items:stretch;
                     }
                     .dash-list-wrap {
@@ -44,6 +43,25 @@ def get_dashboard_screen_html():
                         display:flex;
                         gap:12px;
                         height:100%;
+                    }
+                    .dash-middle-row {
+                        display:flex;
+                        gap:16px;
+                        align-items:center;
+                        justify-content:center;
+                        flex-wrap:wrap;
+                    }
+                    .dash-side-list {
+                        flex:0 1 320px;
+                        display:flex;
+                        justify-content:center;
+                        align-items:center;
+                    }
+                    .dash-pie-cell {
+                        flex:0 1 420px;
+                        display:flex;
+                        justify-content:center;
+                        align-items:center;
                     }
                     .dash-mini-card {
                         flex:1;
@@ -73,71 +91,69 @@ def get_dashboard_screen_html():
                 <div class="dash-center-card">
                     <h4 style="margin:0 0 12px 0; color:#666; font-size:14px; text-align:center;">Total Hrs per Tech</h4>
                     <div class="dash-matrix">
-                        <!-- Top Left: Current Sales -->
-                        <div class="dash-cell">
-                            <h3 style="margin:0 0 10px 0; text-align:center; color:#333;">Current Sales</h3>
-                            <div style="position:relative; background:#e0e0e0; border-radius:4px; overflow:hidden;" class="dash-card-fill">
-                                <div id="totalSalesBar" style="position:absolute; bottom:0; width:100%; background:linear-gradient(to top, #4caf50, #81c784); transition:height 0.5s ease;"></div>
-                            </div>
-                            <div id="totalSalesValue" style="text-align:center; font-size:20px; font-weight:bold; color:#4caf50; margin-top:10px;">$0</div>
-                        </div>
-
-                        <!-- Top Center: Average Hrs + Average RO -->
-                        <div class="dash-cell">
-                            <div class="dash-avg-row">
-                                <div class="dash-mini-card" style="border-color:#9c27b0; box-shadow:none;">
-                                    <h4 style="margin:0 0 8px 0; color:#666; font-size:13px;">Average Hrs</h4>
-                                    <div id="averageHrs" style="font-size:24px; font-weight:bold; color:#9c27b0;">0.0</div>
+                        <div style="display:flex; gap:16px; flex-wrap:wrap; justify-content:center; align-items:stretch;">
+                            <!-- Current Sales -->
+                            <div class="dash-cell" style="flex:1 1 220px; max-width:320px;">
+                                <h3 style="margin:0 0 10px 0; text-align:center; color:#333;">Current Sales</h3>
+                                <div style="position:relative; background:#e0e0e0; border-radius:4px; overflow:hidden;" class="dash-card-fill">
+                                    <div id="totalSalesBar" style="position:absolute; bottom:0; width:100%; background:linear-gradient(to top, #4caf50, #81c784); transition:height 0.5s ease;"></div>
                                 </div>
-                                <div class="dash-mini-card" style="border-color:#ff5722; box-shadow:none;">
-                                    <h4 style="margin:0 0 8px 0; color:#666; font-size:13px;">Average RO</h4>
-                                    <div id="averageRO" style="font-size:24px; font-weight:bold; color:#ff5722;">$0</div>
-                                </div>
+                                <div id="totalSalesValue" style="text-align:center; font-size:20px; font-weight:bold; color:#4caf50; margin-top:10px;">$0</div>
                             </div>
-                        </div>
 
-                        <!-- Top Right: Total ROs -->
-                        <div class="dash-cell">
-                            <h3 style="margin:0 0 10px 0; text-align:center; color:#333;">Total RO's</h3>
-                            <div style="position:relative; background:#e0e0e0; border-radius:4px; overflow:hidden;" class="dash-card-fill">
-                                <div id="totalRosBar" style="position:absolute; bottom:0; width:100%; background:linear-gradient(to top, #42a5f5, #90caf9); transition:height 0.5s ease;"></div>
-                            </div>
-                            <div id="totalRosValue" style="text-align:center; font-size:20px; font-weight:bold; color:#42a5f5; margin-top:10px;">0</div>
-                        </div>
-
-                        <!-- Middle Left: Spacer -->
-                        <div></div>
-
-                        <!-- Center: Pie Chart -->
-                        <div class="dash-cell">
-                            <div class="dash-pie-wrap">
-                                <div class="dash-pie-inner">
-                                    <canvas id="hoursPerTechChart" style="height:100%; width:100%;"></canvas>
+                            <!-- Average Hrs + Average RO -->
+                            <div class="dash-cell" style="flex:1 1 260px; max-width:360px;">
+                                <div class="dash-avg-row">
+                                    <div class="dash-mini-card" style="border-color:#9c27b0; box-shadow:none;">
+                                        <h4 style="margin:0 0 8px 0; color:#666; font-size:13px;">Average Hrs</h4>
+                                        <div id="averageHrs" style="font-size:24px; font-weight:bold; color:#9c27b0;">0.0</div>
+                                    </div>
+                                    <div class="dash-mini-card" style="border-color:#ff5722; box-shadow:none;">
+                                        <h4 style="margin:0 0 8px 0; color:#666; font-size:13px;">Average RO</h4>
+                                        <div id="averageRO" style="font-size:24px; font-weight:bold; color:#ff5722;">$0</div>
+                                    </div>
                                 </div>
                             </div>
-                        </div>
 
-                        <!-- Middle Right: Spacer -->
-                        <div></div>
-
-                        <!-- Bottom Left: Total ROs per Tech -->
-                        <div class="dash-cell">
-                            <div class="dash-list-wrap">
-                                <h4 style="margin:0 0 12px 0; color:#666; font-size:13px; text-align:center;">Total ROs per Tech</h4>
-                                <div id="rosPerTechList" style="font-size:14px;">
-                                    <div style="color:#999; text-align:center;">Loading...</div>
+                            <!-- Total ROs -->
+                            <div class="dash-cell" style="flex:1 1 220px; max-width:320px;">
+                                <h3 style="margin:0 0 10px 0; text-align:center; color:#333;">Total RO's</h3>
+                                <div style="position:relative; background:#e0e0e0; border-radius:4px; overflow:hidden;" class="dash-card-fill">
+                                    <div id="totalRosBar" style="position:absolute; bottom:0; width:100%; background:linear-gradient(to top, #42a5f5, #90caf9); transition:height 0.5s ease;"></div>
                                 </div>
+                                <div id="totalRosValue" style="text-align:center; font-size:20px; font-weight:bold; color:#42a5f5; margin-top:10px;">0</div>
                             </div>
                         </div>
 
-                        <!-- Bottom Center: Spacer -->
-                        <div></div>
+                        <div class="dash-middle-row">
+                            <div class="dash-side-list">
+                                <div class="dash-cell" style="width:100%;">
+                                    <div class="dash-list-wrap">
+                                        <h4 style="margin:0 0 12px 0; color:#666; font-size:13px; text-align:center;">Total ROs per Tech</h4>
+                                        <div id="rosPerTechList" style="font-size:14px;">
+                                            <div style="color:#999; text-align:center;">Loading...</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
 
-                        <!-- Bottom Right: Tech List with Total Hrs -->
-                        <div class="dash-cell">
-                            <div class="dash-list-wrap">
-                                <h4 style="margin:0 0 12px 0; color:#666; font-size:13px; text-align:center;">Tech List (Total Hrs)</h4>
-                                <div id="hoursPerTechLegend" style="font-size:12px; color:#333;"></div>
+                            <div class="dash-pie-cell">
+                                <div class="dash-cell" style="width:100%;">
+                                    <div class="dash-pie-wrap">
+                                        <div class="dash-pie-inner">
+                                            <canvas id="hoursPerTechChart" style="height:100%; width:100%;"></canvas>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="dash-side-list">
+                                <div class="dash-cell" style="width:100%;">
+                                    <div class="dash-list-wrap">
+                                        <h4 style="margin:0 0 12px 0; color:#666; font-size:13px; text-align:center;">Tech List (Total Hrs)</h4>
+                                        <div id="hoursPerTechLegend" style="font-size:12px; color:#333;"></div>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
