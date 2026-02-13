@@ -18,19 +18,21 @@ def get_dashboard_screen_html():
                         border-radius:8px;
                         border:2px solid #00bcd4;
                         box-shadow:0 2px 4px rgba(0,0,0,0.08);
-                        height: var(--dash-chart-h);
+                        height: auto;
                         display:flex;
                         flex-direction:column;
-                        overflow:hidden;
                     }
                     .dash-matrix {
                         display:grid;
                         gap:16px;
                         grid-template-columns: 1fr minmax(320px, 1.2fr) 1fr;
-                        grid-template-rows: 85px 1fr 190px;
+                        grid-template-rows: auto auto auto;
                         align-items:stretch;
-                        flex:1;
-                        min-height:0;
+                    }
+                    .dash-list-wrap {
+                        width:100%;
+                        max-width:320px;
+                        margin:0 auto;
                     }
                     .dash-cell {
                         padding:6px;
@@ -120,9 +122,11 @@ def get_dashboard_screen_html():
 
                         <!-- Bottom Left: Total ROs per Tech -->
                         <div class="dash-cell">
-                            <h4 style="margin:0 0 12px 0; color:#666; font-size:13px;">Total ROs per Tech</h4>
-                            <div id="rosPerTechList" style="height:100%; overflow-y:auto; font-size:14px;">
-                                <div style="color:#999; text-align:center;">Loading...</div>
+                            <div class="dash-list-wrap">
+                                <h4 style="margin:0 0 12px 0; color:#666; font-size:13px; text-align:center;">Total ROs per Tech</h4>
+                                <div id="rosPerTechList" style="font-size:14px;">
+                                    <div style="color:#999; text-align:center;">Loading...</div>
+                                </div>
                             </div>
                         </div>
 
@@ -131,8 +135,10 @@ def get_dashboard_screen_html():
 
                         <!-- Bottom Right: Tech List with Total Hrs -->
                         <div class="dash-cell">
-                            <h4 style="margin:0 0 12px 0; color:#666; font-size:13px;">Tech List (Total Hrs)</h4>
-                            <div id="hoursPerTechLegend" style="flex:1; font-size:12px; color:#333; max-height:100%; overflow:auto;"></div>
+                            <div class="dash-list-wrap">
+                                <h4 style="margin:0 0 12px 0; color:#666; font-size:13px; text-align:center;">Tech List (Total Hrs)</h4>
+                                <div id="hoursPerTechLegend" style="font-size:12px; color:#333;"></div>
+                            </div>
                         </div>
                     </div>
                 </div>
