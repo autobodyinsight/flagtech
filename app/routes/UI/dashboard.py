@@ -88,13 +88,12 @@ def get_dashboard_screen_html():
                     }
                 </style>
 
-                <div class="dash-center-card">
-                    <h4 style="margin:0 0 12px 0; color:#666; font-size:14px; text-align:center;">Total Hrs per Tech</h4>
+                <div class="dash-center-card" style="font-size:18px;">
                     <div class="dash-matrix">
                         <div style="display:flex; gap:16px; flex-wrap:wrap; justify-content:center; align-items:stretch;">
                             <!-- Current Sales -->
                             <div class="dash-cell" style="flex:1 1 220px; max-width:320px;">
-                                <h3 style="margin:0 0 10px 0; text-align:center; color:#333;">Current Sales</h3>
+                                <h3 style="margin:0 0 10px 0; text-align:center; color:#333; font-weight:bold;">Current Sales</h3>
                                 <div style="position:relative; background:#e0e0e0; border-radius:4px; overflow:hidden;" class="dash-card-fill">
                                     <div id="totalSalesBar" style="position:absolute; bottom:0; width:100%; background:linear-gradient(to top, #4caf50, #81c784); transition:height 0.5s ease;"></div>
                                 </div>
@@ -105,11 +104,11 @@ def get_dashboard_screen_html():
                             <div class="dash-cell" style="flex:1 1 260px; max-width:360px;">
                                 <div class="dash-avg-row">
                                     <div class="dash-mini-card" style="border-color:#9c27b0; box-shadow:none;">
-                                        <h4 style="margin:0 0 8px 0; color:#666; font-size:13px;">Average Hrs</h4>
+                                        <h4 style="margin:0 0 8px 0; color:#666; font-size:18px; font-weight:bold;">Average Hrs</h4>
                                         <div id="averageHrs" style="font-size:24px; font-weight:bold; color:#9c27b0;">0.0</div>
                                     </div>
                                     <div class="dash-mini-card" style="border-color:#ff5722; box-shadow:none;">
-                                        <h4 style="margin:0 0 8px 0; color:#666; font-size:13px;">Average RO</h4>
+                                        <h4 style="margin:0 0 8px 0; color:#666; font-size:18px; font-weight:bold;">Average RO</h4>
                                         <div id="averageRO" style="font-size:24px; font-weight:bold; color:#ff5722;">$0</div>
                                     </div>
                                 </div>
@@ -117,7 +116,7 @@ def get_dashboard_screen_html():
 
                             <!-- Total ROs -->
                             <div class="dash-cell" style="flex:1 1 220px; max-width:320px;">
-                                <h3 style="margin:0 0 10px 0; text-align:center; color:#333;">Total RO's</h3>
+                                <h3 style="margin:0 0 10px 0; text-align:center; color:#333; font-weight:bold;">Total RO's</h3>
                                 <div style="position:relative; background:#e0e0e0; border-radius:4px; overflow:hidden;" class="dash-card-fill">
                                     <div id="totalRosBar" style="position:absolute; bottom:0; width:100%; background:linear-gradient(to top, #42a5f5, #90caf9); transition:height 0.5s ease;"></div>
                                 </div>
@@ -129,7 +128,7 @@ def get_dashboard_screen_html():
                             <div class="dash-side-list">
                                 <div class="dash-cell" style="width:100%;">
                                     <div class="dash-list-wrap">
-                                        <h4 style="margin:0 0 12px 0; color:#666; font-size:13px; text-align:center;">Total ROs per Tech</h4>
+                                        <h4 style="margin:0 0 12px 0; color:#666; font-size:18px; text-align:center; font-weight:bold;">Total ROs per Tech</h4>
                                         <div id="rosPerTechList" style="font-size:14px;">
                                             <div style="color:#999; text-align:center;">Loading...</div>
                                         </div>
@@ -150,7 +149,7 @@ def get_dashboard_screen_html():
                             <div class="dash-side-list">
                                 <div class="dash-cell" style="width:100%;">
                                     <div class="dash-list-wrap">
-                                        <h4 style="margin:0 0 12px 0; color:#666; font-size:13px; text-align:center;">Tech List (Total Hrs)</h4>
+                                        <h4 style="margin:0 0 12px 0; color:#666; font-size:18px; text-align:center; font-weight:bold;">Tech List (Total Hrs)</h4>
                                         <div id="hoursPerTechLegend" style="font-size:12px; color:#333;"></div>
                                     </div>
                                 </div>
