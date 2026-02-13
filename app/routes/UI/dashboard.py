@@ -21,14 +21,16 @@ def get_dashboard_screen_html():
                         height: var(--dash-chart-h);
                         display:flex;
                         flex-direction:column;
+                        overflow:hidden;
                     }
                     .dash-matrix {
                         display:grid;
                         gap:16px;
                         grid-template-columns: 1fr minmax(320px, 1.2fr) 1fr;
-                        grid-template-rows: 170px 1fr 190px;
+                        grid-template-rows: 85px 1fr 190px;
                         align-items:stretch;
-                        height:100%;
+                        flex:1;
+                        min-height:0;
                     }
                     .dash-cell {
                         padding:6px;
