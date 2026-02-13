@@ -87,16 +87,16 @@ def get_dashboard_screen_html():
                     <table id="roListTable" style="width:100%; border-collapse:collapse;">
                         <thead>
                             <tr style="background:#f5f5f5; text-align:left;">
-                                <th style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold; color:#555;">RO#</th>
-                                <th style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold; color:#555;">Vehicle</th>
-                                <th style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold; color:#555;">Customer</th>
-                                <th style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold; color:#555;">Phone</th>
-                                <th style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold; color:#555;">Insurance</th>
-                                <th style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold; color:#555;">Claim #</th>
-                                <th style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold; color:#555;">In</th>
-                                <th style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold; color:#555;">ECD</th>
-                                <th style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold; color:#555; text-align:right;">HRS</th>
-                                <th style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold; color:#555; text-align:right;">Total</th>
+                                <th data-sort-key="ro" onclick="sortRoListByHeader('ro')" style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold; color:#555; cursor:pointer; user-select:none;">RO# <span data-sort-indicator="ro" style="font-size:12px;"></span></th>
+                                <th data-sort-key="vehicle" onclick="sortRoListByHeader('vehicle')" style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold; color:#555; cursor:pointer; user-select:none;">Vehicle <span data-sort-indicator="vehicle" style="font-size:12px;"></span></th>
+                                <th data-sort-key="customer" onclick="sortRoListByHeader('customer')" style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold; color:#555; cursor:pointer; user-select:none;">Customer <span data-sort-indicator="customer" style="font-size:12px;"></span></th>
+                                <th data-sort-key="phone" onclick="sortRoListByHeader('phone')" style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold; color:#555; cursor:pointer; user-select:none;">Phone <span data-sort-indicator="phone" style="font-size:12px;"></span></th>
+                                <th data-sort-key="insurance" onclick="sortRoListByHeader('insurance')" style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold; color:#555; cursor:pointer; user-select:none;">Insurance <span data-sort-indicator="insurance" style="font-size:12px;"></span></th>
+                                <th data-sort-key="claim_number" onclick="sortRoListByHeader('claim_number')" style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold; color:#555; cursor:pointer; user-select:none;">Claim # <span data-sort-indicator="claim_number" style="font-size:12px;"></span></th>
+                                <th data-sort-key="in_date" onclick="sortRoListByHeader('in_date')" style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold; color:#555; cursor:pointer; user-select:none;">In <span data-sort-indicator="in_date" style="font-size:12px;"></span></th>
+                                <th data-sort-key="ecd_date" onclick="sortRoListByHeader('ecd_date')" style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold; color:#555; cursor:pointer; user-select:none;">ECD <span data-sort-indicator="ecd_date" style="font-size:12px;"></span></th>
+                                <th data-sort-key="hours" onclick="sortRoListByHeader('hours')" style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold; color:#555; text-align:right; cursor:pointer; user-select:none;">HRS <span data-sort-indicator="hours" style="font-size:12px;"></span></th>
+                                <th data-sort-key="total" onclick="sortRoListByHeader('total')" style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold; color:#555; text-align:right; cursor:pointer; user-select:none;">Total <span data-sort-indicator="total" style="font-size:12px;"></span></th>
                             </tr>
                         </thead>
                         <tbody id="roListBody">
@@ -185,6 +185,10 @@ def get_dashboard_screen_html():
             // Global variables for dashboard
             let dashboardData = null;
             let hoursPerTechChartInstance = null;
+            let roSortState = {
+                key: null,
+                direction: 'asc'
+            };
             
             // Load dashboard data
             async function loadDashboardData() {
@@ -650,17 +654,79 @@ def get_dashboard_screen_html():
                 closeRoDatePicker();
             });
 
+            function sortRoListByHeader(sortKey) {
+                if (roSortState.key === sortKey) {
+                    roSortState.direction = roSortState.direction === 'asc' ? 'desc' : 'asc';
+                } else {
+                    roSortState.key = sortKey;
+                    roSortState.direction = 'asc';
+                }
+
+                if (dashboardData && Array.isArray(dashboardData.roList)) {
+                    updateRoListTable(dashboardData.roList);
+                }
+            }
+
+            function normalizeSortValue(ro, sortKey) {
+                if (!ro) return '';
+
+                if (sortKey === 'hours' || sortKey === 'total') {
+                    return Number(ro[sortKey] || 0);
+                }
+
+                if (sortKey === 'in_date' || sortKey === 'ecd_date') {
+                    const parsedDate = Date.parse(ro[sortKey] || '');
+                    return Number.isNaN(parsedDate) ? 0 : parsedDate;
+                }
+
+                return String(ro[sortKey] || '').toLowerCase();
+            }
+
+            function updateRoSortIndicators() {
+                const indicators = document.querySelectorAll('[data-sort-indicator]');
+                indicators.forEach((element) => {
+                    const key = element.getAttribute('data-sort-indicator');
+                    if (key && roSortState.key === key) {
+                        element.textContent = roSortState.direction === 'asc' ? '▲' : '▼';
+                    } else {
+                        element.textContent = '';
+                    }
+                });
+            }
+
             // Update RO list table
             function updateRoListTable(roList) {
                 const tbody = document.getElementById('roListBody');
+                const sourceList = Array.isArray(roList) ? roList : [];
+                const sortedList = [...sourceList];
+
+                if (roSortState.key) {
+                    sortedList.sort((a, b) => {
+                        const valueA = normalizeSortValue(a, roSortState.key);
+                        const valueB = normalizeSortValue(b, roSortState.key);
+
+                        if (typeof valueA === 'number' && typeof valueB === 'number') {
+                            if (valueA === valueB) return 0;
+                            return valueA < valueB ? -1 : 1;
+                        }
+
+                        return String(valueA).localeCompare(String(valueB), undefined, { numeric: true, sensitivity: 'base' });
+                    });
+
+                    if (roSortState.direction === 'desc') {
+                        sortedList.reverse();
+                    }
+                }
+
+                updateRoSortIndicators();
                 
-                if (!roList || roList.length === 0) {
+                if (sortedList.length === 0) {
                     tbody.innerHTML = '<tr><td colspan="10" style="padding:20px; text-align:center; color:#999;">No repair orders found</td></tr>';
                     return;
                 }
                 
                 let html = '';
-                roList.forEach((ro, index) => {
+                sortedList.forEach((ro, index) => {
                     const rowBg = index % 2 === 0 ? '#fff' : '#f9f9f9';
                     const rowId = safeId(ro.ro);
                     const customerDisplay = ro.customer || '-';
