@@ -10,72 +10,110 @@ def get_dashboard_screen_html():
                 <button onclick="flashAllData()" style="padding:10px 16px; background:#d32f2f; color:#fff; border:none; border-radius:4px; font-weight:bold; cursor:pointer;">FLASH</button>
             </div>
             
-            <div style="display:flex; gap:20px; align-items:stretch; --dash-chart-h: 520px; --dash-card-h: calc((var(--dash-chart-h) - 40px) / 3);">
+            <div style="--dash-chart-h: 520px; --dash-top-h: 190px;">
                 <style>
-                    .dash-stack { display:flex; flex-direction:column; gap:20px; }
-                    .dash-card { height: var(--dash-card-h); }
+                    .dash-grid {
+                        display:grid;
+                        gap:20px;
+                        grid-template-columns: 320px minmax(360px, 1fr) 320px;
+                        grid-template-rows: var(--dash-top-h) var(--dash-chart-h);
+                        align-items:stretch;
+                    }
+                    .dash-card {
+                        background:#fff;
+                        padding:20px;
+                        border-radius:8px;
+                        border:1px solid #ddd;
+                        display:flex;
+                        flex-direction:column;
+                        box-shadow:0 2px 4px rgba(0,0,0,0.08);
+                    }
                     .dash-card-fill { flex:1; }
-                    .dash-chart { height: var(--dash-chart-h); }
+                    .dash-avg-stack {
+                        display:flex;
+                        flex-direction:column;
+                        gap:16px;
+                        height:100%;
+                    }
+                    .dash-avg-card {
+                        flex:1;
+                        border-radius:8px;
+                        padding:16px;
+                        border:2px solid transparent;
+                        display:flex;
+                        flex-direction:column;
+                        justify-content:center;
+                        background:#fff;
+                        box-shadow:0 2px 4px rgba(0,0,0,0.08);
+                    }
+                    .dash-pie-card { height: var(--dash-chart-h); }
+                    .dash-pie-wrap {
+                        flex:1;
+                        display:flex;
+                        align-items:center;
+                        justify-content:center;
+                    }
+                    .dash-pie-inner {
+                        width:80%;
+                        height:80%;
+                        min-width:220px;
+                        min-height:220px;
+                    }
                 </style>
-                <!-- Column 1: Current Sales + Total ROs -->
-                <div style="flex:0 0 300px;" class="dash-stack">
-                    <div style="background:#f9f9f9; padding:20px; border-radius:8px; border:1px solid #ddd; display:flex; flex-direction:column;" class="dash-card">
+
+                <div class="dash-grid">
+                    <!-- Top Left: Current Sales -->
+                    <div class="dash-card" style="background:#f9f9f9;">
                         <h3 style="margin:0 0 10px 0; text-align:center; color:#333;">Current Sales</h3>
                         <div style="position:relative; background:#e0e0e0; border-radius:4px; overflow:hidden;" class="dash-card-fill">
-                            <div id="totalSalesBar" style="position:absolute; bottom:0; width:100%; background:linear-gradient(to top, #4caf50, #81c784); transition:height 0.5s ease;">
-                            </div>
+                            <div id="totalSalesBar" style="position:absolute; bottom:0; width:100%; background:linear-gradient(to top, #4caf50, #81c784); transition:height 0.5s ease;"></div>
                         </div>
-                        <div id="totalSalesValue" style="text-align:center; font-size:20px; font-weight:bold; color:#4caf50; margin-top:10px;">
-                            $0
+                        <div id="totalSalesValue" style="text-align:center; font-size:20px; font-weight:bold; color:#4caf50; margin-top:10px;">$0</div>
+                    </div>
+
+                    <!-- Top Center: Average Hrs + Average RO -->
+                    <div class="dash-avg-stack">
+                        <div class="dash-avg-card" style="border-color:#9c27b0;">
+                            <h4 style="margin:0 0 10px 0; color:#666; font-size:14px;">Average Hrs</h4>
+                            <div id="averageHrs" style="font-size:28px; font-weight:bold; color:#9c27b0;">0.0</div>
+                        </div>
+                        <div class="dash-avg-card" style="border-color:#ff5722;">
+                            <h4 style="margin:0 0 10px 0; color:#666; font-size:14px;">Average RO</h4>
+                            <div id="averageRO" style="font-size:28px; font-weight:bold; color:#ff5722;">$0</div>
                         </div>
                     </div>
 
-                    <div style="background:#f9f9f9; padding:20px; border-radius:8px; border:1px solid #ddd; display:flex; flex-direction:column;" class="dash-card">
+                    <!-- Top Right: Total ROs -->
+                    <div class="dash-card" style="background:#f9f9f9;">
                         <h3 style="margin:0 0 10px 0; text-align:center; color:#333;">Total RO's</h3>
                         <div style="position:relative; background:#e0e0e0; border-radius:4px; overflow:hidden;" class="dash-card-fill">
-                            <div id="totalRosBar" style="position:absolute; bottom:0; width:100%; background:linear-gradient(to top, #42a5f5, #90caf9); transition:height 0.5s ease;">
-                            </div>
+                            <div id="totalRosBar" style="position:absolute; bottom:0; width:100%; background:linear-gradient(to top, #42a5f5, #90caf9); transition:height 0.5s ease;"></div>
                         </div>
-                        <div id="totalRosValue" style="text-align:center; font-size:20px; font-weight:bold; color:#42a5f5; margin-top:10px;">
-                            0
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Column 2: Average Hrs + Average RO + Total ROs per Tech -->
-                <div style="flex:0 0 320px;" class="dash-stack">
-                    <div style="background:#fff; padding:20px; border-radius:8px; border:2px solid #9c27b0; box-shadow:0 2px 4px rgba(0,0,0,0.1);" class="dash-card">
-                        <h4 style="margin:0 0 15px 0; color:#666; font-size:14px;">Average Hrs</h4>
-                        <div id="averageHrs" style="font-size:32px; font-weight:bold; color:#9c27b0;">
-                            0.0
-                        </div>
+                        <div id="totalRosValue" style="text-align:center; font-size:20px; font-weight:bold; color:#42a5f5; margin-top:10px;">0</div>
                     </div>
 
-                    <div style="background:#fff; padding:20px; border-radius:8px; border:2px solid #ff5722; box-shadow:0 2px 4px rgba(0,0,0,0.1);" class="dash-card">
-                        <h4 style="margin:0 0 15px 0; color:#666; font-size:14px;">Average RO</h4>
-                        <div id="averageRO" style="font-size:32px; font-weight:bold; color:#ff5722;">
-                            $0
-                        </div>
-                    </div>
-
-                    <div style="background:#fff; padding:20px; border-radius:8px; border:2px solid #795548; box-shadow:0 2px 4px rgba(0,0,0,0.1);" class="dash-card">
+                    <!-- Bottom Left: Total ROs per Tech -->
+                    <div class="dash-card" style="border:2px solid #795548;">
                         <h4 style="margin:0 0 15px 0; color:#666; font-size:14px;">Total ROs per Tech</h4>
                         <div id="rosPerTechList" style="height:100%; overflow-y:auto; font-size:14px;">
                             <div style="color:#999; text-align:center;">Loading...</div>
                         </div>
                     </div>
-                </div>
 
-                <!-- Column 3: Total Hrs per Tech -->
-                <div style="flex:1; display:flex; flex-direction:column;">
-                    <div style="background:#fff; padding:20px; border-radius:8px; border:2px solid #00bcd4; box-shadow:0 2px 4px rgba(0,0,0,0.1); display:flex; flex-direction:column;" class="dash-chart">
-                        <h4 style="margin:0 0 15px 0; color:#666; font-size:14px;">Total Hrs per Tech</h4>
-                        <div style="display:flex; gap:16px; align-items:center; width:100%; flex:1;">
-                            <div style="flex:0 0 55%; max-width:55%; height:100%;">
+                    <!-- Center: Pie Chart (Total Hrs per Tech) -->
+                    <div class="dash-card dash-pie-card" style="border:2px solid #00bcd4;">
+                        <h4 style="margin:0 0 15px 0; color:#666; font-size:14px; text-align:center;">Total Hrs per Tech</h4>
+                        <div class="dash-pie-wrap">
+                            <div class="dash-pie-inner">
                                 <canvas id="hoursPerTechChart" style="height:100%; width:100%;"></canvas>
                             </div>
-                            <div id="hoursPerTechLegend" style="flex:1; font-size:12px; color:#333; max-height:100%; overflow:auto;"></div>
                         </div>
+                    </div>
+
+                    <!-- Bottom Right: Tech List with Total Hrs -->
+                    <div class="dash-card" style="border:2px solid #00bcd4;">
+                        <h4 style="margin:0 0 15px 0; color:#666; font-size:14px;">Tech List (Total Hrs)</h4>
+                        <div id="hoursPerTechLegend" style="flex:1; font-size:12px; color:#333; max-height:100%; overflow:auto;"></div>
                     </div>
                 </div>
             </div>
