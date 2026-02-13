@@ -31,10 +31,7 @@ def get_dashboard_screen_html():
                         height:100%;
                     }
                     .dash-cell {
-                        background:#f9f9f9;
-                        border:1px solid #ddd;
-                        border-radius:8px;
-                        padding:14px;
+                        padding:6px;
                         display:flex;
                         flex-direction:column;
                     }
@@ -82,13 +79,13 @@ def get_dashboard_screen_html():
                         </div>
 
                         <!-- Top Center: Average Hrs + Average RO -->
-                        <div class="dash-cell" style="background:#fff;">
+                        <div class="dash-cell">
                             <div class="dash-avg-row">
-                                <div class="dash-mini-card" style="border-color:#9c27b0;">
+                                <div class="dash-mini-card" style="border-color:#9c27b0; box-shadow:none;">
                                     <h4 style="margin:0 0 8px 0; color:#666; font-size:13px;">Average Hrs</h4>
                                     <div id="averageHrs" style="font-size:24px; font-weight:bold; color:#9c27b0;">0.0</div>
                                 </div>
-                                <div class="dash-mini-card" style="border-color:#ff5722;">
+                                <div class="dash-mini-card" style="border-color:#ff5722; box-shadow:none;">
                                     <h4 style="margin:0 0 8px 0; color:#666; font-size:13px;">Average RO</h4>
                                     <div id="averageRO" style="font-size:24px; font-weight:bold; color:#ff5722;">$0</div>
                                 </div>
@@ -108,7 +105,7 @@ def get_dashboard_screen_html():
                         <div></div>
 
                         <!-- Center: Pie Chart -->
-                        <div class="dash-cell" style="background:#fff; border:1px solid #eee;">
+                        <div class="dash-cell">
                             <div class="dash-pie-wrap">
                                 <div class="dash-pie-inner">
                                     <canvas id="hoursPerTechChart" style="height:100%; width:100%;"></canvas>
@@ -120,7 +117,7 @@ def get_dashboard_screen_html():
                         <div></div>
 
                         <!-- Bottom Left: Total ROs per Tech -->
-                        <div class="dash-cell" style="border:2px solid #795548;">
+                        <div class="dash-cell">
                             <h4 style="margin:0 0 12px 0; color:#666; font-size:13px;">Total ROs per Tech</h4>
                             <div id="rosPerTechList" style="height:100%; overflow-y:auto; font-size:14px;">
                                 <div style="color:#999; text-align:center;">Loading...</div>
@@ -131,7 +128,7 @@ def get_dashboard_screen_html():
                         <div></div>
 
                         <!-- Bottom Right: Tech List with Total Hrs -->
-                        <div class="dash-cell" style="border:2px solid #00bcd4;">
+                        <div class="dash-cell">
                             <h4 style="margin:0 0 12px 0; color:#666; font-size:13px;">Tech List (Total Hrs)</h4>
                             <div id="hoursPerTechLegend" style="flex:1; font-size:12px; color:#333; max-height:100%; overflow:auto;"></div>
                         </div>
