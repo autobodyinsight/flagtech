@@ -887,6 +887,9 @@ async def get_dashboard_data(request: Request):
                     "ecd_date": ecd_date_value.isoformat() if ecd_date_value else None,
                     "hours": ro_hours,
                     "total": grand_total,
+                    "labor_repairs": labor_repairs if isinstance(labor_repairs, list) else [],
+                    "paint_repairs": paint_repairs if isinstance(paint_repairs, list) else [],
+                    "parts_repairs": parts_repairs if isinstance(parts_repairs, list) else [],
                 }
             )
 

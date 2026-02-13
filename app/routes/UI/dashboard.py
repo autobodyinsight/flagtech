@@ -802,6 +802,145 @@ def get_dashboard_screen_html():
                 });
             }
 
+            // Sublet detection functions
+            function getPendingSubletItems(ro) {
+                if (!ro) return [];
+                
+                const subletItems = [];
+                const allItems = [
+                    ...(ro.labor_repairs || []),
+                    ...(ro.paint_repairs || []),
+                    ...(ro.parts_repairs || [])
+                ];
+                
+                // Keywords that should trigger warning (excluding calibrations for now)
+                const directKeywords = [
+                    'wheel',
+                    'alignment',
+                    'thrust angle',
+                    'windshield',
+                    'w/shield',
+                    'qtr glass',
+                    'backglass',
+                    'stripe',
+                    'stripes',
+                    'edge guard',
+                    'edge guards'
+                ];
+                
+                // Check for calibrations with related operations
+                let hasCalibration = false;
+                let hasRelatedOperation = false;
+                
+                allItems.forEach(item => {
+                    if (!item || !item.description) return;
+                    
+                    const desc = String(item.description).toLowerCase();
+                    
+                    // Check for direct keywords
+                    for (const keyword of directKeywords) {
+                        if (desc.includes(keyword)) {
+                            // Special case: exclude "steering wheel" when checking for "wheel"
+                            if (keyword === 'wheel' && desc.includes('steering wheel')) {
+                                continue;
+                            }
+                            subletItems.push({
+                                description: item.description,
+                                line: item.line,
+                                type: getItemType(item)
+                            });
+                            return; // Don't check other keywords for this item
+                        }
+                    }
+                    
+                    // Check for calibration
+                    if (desc.includes('calibration') || desc.includes('calibrate')) {
+                        hasCalibration = true;
+                    }
+                    
+                    // Check for related operations
+                    if (desc.includes('bumper') || 
+                        desc.includes('windshield') || 
+                        desc.includes('w/shield') ||
+                        desc.includes('grille') || 
+                        desc.includes('grill') ||
+                        desc.includes('camera')) {
+                        hasRelatedOperation = true;
+                    }
+                });
+                
+                // If we have calibration with related operations, add all calibration items
+                if (hasCalibration && hasRelatedOperation) {
+                    allItems.forEach(item => {
+                        if (!item || !item.description) return;
+                        const desc = String(item.description).toLowerCase();
+                        if (desc.includes('calibration') || desc.includes('calibrate')) {
+                            subletItems.push({
+                                description: item.description,
+                                line: item.line,
+                                type: getItemType(item)
+                            });
+                        }
+                    });
+                }
+                
+                return subletItems;
+            }
+            
+            function getItemType(item) {
+                // Determine if item is from labor, paint, or parts
+                if (item.value !== undefined) {
+                    return 'Labor/Paint';
+                } else if (item.price !== undefined || item.qty !== undefined) {
+                    return 'Parts';
+                }
+                return 'Unknown';
+            }
+            
+            function hasSubletWarning(ro) {
+                const subletItems = getPendingSubletItems(ro);
+                return subletItems.length > 0;
+            }
+            
+            // Track currently open sublet panel
+            let currentOpenSubletPanel = null;
+            
+            function toggleSubletPanel(event, roNumber) {
+                event.stopPropagation();
+                event.preventDefault();
+                
+                const panelId = `sublet-panel-${safeId(roNumber)}`;
+                const panel = document.getElementById(panelId);
+                
+                if (!panel) return;
+                
+                // If clicking the same panel, just close it
+                if (currentOpenSubletPanel && currentOpenSubletPanel.id === panelId) {
+                    panel.style.display = 'none';
+                    currentOpenSubletPanel = null;
+                    return;
+                }
+                
+                // Close any currently open panel
+                if (currentOpenSubletPanel) {
+                    currentOpenSubletPanel.style.display = 'none';
+                }
+                
+                // Open the new panel
+                panel.style.display = 'block';
+                currentOpenSubletPanel = panel;
+            }
+            
+            // Close panel when clicking outside
+            document.addEventListener('click', function(event) {
+                if (currentOpenSubletPanel && 
+                    !event.target.closest('.sublet-warning-icon') &&
+                    !event.target.closest('.sublet-panel')) {
+                    currentOpenSubletPanel.style.display = 'none';
+                    currentOpenSubletPanel = null;
+                }
+            });
+
             // Update RO list table
             function updateRoListTable(roList) {
                 const tbody = document.getElementById('roListBody');
@@ -846,12 +985,33 @@ def get_dashboard_screen_html():
                     const ecdIso = ro.ecd_date || computeEcdIso(inIso, Number(ro.hours || 0));
                     const inDisplay = formatShortDate(inIso);
                     const ecdDisplay = formatShortDate(ecdIso);
+                    
+                    // Check for sublet warning
+                    const showSubletWarning = hasSubletWarning(ro);
+                    const subletItems = showSubletWarning ? getPendingSubletItems(ro) : [];
+                    
                     html += `
                         <tr style="background:${rowBg};">
-                            <td style="padding:12px; border-bottom:1px solid #eee;">
-                                <button type="button" onclick="toggleRoNotesFromLink(event, '${ro.ro}')" style="background:none; border:none; color:#0066cc; text-decoration:underline; cursor:pointer; padding:0; font:inherit;">
-                                    ${ro.ro}
-                                </button>
+                            <td style="padding:12px; border-bottom:1px solid #eee; position:relative;">
+                                <div style="display:inline-flex; align-items:center; gap:6px;">
+                                    <button type="button" onclick="toggleRoNotesFromLink(event, '${ro.ro}')" style="background:none; border:none; color:#0066cc; text-decoration:underline; cursor:pointer; padding:0; font:inherit;">
+                                        ${ro.ro}
+                                    </button>
+                                    ${showSubletWarning ? `
+                                        <span class="sublet-warning-icon" onclick="toggleSubletPanel(event, '${ro.ro}')" style="cursor:pointer; color:#ff9800; font-size:18px; line-height:1;" title="Pending Sublets">⚠️</span>
+                                        <div id="sublet-panel-${rowId}" class="sublet-panel" style="display:none; position:absolute; top:100%; left:0; z-index:1000; background:#fff; border:2px solid #ff9800; border-radius:6px; padding:12px; min-width:300px; max-width:500px; box-shadow:0 4px 8px rgba(0,0,0,0.2); margin-top:4px;">
+                                            <div style="font-weight:bold; color:#e65100; margin-bottom:8px; font-size:14px;">Pending Sublet Items:</div>
+                                            <ul style="margin:0; padding-left:20px; font-size:13px;">
+                                                ${subletItems.map(item => `
+                                                    <li style="margin-bottom:6px; color:#333;">
+                                                        ${item.line ? `<strong>Line ${item.line}:</strong> ` : ''}${item.description}
+                                                        <span style="color:#666; font-size:11px;"> (${item.type})</span>
+                                                    </li>
+                                                `).join('')}
+                                            </ul>
+                                        </div>
+                                    ` : ''}
+                                </div>
                             </td>
                             <td style="padding:12px; border-bottom:1px solid #eee; color:#333;">${ro.vehicle || 'N/A'}</td>
                             <td style="padding:12px; border-bottom:1px solid #eee; color:#333;">${customerDisplay}</td>
