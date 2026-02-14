@@ -176,6 +176,7 @@ def get_dashboard_screen_html():
                                 <th data-sort-key="insurance" onclick="sortRoListByHeader('insurance')" style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold; color:#555; cursor:pointer; user-select:none;">Insurance <span data-sort-indicator="insurance" style="font-size:12px;"></span></th>
                                 <th data-sort-key="claim_number" onclick="sortRoListByHeader('claim_number')" style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold; color:#555; cursor:pointer; user-select:none;">Claim # <span data-sort-indicator="claim_number" style="font-size:12px;"></span></th>
                                 <th data-sort-key="in_date" onclick="sortRoListByHeader('in_date')" style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold; color:#555; cursor:pointer; user-select:none;">In <span data-sort-indicator="in_date" style="font-size:12px;"></span></th>
+                                <th style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold; color:#555; text-align:center;" title="Days Since In Date">⏳</th>
                                 <th data-sort-key="ecd_date" onclick="sortRoListByHeader('ecd_date')" style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold; color:#555; cursor:pointer; user-select:none;">ECD <span data-sort-indicator="ecd_date" style="font-size:12px;"></span></th>
                                 <th data-sort-key="hours" onclick="sortRoListByHeader('hours')" style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold; color:#555; text-align:right; cursor:pointer; user-select:none;">HRS <span data-sort-indicator="hours" style="font-size:12px;"></span></th>
                                 <th data-sort-key="total" onclick="sortRoListByHeader('total')" style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold; color:#555; text-align:right; cursor:pointer; user-select:none;">Total <span data-sort-indicator="total" style="font-size:12px;"></span></th>
@@ -183,7 +184,7 @@ def get_dashboard_screen_html():
                         </thead>
                         <tbody id="roListBody">
                             <tr>
-                                <td colspan="10" style="padding:20px; text-align:center; color:#999;">Loading...</td>
+                                <td colspan="11" style="padding:20px; text-align:center; color:#999;">Loading...</td>
                             </tr>
                         </tbody>
                     </table>
@@ -654,6 +655,26 @@ def get_dashboard_screen_html():
                 return `${month.padStart(2, '0')}/${day.padStart(2, '0')}/${year.slice(-2)}`;
             }
 
+            function calculateDaysSince(isoDate) {
+                if (!isoDate) return null;
+                try {
+                    const [yearStr, monthStr, dayStr] = isoDate.split('-');
+                    const inDate = new Date(Number(yearStr), Number(monthStr) - 1, Number(dayStr));
+                    if (isNaN(inDate.getTime())) return null;
+                    
+                    const today = new Date();
+                    today.setHours(0, 0, 0, 0);
+                    inDate.setHours(0, 0, 0, 0);
+                    
+                    const diffTime = today - inDate;
+                    const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+                    
+                    return diffDays;
+                } catch (error) {
+                    return null;
+                }
+            }
+
             function addWeekdaysIso(startIso, weekdayDays) {
                 if (!startIso) return '';
                 const [yearStr, monthStr, dayStr] = startIso.split('-');
@@ -956,7 +977,7 @@ def get_dashboard_screen_html():
                 updateRoSortIndicators();
                 
                 if (sortedList.length === 0) {
-                    tbody.innerHTML = '<tr><td colspan="10" style="padding:20px; text-align:center; color:#999;">No repair orders found</td></tr>';
+                    tbody.innerHTML = '<tr><td colspan="11" style="padding:20px; text-align:center; color:#999;">No repair orders found</td></tr>';
                     return;
                 }
                 
@@ -973,6 +994,10 @@ def get_dashboard_screen_html():
                     const ecdIso = ro.ecd_date || computeEcdIso(inIso, Number(ro.hours || 0));
                     const inDisplay = formatShortDate(inIso);
                     const ecdDisplay = formatShortDate(ecdIso);
+                    
+                    // Calculate days since in date
+                    const daysSinceIn = calculateDaysSince(inIso);
+                    const daysDisplay = daysSinceIn !== null ? daysSinceIn : '-';
                     
                     // Check for sublet warning
                     const showSubletWarning = hasSubletWarning(ro);
@@ -1024,6 +1049,7 @@ def get_dashboard_screen_html():
                                     ${inDisplay}
                                 </button>
                             </td>
+                            <td style="padding:12px; border-bottom:1px solid #eee; color:#555; text-align:center; font-weight:bold;">${daysDisplay}</td>
                             <td style="padding:12px; border-bottom:1px solid #eee; color:#333;">
                                 <button id="ro-date-ecd_date-${rowId}" class="ro-date-btn" data-iso="${ecdIso}" type="button" onclick="openRoDatePicker(event, '${rowId}', '${ro.ro}', 'ecd_date', ${Number(ro.hours || 0)})" style="background:none; border:none; color:#0066cc; text-decoration:underline; cursor:pointer; padding:0; font:inherit;">
                                     ${ecdDisplay}
@@ -1037,7 +1063,7 @@ def get_dashboard_screen_html():
                             <td style="padding:12px; border-bottom:1px solid #eee; color:#333; text-align:right; font-weight:bold;">$${ro.total.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
                         </tr>
                         <tr id="tech-assignment-row-${rowId}" style="display:none; background:${rowBg};">
-                            <td colspan="10" style="padding:16px; border-bottom:1px solid #eee;">
+                            <td colspan="11" style="padding:16px; border-bottom:1px solid #eee;">
                                 <div style="background:#fafafa; border:1px solid #ddd; border-radius:6px; padding:16px;">
                                     <div style="font-weight:bold; color:#333; margin-bottom:10px;">Tech List</div>
                                     <div id="tech-assignment-list-${rowId}" style="margin-top:12px;">
@@ -1047,7 +1073,7 @@ def get_dashboard_screen_html():
                             </td>
                         </tr>
                         <tr id="notes-row-${rowId}" style="display:none; background:${rowBg};">
-                            <td colspan="10" style="padding:12px 16px; border-bottom:1px solid #eee;">
+                            <td colspan="11" style="padding:12px 16px; border-bottom:1px solid #eee;">
                                 <div style="background:#fafafa; border:1px solid #ddd; border-radius:6px; padding:12px;">
                                     <div style="font-weight:bold; margin-bottom:8px;">Notes</div>
                                     <div id="notes-list-${rowId}" style="max-height:180px; overflow-y:auto; margin-bottom:10px;"></div>
@@ -1474,6 +1500,8 @@ def get_dashboard_screen_html():
                     const rowBg = index % 2 === 0 ? '#fff' : '#f9f9f9';
                     const inDisplay = ro.in_date ? formatShortDate(ro.in_date) : '-';
                     const ecdDisplay = ro.ecd_date ? formatShortDate(ro.ecd_date) : '-';
+                    const daysSinceIn = calculateDaysSince(ro.in_date || '');
+                    const daysDisplay = daysSinceIn !== null ? daysSinceIn : '-';
                     
                     rowsHtml += `
                         <tr style="background:${rowBg};">
@@ -1484,6 +1512,7 @@ def get_dashboard_screen_html():
                             <td style="padding:10px; border-bottom:1px solid #eee;">${ro.insurance || '-'}</td>
                             <td style="padding:10px; border-bottom:1px solid #eee;">${ro.claim_number || '-'}</td>
                             <td style="padding:10px; border-bottom:1px solid #eee;">${inDisplay}</td>
+                            <td style="padding:10px; border-bottom:1px solid #eee; text-align:center; font-weight:bold;">${daysDisplay}</td>
                             <td style="padding:10px; border-bottom:1px solid #eee;">${ecdDisplay}</td>
                             <td style="padding:10px; border-bottom:1px solid #eee; text-align:right;">${ro.hours.toFixed(1)}</td>
                             <td style="padding:10px; border-bottom:1px solid #eee; text-align:right;">$${ro.total.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
@@ -1578,6 +1607,7 @@ def get_dashboard_screen_html():
                                         <th>Insurance</th>
                                         <th>Claim #</th>
                                         <th>In</th>
+                                        <th style="text-align:center;">⏳</th>
                                         <th>ECD</th>
                                         <th style="text-align:right;">HRS</th>
                                         <th style="text-align:right;">Total</th>
