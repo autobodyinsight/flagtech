@@ -1911,7 +1911,7 @@ def get_dashboard_screen_html():
             }
             
             function printVehicleTag(data) {
-                const printWindow = window.open('', '_blank', 'width=600,height=800');
+                const printWindow = window.open('', '_blank', 'width=800,height=1000');
                 if (!printWindow) return;
                 
                 const techDisplay = data.techs.body || '';
@@ -1928,210 +1928,218 @@ def get_dashboard_screen_html():
                                 }
                                 body {
                                     font-family: Arial, sans-serif;
-                                    padding: 30px;
+                                    padding: 40px;
                                     color: #222;
-                                    display: flex;
-                                    flex-direction: column;
-                                    min-height: calc(100vh - 1in);
                                 }
-                                .top-line {
+                                .line {
                                     display: flex;
                                     justify-content: space-between;
                                     align-items: baseline;
                                     margin-bottom: 15px;
                                 }
-                                .ro-section {
-                                    font-size: 52px;
-                                    font-weight: bold;
-                                    color: #d32f2f;
-                                }
                                 .vehicle-info {
                                     font-size: 38px;
                                     font-weight: bold;
+                                }
+                                .ro-section {
+                                    font-size: 156px;
+                                    font-weight: bold;
+                                    color: #d32f2f;
                                     text-align: right;
                                 }
-                                .second-line {
-                                    display: flex;
-                                    justify-content: space-between;
-                                    align-items: baseline;
-                                    margin-bottom: 30px;
-                                    padding-bottom: 20px;
-                                    border-bottom: 3px solid #333;
+                                .vin-info {
+                                    font-size: 32px;
+                                    color: #333;
                                 }
                                 .tech-section {
                                     font-size: 32px;
                                     color: #333;
-                                }
-                                .vin-info {
-                                    font-size: 28px;
-                                    color: #555;
                                     text-align: right;
                                 }
-                                .customer-section {
-                                    margin: 30px 0;
-                                    padding: 30px;
-                                    display: flex;
-                                    flex-direction: column;
-                                    align-items: center;
-                                    text-align: center;
+                                .separator {
+                                    border-top: 2px solid #333;
+                                    margin: 25px 0;
                                 }
-                                .customer-label {
-                                    font-weight: bold;
-                                    color: #555;
-                                    font-size: 72px;
-                                    margin-bottom: 20px;
-                                }
-                                .customer-content {
-                                    font-size: 32px;
-                                    line-height: 1.8;
-                                    color: #222;
-                                }
-                                .info-section {
+                                .two-col {
                                     display: grid;
                                     grid-template-columns: 1fr 1fr;
-                                    gap: 25px;
+                                    gap: 40px;
                                     margin-bottom: 30px;
                                 }
-                                .info-item {
-                                    display: flex;
-                                    flex-direction: column;
-                                    gap: 8px;
-                                }
-                                .info-label {
-                                    font-size: 20px;
+                                .section-label {
+                                    font-size: 36px;
                                     font-weight: bold;
-                                    color: #666;
+                                    color: #555;
+                                    margin-bottom: 10px;
                                     text-transform: uppercase;
                                 }
-                                .info-value {
+                                .section-content {
                                     font-size: 28px;
                                     color: #222;
+                                    line-height: 1.6;
                                 }
-                                .checklist-section {
-                                    margin-top: auto;
-                                    padding-top: 30px;
-                                    border-top: 2px solid #ddd;
-                                }
-                                .checklist-title {
-                                    font-size: 24px;
-                                    font-weight: bold;
-                                    margin-bottom: 20px;
-                                    color: #333;
-                                }
-                                .checklist-grid {
+                                .date-section {
                                     display: grid;
-                                    grid-template-columns: repeat(7, 1fr);
-                                    gap: 10px;
+                                    grid-template-columns: 1fr 1fr;
+                                    gap: 40px;
+                                    margin: 30px 0;
+                                }
+                                .date-item {
+                                    display: flex;
+                                    flex-direction: column;
+                                }
+                                .date-label {
+                                    font-size: 32px;
+                                    font-weight: bold;
+                                    color: #555;
+                                    text-transform: uppercase;
+                                    margin-bottom: 8px;
+                                }
+                                .date-value {
+                                    font-size: 36px;
+                                    color: #222;
+                                }
+                                .checklist-container {
+                                    margin-top: 40px;
+                                }
+                                .checklist-row {
+                                    display: grid;
+                                    grid-template-columns: repeat(4, 1fr);
+                                    gap: 20px;
+                                    margin-bottom: 30px;
+                                }
+                                .checklist-row-centered {
+                                    display: flex;
+                                    justify-content: center;
+                                    gap: 20px;
                                 }
                                 .checklist-item {
                                     display: flex;
-                                    flex-direction: column;
-                                    align-items: center;
-                                    gap: 8px;
-                                    text-align: center;
+                                    align-items: flex-start;
+                                    gap: 10px;
                                 }
                                 .checkbox {
-                                    width: 28px;
-                                    height: 28px;
-                                    border: 3px solid #333;
+                                    width: 35px;
+                                    height: 35px;
+                                    border: 4px solid #333;
                                     border-radius: 4px;
                                     flex-shrink: 0;
+                                    margin-top: 3px;
+                                }
+                                .checklist-content {
+                                    display: flex;
+                                    flex-direction: column;
+                                    gap: 5px;
                                 }
                                 .checklist-label {
-                                    font-size: 18px;
+                                    font-size: 28px;
                                     font-weight: bold;
                                     color: #333;
+                                    text-transform: uppercase;
                                 }
                                 .checklist-line {
-                                    font-size: 39px;
+                                    font-size: 18px;
                                     color: #666;
                                     font-family: 'Courier New', monospace;
-                                    white-space: nowrap;
+                                    letter-spacing: 1px;
                                 }
                             </style>
                         </head>
                         <body>
-                            <div class="top-line">
-                                <div class="ro-section">
-                                    RO# ${escapeHtml(data.ro)}
-                                </div>
+                            <div class="line">
                                 <div class="vehicle-info">${escapeHtml(data.vehicle)}</div>
+                                <div class="ro-section">RO# ${escapeHtml(data.ro)}</div>
                             </div>
-                            <div class="second-line">
-                                <div class="tech-section">
-                                    Tech: ${escapeHtml(techDisplay)}
-                                </div>
+                            <div class="line">
                                 <div class="vin-info">VIN: ${escapeHtml(data.vin)}</div>
+                                <div class="tech-section">Tech: ${escapeHtml(techDisplay)}</div>
                             </div>
-                            <div class="customer-section">
-                                <div class="customer-label">CUSTOMER</div>
-                                <div class="customer-content">
-                                    ${escapeHtml(data.customer)}<br/>
-                                    ${escapeHtml(data.phone)}
+                            
+                            <div class="separator"></div>
+                            
+                            <div class="two-col">
+                                <div>
+                                    <div class="section-label">Customer</div>
+                                    <div class="section-content">
+                                        ${escapeHtml(data.customer)}<br/>
+                                        ${escapeHtml(data.phone)}
+                                    </div>
                                 </div>
-                            </div>
-                            <div class="info-section">
-                                <div class="info-item">
-                                    <div class="info-label">Insurance</div>
-                                    <div class="info-value">${escapeHtml(data.insurance)}</div>
-                                </div>
-                                <div class="info-item">
-                                    <div class="info-label">Claim #</div>
-                                    <div class="info-value">${escapeHtml(data.claim_number)}</div>
-                                </div>
-                                <div class="info-item">
-                                    <div class="info-label">In Date</div>
-                                    <div class="info-value">${formatShortDate(data.in_date)}</div>
-                                </div>
-                                <div class="info-item">
-                                    <div class="info-label">ECD</div>
-                                    <div class="info-value">${formatShortDate(data.ecd_date)}</div>
+                                <div>
+                                    <div class="section-label">Insurance</div>
+                                    <div class="section-content">
+                                        ${escapeHtml(data.insurance)}<br/>
+                                        Claim# ${escapeHtml(data.claim_number)}
+                                    </div>
                                 </div>
                             </div>
-                            <div class="checklist-section">
-                                <div class="checklist-title">Process Checklist</div>
-                                <div class="checklist-grid">
+                            
+                            <div class="date-section">
+                                <div class="date-item">
+                                    <div class="date-label">In Date</div>
+                                    <div class="date-value">${formatShortDate(data.in_date)}</div>
+                                </div>
+                                <div class="date-item">
+                                    <div class="date-label">ECD</div>
+                                    <div class="date-value">${formatShortDate(data.ecd_date)}</div>
+                                </div>
+                            </div>
+                            
+                            <div class="separator"></div>
+                            
+                            <div class="checklist-container">
+                                <div class="checklist-row">
                                     <div class="checklist-item">
                                         <div class="checkbox"></div>
-                                        <div class="checklist-label">teardown</div>
-                                        <div class="checklist-line">______/______/__________</div>
-                                        <div class="checklist-line">________________________</div>
+                                        <div class="checklist-content">
+                                            <div class="checklist-label">Teardown</div>
+                                            <div class="checklist-line">___/___/____</div>
+                                        </div>
                                     </div>
                                     <div class="checklist-item">
                                         <div class="checkbox"></div>
-                                        <div class="checklist-label">body</div>
-                                        <div class="checklist-line">______/______/__________</div>
-                                        <div class="checklist-line">________________________</div>
+                                        <div class="checklist-content">
+                                            <div class="checklist-label">Body</div>
+                                            <div class="checklist-line">___/___/____</div>
+                                        </div>
                                     </div>
                                     <div class="checklist-item">
                                         <div class="checkbox"></div>
-                                        <div class="checklist-label">parts</div>
-                                        <div class="checklist-line">______/______/__________</div>
-                                        <div class="checklist-line">________________________</div>
+                                        <div class="checklist-content">
+                                            <div class="checklist-label">Parts</div>
+                                            <div class="checklist-line">___/___/____</div>
+                                        </div>
                                     </div>
                                     <div class="checklist-item">
                                         <div class="checkbox"></div>
-                                        <div class="checklist-label">paint</div>
-                                        <div class="checklist-line">______/______/__________</div>
-                                        <div class="checklist-line">________________________</div>
+                                        <div class="checklist-content">
+                                            <div class="checklist-label">Paint</div>
+                                            <div class="checklist-line">___/___/____</div>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="checklist-row-centered">
+                                    <div class="checklist-item">
+                                        <div class="checkbox"></div>
+                                        <div class="checklist-content">
+                                            <div class="checklist-label">Reassy</div>
+                                            <div class="checklist-line">___/___/____</div>
+                                        </div>
                                     </div>
                                     <div class="checklist-item">
                                         <div class="checkbox"></div>
-                                        <div class="checklist-label">reassy</div>
-                                        <div class="checklist-line">______/______/__________</div>
-                                        <div class="checklist-line">________________________</div>
+                                        <div class="checklist-content">
+                                            <div class="checklist-label">Wash</div>
+                                            <div class="checklist-line">___/___/____</div>
+                                        </div>
                                     </div>
                                     <div class="checklist-item">
                                         <div class="checkbox"></div>
-                                        <div class="checklist-label">wash</div>
-                                        <div class="checklist-line">______/______/__________</div>
-                                        <div class="checklist-line">________________________</div>
-                                    </div>
-                                    <div class="checklist-item">
-                                        <div class="checkbox"></div>
-                                        <div class="checklist-label">qc</div>
-                                        <div class="checklist-line">______/______/__________</div>
-                                        <div class="checklist-line">________________________</div>
+                                        <div class="checklist-content">
+                                            <div class="checklist-label">QC</div>
+                                            <div class="checklist-line">___/___/____</div>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
