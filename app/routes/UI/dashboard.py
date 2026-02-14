@@ -1744,7 +1744,8 @@ def get_dashboard_screen_html():
             
             function printFileCover(data) {
                 // Generate handwritten note lines to fill the page (single column, full width)
-                const numLines = 21;
+                // Reduced to every other line for easier writing
+                const numLines = 11;
                 let noteLinesHtml = '';
                 for (let i = 0; i < numLines; i++) {
                     noteLinesHtml += '<div class="note-line">______/______/_________:_______________________________________________________________________________________________________________________________________________</div>';
@@ -1804,6 +1805,11 @@ def get_dashboard_screen_html():
                                     color: #222;
                                     font-size: 24px;
                                 }
+                                .info-value.ro-number {
+                                    font-size: 96px;
+                                    font-weight: bold;
+                                    color: #d32f2f;
+                                }
                                 .totals-section {
                                     display: flex;
                                     gap: 45px;
@@ -1842,7 +1848,7 @@ def get_dashboard_screen_html():
                                     font-size: 16px;
                                     color: #333;
                                     letter-spacing: 0.5px;
-                                    margin-bottom: 8px;
+                                    margin-bottom: 28px;
                                 }
                             </style>
                         </head>
@@ -1853,7 +1859,7 @@ def get_dashboard_screen_html():
                             <div class="info-grid">
                                 <div class="info-item">
                                     <div class="info-label">RO#:</div>
-                                    <div class="info-value">${escapeHtml(data.ro)}</div>
+                                    <div class="info-value ro-number">${escapeHtml(data.ro)}</div>
                                 </div>
                                 <div class="info-item">
                                     <div class="info-label">Vehicle:</div>
@@ -2006,7 +2012,7 @@ def get_dashboard_screen_html():
                                     display: grid;
                                     grid-template-columns: repeat(4, 1fr);
                                     gap: 20px;
-                                    margin-bottom: 60px;
+                                    margin-bottom: 120px;
                                 }
                                 .checklist-row-centered {
                                     display: flex;
@@ -2048,7 +2054,7 @@ def get_dashboard_screen_html():
                                 .signature-line {
                                     font-size: 14px;
                                     color: #888;
-                                    margin-top: 3px;
+                                    margin-top: 9px;
                                 }
                             </style>
                         </head>
