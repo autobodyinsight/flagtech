@@ -113,6 +113,7 @@ def get_techs_screen_html():
 
         <script>
         let currentModalContext = null;
+        let techPayRateById = {};
 
         // -----------------------------
         // Add Tech Modal
@@ -179,6 +180,8 @@ def get_techs_screen_html():
                 techsRes.techs.forEach(tech => {
                     const fullName = `${tech.first_name} ${tech.last_name}`;
                     const assignmentsId = `tech-assignments-${tech.id}`;
+                    const techRate = Number(tech.pay_rate || 0);
+                    techPayRateById[String(tech.id)] = techRate;
 
                     // Main tech row
                     const row = document.createElement('div');
@@ -234,7 +237,7 @@ def get_techs_screen_html():
                     row.onmouseout = function() { this.style.backgroundColor = "transparent"; };
 
                     row.onclick = function() {
-                        toggleTechAssignments(tech.id, fullName, assignmentsId);
+                        toggleTechAssignments(tech.id, fullName, assignmentsId, techRate);
                     };
 
                     const assignmentsRow = document.createElement('div');
@@ -252,17 +255,17 @@ def get_techs_screen_html():
             });
         }
 
-        function toggleTechAssignments(techId, techName, containerId) {
+        function toggleTechAssignments(techId, techName, containerId, techRate) {
             const container = document.getElementById(containerId);
             if (!container) return;
             const isVisible = container.style.display === 'block';
             container.style.display = isVisible ? 'none' : 'block';
             if (!isVisible) {
-                loadTechAssignmentsForTech(techId, techName, container);
+                loadTechAssignmentsForTech(techId, techName, container, techRate);
             }
         }
 
-        function loadTechAssignmentsForTech(techId, techName, container) {
+        function loadTechAssignmentsForTech(techId, techName, container, techRate) {
             if (!container) return;
             container.innerHTML = `
                 <div class="tech-assignments-panel">
@@ -296,7 +299,7 @@ def get_techs_screen_html():
                         return `
                             <tr style="background:#fff; border-bottom:1px solid #ddd;">
                                 <td style="font-weight:bold; color:${textColor};">
-                                    <button type="button" class="assignment-link link-button" data-ro="${ro}" data-tech-id="${techId}" data-tech="${techName.replace(/"/g, '&quot;')}" style="background:none; border:none; color:#0066cc; text-decoration:underline; cursor:pointer; padding:0; font:inherit; font-weight:bold;">
+                                    <button type="button" class="assignment-link link-button" data-ro="${ro}" data-tech-id="${techId}" data-tech-rate="${Number(techRate || 0).toFixed(2)}" data-tech="${techName.replace(/"/g, '&quot;')}" style="background:none; border:none; color:#0066cc; text-decoration:underline; cursor:pointer; padding:0; font:inherit; font-weight:bold;">
                                         RO# ${ro}
                                     </button>
                                 </td>
@@ -328,7 +331,8 @@ def get_techs_screen_html():
                             const ro = button.dataset.ro || '';
                             const techIdValue = parseInt(button.dataset.techId || '0', 10);
                             const tech = button.dataset.tech || '';
-                            openTechAssignmentModal(event, ro, techIdValue, tech);
+                            const techRateValue = parseFloat(button.dataset.techRate || '0') || 0;
+                            openTechAssignmentModal(event, ro, techIdValue, tech, techRateValue);
                         });
                     });
                 })
@@ -347,7 +351,7 @@ def get_techs_screen_html():
 
         let currentAssignmentPrintHtml = '';
 
-        function openTechAssignmentModal(event, roNumber, techId, techName) {
+        function openTechAssignmentModal(event, roNumber, techId, techName, techRate) {
             if (event) {
                 event.stopPropagation();
             }
@@ -359,7 +363,8 @@ def get_techs_screen_html():
             title.textContent = `Labor Lines - RO# ${roNumber} (${techName})`;
             body.innerHTML = '<div style="color:#777;">Loading...</div>';
             modal.style.display = 'block';
-            currentModalContext = { ro: roNumber, tech_id: techId, tech_name: techName };
+            const resolvedRate = Number.isFinite(Number(techRate)) ? Number(techRate) : Number(techPayRateById[String(techId)] || 0);
+            currentModalContext = { ro: roNumber, tech_id: techId, tech_name: techName, pay_rate: resolvedRate };
 
             fetch(`/api/tech-assignment-lines?ro=${encodeURIComponent(roNumber)}&tech_id=${encodeURIComponent(techId)}`, { credentials: 'include' })
                 .then(r => r.json())
@@ -382,9 +387,9 @@ def get_techs_screen_html():
                         const key = item.line_key || String(line);
                         return `
                             <label style="display:flex; align-items:center; gap:10px; padding:10px 8px; border-bottom:1px solid #eee; cursor:pointer;">
-                                <input type="checkbox" class="flagout-line-checkbox" data-line-key="${key}" checked onchange="updateFlagOutMasterCheckbox()" style="width:16px; height:16px; cursor:pointer;" />
-                                <div style="flex:1;"><strong>Line ${line}</strong> - ${desc}</div>
-                                <div style="min-width:80px; text-align:right; font-weight:bold;">${value} hrs</div>
+                                <input type="checkbox" class="flagout-line-checkbox" data-line-key="${key}" data-hours="${value}" checked onchange="updateFlagOutMasterCheckbox()" style="width:16px; height:16px; cursor:pointer;" />
+                                <div class="print-line-desc" style="flex:1;"><strong>Line ${line}</strong> - ${desc}</div>
+                                <div class="print-line-hours" style="min-width:80px; text-align:right; font-weight:bold;">${value} hrs</div>
                             </label>
                         `;
                     }).join('');
@@ -477,20 +482,49 @@ def get_techs_screen_html():
         }
 
         function printTechAssignment() {
+            const title = (document.getElementById('techAssignmentTitle')?.textContent || 'Repair Lines').trim();
+            const selected = Array.from(document.querySelectorAll('.flagout-line-checkbox:checked'));
+            if (selected.length === 0) {
+                alert('Select at least one line to print.');
+                return;
+            }
+
+            let totalHours = 0;
+            const lineRows = selected.map((chk) => {
+                const row = chk.closest('label');
+                const desc = row?.querySelector('.print-line-desc')?.innerText || '';
+                const hoursText = row?.querySelector('.print-line-hours')?.innerText || '';
+                const hoursVal = parseFloat(chk.getAttribute('data-hours') || '0') || 0;
+                totalHours += hoursVal;
+                return `<div class="line"><div>${desc}</div><div><strong>${hoursText}</strong></div></div>`;
+            }).join('');
+
+            const payRate = Number(currentModalContext?.pay_rate || 0);
+            const totalAmount = totalHours * payRate;
+
             const printWindow = window.open('', '_blank', 'width=900,height=700');
             if (!printWindow) return;
             printWindow.document.write(`
                 <html>
                 <head>
-                    <title>Repair Lines</title>
+                    <title>${title}</title>
                     <style>
                         body { font-family: Arial, sans-serif; padding: 20px; }
+                        h2 { margin: 0 0 14px 0; }
+                        .summary-row { display:flex; gap:18px; align-items:center; margin:0 0 14px 0; font-size:16px; font-weight:bold; }
+                        .summary-pill { padding:6px 10px; border:1px solid #ddd; border-radius:6px; background:#fafafa; }
                         .line { display:flex; justify-content:space-between; padding:8px 0; border-bottom:1px solid #eee; }
                         .line strong { margin-right: 6px; }
                     </style>
                 </head>
                 <body>
-                    ${currentAssignmentPrintHtml}
+                    <h2>${title}</h2>
+                    <div class="summary-row">
+                        <div class="summary-pill">Total HRS: ${totalHours.toFixed(1)}</div>
+                        <div class="summary-pill">Pay Rate: $${payRate.toFixed(2)}/hr</div>
+                        <div class="summary-pill">Total: $${totalAmount.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</div>
+                    </div>
+                    ${lineRows}
                 </body>
                 </html>
             `);
