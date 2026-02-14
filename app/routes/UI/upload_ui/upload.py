@@ -5,9 +5,37 @@ def get_upload_screen_html():
     """Return the HTML content for the upload screen."""
     return """
         <div id="upload" class="screen">
-            <h2>Upload an Estimate PDF</h2>
+            <style>
+                #upload.active {
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    min-height: calc(100vh - 180px);
+                }
+                #upload .upload-center {
+                    width: 100%;
+                    display: flex;
+                    justify-content: center;
+                }
+                #upload .import-button {
+                    display: inline-flex;
+                    align-items: center;
+                    justify-content: center;
+                    padding: 14px 26px;
+                    background-color: #d32f2f;
+                    color: #fff;
+                    border: none;
+                    border-radius: 4px;
+                    cursor: pointer;
+                    font-size: 16px;
+                    font-weight: bold;
+                }
+            </style>
             <form id="uploadForm" enctype="multipart/form-data">
-                <input type="file" id="fileInput" name="file" accept="application/pdf" onchange="handleFileUpload()" style="padding: 10px; cursor: pointer;" />
+                <div class="upload-center">
+                    <label for="fileInput" class="import-button">+ import</label>
+                </div>
+                <input type="file" id="fileInput" name="file" accept="application/pdf" onchange="handleFileUpload()" style="display: none;" />
             </form>
             <div id="uploadStatus"></div>
         </div>
