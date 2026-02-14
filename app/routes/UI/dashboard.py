@@ -246,6 +246,40 @@ def get_dashboard_screen_html():
             </div>
         </div>
 
+        <div id="roPrintModal" class="modal" style="display:none;">
+            <div class="modal-content" style="max-width:500px;">
+                <span class="close" onclick="closeRoPrintModal()">&times;</span>
+                <h2 id="roPrintTitle" style="margin-bottom:24px; color:#333;">Print Reports</h2>
+                <p style="margin-bottom:16px; font-weight:bold; color:#555;">Select reports to print:</p>
+                <div style="display:flex; flex-direction:column; gap:10px; margin-bottom:24px;">
+                    <label style="display:flex; align-items:center; gap:10px; padding:10px; background:#f9f9f9; border-radius:4px; cursor:pointer;">
+                        <input type="checkbox" id="printFileCover" style="width:18px; height:18px; cursor:pointer;" />
+                        <span style="font-size:15px;">File Cover Page</span>
+                    </label>
+                    <label style="display:flex; align-items:center; gap:10px; padding:10px; background:#f9f9f9; border-radius:4px; cursor:pointer;">
+                        <input type="checkbox" id="printVehicleTag" style="width:18px; height:18px; cursor:pointer;" />
+                        <span style="font-size:15px;">Vehicle Tag</span>
+                    </label>
+                    <label style="display:flex; align-items:center; gap:10px; padding:10px; background:#f9f9f9; border-radius:4px; cursor:pointer;">
+                        <input type="checkbox" id="printTechBody" style="width:18px; height:18px; cursor:pointer;" />
+                        <span style="font-size:15px;">Tech Body</span>
+                    </label>
+                    <label style="display:flex; align-items:center; gap:10px; padding:10px; background:#f9f9f9; border-radius:4px; cursor:pointer;">
+                        <input type="checkbox" id="printTechPaint" style="width:18px; height:18px; cursor:pointer;" />
+                        <span style="font-size:15px;">Tech Paint</span>
+                    </label>
+                    <label style="display:flex; align-items:center; gap:10px; padding:10px; background:#f9f9f9; border-radius:4px; cursor:pointer;">
+                        <input type="checkbox" id="printTechMech" style="width:18px; height:18px; cursor:pointer;" />
+                        <span style="font-size:15px;">Tech Mech</span>
+                    </label>
+                </div>
+                <div style="display:flex; justify-content:flex-end; gap:10px;">
+                    <button onclick="closeRoPrintModal()" style="padding:10px 20px; background:#999; color:#fff; border:none; border-radius:4px; cursor:pointer;">Cancel</button>
+                    <button onclick="generateSelectedPrints()" style="padding:10px 20px; background:#d32f2f; color:#fff; border:none; border-radius:4px; cursor:pointer; font-weight:bold;">Print</button>
+                </div>
+            </div>
+        </div>
+
         <style>
             .modal {
                 position: fixed;
@@ -1007,6 +1041,7 @@ def get_dashboard_screen_html():
                         <tr style="background:${rowBg};">
                             <td style="padding:12px; border-bottom:1px solid #eee; position:relative;">
                                 <div style="display:inline-flex; align-items:center; gap:6px;">
+                                    <button type="button" onclick="openRoPrintModal(event, '${ro.ro}')" style="background:none; border:none; color:#333; cursor:pointer; padding:0; font-size:16px; line-height:1;" title="Print Reports">🖨️</button>
                                     <button type="button" onclick="toggleRoNotesFromLink(event, '${ro.ro}')" style="background:none; border:none; color:#0066cc; text-decoration:underline; cursor:pointer; padding:0; font:inherit;">
                                         ${ro.ro}
                                     </button>
@@ -1633,6 +1668,499 @@ def get_dashboard_screen_html():
                 setTimeout(() => {
                     printWindow.print();
                 }, 250);
+            }
+            
+            // RO Print Modal Functions
+            let currentRoPrintData = null;
+            
+            function openRoPrintModal(event, roNumber) {
+                if (event) event.stopPropagation();
+                
+                // Reset checkboxes
+                document.getElementById('printFileCover').checked = false;
+                document.getElementById('printVehicleTag').checked = false;
+                document.getElementById('printTechBody').checked = false;
+                document.getElementById('printTechPaint').checked = false;
+                document.getElementById('printTechMech').checked = false;
+                
+                // Update title
+                document.getElementById('roPrintTitle').textContent = `Print Reports - RO# ${roNumber}`;
+                
+                // Store RO number for later use
+                currentRoPrintData = { ro: roNumber };
+                
+                // Show modal
+                document.getElementById('roPrintModal').style.display = 'block';
+            }
+            
+            function closeRoPrintModal() {
+                document.getElementById('roPrintModal').style.display = 'none';
+                currentRoPrintData = null;
+            }
+            
+            async function generateSelectedPrints() {
+                if (!currentRoPrintData || !currentRoPrintData.ro) {
+                    return;
+                }
+                
+                const fileCover = document.getElementById('printFileCover').checked;
+                const vehicleTag = document.getElementById('printVehicleTag').checked;
+                const techBody = document.getElementById('printTechBody').checked;
+                const techPaint = document.getElementById('printTechPaint').checked;
+                const techMech = document.getElementById('printTechMech').checked;
+                
+                if (!fileCover && !vehicleTag && !techBody && !techPaint && !techMech) {
+                    alert('Please select at least one report to print.');
+                    return;
+                }
+                
+                try {
+                    // Fetch print data
+                    const response = await fetch(`/api/ro-print-data?ro=${encodeURIComponent(currentRoPrintData.ro)}`, {
+                        credentials: 'include'
+                    });
+                    
+                    if (!response.ok) {
+                        throw new Error('Failed to load print data');
+                    }
+                    
+                    const data = await response.json();
+                    
+                    // Close modal
+                    closeRoPrintModal();
+                    
+                    // Generate selected prints
+                    if (fileCover) printFileCover(data);
+                    if (vehicleTag) printVehicleTag(data);
+                    if (techBody) printTechBody(data);
+                    if (techPaint) printTechPaint(data);
+                    if (techMech) printTechMech(data);
+                    
+                } catch (err) {
+                    console.error('Error generating prints:', err);
+                    alert('Error loading print data. Please try again.');
+                }
+            }
+            
+            function printFileCover(data) {
+                const notesHtml = data.notes && data.notes.length > 0
+                    ? data.notes.map(note => `<p style="margin:0 0 8px 0; color:#555;">${escapeHtml(note)}</p>`).join('')
+                    : '<p style="color:#999; font-style:italic;">No notes</p>';
+                
+                const techDisplay = [
+                    data.techs.body ? `Body: ${data.techs.body}` : null,
+                    data.techs.mech ? `Mech: ${data.techs.mech}` : null
+                ].filter(Boolean).join(', ') || 'Not assigned';
+                
+                const printWindow = window.open('', '_blank', 'width=1100,height=850');
+                if (!printWindow) return;
+                
+                printWindow.document.write(`
+                    <!DOCTYPE html>
+                    <html>
+                        <head>
+                            <title>File Cover Page - ${data.ro}</title>
+                            <style>
+                                @media print {
+                                    @page { 
+                                        size: landscape;
+                                        margin: 0.5in;
+                                    }
+                                    body { margin: 0; }
+                                }
+                                body {
+                                    font-family: Arial, sans-serif;
+                                    padding: 30px;
+                                    color: #222;
+                                }
+                                .header {
+                                    text-align: center;
+                                    margin-bottom: 30px;
+                                    border-bottom: 3px solid #d32f2f;
+                                    padding-bottom: 15px;
+                                }
+                                .header h1 {
+                                    margin: 0;
+                                    font-size: 32px;
+                                    color: #d32f2f;
+                                }
+                                .info-grid {
+                                    display: grid;
+                                    grid-template-columns: 1fr 1fr;
+                                    gap: 20px 40px;
+                                    margin-bottom: 30px;
+                                }
+                                .info-item {
+                                    display: flex;
+                                    gap: 10px;
+                                }
+                                .info-label {
+                                    font-weight: bold;
+                                    color: #555;
+                                    min-width: 100px;
+                                }
+                                .info-value {
+                                    color: #222;
+                                }
+                                .totals-section {
+                                    display: flex;
+                                    gap: 30px;
+                                    margin-top: 30px;
+                                    padding: 20px;
+                                    background: #f5f5f5;
+                                    border-radius: 8px;
+                                }
+                                .total-item {
+                                    flex: 1;
+                                }
+                                .total-label {
+                                    font-size: 14px;
+                                    color: #666;
+                                    margin-bottom: 5px;
+                                }
+                                .total-value {
+                                    font-size: 24px;
+                                    font-weight: bold;
+                                    color: #d32f2f;
+                                }
+                                .notes-section {
+                                    margin-top: 30px;
+                                    padding: 20px;
+                                    border: 2px solid #ddd;
+                                    border-radius: 8px;
+                                    min-height: 150px;
+                                }
+                                .notes-title {
+                                    font-weight: bold;
+                                    font-size: 18px;
+                                    margin-bottom: 15px;
+                                    color: #333;
+                                }
+                            </style>
+                        </head>
+                        <body>
+                            <div class="header">
+                                <h1>FILE COVER PAGE</h1>
+                            </div>
+                            <div class="info-grid">
+                                <div class="info-item">
+                                    <div class="info-label">RO#:</div>
+                                    <div class="info-value">${escapeHtml(data.ro)}</div>
+                                </div>
+                                <div class="info-item">
+                                    <div class="info-label">Vehicle:</div>
+                                    <div class="info-value">${escapeHtml(data.vehicle)}</div>
+                                </div>
+                                <div class="info-item">
+                                    <div class="info-label">VIN:</div>
+                                    <div class="info-value">${escapeHtml(data.vin)}</div>
+                                </div>
+                                <div class="info-item">
+                                    <div class="info-label">Insurance:</div>
+                                    <div class="info-value">${escapeHtml(data.insurance)}</div>
+                                </div>
+                                <div class="info-item">
+                                    <div class="info-label">Claim#:</div>
+                                    <div class="info-value">${escapeHtml(data.claim_number)}</div>
+                                </div>
+                                <div class="info-item">
+                                    <div class="info-label">In Date:</div>
+                                    <div class="info-value">${formatShortDate(data.in_date)}</div>
+                                </div>
+                                <div class="info-item">
+                                    <div class="info-label">ECD:</div>
+                                    <div class="info-value">${formatShortDate(data.ecd_date)}</div>
+                                </div>
+                                <div class="info-item">
+                                    <div class="info-label">Tech:</div>
+                                    <div class="info-value">${escapeHtml(techDisplay)}</div>
+                                </div>
+                            </div>
+                            <div class="totals-section">
+                                <div class="total-item">
+                                    <div class="total-label">Total</div>
+                                    <div class="total-value">$${data.totals.grand_total.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</div>
+                                </div>
+                                <div class="total-item">
+                                    <div class="total-label">Insurance Total</div>
+                                    <div class="total-value">$${data.totals.insurance_total.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</div>
+                                </div>
+                                <div class="total-item">
+                                    <div class="total-label">Customer Total</div>
+                                    <div class="total-value">$${data.totals.customer_total.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</div>
+                                </div>
+                            </div>
+                            <div class="notes-section">
+                                <div class="notes-title">Notes</div>
+                                ${notesHtml}
+                            </div>
+                        </body>
+                    </html>
+                `);
+                printWindow.document.close();
+                printWindow.focus();
+                setTimeout(() => printWindow.print(), 250);
+            }
+            
+            function printVehicleTag(data) {
+                const printWindow = window.open('', '_blank', 'width=600,height=800');
+                if (!printWindow) return;
+                
+                const techDisplay = [
+                    data.techs.body ? `Body: ${data.techs.body}` : null,
+                    data.techs.paint ? `Paint: ${data.techs.paint}` : null,
+                    data.techs.mech ? `Mech: ${data.techs.mech}` : null
+                ].filter(Boolean).join(', ') || 'Not assigned';
+                
+                printWindow.document.write(`
+                    <!DOCTYPE html>
+                    <html>
+                        <head>
+                            <title>Vehicle Tag - ${data.ro}</title>
+                            <style>
+                                @media print {
+                                    @page { margin: 0.5in; }
+                                    body { margin: 0; }
+                                }
+                                body {
+                                    font-family: Arial, sans-serif;
+                                    padding: 20px;
+                                    color: #222;
+                                }
+                                .top-section {
+                                    display: grid;
+                                    grid-template-columns: 1fr 1fr;
+                                    gap: 20px;
+                                    margin-bottom: 20px;
+                                    padding-bottom: 20px;
+                                    border-bottom: 2px solid #333;
+                                }
+                                .ro-section {
+                                    font-size: 28px;
+                                    font-weight: bold;
+                                    color: #d32f2f;
+                                }
+                                .vehicle-section {
+                                    text-align: right;
+                                }
+                                .vehicle-info {
+                                    font-size: 18px;
+                                    font-weight: bold;
+                                    margin-bottom: 5px;
+                                }
+                                .vin-info {
+                                    font-size: 14px;
+                                    color: #555;
+                                }
+                                .customer-section {
+                                    margin: 20px 0;
+                                    padding: 20px;
+                                    background: #f9f9f9;
+                                    border-radius: 8px;
+                                    font-size: 18px;
+                                    line-height: 1.8;
+                                }
+                                .customer-label {
+                                    font-weight: bold;
+                                    color: #555;
+                                    font-size: 14px;
+                                    margin-bottom: 10px;
+                                }
+                                .info-section {
+                                    display: grid;
+                                    grid-template-columns: 1fr 1fr;
+                                    gap: 15px;
+                                    margin-top: 20px;
+                                }
+                                .info-item {
+                                    display: flex;
+                                    flex-direction: column;
+                                    gap: 5px;
+                                }
+                                .info-label {
+                                    font-size: 12px;
+                                    font-weight: bold;
+                                    color: #666;
+                                    text-transform: uppercase;
+                                }
+                                .info-value {
+                                    font-size: 16px;
+                                    color: #222;
+                                }
+                            </style>
+                        </head>
+                        <body>
+                            <div class="top-section">
+                                <div class="ro-section">
+                                    RO# ${escapeHtml(data.ro)}
+                                </div>
+                                <div class="vehicle-section">
+                                    <div class="vehicle-info">${escapeHtml(data.vehicle)}</div>
+                                    <div class="vin-info">VIN: ${escapeHtml(data.vin)}</div>
+                                </div>
+                            </div>
+                            <div class="customer-section">
+                                <div class="customer-label">CUSTOMER</div>
+                                <div style="white-space: pre-wrap;">${escapeHtml(data.customer_full)}</div>
+                            </div>
+                            <div class="info-section">
+                                <div class="info-item">
+                                    <div class="info-label">Insurance</div>
+                                    <div class="info-value">${escapeHtml(data.insurance)}</div>
+                                </div>
+                                <div class="info-item">
+                                    <div class="info-label">Claim #</div>
+                                    <div class="info-value">${escapeHtml(data.claim_number)}</div>
+                                </div>
+                                <div class="info-item">
+                                    <div class="info-label">In Date</div>
+                                    <div class="info-value">${formatShortDate(data.in_date)}</div>
+                                </div>
+                                <div class="info-item">
+                                    <div class="info-label">ECD</div>
+                                    <div class="info-value">${formatShortDate(data.ecd_date)}</div>
+                                </div>
+                                <div class="info-item" style="grid-column: 1 / -1;">
+                                    <div class="info-label">Tech</div>
+                                    <div class="info-value">${escapeHtml(techDisplay)}</div>
+                                </div>
+                            </div>
+                        </body>
+                    </html>
+                `);
+                printWindow.document.close();
+                printWindow.focus();
+                setTimeout(() => printWindow.print(), 250);
+            }
+            
+            function printTechBody(data) {
+                printTechLines(data, 'Body', data.body_lines, data.techs.body);
+            }
+            
+            function printTechPaint(data) {
+                printTechLines(data, 'Paint', data.paint_lines, data.techs.paint);
+            }
+            
+            function printTechMech(data) {
+                printTechLines(data, 'Mech', data.mech_lines, data.techs.mech);
+            }
+            
+            function printTechLines(data, typeName, lines, techName) {
+                if (!lines || lines.length === 0) {
+                    alert(`No ${typeName} lines found for this RO.`);
+                    return;
+                }
+                
+                const totalHours = lines.reduce((sum, line) => sum + line.hours, 0);
+                
+                const linesHtml = lines.map((line, idx) => {
+                    const rowBg = idx % 2 === 0 ? '#fff' : '#f9f9f9';
+                    return `
+                        <tr style="background:${rowBg};">
+                            <td style="padding:10px; border-bottom:1px solid #eee;">${escapeHtml(line.line || '-')}</td>
+                            <td style="padding:10px; border-bottom:1px solid #eee;">${escapeHtml(line.description)}</td>
+                            <td style="padding:10px; border-bottom:1px solid #eee; text-align:right; font-weight:bold;">${line.hours.toFixed(1)}</td>
+                        </tr>
+                    `;
+                }).join('');
+                
+                const printWindow = window.open('', '_blank', 'width=980,height=760');
+                if (!printWindow) return;
+                
+                printWindow.document.write(`
+                    <!DOCTYPE html>
+                    <html>
+                        <head>
+                            <title>Tech ${typeName} - ${data.ro}</title>
+                            <style>
+                                @media print {
+                                    @page { margin: 0.5in; }
+                                    body { margin: 0; }
+                                }
+                                body {
+                                    font-family: Arial, sans-serif;
+                                    padding: 28px;
+                                    color: #222;
+                                }
+                                .header {
+                                    display: flex;
+                                    justify-content: space-between;
+                                    align-items: center;
+                                    margin-bottom: 25px;
+                                    padding-bottom: 15px;
+                                    border-bottom: 2px solid #d32f2f;
+                                }
+                                .title {
+                                    font-size: 28px;
+                                    font-weight: bold;
+                                    color: #d32f2f;
+                                }
+                                .meta {
+                                    text-align: right;
+                                    font-size: 14px;
+                                    line-height: 1.7;
+                                }
+                                table {
+                                    width: 100%;
+                                    border-collapse: collapse;
+                                    margin-top: 16px;
+                                }
+                                thead th {
+                                    text-align: left;
+                                    background: #f5f5f5;
+                                    padding: 12px 10px;
+                                    border-bottom: 2px solid #ddd;
+                                    font-weight: bold;
+                                }
+                                thead th:last-child {
+                                    text-align: right;
+                                }
+                                .total {
+                                    margin-top: 20px;
+                                    font-size: 20px;
+                                    font-weight: bold;
+                                    text-align: right;
+                                    color: #d32f2f;
+                                }
+                            </style>
+                        </head>
+                        <body>
+                            <div class="header">
+                                <div class="title">Tech ${typeName} Lines</div>
+                                <div class="meta">
+                                    <div><strong>RO#:</strong> ${escapeHtml(data.ro)}</div>
+                                    <div><strong>Tech:</strong> ${escapeHtml(techName || 'Unassigned')}</div>
+                                    <div><strong>Vehicle:</strong> ${escapeHtml(data.vehicle)}</div>
+                                </div>
+                            </div>
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th style="width:15%;">Line</th>
+                                        <th style="width:65%;">Description</th>
+                                        <th style="width:20%;">Hours</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    ${linesHtml}
+                                </tbody>
+                            </table>
+                            <div class="total">
+                                Total Hours: ${totalHours.toFixed(1)}
+                            </div>
+                        </body>
+                    </html>
+                `);
+                printWindow.document.close();
+                printWindow.focus();
+                setTimeout(() => printWindow.print(), 250);
+            }
+            
+            function escapeHtml(text) {
+                if (!text) return '';
+                const div = document.createElement('div');
+                div.textContent = text;
+                return div.innerHTML;
             }
             
             // Load dashboard data when dashboard screen is shown

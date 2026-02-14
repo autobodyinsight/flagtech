@@ -2157,3 +2157,191 @@ async def get_ro_tech_detail(request: Request, ro: str, tech_id: int, role: str)
         }
     finally:
         cur.close()
+
+
+@router.get("/ro-print-data")
+async def get_ro_print_data(request: Request, ro: str):
+    """Get all data needed for printing RO reports."""
+    domain = get_user_domain(request)
+    if not domain:
+        return JSONResponse(status_code=401, content={"error": "Not authenticated"})
+
+    ro_value = (ro or "").strip()
+    if not ro_value:
+        return JSONResponse(status_code=400, content={"error": "ro is required"})
+
+    conn = get_conn()
+    cur = conn.cursor()
+    try:
+        _ensure_saved_estimates_table(cur)
+        _ensure_ro_assignments_table(cur)
+        _ensure_ro_notes_table(cur)
+        _ensure_ro_line_assignments_table(cur)
+        
+        # Get estimate data
+        cur.execute(
+            """
+            SELECT 
+                ro, vehicle, year, make, model, vin,
+                owner_info, insurance_company, claim_number,
+                phone_original, phone_override,
+                in_date, ecd_date,
+                labor_repairs, paint_repairs, parts_repairs,
+                parts_total, grand_total, deductible, customer_pay, insurance_pay
+            FROM saved_estimates
+            WHERE domain = %s AND ro = %s
+            ORDER BY saved_at DESC, id DESC
+            LIMIT 1
+            """,
+            (domain, ro_value),
+        )
+        estimate_row = cur.fetchone()
+        
+        if not estimate_row:
+            return JSONResponse(status_code=404, content={"error": "RO not found"})
+        
+        # Parse repairs
+        labor_repairs = _parse_json_field(estimate_row.get("labor_repairs"))
+        paint_repairs = _parse_json_field(estimate_row.get("paint_repairs"))
+        parts_repairs = _parse_json_field(estimate_row.get("parts_repairs"))
+        
+        if not isinstance(labor_repairs, list):
+            labor_repairs = []
+        if not isinstance(paint_repairs, list):
+            paint_repairs = []
+        if not isinstance(parts_repairs, list):
+            parts_repairs = []
+        
+        # Get tech assignments
+        cur.execute(
+            """
+            SELECT role, tech_id, tech_name
+            FROM ro_assignments
+            WHERE domain = %s AND ro = %s
+            """,
+            (domain, ro_value),
+        )
+        assignment_rows = cur.fetchall()
+        
+        tech_assignments = {
+            "body": None,
+            "paint": None,
+            "mech": None
+        }
+        
+        for assignment in assignment_rows:
+            role = assignment.get("role", "").lower()
+            if role in tech_assignments:
+                tech_assignments[role] = assignment.get("tech_name")
+        
+        # Get line assignments to determine which lines belong to which techs/types
+        _ensure_ro_line_assignments_for_ro(cur, domain, ro_value)
+        
+        cur.execute(
+            """
+            SELECT repair_type, tech_name, line_key, line_number, description, hours
+            FROM ro_line_assignments
+            WHERE domain = %s AND ro = %s
+            ORDER BY repair_type, line_number
+            """,
+            (domain, ro_value),
+        )
+        line_assignments = cur.fetchall()
+        
+        # Organize lines by repair type and tech
+        body_lines = []
+        paint_lines = []
+        mech_lines = []
+        
+        for line in line_assignments:
+            repair_type = _normalize_repair_type(line.get("repair_type", ""))
+            line_data = {
+                "line": line.get("line_number") or "",
+                "description": line.get("description") or "",
+                "hours": float(line.get("hours") or 0),
+                "tech": line.get("tech_name") or "Unassigned"
+            }
+            
+            if repair_type == "body":
+                body_lines.append(line_data)
+            elif repair_type == "paint":
+                paint_lines.append(line_data)
+            elif repair_type in ("mech", "mechanical"):
+                mech_lines.append(line_data)
+        
+        # Get notes
+        cur.execute(
+            """
+            SELECT note, created_at
+            FROM ro_notes
+            WHERE domain = %s AND ro = %s
+            ORDER BY created_at DESC
+            """,
+            (domain, ro_value),
+        )
+        note_rows = cur.fetchall()
+        notes = [row.get("note") for row in note_rows]
+        
+        # Parse customer info
+        owner_info = estimate_row.get("owner_info") or ""
+        customer_name = ""
+        if owner_info:
+            lines = owner_info.split("\n")
+            if lines:
+                customer_name = lines[0].strip()
+        
+        # Format phone
+        phone_override = (estimate_row.get("phone_override") or "").strip()
+        phone_original = (estimate_row.get("phone_original") or "").strip()
+        phone = phone_override or phone_original or ""
+        
+        # Format vehicle
+        year = (estimate_row.get("year") or "").strip()
+        make = (estimate_row.get("make") or "").strip()
+        model = (estimate_row.get("model") or "").strip()
+        vehicle = " ".join(part for part in (year, make, model) if part) or estimate_row.get("vehicle") or ""
+        
+        # Format dates
+        in_date = estimate_row.get("in_date")
+        ecd_date = estimate_row.get("ecd_date")
+        in_date_str = in_date.isoformat() if in_date else ""
+        ecd_date_str = ecd_date.isoformat() if ecd_date else ""
+        
+        # Calculate totals
+        grand_total = float(estimate_row.get("grand_total") or 0)
+        insurance_pay = float(estimate_row.get("insurance_pay") or 0)
+        customer_pay = float(estimate_row.get("customer_pay") or 0)
+        deductible = float(estimate_row.get("deductible") or 0)
+        
+        # If customer_pay is 0, try to calculate it
+        if customer_pay == 0 and deductible > 0:
+            customer_pay = deductible
+        
+        # If insurance_pay is 0, calculate it
+        if insurance_pay == 0 and grand_total > 0:
+            insurance_pay = grand_total - customer_pay
+        
+        return {
+            "ro": ro_value,
+            "vehicle": vehicle,
+            "vin": estimate_row.get("vin") or "",
+            "customer": customer_name,
+            "customer_full": owner_info,
+            "phone": phone,
+            "insurance": estimate_row.get("insurance_company") or "",
+            "claim_number": estimate_row.get("claim_number") or "",
+            "in_date": in_date_str,
+            "ecd_date": ecd_date_str,
+            "techs": tech_assignments,
+            "totals": {
+                "grand_total": grand_total,
+                "insurance_total": insurance_pay,
+                "customer_total": customer_pay
+            },
+            "body_lines": body_lines,
+            "paint_lines": paint_lines,
+            "mech_lines": mech_lines,
+            "notes": notes
+        }
+    finally:
+        cur.close()
