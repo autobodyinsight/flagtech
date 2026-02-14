@@ -2244,22 +2244,27 @@ async def get_flagout_techs(request: Request):
     cur = conn.cursor()
     try:
         _ensure_ro_flagout_lines_table(cur)
+                _ensure_techs_table(cur)
 
         cur.execute(
             """
             SELECT
                 f.tech_id,
                 COALESCE(MAX(NULLIF(TRIM(f.tech_name), '')), CONCAT('Tech #', f.tech_id::text)) AS tech_name,
+                                COALESCE(MAX(NULLIF(TRIM(t.role), '')), '') AS role,
                 COALESCE(MAX(f.pay_rate), 0) AS pay_rate,
                 COALESCE(SUM(f.hours), 0) AS total_hours,
                 COALESCE(SUM(f.pay_amount), 0) AS total_pay
             FROM ro_flagout_lines f
+                        LEFT JOIN techs t
+                            ON t.id = f.tech_id
+                         AND (t.domain = %s OR t.domain IS NULL)
             WHERE f.domain = %s
               AND f.status = 'ready_to_flag'
             GROUP BY f.tech_id
             ORDER BY COALESCE(MAX(NULLIF(TRIM(f.tech_name), '')), CONCAT('Tech #', f.tech_id::text))
             """,
-            (domain,),
+                        (domain, domain),
         )
         tech_rows = cur.fetchall() or []
 
@@ -2325,6 +2330,7 @@ async def get_flagout_techs(request: Request):
                 {
                     "tech_id": tech_id,
                     "tech_name": row.get("tech_name") or f"Tech #{tech_id}",
+                    "role": (row.get("role") or "").strip(),
                     "pay_rate": _parse_float_value(row.get("pay_rate")),
                     "total_hours": _parse_float_value(row.get("total_hours")),
                     "total_pay": _parse_float_value(row.get("total_pay")),

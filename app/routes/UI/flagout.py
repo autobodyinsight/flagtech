@@ -11,7 +11,8 @@ def get_flagtech_screen_html():
             <h2 style="margin-bottom:16px;">Tech List</h2>
             <div id="flagoutTechTable" style="width:100%; border:1px solid #ddd; border-radius:4px; overflow:hidden; background:#fff;">
                 <div style="display:flex; justify-content:space-between; align-items:center; padding:12px; background-color:#f5f5f5; border-bottom:2px solid #ddd; font-weight:bold;">
-                    <div style="flex:2; text-align:left;">Tech Name</div>
+                    <div style="flex:1.8; text-align:left;">Tech Name</div>
+                    <div style="flex:1; text-align:center;">Role</div>
                     <div style="flex:1; text-align:center;">Pay Rate</div>
                     <div style="flex:1; text-align:right;">Total HRS</div>
                 </div>
@@ -100,6 +101,7 @@ def get_flagtech_screen_html():
                 const html = techs.map((tech) => {
                     const techId = Number(tech.tech_id || 0);
                     const name = tech.tech_name || `Tech #${techId}`;
+                    const role = (tech.role || '').trim() || '-';
                     const payRate = Number(tech.pay_rate || 0);
                     const totalHours = Number(tech.total_hours || 0);
                     const roRows = (tech.ros || []).map((roItem) => {
@@ -140,9 +142,10 @@ def get_flagtech_screen_html():
 
                     return `
                         <div class="flagout-tech-row">
-                            <div style="flex:2;">
+                            <div style="flex:1.8;">
                                 <button type="button" class="flagout-tech-toggle" onclick="toggleFlagoutTechRos(${techId})">${name}</button>
                             </div>
+                            <div style="flex:1; text-align:center;">${role}</div>
                             <div style="flex:1; text-align:center;">${formatCurrency(payRate)}/hr</div>
                             <div style="flex:1; text-align:right; font-weight:bold;">${totalHours.toFixed(1)}</div>
                         </div>
