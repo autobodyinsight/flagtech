@@ -15,7 +15,7 @@ def get_flagtech_screen_html():
         <div style="margin-top:20px;">
             <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:16px;">
                 <h2 style="margin:0;">Tech List</h2>
-                <button id="flagoutPayoutBtn" onclick="submitFlagoutPayout()" style="display:none; padding:10px 20px; background:#d32f2f; color:#fff; border:none; border-radius:4px; cursor:pointer; font-weight:bold;">
+                <button id="flagoutPayoutBtn" onclick="openFlagoutPayoutConfirm()" style="display:none; padding:10px 20px; background:#d32f2f; color:#fff; border:none; border-radius:4px; cursor:pointer; font-weight:bold;">
                     payout
                 </button>
             </div>
@@ -41,6 +41,16 @@ def get_flagtech_screen_html():
                     <button onclick="printFlagoutPayoutSummary()" style="padding:10px 20px; background:#d32f2f; color:#fff; border:none; border-radius:4px; cursor:pointer; font-weight:bold;">
                         Print
                     </button>
+                </div>
+            </div>
+        </div>
+
+        <div id="flagoutPayoutConfirmModal" class="modal" style="display:none;">
+            <div class="modal-content" style="max-width:460px; background:#f2f2f2;">
+                <h3 style="margin:0 0 16px 0; text-align:center;">YOU’RE ABOUT TO PAYOUT, CONFIRM</h3>
+                <div style="display:flex; justify-content:center; gap:10px;">
+                    <button onclick="closeFlagoutPayoutConfirm()" style="padding:10px 20px; background:#777; color:#fff; border:none; border-radius:4px; cursor:pointer;">Cancel</button>
+                    <button onclick="confirmFlagoutPayout()" style="padding:10px 20px; background:#d32f2f; color:#fff; border:none; border-radius:4px; cursor:pointer; font-weight:bold;">Confirm</button>
                 </div>
             </div>
         </div>
@@ -111,6 +121,7 @@ def get_flagtech_screen_html():
             let currentFlagoutTechs = [];
             let selectedFlagoutRosByTech = {};
             let lastFlagoutPayoutSummaries = [];
+            let openFlagoutTechIds = new Set();
 
             function formatCurrency(amount) {
                 const value = Number(amount || 0);
@@ -179,6 +190,23 @@ def get_flagtech_screen_html():
                 if (modal) {
                     modal.style.display = 'none';
                 }
+            }
+
+            function openFlagoutPayoutConfirm() {
+                const modal = document.getElementById('flagoutPayoutConfirmModal');
+                if (!modal) return;
+                modal.style.display = 'block';
+            }
+
+            function closeFlagoutPayoutConfirm() {
+                const modal = document.getElementById('flagoutPayoutConfirmModal');
+                if (!modal) return;
+                modal.style.display = 'none';
+            }
+
+            function confirmFlagoutPayout() {
+                closeFlagoutPayoutConfirm();
+                submitFlagoutPayout();
             }
 
             function showFlagoutPayoutSummary(summaries) {
@@ -313,6 +341,9 @@ def get_flagtech_screen_html():
 
                 currentFlagoutTechs = Array.isArray(techs) ? techs : [];
 
+                const visibleTechIds = new Set((currentFlagoutTechs || []).map(item => String(Number(item.tech_id || 0))));
+                openFlagoutTechIds = new Set(Array.from(openFlagoutTechIds).filter(id => visibleTechIds.has(String(id))));
+
                 if (!techs || techs.length === 0) {
                     container.innerHTML = "<div style='padding:14px; color:#777; text-align:center;'>No flagged-out RO lines yet.</div>";
                     return;
@@ -329,6 +360,7 @@ def get_flagtech_screen_html():
                     const selectedCount = selectedSet.size;
                     const techChecked = roCount > 0 && selectedCount === roCount;
                     const techPartial = selectedCount > 0 && selectedCount < roCount;
+                    const isOpen = openFlagoutTechIds.has(String(techId));
                     const roRows = (tech.ros || []).map((roItem) => {
                         const ro = roItem.ro || '—';
                         const vehicleInfo = roItem.vehicle_info || '—';
@@ -381,7 +413,7 @@ def get_flagtech_screen_html():
                             <div style="flex:1; text-align:center;">${formatCurrency(payRate)}/hr</div>
                             <div style="flex:1; text-align:right; font-weight:bold;">${totalHours.toFixed(1)}</div>
                         </div>
-                        <div id="flagout-ros-${techId}" class="flagout-ros-wrap">${roTable}</div>
+                        <div id="flagout-ros-${techId}" class="flagout-ros-wrap" style="display:${isOpen ? 'block' : 'none'};">${roTable}</div>
                     `;
                 }).join('');
 
@@ -397,7 +429,14 @@ def get_flagtech_screen_html():
             function toggleFlagoutTechRos(techId) {
                 const row = document.getElementById(`flagout-ros-${techId}`);
                 if (!row) return;
-                row.style.display = row.style.display === 'block' ? 'none' : 'block';
+                const key = String(techId);
+                const willOpen = row.style.display !== 'block';
+                row.style.display = willOpen ? 'block' : 'none';
+                if (willOpen) {
+                    openFlagoutTechIds.add(key);
+                } else {
+                    openFlagoutTechIds.delete(key);
+                }
             }
 
             function loadFlagoutTechs() {
