@@ -839,7 +839,8 @@ def get_dashboard_screen_html():
                                 desc.includes('fender wheel') ||
                                 desc.includes('wheel pick up') ||
                                 desc.includes('wheelhouse') ||
-                                desc.includes('wheel opng mldg')
+                                desc.includes('wheel opng mldg') ||
+                                desc.includes('wheel opening mldg')
                             )) {
                                 continue;
                             }
