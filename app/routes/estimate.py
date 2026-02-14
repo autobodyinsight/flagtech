@@ -2244,7 +2244,7 @@ async def get_flagout_techs(request: Request):
     cur = conn.cursor()
     try:
         _ensure_ro_flagout_lines_table(cur)
-                _ensure_techs_table(cur)
+        _ensure_techs_table(cur)
 
         cur.execute(
             """
