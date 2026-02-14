@@ -2006,12 +2006,14 @@ def get_dashboard_screen_html():
                                     display: grid;
                                     grid-template-columns: repeat(4, 1fr);
                                     gap: 20px;
-                                    margin-bottom: 30px;
+                                    margin-bottom: 60px;
                                 }
                                 .checklist-row-centered {
                                     display: flex;
-                                    justify-content: center;
-                                    gap: 20px;
+                                    justify-content: space-around;
+                                    gap: 60px;
+                                    max-width: 80%;
+                                    margin: 0 auto;
                                 }
                                 .checklist-item {
                                     display: flex;
@@ -2038,10 +2040,15 @@ def get_dashboard_screen_html():
                                     text-transform: uppercase;
                                 }
                                 .checklist-line {
-                                    font-size: 18px;
+                                    font-size: 36px;
                                     color: #666;
                                     font-family: 'Courier New', monospace;
                                     letter-spacing: 1px;
+                                }
+                                .signature-line {
+                                    font-size: 14px;
+                                    color: #888;
+                                    margin-top: 3px;
                                 }
                             </style>
                         </head>
@@ -2094,6 +2101,7 @@ def get_dashboard_screen_html():
                                         <div class="checklist-content">
                                             <div class="checklist-label">Teardown</div>
                                             <div class="checklist-line">___/___/____</div>
+                                            <div class="signature-line">Inspected by: ________________</div>
                                         </div>
                                     </div>
                                     <div class="checklist-item">
@@ -2101,6 +2109,7 @@ def get_dashboard_screen_html():
                                         <div class="checklist-content">
                                             <div class="checklist-label">Body</div>
                                             <div class="checklist-line">___/___/____</div>
+                                            <div class="signature-line">Inspected by: ________________</div>
                                         </div>
                                     </div>
                                     <div class="checklist-item">
@@ -2108,6 +2117,7 @@ def get_dashboard_screen_html():
                                         <div class="checklist-content">
                                             <div class="checklist-label">Parts</div>
                                             <div class="checklist-line">___/___/____</div>
+                                            <div class="signature-line">Inspected by: ________________</div>
                                         </div>
                                     </div>
                                     <div class="checklist-item">
@@ -2115,6 +2125,7 @@ def get_dashboard_screen_html():
                                         <div class="checklist-content">
                                             <div class="checklist-label">Paint</div>
                                             <div class="checklist-line">___/___/____</div>
+                                            <div class="signature-line">Inspected by: ________________</div>
                                         </div>
                                     </div>
                                 </div>
@@ -2125,6 +2136,7 @@ def get_dashboard_screen_html():
                                         <div class="checklist-content">
                                             <div class="checklist-label">Reassy</div>
                                             <div class="checklist-line">___/___/____</div>
+                                            <div class="signature-line">Inspected by: ________________</div>
                                         </div>
                                     </div>
                                     <div class="checklist-item">
@@ -2132,6 +2144,7 @@ def get_dashboard_screen_html():
                                         <div class="checklist-content">
                                             <div class="checklist-label">Wash</div>
                                             <div class="checklist-line">___/___/____</div>
+                                            <div class="signature-line">Inspected by: ________________</div>
                                         </div>
                                     </div>
                                     <div class="checklist-item">
@@ -2139,6 +2152,7 @@ def get_dashboard_screen_html():
                                         <div class="checklist-content">
                                             <div class="checklist-label">QC</div>
                                             <div class="checklist-line">___/___/____</div>
+                                            <div class="signature-line">Inspected by: ________________</div>
                                         </div>
                                     </div>
                                 </div>
