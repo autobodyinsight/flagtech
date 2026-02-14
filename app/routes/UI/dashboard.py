@@ -241,6 +241,7 @@ def get_dashboard_screen_html():
                     <button onclick="printRoList('insurance')" style="padding:12px 20px; background:#f5f5f5; color:#333; border:1px solid #ddd; border-radius:4px; cursor:pointer; text-align:left; font-size:15px; transition:background 0.2s;" onmouseover="this.style.background='#e8e8e8'" onmouseout="this.style.background='#f5f5f5'">Insurance</button>
                     <button onclick="printRoList('in_date')" style="padding:12px 20px; background:#f5f5f5; color:#333; border:1px solid #ddd; border-radius:4px; cursor:pointer; text-align:left; font-size:15px; transition:background 0.2s;" onmouseover="this.style.background='#e8e8e8'" onmouseout="this.style.background='#f5f5f5'">In date</button>
                     <button onclick="printRoList('ecd_date')" style="padding:12px 20px; background:#f5f5f5; color:#333; border:1px solid #ddd; border-radius:4px; cursor:pointer; text-align:left; font-size:15px; transition:background 0.2s;" onmouseover="this.style.background='#e8e8e8'" onmouseout="this.style.background='#f5f5f5'">ECD</button>
+                    <button onclick="printRoList('tech')" style="padding:12px 20px; background:#f5f5f5; color:#333; border:1px solid #ddd; border-radius:4px; cursor:pointer; text-align:left; font-size:15px; transition:background 0.2s;" onmouseover="this.style.background='#e8e8e8'" onmouseout="this.style.background='#f5f5f5'">Tech</button>
                 </div>
             </div>
         </div>
@@ -1444,7 +1445,7 @@ def get_dashboard_screen_html():
                     let valA = a[sortBy];
                     let valB = b[sortBy];
                     
-                    if (sortBy === 'ro' || sortBy === 'insurance') {
+                    if (sortBy === 'ro' || sortBy === 'insurance' || sortBy === 'tech') {
                         valA = String(valA || '').toLowerCase();
                         valB = String(valB || '').toLowerCase();
                         return valA.localeCompare(valB);
@@ -1464,7 +1465,8 @@ def get_dashboard_screen_html():
                     'ro': 'RO #',
                     'insurance': 'Insurance',
                     'in_date': 'In date',
-                    'ecd_date': 'ECD'
+                    'ecd_date': 'ECD',
+                    'tech': 'Tech'
                 };
                 const sortLabel = sortLabels[sortBy] || sortBy;
                 
