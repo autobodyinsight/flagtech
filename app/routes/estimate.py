@@ -1435,34 +1435,34 @@ async def get_ro_tech_lines(request: Request, ro: str):
     try:
         _ensure_saved_estimates_table(cur)
         _ensure_ro_line_assignments_table(cur)
-                _ensure_techs_table(cur)
+        _ensure_techs_table(cur)
         _ensure_ro_line_assignments_for_ro(cur, domain, ro_value)
 
-                cur.execute(
-                        """
-                        SELECT id
-                        FROM techs
-                        WHERE active = TRUE
-                            AND status = 'Active'
-                            AND (domain = %s OR domain IS NULL)
-                        """,
-                        (domain,),
-                )
-                active_ids = {int(row.get("id")) for row in (cur.fetchall() or []) if row.get("id") is not None}
-                cur.execute(
-                        """
-                        SELECT first_name, last_name
-                        FROM techs
-                        WHERE active = TRUE
-                            AND status = 'Active'
-                            AND (domain = %s OR domain IS NULL)
-                        """,
-                        (domain,),
-                )
-                active_names = {
-                        " ".join(part for part in [(row.get("first_name") or "").strip(), (row.get("last_name") or "").strip()] if part)
-                        for row in (cur.fetchall() or [])
-                }
+        cur.execute(
+            """
+            SELECT id
+            FROM techs
+            WHERE active = TRUE
+              AND status = 'Active'
+              AND (domain = %s OR domain IS NULL)
+            """,
+            (domain,),
+        )
+        active_ids = {int(row.get("id")) for row in (cur.fetchall() or []) if row.get("id") is not None}
+        cur.execute(
+            """
+            SELECT first_name, last_name
+            FROM techs
+            WHERE active = TRUE
+              AND status = 'Active'
+              AND (domain = %s OR domain IS NULL)
+            """,
+            (domain,),
+        )
+        active_names = {
+            " ".join(part for part in [(row.get("first_name") or "").strip(), (row.get("last_name") or "").strip()] if part)
+            for row in (cur.fetchall() or [])
+        }
 
         cur.execute(
             """
