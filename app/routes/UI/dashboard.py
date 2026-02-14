@@ -813,7 +813,7 @@ def get_dashboard_screen_html():
                     ...(ro.parts_repairs || [])
                 ];
                 
-                // Keywords that should trigger warning (excluding calibrations for now)
+                // Keywords that should trigger warning
                 const directKeywords = [
                     'wheel',
                     'alignment',
@@ -828,10 +828,6 @@ def get_dashboard_screen_html():
                     'edge guards'
                 ];
                 
-                // Check for calibrations with related operations
-                let hasCalibration = false;
-                let hasRelatedOperation = false;
-                
                 allItems.forEach(item => {
                     if (!item || !item.description) return;
                     
@@ -840,10 +836,26 @@ def get_dashboard_screen_html():
                     // Check for direct keywords
                     for (const keyword of directKeywords) {
                         if (desc.includes(keyword)) {
-                            // Special case: exclude "steering wheel" when checking for "wheel"
-                            if (keyword === 'wheel' && desc.includes('steering wheel')) {
+                            // Exclusions for "wheel"
+                            if (keyword === 'wheel' && (
+                                desc.includes('steering wheel') ||
+                                desc.includes('fender wheel') ||
+                                desc.includes('wheel pick up') ||
+                                desc.includes('wheelhouse')
+                            )) {
                                 continue;
                             }
+                            
+                            // Exclusions for "windshield" and "w/shield"
+                            if ((keyword === 'windshield' || keyword === 'w/shield') && (
+                                desc.includes('w/shield washer') ||
+                                desc.includes('w/shield wipper') ||
+                                desc.includes('windshield washer') ||
+                                desc.includes('windshield wipper')
+                            )) {
+                                continue;
+                            }
+                            
                             subletItems.push({
                                 description: item.description,
                                 line: item.line,
@@ -852,37 +864,7 @@ def get_dashboard_screen_html():
                             return; // Don't check other keywords for this item
                         }
                     }
-                    
-                    // Check for calibration
-                    if (desc.includes('calibration') || desc.includes('calibrate')) {
-                        hasCalibration = true;
-                    }
-                    
-                    // Check for related operations
-                    if (desc.includes('bumper') || 
-                        desc.includes('windshield') || 
-                        desc.includes('w/shield') ||
-                        desc.includes('grille') || 
-                        desc.includes('grill') ||
-                        desc.includes('camera')) {
-                        hasRelatedOperation = true;
-                    }
                 });
-                
-                // If we have calibration with related operations, add all calibration items
-                if (hasCalibration && hasRelatedOperation) {
-                    allItems.forEach(item => {
-                        if (!item || !item.description) return;
-                        const desc = String(item.description).toLowerCase();
-                        if (desc.includes('calibration') || desc.includes('calibrate')) {
-                            subletItems.push({
-                                description: item.description,
-                                line: item.line,
-                                type: getItemType(item)
-                            });
-                        }
-                    });
-                }
                 
                 return subletItems;
             }
