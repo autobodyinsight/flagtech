@@ -135,6 +135,10 @@ async def home_screen(request: Request):
             if (screenName === 'phase' && typeof loadPhaseData === 'function') {{
                 loadPhaseData();
             }}
+
+            if (screenName === 'flagtech' && typeof loadFlagoutTechs === 'function') {{
+                loadFlagoutTechs();
+            }}
         }}
         
         {get_upload_script()}

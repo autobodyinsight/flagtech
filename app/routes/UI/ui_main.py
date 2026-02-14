@@ -135,6 +135,10 @@ async def home_screen():
                 if (screenName === 'phase' && typeof loadPhaseData === 'function') {{
                     loadPhaseData();
                 }}
+
+                if (screenName === 'flagtech' && typeof loadFlagoutTechs === 'function') {{
+                    loadFlagoutTechs();
+                }}
             
             // Load dashboard data if switching to dashboard
             if (screenName === 'dashboard' && typeof loadDashboardDataIfNeeded === 'function') {{

@@ -1573,6 +1573,7 @@ async def get_tech_assignments(request: Request, tech_id: int):
         _ensure_saved_estimates_table(cur)
         _ensure_ro_line_assignments_table(cur)
         _ensure_ro_flagout_lines_table(cur)
+        _ensure_saved_estimates_table(cur)
 
         cur.execute(
             """
@@ -1821,6 +1822,109 @@ async def tech_flag_out_lines(request: Request):
             "remaining_count": remaining_count,
             "ro_completed": remaining_count == 0,
         }
+    finally:
+        cur.close()
+
+
+@router.get("/flagout/techs")
+async def get_flagout_techs(request: Request):
+    domain = get_user_domain(request)
+    if not domain:
+        return JSONResponse(status_code=401, content={"error": "Not authenticated"})
+
+    conn = get_conn()
+    cur = conn.cursor()
+    try:
+        _ensure_ro_flagout_lines_table(cur)
+
+        cur.execute(
+            """
+            SELECT
+                f.tech_id,
+                COALESCE(MAX(NULLIF(TRIM(f.tech_name), '')), CONCAT('Tech #', f.tech_id::text)) AS tech_name,
+                COALESCE(MAX(f.pay_rate), 0) AS pay_rate,
+                COALESCE(SUM(f.hours), 0) AS total_hours,
+                COALESCE(SUM(f.pay_amount), 0) AS total_pay
+            FROM ro_flagout_lines f
+            WHERE f.domain = %s
+              AND f.status = 'ready_to_flag'
+            GROUP BY f.tech_id
+            ORDER BY COALESCE(MAX(NULLIF(TRIM(f.tech_name), '')), CONCAT('Tech #', f.tech_id::text))
+            """,
+            (domain,),
+        )
+        tech_rows = cur.fetchall() or []
+
+        cur.execute(
+            """
+            WITH latest_estimates AS (
+                SELECT DISTINCT ON (ro)
+                    ro,
+                    year,
+                    make,
+                    model,
+                    vehicle
+                FROM saved_estimates
+                WHERE domain = %s
+                ORDER BY ro, saved_at DESC, id DESC
+            )
+            SELECT
+                f.tech_id,
+                f.ro,
+                COALESCE(MAX(f.pay_rate), 0) AS pay_rate,
+                COALESCE(SUM(f.hours), 0) AS total_hours,
+                COUNT(*) AS line_count,
+                MAX(f.flagged_at) AS flagged_at,
+                MAX(le.year) AS year,
+                MAX(le.make) AS make,
+                MAX(le.model) AS model,
+                MAX(le.vehicle) AS vehicle
+            FROM ro_flagout_lines f
+            LEFT JOIN latest_estimates le ON le.ro = f.ro
+            WHERE f.domain = %s
+              AND f.status = 'ready_to_flag'
+            GROUP BY f.tech_id, f.ro
+            ORDER BY f.tech_id, f.ro
+            """,
+            (domain, domain),
+        )
+        ro_rows = cur.fetchall() or []
+
+        ro_map = {}
+        for row in ro_rows:
+            tech_id = int(row.get("tech_id") or 0)
+            year = (row.get("year") or "").strip()
+            make = (row.get("make") or "").strip()
+            model = (row.get("model") or "").strip()
+            vehicle_info = " ".join(part for part in [year, make, model] if part)
+            if not vehicle_info:
+                vehicle_info = (row.get("vehicle") or "").strip()
+            ro_map.setdefault(tech_id, []).append(
+                {
+                    "ro": row.get("ro") or "",
+                    "vehicle_info": vehicle_info,
+                    "pay_rate": _parse_float_value(row.get("pay_rate")),
+                    "total_hours": _parse_float_value(row.get("total_hours")),
+                    "line_count": int(row.get("line_count") or 0),
+                    "flagged_at": row.get("flagged_at").isoformat() if row.get("flagged_at") else None,
+                }
+            )
+
+        techs = []
+        for row in tech_rows:
+            tech_id = int(row.get("tech_id") or 0)
+            techs.append(
+                {
+                    "tech_id": tech_id,
+                    "tech_name": row.get("tech_name") or f"Tech #{tech_id}",
+                    "pay_rate": _parse_float_value(row.get("pay_rate")),
+                    "total_hours": _parse_float_value(row.get("total_hours")),
+                    "total_pay": _parse_float_value(row.get("total_pay")),
+                    "ros": ro_map.get(tech_id, []),
+                }
+            )
+
+        return {"techs": techs}
     finally:
         cur.close()
 

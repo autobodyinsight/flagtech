@@ -274,6 +274,10 @@ async def home_screen():
             if (screenName === 'tech' && typeof loadTechsList === 'function') {{
                 loadTechsList();
             }}
+
+            if (screenName === 'flagtech' && typeof loadFlagoutTechs === 'function') {{
+                loadFlagoutTechs();
+            }}
         }}
         
         {get_upload_script()}
