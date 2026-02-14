@@ -8,15 +8,16 @@ def get_upload_screen_html():
             <style>
                 #upload.active {
                     display: flex;
+                    flex-direction: column;
                     align-items: center;
-                    justify-content: center;
+                    justify-content: flex-start;
                     min-height: calc(100vh - 180px);
                 }
                 #upload .upload-center {
                     width: 100%;
                     display: flex;
                     justify-content: center;
-                    transform: translateY(-50%);
+                    margin-top: 16px;
                 }
                 #upload .import-button {
                     display: inline-flex;
@@ -82,11 +83,6 @@ def get_upload_script():
             const fileInput = document.getElementById('fileInput');
             const file = fileInput.files[0];
             if (!file) return;
-
-            const importButtonWrap = document.getElementById('importButtonWrap');
-            if (importButtonWrap) {
-                importButtonWrap.style.display = 'none';
-            }
             
             const formData = new FormData();
             formData.append('file', file);
@@ -110,6 +106,12 @@ def get_upload_script():
                     newScript.innerHTML = oldScript.innerHTML;
                     document.body.appendChild(newScript);
                 });
+
+                const importButtonWrap = document.getElementById('importButtonWrap');
+                const estimateRendered = !!statusDiv.querySelector('#estimatePages');
+                if (importButtonWrap) {
+                    importButtonWrap.style.display = estimateRendered ? 'none' : 'flex';
+                }
             })
             .catch(error => {
                 statusDiv.innerHTML = '<p>Error: ' + error.message + '</p>';
