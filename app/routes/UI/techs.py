@@ -18,6 +18,11 @@ def get_techs_screen_html():
                     style="padding:12px 24px; font-size:16px; cursor:pointer; background-color:#d32f2f; color:#fff; border:none; border-radius:4px; font-weight:bold;">
                 EDIT
             </button>
+            <button id="techArchiveBtn" onclick="archiveSelectedTechs()"
+                    style="display:none; padding:12px 24px; font-size:16px; cursor:pointer; background-color:#d32f2f; color:#fff; border:none; border-radius:4px; font-weight:bold;"
+                    disabled>
+                ARCHIVE
+            </button>
         </div>
 
         <!-- Techs Details Table -->
@@ -127,6 +132,7 @@ def get_techs_screen_html():
         let cachedTechRows = [];
         let currentStatusDropdownTechId = null;
         let isTechEditMode = false;
+        let selectedArchiveTechIds = new Set();
 
         // -----------------------------
         // Add Tech Modal
@@ -146,11 +152,69 @@ def get_techs_screen_html():
         function toggleTechEditMode() {
             isTechEditMode = !isTechEditMode;
             const editBtn = document.getElementById('techEditBtn');
+            const archiveBtn = document.getElementById('techArchiveBtn');
             if (editBtn) {
                 editBtn.textContent = isTechEditMode ? 'DONE' : 'EDIT';
             }
+            if (!isTechEditMode) {
+                selectedArchiveTechIds = new Set();
+            }
+            if (archiveBtn) {
+                archiveBtn.style.display = isTechEditMode ? 'inline-flex' : 'none';
+                archiveBtn.disabled = !isTechEditMode || selectedArchiveTechIds.size === 0;
+            }
             closeStatusDropdown();
             loadTechsList();
+        }
+
+        function toggleArchiveSelection(techId, isChecked) {
+            const archiveBtn = document.getElementById('techArchiveBtn');
+            if (isChecked) {
+                selectedArchiveTechIds.add(String(techId));
+            } else {
+                selectedArchiveTechIds.delete(String(techId));
+            }
+            if (archiveBtn) {
+                archiveBtn.disabled = selectedArchiveTechIds.size === 0;
+            }
+        }
+
+        function archiveSelectedTechs() {
+            const selected = Array.from(selectedArchiveTechIds).map(id => parseInt(id, 10)).filter(id => Number.isFinite(id));
+            if (!selected.length) {
+                alert('Select at least one tech to archive.');
+                return;
+            }
+
+            fetch('/api/techs/archive', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
+                body: JSON.stringify({ ids: selected })
+            })
+            .then(r => r.json())
+            .then(res => {
+                if (res.error) {
+                    throw new Error(res.error);
+                }
+
+                isTechEditMode = false;
+                selectedArchiveTechIds = new Set();
+                const editBtn = document.getElementById('techEditBtn');
+                const archiveBtn = document.getElementById('techArchiveBtn');
+                if (editBtn) {
+                    editBtn.textContent = 'EDIT';
+                }
+                if (archiveBtn) {
+                    archiveBtn.style.display = 'none';
+                    archiveBtn.disabled = true;
+                }
+                loadTechsList();
+            })
+            .catch(err => {
+                console.error('Error archiving techs:', err);
+                alert('Error archiving selected techs.');
+            });
         }
 
         function getStatusIcon(statusValue) {
@@ -339,11 +403,15 @@ def get_techs_screen_html():
                     if (isTechEditMode) {
                         const editCheck = document.createElement('input');
                         editCheck.type = 'checkbox';
+                        editCheck.checked = selectedArchiveTechIds.has(String(tech.id));
                         editCheck.style.width = '16px';
                         editCheck.style.height = '16px';
                         editCheck.style.marginLeft = '8px';
                         editCheck.style.marginRight = '4px';
                         editCheck.addEventListener('click', (e) => e.stopPropagation());
+                        editCheck.addEventListener('change', function() {
+                            toggleArchiveSelection(tech.id, editCheck.checked);
+                        });
                         techNameCell.appendChild(editCheck);
                     }
 
