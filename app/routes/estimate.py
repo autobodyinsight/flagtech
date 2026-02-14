@@ -273,12 +273,16 @@ def _ensure_ro_flagout_lines_table(cur) -> None:
             line_number VARCHAR(64),
             description TEXT,
             hours NUMERIC,
+            pay_rate NUMERIC,
+            pay_amount NUMERIC,
             status VARCHAR(32) NOT NULL DEFAULT 'ready_to_flag',
             domain VARCHAR(255) NOT NULL,
             flagged_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
         """
     )
+    cur.execute("ALTER TABLE ro_flagout_lines ADD COLUMN IF NOT EXISTS pay_rate NUMERIC")
+    cur.execute("ALTER TABLE ro_flagout_lines ADD COLUMN IF NOT EXISTS pay_amount NUMERIC")
     cur.execute(
         """
         CREATE UNIQUE INDEX IF NOT EXISTS idx_ro_flagout_lines_unique
@@ -1695,6 +1699,7 @@ async def tech_flag_out_lines(request: Request):
     ro_value = (data.get("ro") or "").strip()
     tech_id = data.get("tech_id")
     selected_line_keys = data.get("line_keys") or []
+    pay_rate = _parse_float_value(data.get("pay_rate"))
 
     if not ro_value or not tech_id:
         return JSONResponse(status_code=400, content={"error": "ro and tech_id are required"})
@@ -1729,7 +1734,13 @@ async def tech_flag_out_lines(request: Request):
             return JSONResponse(status_code=404, content={"error": "No matching unpaid labor lines found"})
 
         row_ids = [int(row.get("id")) for row in rows if row.get("id") is not None]
+        flagged_hours = 0.0
+        flagged_pay = 0.0
         for row in rows:
+            line_hours = _parse_float_value(row.get("hours"))
+            line_pay = line_hours * pay_rate
+            flagged_hours += line_hours
+            flagged_pay += line_pay
             cur.execute(
                 """
                 INSERT INTO ro_flagout_lines (
@@ -1741,16 +1752,20 @@ async def tech_flag_out_lines(request: Request):
                     line_number,
                     description,
                     hours,
+                    pay_rate,
+                    pay_amount,
                     status,
                     domain,
                     flagged_at
                 )
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, 'ready_to_flag', %s, CURRENT_TIMESTAMP)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 'ready_to_flag', %s, CURRENT_TIMESTAMP)
                 ON CONFLICT (ro, tech_id, repair_type, line_key, domain)
                 DO UPDATE SET
                     line_number = EXCLUDED.line_number,
                     description = EXCLUDED.description,
                     hours = EXCLUDED.hours,
+                    pay_rate = EXCLUDED.pay_rate,
+                    pay_amount = EXCLUDED.pay_amount,
                     status = 'ready_to_flag',
                     flagged_at = CURRENT_TIMESTAMP
                 """,
@@ -1763,6 +1778,8 @@ async def tech_flag_out_lines(request: Request):
                     row.get("line_number"),
                     row.get("description"),
                     row.get("hours"),
+                    pay_rate,
+                    line_pay,
                     domain,
                 ),
             )
@@ -1798,6 +1815,9 @@ async def tech_flag_out_lines(request: Request):
         return {
             "status": "ok",
             "flagged_count": len(row_ids),
+            "flagged_hours": flagged_hours,
+            "pay_rate": pay_rate,
+            "flagged_pay": flagged_pay,
             "remaining_count": remaining_count,
             "ro_completed": remaining_count == 0,
         }

@@ -402,8 +402,10 @@ def get_techs_screen_html():
                             </label>
                         </div>
                         <div>${rowsHtml}</div>
+                        <div id="flagout-summary" style="margin-top:12px; padding:10px 12px; border:1px solid #ddd; background:#fafafa; border-radius:4px; font-size:14px;"></div>
                     `;
                     currentAssignmentPrintHtml = body.innerHTML;
+                    updateFlagOutSummary();
                 })
                 .catch(err => {
                     console.error('Error loading repair lines:', err);
@@ -435,11 +437,29 @@ def get_techs_screen_html():
             if (checks.length === 0) {
                 master.checked = false;
                 master.indeterminate = false;
+                updateFlagOutSummary();
                 return;
             }
             const checkedCount = Array.from(checks).filter(chk => chk.checked).length;
             master.checked = checkedCount === checks.length;
             master.indeterminate = checkedCount > 0 && checkedCount < checks.length;
+            updateFlagOutSummary();
+        }
+
+        function updateFlagOutSummary() {
+            const summaryEl = document.getElementById('flagout-summary');
+            if (!summaryEl) return;
+
+            const payRate = Number(currentModalContext?.pay_rate || 0);
+            const selected = Array.from(document.querySelectorAll('.flagout-line-checkbox:checked'));
+            const totalHours = selected.reduce((sum, chk) => sum + (parseFloat(chk.getAttribute('data-hours') || '0') || 0), 0);
+            const totalPay = totalHours * payRate;
+
+            summaryEl.innerHTML = `
+                <span style="font-weight:bold;">Total HRS</span> ${totalHours.toFixed(1)}
+                <span style="font-weight:bold; margin-left:18px;">Rate</span> $${payRate.toFixed(2)}
+                <span style="font-weight:bold; margin-left:18px;">Pay</span> $${totalPay.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}
+            `;
         }
 
         function flagOutSelectedLines() {
@@ -450,6 +470,10 @@ def get_techs_screen_html():
             const selectedKeys = Array.from(document.querySelectorAll('.flagout-line-checkbox:checked'))
                 .map(chk => chk.getAttribute('data-line-key'))
                 .filter(Boolean);
+            const totalHours = Array.from(document.querySelectorAll('.flagout-line-checkbox:checked'))
+                .reduce((sum, chk) => sum + (parseFloat(chk.getAttribute('data-hours') || '0') || 0), 0);
+            const payRate = Number(currentModalContext?.pay_rate || 0);
+            const totalPay = totalHours * payRate;
 
             if (selectedKeys.length === 0) {
                 alert('Select at least one line to flag out.');
@@ -463,7 +487,10 @@ def get_techs_screen_html():
                 body: JSON.stringify({
                     ro: currentModalContext.ro,
                     tech_id: currentModalContext.tech_id,
-                    line_keys: selectedKeys
+                    line_keys: selectedKeys,
+                    pay_rate: payRate,
+                    total_hours: totalHours,
+                    total_pay: totalPay
                 })
             })
             .then(r => r.json())
