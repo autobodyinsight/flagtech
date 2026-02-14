@@ -225,6 +225,8 @@ def _ensure_ro_line_assignments_table(cur) -> None:
     )
     cur.execute("ALTER TABLE ro_line_assignments ADD COLUMN IF NOT EXISTS is_pending BOOLEAN DEFAULT FALSE")
     cur.execute("ALTER TABLE ro_line_assignments ADD COLUMN IF NOT EXISTS source_repair_type VARCHAR(20)")
+    cur.execute("ALTER TABLE ro_line_assignments ADD COLUMN IF NOT EXISTS ready_to_flag BOOLEAN DEFAULT FALSE")
+    cur.execute("ALTER TABLE ro_line_assignments ADD COLUMN IF NOT EXISTS flagged_at TIMESTAMP")
     cur.execute(
         """
         UPDATE ro_line_assignments
@@ -248,6 +250,45 @@ def _ensure_ro_line_assignments_table(cur) -> None:
         """
         CREATE INDEX IF NOT EXISTS idx_ro_line_assignments_ro_domain
         ON ro_line_assignments(ro, domain)
+        """
+    )
+    cur.execute(
+        """
+        CREATE INDEX IF NOT EXISTS idx_ro_line_assignments_ready_flag
+        ON ro_line_assignments(domain, tech_id, ready_to_flag)
+        """
+    )
+
+
+def _ensure_ro_flagout_lines_table(cur) -> None:
+    cur.execute(
+        """
+        CREATE TABLE IF NOT EXISTS ro_flagout_lines (
+            id SERIAL PRIMARY KEY,
+            ro VARCHAR(255) NOT NULL,
+            tech_id INTEGER,
+            tech_name VARCHAR(255),
+            repair_type VARCHAR(20) NOT NULL,
+            line_key VARCHAR(64) NOT NULL,
+            line_number VARCHAR(64),
+            description TEXT,
+            hours NUMERIC,
+            status VARCHAR(32) NOT NULL DEFAULT 'ready_to_flag',
+            domain VARCHAR(255) NOT NULL,
+            flagged_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+        """
+    )
+    cur.execute(
+        """
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_ro_flagout_lines_unique
+        ON ro_flagout_lines(ro, tech_id, repair_type, line_key, domain)
+        """
+    )
+    cur.execute(
+        """
+        CREATE INDEX IF NOT EXISTS idx_ro_flagout_lines_domain_status
+        ON ro_flagout_lines(domain, status, flagged_at)
         """
     )
 
@@ -1527,33 +1568,239 @@ async def get_tech_assignments(request: Request, tech_id: int):
     try:
         _ensure_saved_estimates_table(cur)
         _ensure_ro_line_assignments_table(cur)
+        _ensure_ro_flagout_lines_table(cur)
 
         cur.execute(
             """
-            SELECT ro, repair_type, COALESCE(SUM(hours), 0) AS total_hours
-            FROM ro_line_assignments
-            WHERE domain = %s
-              AND tech_id = %s
-              AND tech_name IS NOT NULL
-            GROUP BY ro, repair_type
+            WITH latest_estimates AS (
+                SELECT DISTINCT ON (ro)
+                    ro,
+                    year,
+                    make,
+                    model,
+                    vehicle
+                FROM saved_estimates
+                WHERE domain = %s
+                  AND ro IS NOT NULL
+                  AND ro <> ''
+                ORDER BY ro, saved_at DESC, id DESC
+            )
+            SELECT
+                a.ro,
+                COALESCE(SUM(a.hours), 0) AS total_hours,
+                le.year,
+                le.make,
+                le.model,
+                le.vehicle
+            FROM ro_line_assignments a
+            LEFT JOIN latest_estimates le ON le.ro = a.ro
+            WHERE a.domain = %s
+              AND a.tech_id = %s
+              AND a.tech_name IS NOT NULL
+              AND a.repair_type = 'body'
+              AND COALESCE(a.ready_to_flag, FALSE) = FALSE
+            GROUP BY a.ro, le.year, le.make, le.model, le.vehicle
             ORDER BY ro
             """,
-            (domain, tech_id),
+            (domain, domain, tech_id),
         )
         assignment_rows = cur.fetchall()
 
         assignments = []
         for row in assignment_rows:
+            year = (row.get("year") or "").strip()
+            make = (row.get("make") or "").strip()
+            model = (row.get("model") or "").strip()
+            vehicle_text = " ".join(part for part in [year, make, model] if part)
+            if not vehicle_text:
+                vehicle_text = (row.get("vehicle") or "").strip()
             assignments.append(
                 {
                     "ro": row.get("ro"),
-                    "role": _normalize_repair_type(row.get("repair_type")),
                     "total_hours": _parse_float_value(row.get("total_hours")),
-                    "excluded_lines": [],
+                    "vehicle": vehicle_text,
                 }
             )
 
         return {"assignments": assignments}
+    finally:
+        cur.close()
+
+
+@router.get("/tech-assignment-lines")
+async def get_tech_assignment_lines(request: Request, tech_id: int, ro: str):
+    domain = get_user_domain(request)
+    if not domain:
+        return JSONResponse(status_code=401, content={"error": "Not authenticated"})
+
+    ro_value = (ro or "").strip()
+    if not tech_id or not ro_value:
+        return JSONResponse(status_code=400, content={"error": "tech_id and ro are required"})
+
+    conn = get_conn()
+    cur = conn.cursor()
+    try:
+        _ensure_saved_estimates_table(cur)
+        _ensure_ro_line_assignments_table(cur)
+        _ensure_ro_line_assignments_for_ro(cur, domain, ro_value)
+
+        cur.execute(
+            """
+            SELECT
+                line_key,
+                line_number,
+                description,
+                hours
+            FROM ro_line_assignments
+            WHERE domain = %s
+              AND ro = %s
+              AND tech_id = %s
+              AND repair_type = 'body'
+              AND COALESCE(ready_to_flag, FALSE) = FALSE
+            ORDER BY line_number
+            """,
+            (domain, ro_value, tech_id),
+        )
+        rows = cur.fetchall()
+
+        lines = []
+        total_hours = 0.0
+        for row in rows:
+            hours = _parse_float_value(row.get("hours"))
+            total_hours += hours
+            lines.append(
+                {
+                    "line_key": str(row.get("line_key") or ""),
+                    "line": row.get("line_number") or "",
+                    "description": row.get("description") or "",
+                    "value": hours,
+                }
+            )
+
+        return {
+            "lines": lines,
+            "total_hours": total_hours,
+        }
+    finally:
+        cur.close()
+
+
+@router.post("/tech-flag-out")
+async def tech_flag_out_lines(request: Request):
+    domain = get_user_domain(request)
+    if not domain:
+        return JSONResponse(status_code=401, content={"error": "Not authenticated"})
+
+    data = await request.json()
+    ro_value = (data.get("ro") or "").strip()
+    tech_id = data.get("tech_id")
+    selected_line_keys = data.get("line_keys") or []
+
+    if not ro_value or not tech_id:
+        return JSONResponse(status_code=400, content={"error": "ro and tech_id are required"})
+
+    normalized_keys = [str(key).strip() for key in selected_line_keys if str(key).strip()]
+    if not normalized_keys:
+        return JSONResponse(status_code=400, content={"error": "line_keys is required"})
+
+    conn = get_conn()
+    cur = conn.cursor()
+    try:
+        _ensure_ro_line_assignments_table(cur)
+        _ensure_ro_flagout_lines_table(cur)
+        _ensure_ro_line_assignments_for_ro(cur, domain, ro_value)
+
+        cur.execute(
+            """
+            SELECT id, line_key, line_number, description, hours, tech_name, repair_type
+            FROM ro_line_assignments
+            WHERE domain = %s
+              AND ro = %s
+              AND tech_id = %s
+              AND repair_type = 'body'
+              AND COALESCE(ready_to_flag, FALSE) = FALSE
+              AND line_key = ANY(%s)
+            """,
+            (domain, ro_value, tech_id, normalized_keys),
+        )
+        rows = cur.fetchall()
+
+        if not rows:
+            return JSONResponse(status_code=404, content={"error": "No matching unpaid labor lines found"})
+
+        row_ids = [int(row.get("id")) for row in rows if row.get("id") is not None]
+        for row in rows:
+            cur.execute(
+                """
+                INSERT INTO ro_flagout_lines (
+                    ro,
+                    tech_id,
+                    tech_name,
+                    repair_type,
+                    line_key,
+                    line_number,
+                    description,
+                    hours,
+                    status,
+                    domain,
+                    flagged_at
+                )
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, 'ready_to_flag', %s, CURRENT_TIMESTAMP)
+                ON CONFLICT (ro, tech_id, repair_type, line_key, domain)
+                DO UPDATE SET
+                    line_number = EXCLUDED.line_number,
+                    description = EXCLUDED.description,
+                    hours = EXCLUDED.hours,
+                    status = 'ready_to_flag',
+                    flagged_at = CURRENT_TIMESTAMP
+                """,
+                (
+                    ro_value,
+                    tech_id,
+                    row.get("tech_name"),
+                    row.get("repair_type") or "body",
+                    row.get("line_key"),
+                    row.get("line_number"),
+                    row.get("description"),
+                    row.get("hours"),
+                    domain,
+                ),
+            )
+
+        if row_ids:
+            cur.execute(
+                """
+                UPDATE ro_line_assignments
+                SET ready_to_flag = TRUE,
+                    flagged_at = CURRENT_TIMESTAMP,
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE id = ANY(%s)
+                """,
+                (row_ids,),
+            )
+
+        cur.execute(
+            """
+            SELECT COUNT(*) AS remaining_count
+            FROM ro_line_assignments
+            WHERE domain = %s
+              AND ro = %s
+              AND tech_id = %s
+              AND repair_type = 'body'
+              AND COALESCE(ready_to_flag, FALSE) = FALSE
+            """,
+            (domain, ro_value, tech_id),
+        )
+        remaining_row = cur.fetchone() or {}
+        remaining_count = int(remaining_row.get("remaining_count") or 0)
+
+        conn.commit()
+        return {
+            "status": "ok",
+            "flagged_count": len(row_ids),
+            "remaining_count": remaining_count,
+            "ro_completed": remaining_count == 0,
+        }
     finally:
         cur.close()
 

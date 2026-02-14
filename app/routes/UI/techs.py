@@ -61,6 +61,7 @@ def get_techs_screen_html():
                 <div id="techAssignmentBody"></div>
                 <div style="text-align:right; margin-top:12px;">
                     <button onclick="printTechAssignment()" style="padding:8px 16px; background:#505050; color:#fff; border:none; border-radius:4px; cursor:pointer;">Print</button>
+                    <button onclick="flagOutSelectedLines()" style="padding:8px 16px; background:#d32f2f; color:#fff; border:none; border-radius:4px; cursor:pointer; font-weight:bold; margin-left:8px;">Flag Out</button>
                 </div>
             </div>
         </div>
@@ -70,37 +71,48 @@ def get_techs_screen_html():
                 cursor: pointer;
             }
             .tech-assignments {
-                padding: 10px 12px;
+                padding: 12px 16px;
                 border-bottom: 1px solid #eee;
-                background: #fafafa;
+                background: #fff;
             }
-            .tech-assignments .assignment-item {
-                display: flex;
-                justify-content: space-between;
-                align-items: center;
-                padding: 8px 0;
-                border-bottom: 1px solid #eee;
+            .tech-assignments-panel {
+                background:#fafafa;
+                border:1px solid #ddd;
+                border-radius:6px;
+                padding:12px;
             }
-            .tech-assignments .assignment-item:last-child {
-                border-bottom: none;
+            .tech-assignments-title {
+                font-weight:bold;
+                color:#333;
+                margin-bottom:10px;
             }
-            .tech-assignments .assignment-meta {
-                display: flex;
-                gap: 12px;
-                align-items: center;
-                font-size: 12px;
-                color: #555;
+            .tech-assignments-table {
+                width:100%;
+                border-collapse:collapse;
+                margin-top:8px;
             }
-            .tech-assignments .assignment-role {
-                padding: 2px 6px;
-                border-radius: 10px;
-                background: #e0e0e0;
-                font-size: 11px;
-                text-transform: uppercase;
+            .tech-assignments-table thead tr {
+                background:#d9d9d9;
+                border-bottom:2px solid #999;
+            }
+            .tech-assignments-table th,
+            .tech-assignments-table td {
+                padding:8px 12px;
+                border-bottom:1px solid #ddd;
+                color:#333;
+            }
+            .tech-assignments-table th {
+                font-weight:bold;
+                text-align:left;
+            }
+            .tech-assignments-table th:last-child,
+            .tech-assignments-table td:last-child {
+                text-align:right;
             }
         </style>
 
         <script>
+        let currentModalContext = null;
 
         // -----------------------------
         // Add Tech Modal
@@ -252,7 +264,12 @@ def get_techs_screen_html():
 
         function loadTechAssignmentsForTech(techId, techName, container) {
             if (!container) return;
-            container.innerHTML = '<div style="color:#777;">Loading assignments...</div>';
+            container.innerHTML = `
+                <div class="tech-assignments-panel">
+                    <div class="tech-assignments-title">Tech List</div>
+                    <div style="color:#777;">Loading assignments...</div>
+                </div>
+            `;
 
             fetch(`/api/tech-assignments?tech_id=${encodeURIComponent(techId)}`, { credentials: 'include' })
                 .then(r => r.json())
@@ -263,54 +280,74 @@ def get_techs_screen_html():
                     if (!container) return;
                     const assignments = res.assignments || [];
                     if (assignments.length === 0) {
-                        container.innerHTML = '<div style="color:#999;">No assignments yet.</div>';
-                        return;
-                    }
-                    container.innerHTML = assignments.map(item => {
-                        const roleLabel = item.role === 'paint' ? 'Painter' : 'Labor';
-                        const total = Number.isFinite(parseFloat(item.total_hours)) ? parseFloat(item.total_hours).toFixed(1) : '0.0';
-                        const ro = item.ro || '—';
-                        const excluded = encodeURIComponent(JSON.stringify(item.excluded_lines || []));
-                        return `
-                            <div class="assignment-item">
-                                <div class="assignment-meta">
-                                    <span class="assignment-role">${roleLabel}</span>
-                                    <button type="button" class="assignment-link link-button" data-ro="${ro}" data-role="${item.role}" data-excluded="${excluded}" data-tech="${techName.replace(/"/g, '&quot;')}" style="background:none; border:none; color:#0066cc; text-decoration:underline; cursor:pointer; padding:0; font:inherit;">
-                                        RO# ${ro}
-                                    </button>
-                                </div>
-                                <div style="font-weight:bold;">${total} hrs</div>
+                        container.innerHTML = `
+                            <div class="tech-assignments-panel">
+                                <div class="tech-assignments-title">Tech List</div>
+                                <div style="color:#999; padding:8px 0;">No assignments yet.</div>
                             </div>
                         `;
+                        return;
+                    }
+                    const rows = assignments.map(item => {
+                        const total = Number.isFinite(parseFloat(item.total_hours)) ? parseFloat(item.total_hours).toFixed(1) : '0.0';
+                        const ro = item.ro || '—';
+                        const vehicle = item.vehicle || '—';
+                        const textColor = '#333';
+                        return `
+                            <tr style="background:#fff; border-bottom:1px solid #ddd;">
+                                <td style="font-weight:bold; color:${textColor};">
+                                    <button type="button" class="assignment-link link-button" data-ro="${ro}" data-tech-id="${techId}" data-tech="${techName.replace(/"/g, '&quot;')}" style="background:none; border:none; color:#0066cc; text-decoration:underline; cursor:pointer; padding:0; font:inherit; font-weight:bold;">
+                                        RO# ${ro}
+                                    </button>
+                                </td>
+                                <td>${vehicle}</td>
+                                <td style="font-weight:bold;">${total}</td>
+                            </tr>
+                        `;
                     }).join('');
+
+                    container.innerHTML = `
+                        <div class="tech-assignments-panel">
+                            <div class="tech-assignments-title">Tech List</div>
+                            <table class="tech-assignments-table">
+                                <thead>
+                                    <tr>
+                                        <th>RO#</th>
+                                        <th>Vehicle</th>
+                                        <th>HRS</th>
+                                    </tr>
+                                </thead>
+                                <tbody>${rows}</tbody>
+                            </table>
+                        </div>
+                    `;
 
                     container.querySelectorAll('.assignment-link').forEach(button => {
                         button.addEventListener('click', (event) => {
                             event.stopPropagation();
                             const ro = button.dataset.ro || '';
-                            const role = button.dataset.role || 'labor';
+                            const techIdValue = parseInt(button.dataset.techId || '0', 10);
                             const tech = button.dataset.tech || '';
-                            let excluded = [];
-                            try {
-                                excluded = JSON.parse(decodeURIComponent(button.dataset.excluded || '[]'));
-                            } catch (e) {
-                                excluded = [];
-                            }
-                            openTechAssignmentModal(event, ro, role, excluded, tech);
+                            openTechAssignmentModal(event, ro, techIdValue, tech);
                         });
                     });
                 })
                 .catch(err => {
                     console.error('Error loading assignments:', err);
                     if (container) {
-                        container.innerHTML = '<div style="color:red;">Error loading assignments.</div>';
+                        container.innerHTML = `
+                            <div class="tech-assignments-panel">
+                                <div class="tech-assignments-title">Tech List</div>
+                                <div style="color:red; padding:8px 0;">Error loading assignments.</div>
+                            </div>
+                        `;
                     }
                 });
         }
 
         let currentAssignmentPrintHtml = '';
 
-        function openTechAssignmentModal(event, roNumber, role, excludedLines, techName) {
+        function openTechAssignmentModal(event, roNumber, techId, techName) {
             if (event) {
                 event.stopPropagation();
             }
@@ -319,40 +356,48 @@ def get_techs_screen_html():
             const body = document.getElementById('techAssignmentBody');
             if (!modal || !title || !body) return;
 
-            const roleLabel = role === 'paint' ? 'Painter' : 'Labor';
-            title.textContent = `${roleLabel} Lines - RO# ${roNumber} (${techName})`;
+            title.textContent = `Labor Lines - RO# ${roNumber} (${techName})`;
             body.innerHTML = '<div style="color:#777;">Loading...</div>';
             modal.style.display = 'block';
+            currentModalContext = { ro: roNumber, tech_id: techId, tech_name: techName };
 
-            fetch(`/api/ro-repairs?ro=${encodeURIComponent(roNumber)}`, { credentials: 'include' })
+            fetch(`/api/tech-assignment-lines?ro=${encodeURIComponent(roNumber)}&tech_id=${encodeURIComponent(techId)}`, { credentials: 'include' })
                 .then(r => r.json())
                 .then(res => {
                     if (res.error) {
                         throw new Error(res.error);
                     }
                     if (!body) return;
-                    const lines = role === 'paint' ? res.paint : res.labor;
-                    const excluded = Array.isArray(excludedLines) ? excludedLines.map(String) : [];
-                    const visible = (lines || []).filter((item, index) => {
-                        const key = item.line !== null && item.line !== undefined ? String(item.line) : String(index + 1);
-                        return !excluded.includes(key);
-                    });
+                    const visible = res.lines || [];
                     if (!visible.length) {
                         body.innerHTML = '<div style="color:#777;">No assigned repair lines.</div>';
                         currentAssignmentPrintHtml = '<div>No assigned repair lines.</div>';
                         return;
                     }
-                    body.innerHTML = visible.map(item => {
+
+                    const rowsHtml = visible.map(item => {
                         const line = item.line || '—';
                         const desc = item.description || '';
                         const value = Number.isFinite(parseFloat(item.value)) ? parseFloat(item.value).toFixed(1) : '0.0';
+                        const key = item.line_key || String(line);
                         return `
-                            <div style="display:flex; justify-content:space-between; padding:10px 8px; border-bottom:1px solid #eee;">
+                            <label style="display:flex; align-items:center; gap:10px; padding:10px 8px; border-bottom:1px solid #eee; cursor:pointer;">
+                                <input type="checkbox" class="flagout-line-checkbox" data-line-key="${key}" checked onchange="updateFlagOutMasterCheckbox()" style="width:16px; height:16px; cursor:pointer;" />
                                 <div style="flex:1;"><strong>Line ${line}</strong> - ${desc}</div>
                                 <div style="min-width:80px; text-align:right; font-weight:bold;">${value} hrs</div>
-                            </div>
+                            </label>
                         `;
                     }).join('');
+
+                    body.innerHTML = `
+                        <div style="margin:0 0 10px 0; padding:8px; border:1px solid #ddd; background:#fafafa; border-radius:4px;">
+                            <label style="display:flex; align-items:center; gap:8px; font-weight:bold; cursor:pointer;">
+                                <input type="checkbox" id="flagout-master-checkbox" checked onchange="toggleAllFlagOutLines(this.checked)" style="width:16px; height:16px; cursor:pointer;" />
+                                Select / Unselect All
+                            </label>
+                        </div>
+                        <div>${rowsHtml}</div>
+                    `;
                     currentAssignmentPrintHtml = body.innerHTML;
                 })
                 .catch(err => {
@@ -367,6 +412,68 @@ def get_techs_screen_html():
         function closeTechAssignmentModal() {
             const modal = document.getElementById('techAssignmentModal');
             if (modal) modal.style.display = 'none';
+            currentModalContext = null;
+        }
+
+        function toggleAllFlagOutLines(checked) {
+            const checks = document.querySelectorAll('.flagout-line-checkbox');
+            checks.forEach(chk => {
+                chk.checked = checked;
+            });
+            updateFlagOutMasterCheckbox();
+        }
+
+        function updateFlagOutMasterCheckbox() {
+            const master = document.getElementById('flagout-master-checkbox');
+            const checks = document.querySelectorAll('.flagout-line-checkbox');
+            if (!master) return;
+            if (checks.length === 0) {
+                master.checked = false;
+                master.indeterminate = false;
+                return;
+            }
+            const checkedCount = Array.from(checks).filter(chk => chk.checked).length;
+            master.checked = checkedCount === checks.length;
+            master.indeterminate = checkedCount > 0 && checkedCount < checks.length;
+        }
+
+        function flagOutSelectedLines() {
+            if (!currentModalContext?.ro || !currentModalContext?.tech_id) {
+                return;
+            }
+
+            const selectedKeys = Array.from(document.querySelectorAll('.flagout-line-checkbox:checked'))
+                .map(chk => chk.getAttribute('data-line-key'))
+                .filter(Boolean);
+
+            if (selectedKeys.length === 0) {
+                alert('Select at least one line to flag out.');
+                return;
+            }
+
+            fetch('/api/tech-flag-out', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
+                body: JSON.stringify({
+                    ro: currentModalContext.ro,
+                    tech_id: currentModalContext.tech_id,
+                    line_keys: selectedKeys
+                })
+            })
+            .then(r => r.json())
+            .then(res => {
+                if (res.error) {
+                    throw new Error(res.error);
+                }
+
+                closeTechAssignmentModal();
+                loadTechsList();
+            })
+            .catch(err => {
+                console.error('Error flagging out lines:', err);
+                alert('Error flagging out selected lines.');
+            });
         }
 
         function printTechAssignment() {
