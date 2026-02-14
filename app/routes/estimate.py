@@ -308,12 +308,18 @@ def _ensure_techs_table(cur) -> None:
             pay_rate NUMERIC(10, 2) NOT NULL,
             domain VARCHAR(255),
             active BOOLEAN DEFAULT TRUE,
+            status VARCHAR(32) DEFAULT 'Active',
+            role VARCHAR(100) DEFAULT '',
+            total_ros INTEGER DEFAULT 0,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
         """
     )
     cur.execute("ALTER TABLE techs ADD COLUMN IF NOT EXISTS domain VARCHAR(255)")
     cur.execute("ALTER TABLE techs ADD COLUMN IF NOT EXISTS active BOOLEAN DEFAULT TRUE")
+    cur.execute("ALTER TABLE techs ADD COLUMN IF NOT EXISTS status VARCHAR(32) DEFAULT 'Active'")
+    cur.execute("ALTER TABLE techs ADD COLUMN IF NOT EXISTS role VARCHAR(100) DEFAULT ''")
+    cur.execute("ALTER TABLE techs ADD COLUMN IF NOT EXISTS total_ros INTEGER DEFAULT 0")
     cur.execute("CREATE INDEX IF NOT EXISTS idx_techs_domain ON techs(domain)")
     cur.execute("CREATE INDEX IF NOT EXISTS idx_techs_active ON techs(active)")
 
@@ -603,9 +609,9 @@ async def add_tech(request: Request):
     try:
         _ensure_techs_table(cur)
         cur.execute("""
-            INSERT INTO techs (first_name, last_name, pay_rate, domain)
-            VALUES (%s, %s, %s, %s)
-            RETURNING id, first_name, last_name, pay_rate, active
+            INSERT INTO techs (first_name, last_name, pay_rate, domain, status, role, total_ros)
+            VALUES (%s, %s, %s, %s, 'Active', '', 0)
+            RETURNING id, first_name, last_name, pay_rate, active, status, role, total_ros
         """, (
             data["first_name"],
             data["last_name"],
@@ -622,7 +628,10 @@ async def add_tech(request: Request):
                 "first_name": row["first_name"],
                 "last_name": row["last_name"],
                 "pay_rate": float(row["pay_rate"]),
-                "active": row["active"]
+                "active": row["active"],
+                "status": row.get("status") or "Active",
+                "role": row.get("role") or "",
+                "total_ros": int(row.get("total_ros") or 0),
             }
         }
     finally:
@@ -641,13 +650,31 @@ async def list_techs(request: Request):
     
     try:
         _ensure_techs_table(cur)
+        _ensure_ro_line_assignments_table(cur)
+
         cur.execute("""
-            SELECT id, first_name, last_name, pay_rate, active
-            FROM techs
-            WHERE active = true
-              AND (domain = %s OR domain IS NULL)
+                        SELECT
+                                t.id,
+                                t.first_name,
+                                t.last_name,
+                                t.pay_rate,
+                                t.active,
+                                t.status,
+                                t.role,
+                                COALESCE(rc.total_ros, 0) AS total_ros
+                        FROM techs t
+                        LEFT JOIN (
+                                SELECT tech_id, COUNT(DISTINCT ro) AS total_ros
+                                FROM ro_line_assignments
+                                WHERE domain = %s
+                                    AND COALESCE(ready_to_flag, FALSE) = FALSE
+                                    AND tech_id IS NOT NULL
+                                GROUP BY tech_id
+                        ) rc ON rc.tech_id = t.id
+                        WHERE t.active = true
+                            AND (t.domain = %s OR t.domain IS NULL)
             ORDER BY first_name, last_name
-        """, (domain,))
+                """, (domain, domain))
         
         rows = cur.fetchall()
         
@@ -658,10 +685,50 @@ async def list_techs(request: Request):
                 "first_name": row["first_name"],
                 "last_name": row["last_name"],
                 "pay_rate": float(row["pay_rate"]),
-                "active": row["active"]
+                "active": row["active"],
+                "status": row.get("status") or "Active",
+                "role": row.get("role") or "",
+                "total_ros": int(row.get("total_ros") or 0),
             })
         
         return {"techs": techs}
+    finally:
+        cur.close()
+
+
+@router.post("/techs/status")
+async def update_tech_status(request: Request):
+    domain = get_user_domain(request)
+    if not domain:
+        return JSONResponse(status_code=401, content={"error": "Not authenticated"})
+
+    data = await request.json()
+    tech_id = data.get("id")
+    status_value = (data.get("status") or "").strip()
+    allowed = {"Active", "Vacation", "FMLA"}
+    if not tech_id or status_value not in allowed:
+        return JSONResponse(status_code=400, content={"error": "id and valid status are required"})
+
+    conn = get_conn()
+    cur = conn.cursor()
+    try:
+        _ensure_techs_table(cur)
+        cur.execute(
+            """
+            UPDATE techs
+            SET status = %s
+            WHERE id = %s
+              AND active = TRUE
+              AND (domain = %s OR domain IS NULL)
+            RETURNING id, status
+            """,
+            (status_value, tech_id, domain),
+        )
+        row = cur.fetchone()
+        conn.commit()
+        if not row:
+            return JSONResponse(status_code=404, content={"error": "Tech not found"})
+        return {"status": "ok", "tech": {"id": row.get("id"), "status": row.get("status")}}
     finally:
         cur.close()
 
@@ -990,6 +1057,22 @@ async def get_dashboard_data(request: Request):
         _ensure_saved_estimates_table(cur)
         _ensure_ro_assignments_table(cur)
         _ensure_ro_line_assignments_table(cur)
+        _ensure_techs_table(cur)
+
+        cur.execute(
+            """
+            SELECT id, first_name, last_name
+            FROM techs
+            WHERE active = TRUE
+              AND status = 'Active'
+              AND (domain = %s OR domain IS NULL)
+            """,
+            (domain,),
+        )
+        active_name_set = {
+            " ".join(part for part in [(row.get("first_name") or "").strip(), (row.get("last_name") or "").strip()] if part)
+            for row in (cur.fetchall() or [])
+        }
         cur.execute(
             """
             SELECT DISTINCT ON (ro)
@@ -1094,7 +1177,9 @@ async def get_dashboard_data(request: Request):
             paint_tech = "Unassigned"
             for group in grouped_lines:
                 repair_type = _normalize_repair_type(group.get("repair_type"))
-                tech_name = group.get("tech_name")
+                tech_name = (group.get("tech_name") or "").strip()
+                if tech_name and tech_name not in active_name_set:
+                    tech_name = ""
                 if repair_type == "body" and tech_name:
                     labor_tech = tech_name
                 if repair_type == "paint" and tech_name:
@@ -1123,7 +1208,10 @@ async def get_dashboard_data(request: Request):
 
             ro_seen_for_tech = set()
             for group in grouped_lines:
-                tech_name = (group.get("tech_name") or "").strip() or "Unassigned"
+                tech_name = (group.get("tech_name") or "").strip()
+                if tech_name and tech_name not in active_name_set:
+                    tech_name = ""
+                tech_name = tech_name or "Unassigned"
                 group_hours = _parse_float_value(group.get("total_hours"))
                 labor_hours_by_tech[tech_name] = labor_hours_by_tech.get(tech_name, 0.0) + group_hours
                 if tech_name not in ro_seen_for_tech:
@@ -1347,7 +1435,34 @@ async def get_ro_tech_lines(request: Request, ro: str):
     try:
         _ensure_saved_estimates_table(cur)
         _ensure_ro_line_assignments_table(cur)
+                _ensure_techs_table(cur)
         _ensure_ro_line_assignments_for_ro(cur, domain, ro_value)
+
+                cur.execute(
+                        """
+                        SELECT id
+                        FROM techs
+                        WHERE active = TRUE
+                            AND status = 'Active'
+                            AND (domain = %s OR domain IS NULL)
+                        """,
+                        (domain,),
+                )
+                active_ids = {int(row.get("id")) for row in (cur.fetchall() or []) if row.get("id") is not None}
+                cur.execute(
+                        """
+                        SELECT first_name, last_name
+                        FROM techs
+                        WHERE active = TRUE
+                            AND status = 'Active'
+                            AND (domain = %s OR domain IS NULL)
+                        """,
+                        (domain,),
+                )
+                active_names = {
+                        " ".join(part for part in [(row.get("first_name") or "").strip(), (row.get("last_name") or "").strip()] if part)
+                        for row in (cur.fetchall() or [])
+                }
 
         cur.execute(
             """
@@ -1377,6 +1492,11 @@ async def get_ro_tech_lines(request: Request, ro: str):
             hours = _parse_float_value(row.get("hours"))
             line_count = int(row.get("line_count") or 0)
             tech_name = (row.get("tech_name") or "").strip()
+            tech_id = row.get("tech_id")
+            if tech_name and tech_id is not None and int(tech_id) not in active_ids:
+                tech_name = ""
+            if tech_name and tech_id is None and tech_name not in active_names:
+                tech_name = ""
             is_pending = bool(row.get("is_pending"))
 
             if not tech_name and is_pending:
@@ -1515,6 +1635,7 @@ async def get_ro_assignment_lines(
             SELECT id, first_name, last_name, pay_rate
             FROM techs
             WHERE active = TRUE
+                            AND status = 'Active'
               AND (domain = %s OR domain IS NULL)
             ORDER BY first_name, last_name
             """,
@@ -1593,6 +1714,7 @@ async def save_ro_assignment_lines(request: Request):
                 FROM techs
                 WHERE id = %s
                   AND active = TRUE
+                                    AND status = 'Active'
                   AND (domain = %s OR domain IS NULL)
                 """,
                 (target_tech_id, domain),
@@ -1609,6 +1731,7 @@ async def save_ro_assignment_lines(request: Request):
                 SELECT id
                 FROM techs
                 WHERE active = TRUE
+                                    AND status = 'Active'
                   AND (domain = %s OR domain IS NULL)
                   AND TRIM(CONCAT(COALESCE(first_name, ''), ' ', COALESCE(last_name, ''))) = %s
                 LIMIT 1
@@ -1728,6 +1851,7 @@ async def save_ro_assignments(request: Request):
                 FROM techs
                 WHERE id = %s
                   AND active = TRUE
+                                    AND status = 'Active'
                   AND (domain = %s OR domain IS NULL)
                 """,
                 (tech_id, domain),
@@ -1744,6 +1868,7 @@ async def save_ro_assignments(request: Request):
                 SELECT id
                 FROM techs
                 WHERE active = TRUE
+                                    AND status = 'Active'
                   AND (domain = %s OR domain IS NULL)
                   AND TRIM(CONCAT(COALESCE(first_name, ''), ' ', COALESCE(last_name, ''))) = %s
                 LIMIT 1
