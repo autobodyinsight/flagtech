@@ -277,12 +277,14 @@ def _ensure_ro_flagout_lines_table(cur) -> None:
             pay_amount NUMERIC,
             status VARCHAR(32) NOT NULL DEFAULT 'ready_to_flag',
             domain VARCHAR(255) NOT NULL,
-            flagged_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            flagged_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            paid_at TIMESTAMP
         )
         """
     )
     cur.execute("ALTER TABLE ro_flagout_lines ADD COLUMN IF NOT EXISTS pay_rate NUMERIC")
     cur.execute("ALTER TABLE ro_flagout_lines ADD COLUMN IF NOT EXISTS pay_amount NUMERIC")
+    cur.execute("ALTER TABLE ro_flagout_lines ADD COLUMN IF NOT EXISTS paid_at TIMESTAMP")
     cur.execute(
         """
         CREATE UNIQUE INDEX IF NOT EXISTS idx_ro_flagout_lines_unique
@@ -2339,6 +2341,142 @@ async def get_flagout_techs(request: Request):
             )
 
         return {"techs": techs}
+    finally:
+        cur.close()
+
+
+@router.post("/flagout/payout")
+async def save_flagout_payout(request: Request):
+    domain = get_user_domain(request)
+    if not domain:
+        return JSONResponse(status_code=401, content={"error": "Not authenticated"})
+
+    data = await request.json()
+    selections = data.get("selections") or []
+    if not isinstance(selections, list) or not selections:
+        return JSONResponse(status_code=400, content={"error": "No payout selections provided"})
+
+    normalized = []
+    for item in selections:
+        if not isinstance(item, dict):
+            continue
+        try:
+            tech_id = int(item.get("tech_id"))
+        except Exception:
+            continue
+        ros = [str(ro).strip() for ro in (item.get("ros") or []) if str(ro).strip()]
+        if not ros:
+            continue
+        normalized.append({"tech_id": tech_id, "ros": sorted(set(ros))})
+
+    if not normalized:
+        return JSONResponse(status_code=400, content={"error": "No valid payout selections provided"})
+
+    conn = get_conn()
+    cur = conn.cursor()
+    try:
+        _ensure_ro_flagout_lines_table(cur)
+        _ensure_saved_estimates_table(cur)
+
+        summaries = []
+
+        for group in normalized:
+            tech_id = group["tech_id"]
+            ro_values = group["ros"]
+
+            cur.execute(
+                """
+                WITH latest_estimates AS (
+                    SELECT DISTINCT ON (ro)
+                        ro,
+                        year,
+                        make,
+                        model,
+                        vehicle
+                    FROM saved_estimates
+                    WHERE domain = %s
+                    ORDER BY ro, saved_at DESC, id DESC
+                )
+                SELECT
+                    f.tech_id,
+                    COALESCE(MAX(NULLIF(TRIM(f.tech_name), '')), CONCAT('Tech #', f.tech_id::text)) AS tech_name,
+                    f.ro,
+                    COALESCE(MAX(f.pay_rate), 0) AS pay_rate,
+                    COALESCE(SUM(f.hours), 0) AS total_hours,
+                    COALESCE(SUM(f.pay_amount), 0) AS total_pay,
+                    MAX(le.year) AS year,
+                    MAX(le.make) AS make,
+                    MAX(le.model) AS model,
+                    MAX(le.vehicle) AS vehicle
+                FROM ro_flagout_lines f
+                LEFT JOIN latest_estimates le ON le.ro = f.ro
+                WHERE f.domain = %s
+                  AND f.status = 'ready_to_flag'
+                  AND f.tech_id = %s
+                  AND f.ro = ANY(%s)
+                GROUP BY f.tech_id, f.ro
+                ORDER BY f.ro
+                """,
+                (domain, domain, tech_id, ro_values),
+            )
+            ro_rows = cur.fetchall() or []
+            if not ro_rows:
+                continue
+
+            ro_items = []
+            total_paid = 0.0
+            for row in ro_rows:
+                year = (row.get("year") or "").strip()
+                make = (row.get("make") or "").strip()
+                model = (row.get("model") or "").strip()
+                vehicle_info = " ".join(part for part in [year, make, model] if part)
+                if not vehicle_info:
+                    vehicle_info = (row.get("vehicle") or "").strip()
+
+                pay_rate = _parse_float_value(row.get("pay_rate"))
+                total_hours = _parse_float_value(row.get("total_hours"))
+                total = _parse_float_value(row.get("total_pay"))
+                total_paid += total
+
+                ro_items.append(
+                    {
+                        "ro": row.get("ro") or "",
+                        "vehicle_info": vehicle_info,
+                        "pay_rate": pay_rate,
+                        "total_hours": total_hours,
+                        "total": total,
+                    }
+                )
+
+            tech_name = (ro_rows[0].get("tech_name") or f"Tech #{tech_id}").strip()
+            pay_rate_display = _parse_float_value(ro_rows[0].get("pay_rate"))
+
+            summaries.append(
+                {
+                    "tech_id": tech_id,
+                    "tech_name": tech_name,
+                    "total_ros_paid": len(ro_items),
+                    "pay_rate": pay_rate_display,
+                    "total_paid": total_paid,
+                    "ros": ro_items,
+                }
+            )
+
+            cur.execute(
+                """
+                UPDATE ro_flagout_lines
+                SET status = 'paid',
+                    paid_at = CURRENT_TIMESTAMP
+                WHERE domain = %s
+                  AND status = 'ready_to_flag'
+                  AND tech_id = %s
+                  AND ro = ANY(%s)
+                """,
+                (domain, tech_id, ro_values),
+            )
+
+        conn.commit()
+        return {"status": "ok", "summaries": summaries}
     finally:
         cur.close()
 
