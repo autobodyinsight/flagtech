@@ -14,6 +14,10 @@ def get_techs_screen_html():
                     style="padding:12px 24px; font-size:16px; cursor:pointer; background-color:#505050; color:white; border:none; border-radius:4px;">
                 + tech
             </button>
+            <button id="techEditBtn" onclick="toggleTechEditMode()"
+                    style="padding:12px 24px; font-size:16px; cursor:pointer; background-color:#d32f2f; color:#fff; border:none; border-radius:4px; font-weight:bold;">
+                EDIT
+            </button>
         </div>
 
         <!-- Techs Details Table -->
@@ -27,19 +31,14 @@ def get_techs_screen_html():
                     <div style="flex:0.9; text-align:center;">Role</div>
                     <div style="flex:0.7; text-align:center;">Total RO's</div>
                     <div style="flex:0.8; text-align:center;">Pay Rate</div>
+                    <div style="flex:0.8; text-align:center;">Action</div>
                 </div>
                 <!-- Tech rows will be inserted here -->
                 <div id="techsListContainer"></div>
             </div>
         </div>
 
-        <div id="techStatusModal" class="modal" style="display:none;">
-            <div class="modal-content" style="max-width:520px; background-color:#f2f2f2;">
-                <span class="close" onclick="closeTechStatusModal()">&times;</span>
-                <h3 style="margin-bottom:14px;">Update Technician Status</h3>
-                <div id="techStatusModalList"></div>
-            </div>
-        </div>
+        <div id="statusDropdownMenu" style="display:none; position:fixed; z-index:3000; background:#fff; border:1px solid #ddd; border-radius:6px; box-shadow:0 4px 10px rgba(0,0,0,0.15); padding:6px;"></div>
 
         <!-- Add Tech Modal -->
         <div id="addTechModal" class="modal" style="display:none;">
@@ -126,6 +125,8 @@ def get_techs_screen_html():
         let currentModalContext = null;
         let techPayRateById = {};
         let cachedTechRows = [];
+        let currentStatusDropdownTechId = null;
+        let isTechEditMode = false;
 
         // -----------------------------
         // Add Tech Modal
@@ -142,6 +143,16 @@ def get_techs_screen_html():
             document.getElementById('addTechModal').style.display = 'none';
         }
 
+        function toggleTechEditMode() {
+            isTechEditMode = !isTechEditMode;
+            const editBtn = document.getElementById('techEditBtn');
+            if (editBtn) {
+                editBtn.textContent = isTechEditMode ? 'DONE' : 'EDIT';
+            }
+            closeStatusDropdown();
+            loadTechsList();
+        }
+
         function getStatusIcon(statusValue) {
             const status = (statusValue || '').trim();
             if (status === 'Active') {
@@ -156,38 +167,44 @@ def get_techs_screen_html():
             return '<span>-</span>';
         }
 
-        function openTechStatusModal(selectedTechId) {
-            const modal = document.getElementById('techStatusModal');
-            const list = document.getElementById('techStatusModalList');
-            if (!modal || !list) return;
-
-            const selectedId = String(selectedTechId || '');
-            const rowsHtml = cachedTechRows.map(tech => {
-                const techId = String(tech.id || '');
-                const checked = techId === selectedId ? 'checked' : '';
-                const status = tech.status || 'Active';
-                const fullName = `${tech.first_name || ''} ${tech.last_name || ''}`.trim();
-                return `
-                    <div style="display:flex; align-items:center; gap:10px; padding:8px 0; border-bottom:1px solid #e7e7e7;">
-                        <input type="checkbox" ${checked} style="width:16px; height:16px;" />
-                        <div style="flex:1; font-weight:bold; color:#333;">${fullName}</div>
-                        <select onchange="updateTechStatus(${tech.id}, this.value)" style="padding:6px 8px; border:1px solid #ccc; border-radius:4px;">
-                            <option value="Active" ${status === 'Active' ? 'selected' : ''}>Active</option>
-                            <option value="Vacation" ${status === 'Vacation' ? 'selected' : ''}>Vacation</option>
-                            <option value="FMLA" ${status === 'FMLA' ? 'selected' : ''}>FMLA</option>
-                        </select>
-                    </div>
-                `;
-            }).join('');
-
-            list.innerHTML = rowsHtml || '<p style="color:#777;">No technicians found.</p>';
-            modal.style.display = 'block';
+        function closeStatusDropdown() {
+            const menu = document.getElementById('statusDropdownMenu');
+            if (!menu) return;
+            menu.style.display = 'none';
+            currentStatusDropdownTechId = null;
         }
 
-        function closeTechStatusModal() {
-            const modal = document.getElementById('techStatusModal');
-            if (modal) {
-                modal.style.display = 'none';
+        function openStatusDropdown(event, techId, currentStatus) {
+            const menu = document.getElementById('statusDropdownMenu');
+            if (!menu) return;
+            event.stopPropagation();
+
+            currentStatusDropdownTechId = techId;
+            menu.innerHTML = `
+                <select id="statusDropdownSelect" style="padding:6px 8px; border:1px solid #ccc; border-radius:4px; min-width:120px;">
+                    <option value="Active" ${currentStatus === 'Active' ? 'selected' : ''}>Active</option>
+                    <option value="Vacation" ${currentStatus === 'Vacation' ? 'selected' : ''}>Vacation</option>
+                    <option value="FMLA" ${currentStatus === 'FMLA' ? 'selected' : ''}>FMLA</option>
+                </select>
+            `;
+
+            const clickX = event.clientX || 0;
+            const clickY = event.clientY || 0;
+            menu.style.left = `${clickX}px`;
+            menu.style.top = `${clickY + 6}px`;
+            menu.style.display = 'block';
+
+            const select = document.getElementById('statusDropdownSelect');
+            if (select) {
+                select.focus();
+                select.addEventListener('change', function() {
+                    if (!currentStatusDropdownTechId) return;
+                    updateTechStatus(currentStatusDropdownTechId, select.value);
+                    closeStatusDropdown();
+                });
+                select.addEventListener('blur', function() {
+                    setTimeout(() => closeStatusDropdown(), 120);
+                });
             }
         }
 
@@ -208,6 +225,36 @@ def get_techs_screen_html():
             .catch(err => {
                 console.error('Error updating tech status:', err);
                 alert('Error updating technician status.');
+            });
+        }
+
+        function saveTechLine(techId) {
+            const roleSelect = document.getElementById(`techRoleEdit-${techId}`);
+            const rateInput = document.getElementById(`techRateEdit-${techId}`);
+            if (!roleSelect || !rateInput) return;
+
+            const payload = {
+                id: techId,
+                role: roleSelect.value,
+                pay_rate: parseFloat(rateInput.value || '0')
+            };
+
+            fetch('/api/techs/update', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
+                body: JSON.stringify(payload)
+            })
+            .then(r => r.json())
+            .then(res => {
+                if (res.error) {
+                    throw new Error(res.error);
+                }
+                loadTechsList();
+            })
+            .catch(err => {
+                console.error('Error saving technician line:', err);
+                alert('Error saving technician updates.');
             });
         }
 
@@ -264,6 +311,8 @@ def get_techs_screen_html():
                     const assignmentsId = `tech-assignments-${tech.id}`;
                     const techRate = Number(tech.pay_rate || 0);
                     techPayRateById[String(tech.id)] = techRate;
+                    const currentRole = (tech.role || '').trim();
+                    const selectedRole = ['Body', 'Paint', 'Mech'].includes(currentRole) ? currentRole : 'Body';
 
                     // Main tech row
                     const row = document.createElement('div');
@@ -277,8 +326,7 @@ def get_techs_screen_html():
                     statusCell.innerHTML = getStatusIcon(tech.status || 'Active');
                     statusCell.title = 'Update status';
                     statusCell.onclick = function(e) {
-                        e.stopPropagation();
-                        openTechStatusModal(tech.id);
+                        openStatusDropdown(e, tech.id, tech.status || 'Active');
                     };
 
                     const techNameCell = document.createElement('div');
@@ -287,6 +335,17 @@ def get_techs_screen_html():
                     techNameCell.style.display = "flex";
                     techNameCell.style.alignItems = "center";
                     techNameCell.style.gap = "10px";
+
+                    if (isTechEditMode) {
+                        const editCheck = document.createElement('input');
+                        editCheck.type = 'checkbox';
+                        editCheck.style.width = '16px';
+                        editCheck.style.height = '16px';
+                        editCheck.style.marginLeft = '8px';
+                        editCheck.style.marginRight = '4px';
+                        editCheck.addEventListener('click', (e) => e.stopPropagation());
+                        techNameCell.appendChild(editCheck);
+                    }
 
                     const techName = document.createElement('span');
                     techName.textContent = fullName;
@@ -300,7 +359,17 @@ def get_techs_screen_html():
                     const roleCell = document.createElement('div');
                     roleCell.style.flex = '0.9';
                     roleCell.style.textAlign = 'center';
-                    roleCell.textContent = (tech.role || '').trim() || '-';
+                    if (isTechEditMode) {
+                        roleCell.innerHTML = `
+                            <select id="techRoleEdit-${tech.id}" style="padding:6px 8px; border:1px solid #ccc; border-radius:4px;">
+                                <option value="Body" ${selectedRole === 'Body' ? 'selected' : ''}>Body</option>
+                                <option value="Paint" ${selectedRole === 'Paint' ? 'selected' : ''}>Paint</option>
+                                <option value="Mech" ${selectedRole === 'Mech' ? 'selected' : ''}>Mech</option>
+                            </select>
+                        `;
+                    } else {
+                        roleCell.textContent = (tech.role || '').trim() || '-';
+                    }
 
                     const totalRosCell = document.createElement('div');
                     totalRosCell.style.flex = '0.7';
@@ -311,18 +380,48 @@ def get_techs_screen_html():
                     const rateCell = document.createElement('div');
                     rateCell.style.flex = "0.8";
                     rateCell.style.textAlign = "center";
-                    rateCell.textContent = `$${tech.pay_rate.toFixed(2)}/hr`;
+                    if (isTechEditMode) {
+                        rateCell.innerHTML = `<input id="techRateEdit-${tech.id}" type="number" step="0.01" value="${Number(tech.pay_rate || 0).toFixed(2)}" style="width:90px; padding:6px 8px; border:1px solid #ccc; border-radius:4px; text-align:right;" />`;
+                    } else {
+                        rateCell.textContent = `$${tech.pay_rate.toFixed(2)}/hr`;
+                    }
+
+                    const actionCell = document.createElement('div');
+                    actionCell.style.flex = '0.8';
+                    actionCell.style.textAlign = 'center';
+                    if (isTechEditMode) {
+                        const saveBtn = document.createElement('button');
+                        saveBtn.textContent = 'Save';
+                        saveBtn.style.padding = '8px 14px';
+                        saveBtn.style.background = '#d32f2f';
+                        saveBtn.style.color = '#fff';
+                        saveBtn.style.border = 'none';
+                        saveBtn.style.borderRadius = '4px';
+                        saveBtn.style.cursor = 'pointer';
+                        saveBtn.style.fontWeight = 'bold';
+                        saveBtn.onclick = function(e) {
+                            e.stopPropagation();
+                            saveTechLine(tech.id);
+                        };
+                        actionCell.appendChild(saveBtn);
+                    } else {
+                        actionCell.textContent = '-';
+                    }
 
                     row.appendChild(statusCell);
                     row.appendChild(techNameCell);
                     row.appendChild(roleCell);
                     row.appendChild(totalRosCell);
                     row.appendChild(rateCell);
+                    row.appendChild(actionCell);
 
                     row.onmouseover = function() { this.style.backgroundColor = "#f5f5f5"; };
                     row.onmouseout = function() { this.style.backgroundColor = "transparent"; };
 
                     row.onclick = function() {
+                        if (isTechEditMode) {
+                            return;
+                        }
                         toggleTechAssignments(tech.id, fullName, assignmentsId, techRate);
                     };
 
@@ -649,6 +748,12 @@ def get_techs_screen_html():
         // Load techs list on startup
         document.addEventListener("DOMContentLoaded", () => {
             loadTechsList();
+            document.addEventListener('click', (event) => {
+                const menu = document.getElementById('statusDropdownMenu');
+                if (!menu || menu.style.display !== 'block') return;
+                if (menu.contains(event.target)) return;
+                closeStatusDropdown();
+            });
         });
 
         </script>

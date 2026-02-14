@@ -733,6 +733,65 @@ async def update_tech_status(request: Request):
         cur.close()
 
 
+@router.post("/techs/update")
+async def update_tech_line(request: Request):
+    domain = get_user_domain(request)
+    if not domain:
+        return JSONResponse(status_code=401, content={"error": "Not authenticated"})
+
+    data = await request.json()
+    tech_id = data.get("id")
+    role_value = (data.get("role") or "").strip()
+    pay_rate_raw = data.get("pay_rate")
+
+    allowed_roles = {"Body", "Paint", "Mech"}
+    if not tech_id:
+        return JSONResponse(status_code=400, content={"error": "id is required"})
+    if role_value not in allowed_roles:
+        return JSONResponse(status_code=400, content={"error": "role must be Body, Paint, or Mech"})
+
+    try:
+        pay_rate_value = float(pay_rate_raw)
+    except Exception:
+        return JSONResponse(status_code=400, content={"error": "pay_rate must be numeric"})
+
+    if pay_rate_value <= 0:
+        return JSONResponse(status_code=400, content={"error": "pay_rate must be greater than zero"})
+
+    conn = get_conn()
+    cur = conn.cursor()
+    try:
+        _ensure_techs_table(cur)
+        cur.execute(
+            """
+            UPDATE techs
+            SET role = %s,
+                pay_rate = %s
+            WHERE id = %s
+              AND active = TRUE
+              AND (domain = %s OR domain IS NULL)
+            RETURNING id, role, pay_rate
+            """,
+            (role_value, pay_rate_value, tech_id, domain),
+        )
+        row = cur.fetchone()
+        conn.commit()
+
+        if not row:
+            return JSONResponse(status_code=404, content={"error": "Tech not found"})
+
+        return {
+            "status": "ok",
+            "tech": {
+                "id": row.get("id"),
+                "role": row.get("role") or "",
+                "pay_rate": float(row.get("pay_rate") or 0),
+            },
+        }
+    finally:
+        cur.close()
+
+
 @router.post("/techs/delete")
 async def delete_tech(request: Request):
     """Soft delete a technician (set active=false)."""
