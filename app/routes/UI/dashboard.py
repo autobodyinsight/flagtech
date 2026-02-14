@@ -1743,11 +1743,11 @@ def get_dashboard_screen_html():
             }
             
             function printFileCover(data) {
-                // Generate handwritten note lines to fill the page
-                const numLines = 18;
+                // Generate handwritten note lines to fill the page (fill left to right)
+                const numLines = 21;
                 let noteLinesHtml = '';
                 for (let i = 0; i < numLines; i++) {
-                    noteLinesHtml += '<div class="note-line">____/____/________:_______________________________________________</div>';
+                    noteLinesHtml += '<div class="note-line">____/____/________:_______________________</div>';
                 }
                 
                 const techDisplay = data.techs.body || '';
@@ -1837,12 +1837,16 @@ def get_dashboard_screen_html():
                                     margin-bottom: 22px;
                                     color: #333;
                                 }
+                                .notes-grid {
+                                    display: grid;
+                                    grid-template-columns: 1fr 1fr 1fr;
+                                    gap: 8px 15px;
+                                }
                                 .note-line {
                                     font-family: 'Courier New', monospace;
-                                    font-size: 18px;
+                                    font-size: 16px;
                                     color: #333;
-                                    margin-bottom: 12px;
-                                    letter-spacing: 1px;
+                                    letter-spacing: 0.5px;
                                 }
                             </style>
                         </head>
@@ -1900,7 +1904,9 @@ def get_dashboard_screen_html():
                             </div>
                             <div class="notes-section">
                                 <div class="notes-title">Notes</div>
-                                ${noteLinesHtml}
+                                <div class="notes-grid">
+                                    ${noteLinesHtml}
+                                </div>
                             </div>
                         </body>
                     </html>
@@ -1914,11 +1920,7 @@ def get_dashboard_screen_html():
                 const printWindow = window.open('', '_blank', 'width=600,height=800');
                 if (!printWindow) return;
                 
-                const techDisplay = [
-                    data.techs.body ? `Body: ${data.techs.body}` : null,
-                    data.techs.paint ? `Paint: ${data.techs.paint}` : null,
-                    data.techs.mech ? `Mech: ${data.techs.mech}` : null
-                ].filter(Boolean).join(', ') || 'Not assigned';
+                const techDisplay = data.techs.body || '';
                 
                 printWindow.document.write(`
                     <!DOCTYPE html>
@@ -2009,33 +2011,35 @@ def get_dashboard_screen_html():
                                     margin-bottom: 20px;
                                     color: #333;
                                 }
-                                .checklist-item {
+                                .checklist-grid {
                                     display: grid;
-                                    grid-template-columns: 30px 1fr;
-                                    gap: 15px;
-                                    margin-bottom: 25px;
-                                    align-items: start;
+                                    grid-template-columns: repeat(7, 1fr);
+                                    gap: 10px;
                                 }
-                                .checkbox {
-                                    width: 30px;
-                                    height: 30px;
-                                    border: 3px solid #333;
-                                    border-radius: 4px;
-                                }
-                                .checklist-content {
+                                .checklist-item {
                                     display: flex;
                                     flex-direction: column;
+                                    align-items: center;
                                     gap: 8px;
+                                    text-align: center;
+                                }
+                                .checkbox {
+                                    width: 28px;
+                                    height: 28px;
+                                    border: 3px solid #333;
+                                    border-radius: 4px;
+                                    flex-shrink: 0;
                                 }
                                 .checklist-label {
-                                    font-size: 24px;
+                                    font-size: 18px;
                                     font-weight: bold;
                                     color: #333;
                                 }
                                 .checklist-line {
-                                    font-size: 18px;
+                                    font-size: 13px;
                                     color: #666;
                                     font-family: 'Courier New', monospace;
+                                    white-space: nowrap;
                                 }
                             </style>
                         </head>
@@ -2074,60 +2078,48 @@ def get_dashboard_screen_html():
                             </div>
                             <div class="checklist-section">
                                 <div class="checklist-title">Process Checklist</div>
-                                <div class="checklist-item">
-                                    <div class="checkbox"></div>
-                                    <div class="checklist-content">
+                                <div class="checklist-grid">
+                                    <div class="checklist-item">
+                                        <div class="checkbox"></div>
                                         <div class="checklist-label">teardown</div>
-                                        <div class="checklist-line">Date: ____/_____/_____</div>
-                                        <div class="checklist-line">Sign: _________________________</div>
+                                        <div class="checklist-line">___/___/___</div>
+                                        <div class="checklist-line">__________</div>
                                     </div>
-                                </div>
-                                <div class="checklist-item">
-                                    <div class="checkbox"></div>
-                                    <div class="checklist-content">
+                                    <div class="checklist-item">
+                                        <div class="checkbox"></div>
                                         <div class="checklist-label">body</div>
-                                        <div class="checklist-line">Date: ____/_____/_____</div>
-                                        <div class="checklist-line">Sign: _________________________</div>
+                                        <div class="checklist-line">___/___/___</div>
+                                        <div class="checklist-line">__________</div>
                                     </div>
-                                </div>
-                                <div class="checklist-item">
-                                    <div class="checkbox"></div>
-                                    <div class="checklist-content">
+                                    <div class="checklist-item">
+                                        <div class="checkbox"></div>
                                         <div class="checklist-label">parts</div>
-                                        <div class="checklist-line">Date: ____/_____/_____</div>
-                                        <div class="checklist-line">Sign: _________________________</div>
+                                        <div class="checklist-line">___/___/___</div>
+                                        <div class="checklist-line">__________</div>
                                     </div>
-                                </div>
-                                <div class="checklist-item">
-                                    <div class="checkbox"></div>
-                                    <div class="checklist-content">
+                                    <div class="checklist-item">
+                                        <div class="checkbox"></div>
                                         <div class="checklist-label">paint</div>
-                                        <div class="checklist-line">Date: ____/_____/_____</div>
-                                        <div class="checklist-line">Sign: _________________________</div>
+                                        <div class="checklist-line">___/___/___</div>
+                                        <div class="checklist-line">__________</div>
                                     </div>
-                                </div>
-                                <div class="checklist-item">
-                                    <div class="checkbox"></div>
-                                    <div class="checklist-content">
+                                    <div class="checklist-item">
+                                        <div class="checkbox"></div>
                                         <div class="checklist-label">reassy</div>
-                                        <div class="checklist-line">Date: ____/_____/_____</div>
-                                        <div class="checklist-line">Sign: _________________________</div>
+                                        <div class="checklist-line">___/___/___</div>
+                                        <div class="checklist-line">__________</div>
                                     </div>
-                                </div>
-                                <div class="checklist-item">
-                                    <div class="checkbox"></div>
-                                    <div class="checklist-content">
+                                    <div class="checklist-item">
+                                        <div class="checkbox"></div>
                                         <div class="checklist-label">wash</div>
-                                        <div class="checklist-line">Date: ____/_____/_____</div>
-                                        <div class="checklist-line">Sign: _________________________</div>
+                                        <div class="checklist-line">___/___/___</div>
+                                        <div class="checklist-line">__________</div>
                                     </div>
-                                </div>
-                                <div class="checklist-item">
-                                    <div class="checkbox"></div>
-                                    <div class="checklist-content">
+                                    <div class="checklist-item">
+                                        <div class="checkbox"></div>
                                         <div class="checklist-label">qc</div>
-                                        <div class="checklist-line">Date: ____/_____/_____</div>
-                                        <div class="checklist-line">Sign: _________________________</div>
+                                        <div class="checklist-line">___/___/___</div>
+                                        <div class="checklist-line">__________</div>
                                     </div>
                                 </div>
                             </div>

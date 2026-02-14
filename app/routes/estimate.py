@@ -2212,28 +2212,6 @@ async def get_ro_print_data(request: Request, ro: str):
         if not isinstance(parts_repairs, list):
             parts_repairs = []
         
-        # Get tech assignments
-        cur.execute(
-            """
-            SELECT role, tech_id, tech_name
-            FROM ro_assignments
-            WHERE domain = %s AND ro = %s
-            """,
-            (domain, ro_value),
-        )
-        assignment_rows = cur.fetchall()
-        
-        tech_assignments = {
-            "body": None,
-            "paint": None,
-            "mech": None
-        }
-        
-        for assignment in assignment_rows:
-            role = assignment.get("role", "").lower()
-            if role in tech_assignments:
-                tech_assignments[role] = assignment.get("tech_name")
-        
         # Get line assignments to determine which lines belong to which techs/types
         _ensure_ro_line_assignments_for_ro(cur, domain, ro_value)
         
@@ -2247,6 +2225,34 @@ async def get_ro_print_data(request: Request, ro: str):
             (domain, ro_value),
         )
         line_assignments = cur.fetchall()
+        
+        # Get tech assignments from grouped line assignments (like dashboard does)
+        cur.execute(
+            """
+            SELECT repair_type, tech_name, COALESCE(SUM(hours), 0) AS total_hours
+            FROM ro_line_assignments
+            WHERE domain = %s AND ro = %s
+            GROUP BY repair_type, tech_name
+            """,
+            (domain, ro_value),
+        )
+        grouped_lines = cur.fetchall()
+        
+        tech_assignments = {
+            "body": None,
+            "paint": None,
+            "mech": None
+        }
+        
+        for group in grouped_lines:
+            repair_type = _normalize_repair_type(group.get("repair_type", ""))
+            tech_name = group.get("tech_name")
+            if repair_type == "body" and tech_name:
+                tech_assignments["body"] = tech_name
+            elif repair_type == "paint" and tech_name:
+                tech_assignments["paint"] = tech_name
+            elif repair_type in ("mech", "mechanical") and tech_name:
+                tech_assignments["mech"] = tech_name
         
         # Organize lines by repair type and tech
         body_lines = []
