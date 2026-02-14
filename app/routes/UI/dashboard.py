@@ -161,7 +161,10 @@ def get_dashboard_screen_html():
             
             <!-- RO List Table -->
             <div style="margin-top:30px; background:#fff; padding:20px; border-radius:8px; box-shadow:0 2px 4px rgba(0,0,0,0.1);">
-                <h3 style="margin:0 0 20px 0; color:#333;">Repair Orders</h3>
+                <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:20px;">
+                    <h3 style="margin:0; color:#333;">Repair Orders</h3>
+                    <button onclick="openPrintOptionsModal()" style="padding:8px 16px; background:#b22222; color:#fff; border:none; border-radius:4px; cursor:pointer; font-weight:bold; font-size:14px;">Print</button>
+                </div>
                 <div style="overflow-x:auto;">
                     <table id="roListTable" style="width:100%; border-collapse:collapse;">
                         <thead>
@@ -226,6 +229,20 @@ def get_dashboard_screen_html():
 
         <div id="roDatePickerPopup" style="display:none; position:fixed; z-index:2001; background:#fff; border:1px solid #ccc; border-radius:6px; padding:8px; box-shadow:0 3px 8px rgba(0,0,0,0.18);">
             <input id="roDatePickerInput" type="date" style="padding:4px 6px;" />
+        </div>
+
+        <div id="printOptionsModal" class="modal" style="display:none;">
+            <div class="modal-content" style="max-width:400px;">
+                <span class="close" onclick="closePrintOptionsModal()">&times;</span>
+                <h2 style="margin-bottom:24px; color:#333;">Print RO List</h2>
+                <p style="margin-bottom:16px; font-weight:bold; color:#555;">Print by:</p>
+                <div style="display:flex; flex-direction:column; gap:12px;">
+                    <button onclick="printRoList('ro')" style="padding:12px 20px; background:#f5f5f5; color:#333; border:1px solid #ddd; border-radius:4px; cursor:pointer; text-align:left; font-size:15px; transition:background 0.2s;" onmouseover="this.style.background='#e8e8e8'" onmouseout="this.style.background='#f5f5f5'">RO #</button>
+                    <button onclick="printRoList('insurance')" style="padding:12px 20px; background:#f5f5f5; color:#333; border:1px solid #ddd; border-radius:4px; cursor:pointer; text-align:left; font-size:15px; transition:background 0.2s;" onmouseover="this.style.background='#e8e8e8'" onmouseout="this.style.background='#f5f5f5'">Insurance</button>
+                    <button onclick="printRoList('in_date')" style="padding:12px 20px; background:#f5f5f5; color:#333; border:1px solid #ddd; border-radius:4px; cursor:pointer; text-align:left; font-size:15px; transition:background 0.2s;" onmouseover="this.style.background='#e8e8e8'" onmouseout="this.style.background='#f5f5f5'">In date</button>
+                    <button onclick="printRoList('ecd_date')" style="padding:12px 20px; background:#f5f5f5; color:#333; border:1px solid #ddd; border-radius:4px; cursor:pointer; text-align:left; font-size:15px; transition:background 0.2s;" onmouseover="this.style.background='#e8e8e8'" onmouseout="this.style.background='#f5f5f5'">ECD</button>
+                </div>
+            </div>
         </div>
 
         <style>
@@ -1403,6 +1420,189 @@ def get_dashboard_screen_html():
                 printWindow.document.close();
                 printWindow.focus();
                 printWindow.print();
+            }
+            
+            // Print Options Modal Functions
+            function openPrintOptionsModal() {
+                document.getElementById('printOptionsModal').style.display = 'block';
+            }
+            
+            function closePrintOptionsModal() {
+                document.getElementById('printOptionsModal').style.display = 'none';
+            }
+            
+            function printRoList(sortBy) {
+                closePrintOptionsModal();
+                
+                if (!dashboardData || !dashboardData.roList || dashboardData.roList.length === 0) {
+                    alert('No repair orders to print');
+                    return;
+                }
+                
+                // Sort the data
+                const sortedList = [...dashboardData.roList].sort((a, b) => {
+                    let valA = a[sortBy];
+                    let valB = b[sortBy];
+                    
+                    if (sortBy === 'ro' || sortBy === 'insurance') {
+                        valA = String(valA || '').toLowerCase();
+                        valB = String(valB || '').toLowerCase();
+                        return valA.localeCompare(valB);
+                    }
+                    
+                    if (sortBy === 'in_date' || sortBy === 'ecd_date') {
+                        valA = valA || '';
+                        valB = valB || '';
+                        return valA.localeCompare(valB);
+                    }
+                    
+                    return 0;
+                });
+                
+                // Get sort label
+                const sortLabels = {
+                    'ro': 'RO #',
+                    'insurance': 'Insurance',
+                    'in_date': 'In date',
+                    'ecd_date': 'ECD'
+                };
+                const sortLabel = sortLabels[sortBy] || sortBy;
+                
+                // Build table rows
+                let rowsHtml = '';
+                sortedList.forEach((ro, index) => {
+                    const rowBg = index % 2 === 0 ? '#fff' : '#f9f9f9';
+                    const inDisplay = ro.in_date ? formatShortDate(ro.in_date) : '-';
+                    const ecdDisplay = ro.ecd_date ? formatShortDate(ro.ecd_date) : '-';
+                    
+                    rowsHtml += `
+                        <tr style="background:${rowBg};">
+                            <td style="padding:10px; border-bottom:1px solid #eee;">${ro.ro}</td>
+                            <td style="padding:10px; border-bottom:1px solid #eee;">${ro.vehicle || 'N/A'}</td>
+                            <td style="padding:10px; border-bottom:1px solid #eee;">${ro.customer || '-'}</td>
+                            <td style="padding:10px; border-bottom:1px solid #eee;">${ro.phone || '-'}</td>
+                            <td style="padding:10px; border-bottom:1px solid #eee;">${ro.insurance || '-'}</td>
+                            <td style="padding:10px; border-bottom:1px solid #eee;">${ro.claim_number || '-'}</td>
+                            <td style="padding:10px; border-bottom:1px solid #eee;">${inDisplay}</td>
+                            <td style="padding:10px; border-bottom:1px solid #eee;">${ecdDisplay}</td>
+                            <td style="padding:10px; border-bottom:1px solid #eee; text-align:right;">${ro.hours.toFixed(1)}</td>
+                            <td style="padding:10px; border-bottom:1px solid #eee; text-align:right;">$${ro.total.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                        </tr>
+                    `;
+                });
+                
+                // Calculate totals
+                const totalHours = sortedList.reduce((sum, ro) => sum + ro.hours, 0);
+                const totalAmount = sortedList.reduce((sum, ro) => sum + ro.total, 0);
+                
+                // Open print window
+                const printWindow = window.open('', '_blank');
+                printWindow.document.write(`
+                    <!DOCTYPE html>
+                    <html>
+                        <head>
+                            <title>RO List - Print by ${sortLabel}</title>
+                            <style>
+                                @media print {
+                                    @page { margin: 0.5in; }
+                                    body { margin: 0; }
+                                }
+                                body {
+                                    font-family: Arial, sans-serif;
+                                    padding: 20px;
+                                    color: #333;
+                                }
+                                .header {
+                                    text-align: center;
+                                    margin-bottom: 30px;
+                                    border-bottom: 2px solid #b22222;
+                                    padding-bottom: 15px;
+                                }
+                                .header h1 {
+                                    margin: 0 0 8px 0;
+                                    color: #b22222;
+                                    font-size: 28px;
+                                }
+                                .header .subtitle {
+                                    margin: 0;
+                                    color: #666;
+                                    font-size: 16px;
+                                }
+                                table {
+                                    width: 100%;
+                                    border-collapse: collapse;
+                                    margin-top: 20px;
+                                }
+                                thead th {
+                                    text-align: left;
+                                    background: #f5f5f5;
+                                    padding: 12px 10px;
+                                    border-bottom: 2px solid #ddd;
+                                    font-weight: bold;
+                                    color: #555;
+                                    font-size: 13px;
+                                }
+                                tbody td {
+                                    font-size: 12px;
+                                }
+                                .totals {
+                                    margin-top: 20px;
+                                    padding-top: 15px;
+                                    border-top: 2px solid #333;
+                                    display: flex;
+                                    justify-content: flex-end;
+                                    gap: 40px;
+                                    font-weight: bold;
+                                    font-size: 15px;
+                                }
+                                .footer {
+                                    margin-top: 40px;
+                                    text-align: center;
+                                    color: #999;
+                                    font-size: 11px;
+                                }
+                            </style>
+                        </head>
+                        <body>
+                            <div class="header">
+                                <h1>Repair Orders</h1>
+                                <p class="subtitle">Print by: ${sortLabel}</p>
+                            </div>
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>RO #</th>
+                                        <th>Vehicle</th>
+                                        <th>Customer</th>
+                                        <th>Phone</th>
+                                        <th>Insurance</th>
+                                        <th>Claim #</th>
+                                        <th>In</th>
+                                        <th>ECD</th>
+                                        <th style="text-align:right;">HRS</th>
+                                        <th style="text-align:right;">Total</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    ${rowsHtml}
+                                </tbody>
+                            </table>
+                            <div class="totals">
+                                <div>Total ROs: ${sortedList.length}</div>
+                                <div>Total Hours: ${totalHours.toFixed(1)}</div>
+                                <div>Total Amount: $${totalAmount.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</div>
+                            </div>
+                            <div class="footer">
+                                <p>Generated on ${new Date().toLocaleString()}</p>
+                            </div>
+                        </body>
+                    </html>
+                `);
+                printWindow.document.close();
+                printWindow.focus();
+                setTimeout(() => {
+                    printWindow.print();
+                }, 250);
             }
             
             // Load dashboard data when dashboard screen is shown
