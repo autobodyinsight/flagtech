@@ -600,6 +600,10 @@ function executeSaveEstimate() {{
       if (fileInput) {{
         fileInput.value = '';
       }}
+      const importButtonWrap = document.getElementById('importButtonWrap');
+      if (importButtonWrap) {{
+        importButtonWrap.style.display = 'flex';
+      }}
       statusDiv.textContent = '';
       saveBtn.disabled = false;
     }} else {{

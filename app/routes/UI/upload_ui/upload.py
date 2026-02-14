@@ -16,6 +16,7 @@ def get_upload_screen_html():
                     width: 100%;
                     display: flex;
                     justify-content: center;
+                    transform: translateY(-50%);
                 }
                 #upload .import-button {
                     display: inline-flex;
@@ -32,7 +33,7 @@ def get_upload_screen_html():
                 }
             </style>
             <form id="uploadForm" enctype="multipart/form-data">
-                <div class="upload-center">
+                <div id="importButtonWrap" class="upload-center">
                     <label for="fileInput" class="import-button">+ import</label>
                 </div>
                 <input type="file" id="fileInput" name="file" accept="application/pdf" onchange="handleFileUpload()" style="display: none;" />
@@ -81,6 +82,11 @@ def get_upload_script():
             const fileInput = document.getElementById('fileInput');
             const file = fileInput.files[0];
             if (!file) return;
+
+            const importButtonWrap = document.getElementById('importButtonWrap');
+            if (importButtonWrap) {
+                importButtonWrap.style.display = 'none';
+            }
             
             const formData = new FormData();
             formData.append('file', file);
@@ -107,6 +113,10 @@ def get_upload_script():
             })
             .catch(error => {
                 statusDiv.innerHTML = '<p>Error: ' + error.message + '</p>';
+                const importButtonWrap = document.getElementById('importButtonWrap');
+                if (importButtonWrap) {
+                    importButtonWrap.style.display = 'flex';
+                }
             });
         }
         
@@ -170,6 +180,10 @@ def get_upload_script():
                         document.getElementById('uploadStatus').innerHTML = '';
                         document.getElementById('estimateSummary').style.display = 'none';
                         document.getElementById('fileInput').value = '';
+                        const importButtonWrap = document.getElementById('importButtonWrap');
+                        if (importButtonWrap) {
+                            importButtonWrap.style.display = 'flex';
+                        }
                         saveStatus.textContent = '';
                         saveBtn.disabled = false;
                     }, 2000);
