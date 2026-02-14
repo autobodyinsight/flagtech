@@ -807,11 +807,8 @@ def get_dashboard_screen_html():
                 if (!ro) return [];
                 
                 const subletItems = [];
-                const allItems = [
-                    ...(ro.labor_repairs || []),
-                    ...(ro.paint_repairs || []),
-                    ...(ro.parts_repairs || [])
-                ];
+                // Only check parts repairs (not labor/paint repairs)
+                const partsItems = ro.parts_repairs || [];
                 
                 // Keywords that should trigger warning
                 const directKeywords = [
@@ -828,7 +825,7 @@ def get_dashboard_screen_html():
                     'edge guards'
                 ];
                 
-                allItems.forEach(item => {
+                partsItems.forEach(item => {
                     if (!item || !item.description) return;
                     
                     const desc = String(item.description).toLowerCase();
@@ -841,7 +838,8 @@ def get_dashboard_screen_html():
                                 desc.includes('steering wheel') ||
                                 desc.includes('fender wheel') ||
                                 desc.includes('wheel pick up') ||
-                                desc.includes('wheelhouse')
+                                desc.includes('wheelhouse') ||
+                                desc.includes('wheel opng mldg')
                             )) {
                                 continue;
                             }
@@ -859,7 +857,7 @@ def get_dashboard_screen_html():
                             subletItems.push({
                                 description: item.description,
                                 line: item.line,
-                                type: getItemType(item)
+                                type: 'Parts'
                             });
                             return; // Don't check other keywords for this item
                         }
@@ -867,16 +865,6 @@ def get_dashboard_screen_html():
                 });
                 
                 return subletItems;
-            }
-            
-            function getItemType(item) {
-                // Determine if item is from labor, paint, or parts
-                if (item.value !== undefined) {
-                    return 'Labor/Paint';
-                } else if (item.price !== undefined || item.qty !== undefined) {
-                    return 'Parts';
-                }
-                return 'Unknown';
             }
             
             function hasSubletWarning(ro) {
