@@ -494,7 +494,7 @@ async def grid_ui(request: Request, file: UploadFile = File(...), ajax: str = No
         
         content = f"""
 <h2>Document Visual Grid</h2>
-<button onclick="openSaveEstimateModal(window.currentEstimateTotals)" style='padding:10px 20px; font-size:14px; cursor:pointer; background-color:#4CAF50; color:white; border:none; border-radius:3px;'>Save</button>
+<button onclick="openSaveEstimateModal(window.currentEstimateTotals)" style='padding:10px 20px; font-size:14px; cursor:pointer; background-color:#d32f2f; color:#fff; border:none; border-radius:4px; font-weight:bold;'>Save</button>
 <br><br>
 <div id="estimatePages">
 {pages_html}

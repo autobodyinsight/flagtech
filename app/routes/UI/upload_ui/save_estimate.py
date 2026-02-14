@@ -100,8 +100,8 @@ def get_save_estimate_modal_html(
 
     <!-- Action Buttons -->
     <div style="margin-top: 20px; display: flex; gap: 10px; justify-content: flex-end;">
-      <button onclick="closeSaveEstimateModal()" style='padding:10px 20px; font-size:14px; cursor:pointer; background-color:#999; color:white; border:none; border-radius:3px;'>Cancel</button>
-      <button onclick="executeSaveEstimate()" id="executeSaveBtn" style='padding:10px 20px; font-size:14px; cursor:pointer; background-color:#4CAF50; color:white; border:none; border-radius:3px;'>Save Estimate</button>
+      <button onclick="closeSaveEstimateModal()" style='padding:10px 20px; font-size:14px; cursor:pointer; background-color:#d32f2f; color:#fff; border:none; border-radius:4px; font-weight:bold;'>Close</button>
+      <button onclick="executeSaveEstimate()" id="executeSaveBtn" style='padding:10px 20px; font-size:14px; cursor:pointer; background-color:#d32f2f; color:#fff; border:none; border-radius:4px; font-weight:bold;'>CONFIRM</button>
     </div>
   </div>
 </div>
