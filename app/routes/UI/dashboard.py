@@ -1743,14 +1743,14 @@ def get_dashboard_screen_html():
             }
             
             function printFileCover(data) {
-                const notesHtml = data.notes && data.notes.length > 0
-                    ? data.notes.map(note => `<p style="margin:0 0 8px 0; color:#555;">${escapeHtml(note)}</p>`).join('')
-                    : '<p style="color:#999; font-style:italic;">No notes</p>';
+                // Generate handwritten note lines to fill the page
+                const numLines = 18;
+                let noteLinesHtml = '';
+                for (let i = 0; i < numLines; i++) {
+                    noteLinesHtml += '<div class="note-line">____/____/________:_______________________________________________</div>';
+                }
                 
-                const techDisplay = [
-                    data.techs.body ? `Body: ${data.techs.body}` : null,
-                    data.techs.mech ? `Mech: ${data.techs.mech}` : null
-                ].filter(Boolean).join(', ') || 'Not assigned';
+                const techDisplay = data.techs.body || '';
                 
                 const printWindow = window.open('', '_blank', 'width=1100,height=850');
                 if (!printWindow) return;
@@ -1775,38 +1775,40 @@ def get_dashboard_screen_html():
                                 }
                                 .header {
                                     text-align: center;
-                                    margin-bottom: 30px;
+                                    margin-bottom: 45px;
                                     border-bottom: 3px solid #d32f2f;
-                                    padding-bottom: 15px;
+                                    padding-bottom: 22px;
                                 }
                                 .header h1 {
                                     margin: 0;
-                                    font-size: 32px;
+                                    font-size: 48px;
                                     color: #d32f2f;
                                 }
                                 .info-grid {
                                     display: grid;
                                     grid-template-columns: 1fr 1fr;
-                                    gap: 20px 40px;
-                                    margin-bottom: 30px;
+                                    gap: 30px 60px;
+                                    margin-bottom: 45px;
                                 }
                                 .info-item {
                                     display: flex;
-                                    gap: 10px;
+                                    gap: 15px;
                                 }
                                 .info-label {
                                     font-weight: bold;
                                     color: #555;
-                                    min-width: 100px;
+                                    min-width: 150px;
+                                    font-size: 24px;
                                 }
                                 .info-value {
                                     color: #222;
+                                    font-size: 24px;
                                 }
                                 .totals-section {
                                     display: flex;
-                                    gap: 30px;
-                                    margin-top: 30px;
-                                    padding: 20px;
+                                    gap: 45px;
+                                    margin-top: 45px;
+                                    padding: 30px;
                                     background: #f5f5f5;
                                     border-radius: 8px;
                                 }
@@ -1814,27 +1816,33 @@ def get_dashboard_screen_html():
                                     flex: 1;
                                 }
                                 .total-label {
-                                    font-size: 14px;
+                                    font-size: 21px;
                                     color: #666;
-                                    margin-bottom: 5px;
+                                    margin-bottom: 8px;
                                 }
                                 .total-value {
-                                    font-size: 24px;
+                                    font-size: 36px;
                                     font-weight: bold;
                                     color: #d32f2f;
                                 }
                                 .notes-section {
-                                    margin-top: 30px;
-                                    padding: 20px;
+                                    margin-top: 45px;
+                                    padding: 30px;
                                     border: 2px solid #ddd;
                                     border-radius: 8px;
-                                    min-height: 150px;
                                 }
                                 .notes-title {
                                     font-weight: bold;
-                                    font-size: 18px;
-                                    margin-bottom: 15px;
+                                    font-size: 27px;
+                                    margin-bottom: 22px;
                                     color: #333;
+                                }
+                                .note-line {
+                                    font-family: 'Courier New', monospace;
+                                    font-size: 18px;
+                                    color: #333;
+                                    margin-bottom: 12px;
+                                    letter-spacing: 1px;
                                 }
                             </style>
                         </head>
@@ -1864,16 +1872,16 @@ def get_dashboard_screen_html():
                                     <div class="info-value">${escapeHtml(data.claim_number)}</div>
                                 </div>
                                 <div class="info-item">
-                                    <div class="info-label">In Date:</div>
-                                    <div class="info-value">${formatShortDate(data.in_date)}</div>
+                                    <div class="info-label">Tech:</div>
+                                    <div class="info-value">${escapeHtml(techDisplay)}</div>
                                 </div>
                                 <div class="info-item">
                                     <div class="info-label">ECD:</div>
                                     <div class="info-value">${formatShortDate(data.ecd_date)}</div>
                                 </div>
                                 <div class="info-item">
-                                    <div class="info-label">Tech:</div>
-                                    <div class="info-value">${escapeHtml(techDisplay)}</div>
+                                    <div class="info-label">In Date:</div>
+                                    <div class="info-value">${formatShortDate(data.in_date)}</div>
                                 </div>
                             </div>
                             <div class="totals-section">
@@ -1892,7 +1900,7 @@ def get_dashboard_screen_html():
                             </div>
                             <div class="notes-section">
                                 <div class="notes-title">Notes</div>
-                                ${notesHtml}
+                                ${noteLinesHtml}
                             </div>
                         </body>
                     </html>
@@ -1924,80 +1932,123 @@ def get_dashboard_screen_html():
                                 }
                                 body {
                                     font-family: Arial, sans-serif;
-                                    padding: 20px;
+                                    padding: 30px;
                                     color: #222;
-                                }
-                                .top-section {
-                                    display: grid;
-                                    grid-template-columns: 1fr 1fr;
-                                    gap: 20px;
-                                    margin-bottom: 20px;
-                                    padding-bottom: 20px;
-                                    border-bottom: 2px solid #333;
+                                    display: flex;
+                                    flex-direction: column;
+                                    min-height: calc(100vh - 1in);
                                 }
                                 .ro-section {
-                                    font-size: 28px;
+                                    font-size: 52px;
                                     font-weight: bold;
                                     color: #d32f2f;
+                                    margin-bottom: 15px;
+                                }
+                                .tech-section {
+                                    font-size: 32px;
+                                    color: #333;
+                                    margin-bottom: 30px;
+                                    padding-bottom: 20px;
+                                    border-bottom: 3px solid #333;
                                 }
                                 .vehicle-section {
-                                    text-align: right;
+                                    margin-bottom: 30px;
                                 }
                                 .vehicle-info {
-                                    font-size: 18px;
+                                    font-size: 38px;
                                     font-weight: bold;
-                                    margin-bottom: 5px;
+                                    margin-bottom: 10px;
                                 }
                                 .vin-info {
-                                    font-size: 14px;
+                                    font-size: 28px;
                                     color: #555;
                                 }
                                 .customer-section {
-                                    margin: 20px 0;
-                                    padding: 20px;
+                                    margin: 30px 0;
+                                    padding: 30px;
                                     background: #f9f9f9;
                                     border-radius: 8px;
-                                    font-size: 18px;
+                                    font-size: 32px;
                                     line-height: 1.8;
                                 }
                                 .customer-label {
                                     font-weight: bold;
                                     color: #555;
-                                    font-size: 14px;
-                                    margin-bottom: 10px;
+                                    font-size: 24px;
+                                    margin-bottom: 15px;
                                 }
                                 .info-section {
                                     display: grid;
                                     grid-template-columns: 1fr 1fr;
-                                    gap: 15px;
-                                    margin-top: 20px;
+                                    gap: 25px;
+                                    margin-bottom: 30px;
                                 }
                                 .info-item {
                                     display: flex;
                                     flex-direction: column;
-                                    gap: 5px;
+                                    gap: 8px;
                                 }
                                 .info-label {
-                                    font-size: 12px;
+                                    font-size: 20px;
                                     font-weight: bold;
                                     color: #666;
                                     text-transform: uppercase;
                                 }
                                 .info-value {
-                                    font-size: 16px;
+                                    font-size: 28px;
                                     color: #222;
+                                }
+                                .checklist-section {
+                                    margin-top: auto;
+                                    padding-top: 30px;
+                                    border-top: 2px solid #ddd;
+                                }
+                                .checklist-title {
+                                    font-size: 24px;
+                                    font-weight: bold;
+                                    margin-bottom: 20px;
+                                    color: #333;
+                                }
+                                .checklist-item {
+                                    display: grid;
+                                    grid-template-columns: 30px 1fr;
+                                    gap: 15px;
+                                    margin-bottom: 25px;
+                                    align-items: start;
+                                }
+                                .checkbox {
+                                    width: 30px;
+                                    height: 30px;
+                                    border: 3px solid #333;
+                                    border-radius: 4px;
+                                }
+                                .checklist-content {
+                                    display: flex;
+                                    flex-direction: column;
+                                    gap: 8px;
+                                }
+                                .checklist-label {
+                                    font-size: 24px;
+                                    font-weight: bold;
+                                    color: #333;
+                                }
+                                .checklist-line {
+                                    font-size: 18px;
+                                    color: #666;
+                                    font-family: 'Courier New', monospace;
                                 }
                             </style>
                         </head>
                         <body>
-                            <div class="top-section">
-                                <div class="ro-section">
-                                    RO# ${escapeHtml(data.ro)}
-                                </div>
-                                <div class="vehicle-section">
-                                    <div class="vehicle-info">${escapeHtml(data.vehicle)}</div>
-                                    <div class="vin-info">VIN: ${escapeHtml(data.vin)}</div>
-                                </div>
+                            <div class="ro-section">
+                                RO# ${escapeHtml(data.ro)}
+                            </div>
+                            <div class="tech-section">
+                                Tech: ${escapeHtml(techDisplay)}
+                            </div>
+                            <div class="vehicle-section">
+                                <div class="vehicle-info">${escapeHtml(data.vehicle)}</div>
+                                <div class="vin-info">VIN: ${escapeHtml(data.vin)}</div>
                             </div>
                             <div class="customer-section">
                                 <div class="customer-label">CUSTOMER</div>
@@ -2020,9 +2071,64 @@ def get_dashboard_screen_html():
                                     <div class="info-label">ECD</div>
                                     <div class="info-value">${formatShortDate(data.ecd_date)}</div>
                                 </div>
-                                <div class="info-item" style="grid-column: 1 / -1;">
-                                    <div class="info-label">Tech</div>
-                                    <div class="info-value">${escapeHtml(techDisplay)}</div>
+                            </div>
+                            <div class="checklist-section">
+                                <div class="checklist-title">Process Checklist</div>
+                                <div class="checklist-item">
+                                    <div class="checkbox"></div>
+                                    <div class="checklist-content">
+                                        <div class="checklist-label">teardown</div>
+                                        <div class="checklist-line">Date: ____/_____/_____</div>
+                                        <div class="checklist-line">Sign: _________________________</div>
+                                    </div>
+                                </div>
+                                <div class="checklist-item">
+                                    <div class="checkbox"></div>
+                                    <div class="checklist-content">
+                                        <div class="checklist-label">body</div>
+                                        <div class="checklist-line">Date: ____/_____/_____</div>
+                                        <div class="checklist-line">Sign: _________________________</div>
+                                    </div>
+                                </div>
+                                <div class="checklist-item">
+                                    <div class="checkbox"></div>
+                                    <div class="checklist-content">
+                                        <div class="checklist-label">parts</div>
+                                        <div class="checklist-line">Date: ____/_____/_____</div>
+                                        <div class="checklist-line">Sign: _________________________</div>
+                                    </div>
+                                </div>
+                                <div class="checklist-item">
+                                    <div class="checkbox"></div>
+                                    <div class="checklist-content">
+                                        <div class="checklist-label">paint</div>
+                                        <div class="checklist-line">Date: ____/_____/_____</div>
+                                        <div class="checklist-line">Sign: _________________________</div>
+                                    </div>
+                                </div>
+                                <div class="checklist-item">
+                                    <div class="checkbox"></div>
+                                    <div class="checklist-content">
+                                        <div class="checklist-label">reassy</div>
+                                        <div class="checklist-line">Date: ____/_____/_____</div>
+                                        <div class="checklist-line">Sign: _________________________</div>
+                                    </div>
+                                </div>
+                                <div class="checklist-item">
+                                    <div class="checkbox"></div>
+                                    <div class="checklist-content">
+                                        <div class="checklist-label">wash</div>
+                                        <div class="checklist-line">Date: ____/_____/_____</div>
+                                        <div class="checklist-line">Sign: _________________________</div>
+                                    </div>
+                                </div>
+                                <div class="checklist-item">
+                                    <div class="checkbox"></div>
+                                    <div class="checklist-content">
+                                        <div class="checklist-label">qc</div>
+                                        <div class="checklist-line">Date: ____/_____/_____</div>
+                                        <div class="checklist-line">Sign: _________________________</div>
+                                    </div>
                                 </div>
                             </div>
                         </body>
@@ -2052,6 +2158,7 @@ def get_dashboard_screen_html():
                 }
                 
                 const totalHours = lines.reduce((sum, line) => sum + line.hours, 0);
+                const techDisplayValue = techName || '_______________________';
                 
                 const linesHtml = lines.map((line, idx) => {
                     const rowBg = idx % 2 === 0 ? '#fff' : '#f9f9f9';
@@ -2129,7 +2236,7 @@ def get_dashboard_screen_html():
                                 <div class="title">Tech ${typeName} Lines</div>
                                 <div class="meta">
                                     <div><strong>RO#:</strong> ${escapeHtml(data.ro)}</div>
-                                    <div><strong>Tech:</strong> ${escapeHtml(techName || 'Unassigned')}</div>
+                                    <div><strong>Tech:</strong> ${escapeHtml(techDisplayValue)}</div>
                                     <div><strong>Vehicle:</strong> ${escapeHtml(data.vehicle)}</div>
                                 </div>
                             </div>
