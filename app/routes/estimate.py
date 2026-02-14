@@ -2339,7 +2339,10 @@ async def get_flagout_techs(request: Request):
 
 @router.post("/phase/update")
 async def phase_update(request: Request):
-    domain = get_user_domain(request) or "default"
+    domain = get_user_domain(request)
+    if not domain:
+        return JSONResponse(status_code=401, content={"error": "Not authenticated"})
+
     data = await request.json()
     ro = (data.get("ro") or "").strip()
     phase = (data.get("phase") or "").strip().lower()
