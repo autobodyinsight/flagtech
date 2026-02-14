@@ -318,6 +318,27 @@ def _ensure_techs_table(cur) -> None:
     cur.execute("CREATE INDEX IF NOT EXISTS idx_techs_active ON techs(active)")
 
 
+def _ensure_archived_techs_table(cur) -> None:
+    cur.execute(
+        """
+        CREATE TABLE IF NOT EXISTS archived_techs (
+            id SERIAL PRIMARY KEY,
+            tech_id INTEGER NOT NULL,
+            tech_name VARCHAR(255) NOT NULL,
+            pay_rate NUMERIC(10, 2),
+            assigned_ros JSONB,
+            total_hours NUMERIC,
+            domain VARCHAR(255),
+            archived_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+        """
+    )
+    cur.execute("ALTER TABLE archived_techs ADD COLUMN IF NOT EXISTS domain VARCHAR(255)")
+    cur.execute("ALTER TABLE archived_techs ADD COLUMN IF NOT EXISTS assigned_ros JSONB")
+    cur.execute("ALTER TABLE archived_techs ADD COLUMN IF NOT EXISTS total_hours NUMERIC")
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_archived_techs_domain_archived ON archived_techs(domain, archived_at DESC)")
+
+
 def _parse_json_field(value):
     if value is None:
         return []
@@ -571,6 +592,10 @@ async def parse_paint(file: UploadFile = File(...)):
 @router.post("/techs/add")
 async def add_tech(request: Request):
     """Add a new technician."""
+    domain = get_user_domain(request)
+    if not domain:
+        return JSONResponse(status_code=401, content={"error": "Not authenticated"})
+
     data = await request.json()
     conn = get_conn()
     cur = conn.cursor()
@@ -578,13 +603,14 @@ async def add_tech(request: Request):
     try:
         _ensure_techs_table(cur)
         cur.execute("""
-            INSERT INTO techs (first_name, last_name, pay_rate)
-            VALUES (%s, %s, %s)
+            INSERT INTO techs (first_name, last_name, pay_rate, domain)
+            VALUES (%s, %s, %s, %s)
             RETURNING id, first_name, last_name, pay_rate, active
         """, (
             data["first_name"],
             data["last_name"],
-            data["pay_rate"]
+            data["pay_rate"],
+            domain,
         ))
 
         row = cur.fetchone()
@@ -606,6 +632,10 @@ async def add_tech(request: Request):
 @router.get("/techs/list")
 async def list_techs(request: Request):
     """Get list of all active technicians."""
+    domain = get_user_domain(request)
+    if not domain:
+        return JSONResponse(status_code=401, content={"error": "Not authenticated"})
+
     conn = get_conn()
     cur = conn.cursor()
     
@@ -615,8 +645,9 @@ async def list_techs(request: Request):
             SELECT id, first_name, last_name, pay_rate, active
             FROM techs
             WHERE active = true
+              AND (domain = %s OR domain IS NULL)
             ORDER BY first_name, last_name
-        """)
+        """, (domain,))
         
         rows = cur.fetchall()
         
@@ -638,6 +669,10 @@ async def list_techs(request: Request):
 @router.post("/techs/delete")
 async def delete_tech(request: Request):
     """Soft delete a technician (set active=false)."""
+    domain = get_user_domain(request)
+    if not domain:
+        return JSONResponse(status_code=401, content={"error": "Not authenticated"})
+
     data = await request.json()
     tech_id = data.get("id")
 
@@ -653,10 +688,11 @@ async def delete_tech(request: Request):
             """
             UPDATE techs
             SET active = false
-            WHERE id = %s
+                        WHERE id = %s
+                            AND (domain = %s OR domain IS NULL)
             RETURNING id
             """,
-            (tech_id,),
+                        (tech_id, domain),
         )
         row = cur.fetchone()
         conn.commit()
@@ -665,6 +701,153 @@ async def delete_tech(request: Request):
             return JSONResponse(status_code=404, content={"error": "Tech not found"})
 
         return {"status": "ok", "id": row["id"]}
+    finally:
+        cur.close()
+
+
+@router.post("/techs/archive")
+async def archive_techs(request: Request):
+    domain = get_user_domain(request)
+    if not domain:
+        return JSONResponse(status_code=401, content={"error": "Not authenticated"})
+
+    data = await request.json()
+    tech_ids = data.get("ids") or []
+    normalized_ids = []
+    for value in tech_ids:
+        try:
+            normalized_ids.append(int(value))
+        except Exception:
+            continue
+
+    if not normalized_ids:
+        return JSONResponse(status_code=400, content={"error": "No tech ids provided"})
+
+    conn = get_conn()
+    cur = conn.cursor()
+    archived = []
+    try:
+        _ensure_techs_table(cur)
+        _ensure_ro_line_assignments_table(cur)
+        _ensure_archived_techs_table(cur)
+
+        cur.execute(
+            """
+            SELECT id, first_name, last_name, pay_rate
+            FROM techs
+            WHERE id = ANY(%s)
+              AND active = TRUE
+              AND (domain = %s OR domain IS NULL)
+            ORDER BY first_name, last_name
+            """,
+            (normalized_ids, domain),
+        )
+        tech_rows = cur.fetchall() or []
+
+        for tech in tech_rows:
+            tech_id = int(tech.get("id"))
+            tech_name = " ".join(
+                part for part in [(tech.get("first_name") or "").strip(), (tech.get("last_name") or "").strip()] if part
+            )
+            pay_rate = _parse_float_value(tech.get("pay_rate"))
+
+            cur.execute(
+                """
+                SELECT ro, COALESCE(SUM(hours), 0) AS hours
+                FROM ro_line_assignments
+                WHERE domain = %s
+                  AND tech_id = %s
+                  AND tech_name IS NOT NULL
+                  AND COALESCE(ready_to_flag, FALSE) = FALSE
+                GROUP BY ro
+                ORDER BY ro
+                """,
+                (domain, tech_id),
+            )
+            ro_rows = cur.fetchall() or []
+
+            assigned_ros = []
+            total_hours = 0.0
+            for row in ro_rows:
+                ro_value = (row.get("ro") or "").strip()
+                hours_value = _parse_float_value(row.get("hours"))
+                if not ro_value:
+                    continue
+                assigned_ros.append({"ro": ro_value, "hours": hours_value})
+                total_hours += hours_value
+
+            cur.execute(
+                """
+                INSERT INTO archived_techs (tech_id, tech_name, pay_rate, assigned_ros, total_hours, domain)
+                VALUES (%s, %s, %s, %s, %s, %s)
+                """,
+                (
+                    tech_id,
+                    tech_name,
+                    pay_rate,
+                    json.dumps(assigned_ros),
+                    total_hours,
+                    domain,
+                ),
+            )
+
+            cur.execute(
+                """
+                UPDATE techs
+                SET active = FALSE
+                WHERE id = %s
+                """,
+                (tech_id,),
+            )
+
+            archived.append({
+                "tech_id": tech_id,
+                "tech_name": tech_name,
+                "pay_rate": pay_rate,
+                "assigned_ros": assigned_ros,
+                "total_hours": total_hours,
+            })
+
+        conn.commit()
+        return {"status": "ok", "archived": archived}
+    finally:
+        cur.close()
+
+
+@router.get("/techs/archived")
+async def list_archived_techs(request: Request):
+    domain = get_user_domain(request)
+    if not domain:
+        return JSONResponse(status_code=401, content={"error": "Not authenticated"})
+
+    conn = get_conn()
+    cur = conn.cursor()
+    try:
+        _ensure_archived_techs_table(cur)
+        cur.execute(
+            """
+            SELECT id, tech_id, tech_name, pay_rate, assigned_ros, total_hours, archived_at
+            FROM archived_techs
+            WHERE domain = %s
+            ORDER BY archived_at DESC, id DESC
+            """,
+            (domain,),
+        )
+        rows = cur.fetchall() or []
+        archived = []
+        for row in rows:
+            archived.append(
+                {
+                    "id": row.get("id"),
+                    "tech_id": row.get("tech_id"),
+                    "tech_name": row.get("tech_name") or "",
+                    "pay_rate": _parse_float_value(row.get("pay_rate")),
+                    "assigned_ros": _parse_json_field(row.get("assigned_ros")),
+                    "total_hours": _parse_float_value(row.get("total_hours")),
+                    "archived_at": row.get("archived_at").isoformat() if row.get("archived_at") else None,
+                }
+            )
+        return {"archived": archived}
     finally:
         cur.close()
 
@@ -1403,17 +1586,38 @@ async def save_ro_assignment_lines(request: Request):
         _ensure_techs_table(cur)
         _ensure_ro_line_assignments_for_ro(cur, domain, ro_value)
 
-        if target_tech_id and not target_tech_name:
+        if target_tech_id:
             cur.execute(
                 """
-                SELECT first_name, last_name
+                SELECT id, first_name, last_name
                 FROM techs
                 WHERE id = %s
+                  AND active = TRUE
+                  AND (domain = %s OR domain IS NULL)
                 """,
-                (target_tech_id,),
+                (target_tech_id, domain),
             )
-            row = cur.fetchone() or {}
-            target_tech_name = " ".join(part for part in [row.get("first_name"), row.get("last_name")] if part)
+            tech_row = cur.fetchone()
+            if not tech_row:
+                return JSONResponse(status_code=400, content={"error": "Selected tech is archived or unavailable"})
+            if not target_tech_name:
+                target_tech_name = " ".join(part for part in [tech_row.get("first_name"), tech_row.get("last_name")] if part)
+
+        if not target_tech_id and target_tech_name:
+            cur.execute(
+                """
+                SELECT id
+                FROM techs
+                WHERE active = TRUE
+                  AND (domain = %s OR domain IS NULL)
+                  AND TRIM(CONCAT(COALESCE(first_name, ''), ' ', COALESCE(last_name, ''))) = %s
+                LIMIT 1
+                """,
+                (domain, target_tech_name),
+            )
+            active_named = cur.fetchone()
+            if not active_named:
+                return JSONResponse(status_code=400, content={"error": "Selected tech is archived or unavailable"})
 
         scope_rows = _get_scope_rows(cur, domain, ro_value, source)
         if not scope_rows:
@@ -1517,18 +1721,38 @@ async def save_ro_assignments(request: Request):
         lines = labor_repairs if role == "labor" else paint_repairs
         assigned_hours = _sum_assigned_hours(lines, excluded_lines)
 
-        if tech_id and not tech_name:
+        if tech_id:
             cur.execute(
                 """
-                SELECT first_name, last_name
+                SELECT id, first_name, last_name
                 FROM techs
                 WHERE id = %s
+                  AND active = TRUE
+                  AND (domain = %s OR domain IS NULL)
                 """,
-                (tech_id,),
+                (tech_id, domain),
             )
             row = cur.fetchone()
-            if row:
+            if not row:
+                return JSONResponse(status_code=400, content={"error": "Selected tech is archived or unavailable"})
+            if not tech_name:
                 tech_name = " ".join(part for part in [row.get("first_name"), row.get("last_name")] if part)
+
+        if not tech_id and tech_name:
+            cur.execute(
+                """
+                SELECT id
+                FROM techs
+                WHERE active = TRUE
+                  AND (domain = %s OR domain IS NULL)
+                  AND TRIM(CONCAT(COALESCE(first_name, ''), ' ', COALESCE(last_name, ''))) = %s
+                LIMIT 1
+                """,
+                (domain, tech_name),
+            )
+            active_named = cur.fetchone()
+            if not active_named:
+                return JSONResponse(status_code=400, content={"error": "Selected tech is archived or unavailable"})
 
         cur.execute(
             """

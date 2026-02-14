@@ -8,11 +8,16 @@ def get_techs_screen_html():
 
         <h1 style="text-align:center; margin-bottom:20px;">TECHS</h1>
 
-        <!-- Add Tech Button (centered) -->
-        <div style="text-align:center; margin-bottom:30px;">
+        <!-- Tech Action Buttons (centered) -->
+        <div style="display:flex; justify-content:center; gap:12px; margin-bottom:30px;">
             <button onclick="openAddTechModal()"
                     style="padding:12px 24px; font-size:16px; cursor:pointer; background-color:#505050; color:white; border:none; border-radius:4px;">
                 + tech
+            </button>
+            <button onclick="toggleTechEditMode()"
+                    id="techEditBtn"
+                    style="padding:12px 24px; font-size:16px; cursor:pointer; background-color:#d32f2f; color:#fff; border:none; border-radius:4px; font-weight:bold;">
+                EDIT
             </button>
         </div>
 
@@ -28,6 +33,16 @@ def get_techs_screen_html():
                 <!-- Tech rows will be inserted here -->
                 <div id="techsListContainer"></div>
             </div>
+            <div id="techArchiveActions" style="display:none; margin-top:14px;">
+                <button id="archiveTechBtn" onclick="archiveSelectedTechs()" style="padding:10px 20px; background:#d32f2f; color:#fff; border:none; border-radius:4px; cursor:pointer; font-size:14px; font-weight:bold;" disabled>
+                    ARCHIVE
+                </button>
+            </div>
+        </div>
+
+        <div style="margin-top:28px;">
+            <h2 style="margin-bottom:12px;">Archived Techs</h2>
+            <div id="archivedTechsContainer" style="width:100%; border:1px solid #ddd; border-radius:4px; background:#fff; padding:12px;"></div>
         </div>
 
         <!-- Add Tech Modal -->
@@ -114,6 +129,8 @@ def get_techs_screen_html():
         <script>
         let currentModalContext = null;
         let techPayRateById = {};
+        let isTechEditMode = false;
+        let selectedTechIds = new Set();
 
         // -----------------------------
         // Add Tech Modal
@@ -128,6 +145,69 @@ def get_techs_screen_html():
 
         function closeAddTechModal() {
             document.getElementById('addTechModal').style.display = 'none';
+        }
+
+        function toggleTechEditMode() {
+            isTechEditMode = !isTechEditMode;
+            selectedTechIds = new Set();
+            const editBtn = document.getElementById('techEditBtn');
+            const archiveActions = document.getElementById('techArchiveActions');
+            if (editBtn) {
+                editBtn.textContent = isTechEditMode ? 'DONE' : 'EDIT';
+            }
+            if (archiveActions) {
+                archiveActions.style.display = isTechEditMode ? 'block' : 'none';
+            }
+            updateArchiveButtonState();
+            loadTechsList();
+        }
+
+        function updateArchiveButtonState() {
+            const archiveBtn = document.getElementById('archiveTechBtn');
+            if (!archiveBtn) return;
+            archiveBtn.disabled = selectedTechIds.size === 0;
+        }
+
+        function onTechArchiveCheckboxChange(techId, isChecked) {
+            if (isChecked) {
+                selectedTechIds.add(String(techId));
+            } else {
+                selectedTechIds.delete(String(techId));
+            }
+            updateArchiveButtonState();
+        }
+
+        function archiveSelectedTechs() {
+            const selected = Array.from(selectedTechIds);
+            if (!selected.length) {
+                alert('Select at least one technician to archive.');
+                return;
+            }
+
+            if (!confirm(`Archive ${selected.length} technician(s)?`)) {
+                return;
+            }
+
+            fetch('/api/techs/archive', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
+                body: JSON.stringify({ ids: selected.map(id => parseInt(id, 10)) })
+            })
+            .then(r => r.json())
+            .then(res => {
+                if (res.error) {
+                    throw new Error(res.error);
+                }
+                selectedTechIds = new Set();
+                updateArchiveButtonState();
+                loadTechsList();
+                loadArchivedTechs();
+            })
+            .catch(err => {
+                console.error('Error archiving techs:', err);
+                alert('Error archiving selected technicians.');
+            });
         }
 
         function saveTech() {
@@ -153,6 +233,7 @@ def get_techs_screen_html():
             .then(() => {
                 closeAddTechModal();
                 loadTechsList();
+                loadArchivedTechs();
             })
             .catch(err => {
                 console.error("Error saving tech:", err);
@@ -195,25 +276,21 @@ def get_techs_screen_html():
                     techNameCell.style.alignItems = "center";
                     techNameCell.style.gap = "10px";
 
-                    const deleteBtn = document.createElement('button');
-                    deleteBtn.textContent = "−";
-                    deleteBtn.title = `Delete ${fullName}`;
-                    deleteBtn.setAttribute('aria-label', `Delete ${fullName}`);
-                    deleteBtn.style.width = "20px";
-                    deleteBtn.style.height = "20px";
-                    deleteBtn.style.borderRadius = "50%";
-                    deleteBtn.style.border = "none";
-                    deleteBtn.style.backgroundColor = "#d32f2f";
-                    deleteBtn.style.color = "#fff";
-                    deleteBtn.style.fontWeight = "bold";
-                    deleteBtn.style.cursor = "pointer";
-                    deleteBtn.style.display = "inline-flex";
-                    deleteBtn.style.alignItems = "center";
-                    deleteBtn.style.justifyContent = "center";
-                    deleteBtn.onclick = function(e) {
-                        e.stopPropagation();
-                        deleteTech(tech.id, fullName);
-                    };
+                    if (isTechEditMode) {
+                        const check = document.createElement('input');
+                        check.type = 'checkbox';
+                        check.checked = selectedTechIds.has(String(tech.id));
+                        check.style.width = '16px';
+                        check.style.height = '16px';
+                        check.style.cursor = 'pointer';
+                        check.addEventListener('click', function(e) {
+                            e.stopPropagation();
+                        });
+                        check.addEventListener('change', function() {
+                            onTechArchiveCheckboxChange(tech.id, check.checked);
+                        });
+                        techNameCell.appendChild(check);
+                    }
 
                     const techName = document.createElement('span');
                     techName.textContent = fullName;
@@ -222,7 +299,6 @@ def get_techs_screen_html():
                     techName.style.textDecoration = "none";
                     techName.style.fontWeight = "bold";
 
-                    techNameCell.appendChild(deleteBtn);
                     techNameCell.appendChild(techName);
 
                     const rateCell = document.createElement('div');
@@ -237,6 +313,9 @@ def get_techs_screen_html():
                     row.onmouseout = function() { this.style.backgroundColor = "transparent"; };
 
                     row.onclick = function() {
+                        if (isTechEditMode) {
+                            return;
+                        }
                         toggleTechAssignments(tech.id, fullName, assignmentsId, techRate);
                     };
 
@@ -252,6 +331,44 @@ def get_techs_screen_html():
             .catch(err => {
                 console.error("Error loading techs:", err);
                 tableContainer.innerHTML = "<p style='color:red; text-align:center; padding:12px;'>Error loading techs.</p>";
+            });
+        }
+
+        function loadArchivedTechs() {
+            const container = document.getElementById('archivedTechsContainer');
+            if (!container) return;
+            container.innerHTML = "<p style='color:#777; text-align:center; padding:12px;'>Loading...</p>";
+
+            fetch('/api/techs/archived', { credentials: 'include' })
+            .then(r => r.json())
+            .then(res => {
+                const archived = res.archived || [];
+                if (!archived.length) {
+                    container.innerHTML = "<p style='color:#777; text-align:center; padding:12px;'>No archived technicians.</p>";
+                    return;
+                }
+
+                const rows = archived.map(item => {
+                    const roItems = (item.assigned_ros || []).map(ro => {
+                        const roVal = ro.ro || '—';
+                        const hrsVal = Number(ro.hours || 0).toFixed(1);
+                        return `<span style=\"display:inline-block; margin-right:8px;\">RO ${roVal} (${hrsVal}h)</span>`;
+                    }).join('') || '<span>—</span>';
+                    return `
+                        <div style="padding:10px 0; border-bottom:1px solid #eee;">
+                            <div style="font-weight:bold; color:#333;">${item.tech_name || 'Unknown'}</div>
+                            <div style="font-size:13px; color:#555; margin-top:4px;">Rate: $${Number(item.pay_rate || 0).toFixed(2)}/hr</div>
+                            <div style="font-size:13px; color:#555; margin-top:4px;">Total Hours: ${Number(item.total_hours || 0).toFixed(1)}</div>
+                            <div style="font-size:13px; color:#555; margin-top:6px;">Assigned ROs: ${roItems}</div>
+                        </div>
+                    `;
+                }).join('');
+
+                container.innerHTML = rows;
+            })
+            .catch(err => {
+                console.error('Error loading archived techs:', err);
+                container.innerHTML = "<p style='color:red; text-align:center; padding:12px;'>Error loading archived technicians.</p>";
             });
         }
 
@@ -560,28 +677,11 @@ def get_techs_screen_html():
             printWindow.print();
         }
 
-        function deleteTech(techId, techName) {
-            if (!confirm(`Delete ${techName}?`)) {
-                return;
-            }
-
-            fetch('/api/techs/delete', {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ id: techId })
-            })
-            .then(r => r.json())
-            .then(() => {
-                loadTechsList();
-            })
-            .catch(err => {
-                console.error("Error deleting tech:", err);
-                alert("Error deleting tech. Please try again.");
-            });
-        }
-
         // Load techs list on startup
-        document.addEventListener("DOMContentLoaded", loadTechsList);
+        document.addEventListener("DOMContentLoaded", () => {
+            loadTechsList();
+            loadArchivedTechs();
+        });
 
         </script>
 
