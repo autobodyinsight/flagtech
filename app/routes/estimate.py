@@ -2919,6 +2919,28 @@ async def list_parts_ros(request: Request):
 
         cur.execute(
             """
+            SELECT ro, line_id
+            FROM parts_received
+            WHERE domain = %s
+              AND COALESCE(returned, FALSE) = FALSE
+            """,
+            (domain,),
+        )
+        received_not_returned_rows = cur.fetchall() or []
+        received_not_returned_by_ro = {}
+        for received_row in received_not_returned_rows:
+            ro_value = received_row.get("ro")
+            line_id = received_row.get("line_id")
+            if not ro_value or line_id is None:
+                continue
+            try:
+                line_num = int(line_id)
+            except (TypeError, ValueError):
+                continue
+            received_not_returned_by_ro.setdefault(ro_value, set()).add(line_num)
+
+        cur.execute(
+            """
             SELECT ro, COUNT(*) as returned
             FROM parts_received
             WHERE domain = %s
@@ -2952,16 +2974,42 @@ async def list_parts_ros(request: Request):
             tech_by_ro[ro_value] = (tech_row.get("tech_name") or "").strip()
 
         order_summary = {}
+        on_order_warning_counts = {}
+        today = date.today()
         for order in orders:
             ro = order["ro"]
             if ro not in order_summary:
                 order_summary[ro] = {
                     "ordered_ids": set(),
                     "arrival_date": order.get("arrival_date"),
+                    "included_line_ids": set(),
                 }
 
             ordered_ids = _normalize_line_ids(order.get("ordered_lines") or [])
             order_summary[ro]["ordered_ids"].update(ordered_ids)
+
+            received_not_returned_ids = received_not_returned_by_ro.get(ro, set())
+            included_line_ids = order_summary[ro]["included_line_ids"]
+
+            eta_date = order.get("arrival_date")
+            created_at = order.get("created_at")
+            created_date = created_at.date() if isinstance(created_at, datetime) else today
+
+            for line_id in ordered_ids:
+                if line_id in included_line_ids:
+                    continue
+                included_line_ids.add(line_id)
+
+                if line_id in received_not_returned_ids:
+                    continue
+
+                if eta_date:
+                    threshold_date = eta_date + timedelta(days=1)
+                else:
+                    threshold_date = created_date + timedelta(days=2)
+
+                if today > threshold_date:
+                    on_order_warning_counts[ro] = on_order_warning_counts.get(ro, 0) + 1
 
         ros = []
         for row in rows:
@@ -2996,6 +3044,7 @@ async def list_parts_ros(request: Request):
                     "tech": tech_by_ro.get(ro, "—"),
                     "parts_qty": float(parts_qty or line_count or 0),
                     "on_order": on_order,
+                    "on_order_warning_count": on_order_warning_counts.get(ro, 0),
                     "arrival_date": summary.get("arrival_date"),
                     "arrived": received_map.get(ro, 0),
                     "returned": returned_count,

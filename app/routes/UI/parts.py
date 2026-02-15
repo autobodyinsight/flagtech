@@ -722,9 +722,14 @@ def get_parts_script():
                                     </button>
                                 </td>
                                 <td style="padding:12px; border-bottom:1px solid #eee; color:#333;">
-                                    <button class="link-button" onclick="openPartsOnOrderModal('${ro.ro}')" style="background:none; border:none; color:#0066cc; text-decoration:underline; cursor:pointer; padding:0;">
-                                        ${ro.on_order || 0}
-                                    </button>
+                                    <div style="display:flex; align-items:center; justify-content:space-between; gap:8px;">
+                                        <button class="link-button" onclick="openPartsOnOrderModal('${ro.ro}')" style="background:none; border:none; color:#0066cc; text-decoration:underline; cursor:pointer; padding:0;">
+                                            ${ro.on_order || 0}
+                                        </button>
+                                        ${(ro.on_order_warning_count || 0) > 0
+                                            ? `<span title="${ro.on_order_warning_count} overdue on-order part(s)" aria-label="${ro.on_order_warning_count} overdue on-order part(s)" style="font-size:16px; line-height:1;">⚠️</span>`
+                                            : ''}
+                                    </div>
                                 </td>
                                 <td style="padding:12px; border-bottom:1px solid #eee; color:#333;">
                                     <button class="link-button" onclick="openPartsArrivedModal('${ro.ro}')" style="background:none; border:none; color:#0066cc; text-decoration:underline; cursor:pointer; padding:0;">
