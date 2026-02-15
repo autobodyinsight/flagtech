@@ -26,14 +26,13 @@ def get_parts_screen_html():
                             <th style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold; color:#555;">Tech</th>
                             <th style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold; color:#555;">Parts Qty</th>
                             <th style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold; color:#555;">On Order</th>
-                            <th style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold; color:#555;">Arrival Date</th>
                             <th style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold; color:#555;">Arrived</th>
                             <th style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold; color:#555;">Returned</th>
                         </tr>
                     </thead>
                     <tbody id="partsRoBody">
                         <tr>
-                            <td colspan="8" style="padding:20px; text-align:center; color:#999;">Loading...</td>
+                            <td colspan="7" style="padding:20px; text-align:center; color:#999;">Loading...</td>
                         </tr>
                     </tbody>
                 </table>
@@ -97,7 +96,9 @@ def get_parts_screen_html():
                     <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px; max-width:820px;">
                         <div>
                             <label>Vendor:</label>
-                            <input type="text" id="partsOnOrderVendorInput" style="width:100%; padding:8px; box-sizing:border-box;" />
+                            <select id="partsOnOrderVendorInput" style="width:100%; padding:8px; box-sizing:border-box;">
+                                <option value="">Select vendor...</option>
+                            </select>
                         </div>
                         <div>
                             <label>Invoice Number:</label>
@@ -304,7 +305,7 @@ def get_parts_script():
         }
 
         function partsLoadVendors(renderTable = false) {
-            fetch('/api/vendors/list', { credentials: 'include' })
+            return fetch('/api/vendors/list', { credentials: 'include' })
                 .then(r => r.json())
                 .then(res => {
                     partsVendorsCache = res.vendors || [];
@@ -320,7 +321,32 @@ def get_parts_script():
                             body.innerHTML = '<tr><td colspan="4" style="padding:12px; text-align:center; color:red;">Error loading vendors.</td></tr>';
                         }
                     }
+                    throw err;
                 });
+        }
+
+        function partsPopulateOnOrderVendorDropdown(selectedValue = '') {
+            const select = document.getElementById('partsOnOrderVendorInput');
+            if (!select) return;
+
+            const currentValue = selectedValue || select.value || '';
+            select.innerHTML = '<option value="">Select vendor...</option>';
+
+            const names = Array.from(new Set((partsVendorsCache || [])
+                .map(v => String(v.name || '').trim())
+                .filter(Boolean)))
+                .sort((a, b) => a.localeCompare(b));
+
+            names.forEach(name => {
+                const option = document.createElement('option');
+                option.value = name;
+                option.textContent = name;
+                select.appendChild(option);
+            });
+
+            if (currentValue && names.includes(currentValue)) {
+                select.value = currentValue;
+            }
         }
 
         function partsFormatDisplayDate(value) {
@@ -640,19 +666,18 @@ def get_parts_script():
             const tbody = document.getElementById('partsRoBody');
             if (!tbody) return;
 
-            tbody.innerHTML = '<tr><td colspan="8" style="padding:20px; text-align:center; color:#999;">Loading...</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="7" style="padding:20px; text-align:center; color:#999;">Loading...</td></tr>';
 
             fetch('/api/parts/ros', { credentials: 'include' })
                 .then(r => r.json())
                 .then(res => {
                     if (!res.ros || res.ros.length === 0) {
-                        tbody.innerHTML = '<tr><td colspan="8" style="padding:20px; text-align:center; color:#999;">No repair orders found</td></tr>';
+                        tbody.innerHTML = '<tr><td colspan="7" style="padding:20px; text-align:center; color:#999;">No repair orders found</td></tr>';
                         return;
                     }
 
                     tbody.innerHTML = res.ros.map((ro, idx) => {
                         const rowBg = idx % 2 === 0 ? '#fff' : '#f9f9f9';
-                        const arrival = ro.arrival_date ? new Date(ro.arrival_date).toLocaleDateString() : '—';
                         return `
                             <tr style="background:${rowBg};">
                                 <td style="padding:12px; border-bottom:1px solid #eee; color:#333;">${ro.ro}</td>
@@ -668,7 +693,6 @@ def get_parts_script():
                                         ${ro.on_order || 0}
                                     </button>
                                 </td>
-                                <td style="padding:12px; border-bottom:1px solid #eee; color:#333;">${arrival}</td>
                                 <td style="padding:12px; border-bottom:1px solid #eee; color:#333;">${ro.arrived || 0}</td>
                                 <td style="padding:12px; border-bottom:1px solid #eee; color:#333;">${ro.returned || 0}</td>
                             </tr>
@@ -677,7 +701,7 @@ def get_parts_script():
                 })
                 .catch(err => {
                     console.error('Error loading parts ROs:', err);
-                    tbody.innerHTML = '<tr><td colspan="8" style="padding:20px; text-align:center; color:red;">Error loading repair orders.</td></tr>';
+                    tbody.innerHTML = '<tr><td colspan="7" style="padding:20px; text-align:center; color:red;">Error loading repair orders.</td></tr>';
                 });
         }
 
@@ -698,6 +722,14 @@ def get_parts_script():
             if (vendorInput) vendorInput.value = '';
             if (invoiceNumberInput) invoiceNumberInput.value = '';
             if (invoiceTotalInput) invoiceTotalInput.value = '';
+
+            partsLoadVendors(false)
+                .then(() => {
+                    partsPopulateOnOrderVendorDropdown('');
+                })
+                .catch(() => {
+                    partsPopulateOnOrderVendorDropdown('');
+                });
 
             partsLoadOnOrderLines();
         }

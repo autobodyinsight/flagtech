@@ -40,23 +40,53 @@ def _parse_part_description_and_number(item: dict) -> tuple[str, str]:
     )
     part_number = str(explicit_part_number or "").strip()
 
+    def _clean_token(token: str) -> str:
+        return (token or "").strip().strip(",;:|()[]{}")
+
+    def _is_noise_token(token: str) -> bool:
+        cleaned = _clean_token(token)
+        if not cleaned:
+            return True
+        if re.fullmatch(r"\$?\d+(?:\.\d+)?", cleaned):
+            return True
+        if re.fullmatch(r"\d+(?:\.\d+)?(?:HRS?|HR)?", cleaned, re.IGNORECASE):
+            return True
+        if cleaned.lower() in {"qty", "incl", "incl.", "list", "price", "labor", "hrs", "hr", "ea", "each"}:
+            return True
+        return False
+
+    def _is_part_number_token(token: str) -> bool:
+        cleaned = _clean_token(token)
+        if not re.fullmatch(r"[A-Z0-9-]{5,}", cleaned, re.IGNORECASE):
+            return False
+        has_alpha = any(ch.isalpha() for ch in cleaned)
+        has_digit = any(ch.isdigit() for ch in cleaned)
+        return has_alpha and has_digit
+
+    tokens = description.split()
+    while tokens:
+        last_token = tokens[-1]
+        if _is_noise_token(last_token):
+            tokens.pop()
+            continue
+        if _is_part_number_token(last_token):
+            if not part_number:
+                part_number = _clean_token(last_token)
+            tokens.pop()
+            continue
+        break
+
+    description = " ".join(tokens).strip()
+
     if not part_number:
         trailing_match = _TRAILING_PART_NUMBER_RE.search(description)
         if trailing_match:
-            candidate = (trailing_match.group(1) or "").strip()
+            candidate = _clean_token(trailing_match.group(1) or "")
             has_alpha = any(ch.isalpha() for ch in candidate)
             has_digit = any(ch.isdigit() for ch in candidate)
             if has_alpha and has_digit:
                 part_number = candidate
                 description = description[:trailing_match.start()].strip()
-
-    for pattern in [
-        r"\bQTY\s*[:#-]?\s*\d+(?:\.\d+)?\b",
-        r"\b\d+(?:\.\d+)?\s*(?:HRS?|HR)\b",
-        r"\b(?:LABOR|LIST|PRICE|LP)\s*[:$-]?\s*\d+(?:\.\d+)?\b",
-        r"\$\s*\d+(?:\.\d+)?",
-    ]:
-        description = re.sub(pattern, "", description, flags=re.IGNORECASE)
 
     description = re.sub(r"\s{2,}", " ", description).strip(" -|,;:")
     return description, part_number
