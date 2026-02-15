@@ -7,11 +7,11 @@ def get_parts_screen_html():
     <div id="parts" class="screen" style="padding:20px;">
         <div style="display:grid; grid-template-columns:1fr auto 1fr; align-items:center; margin-bottom:20px;">
             <div style="display:flex; justify-content:flex-start;">
-                <button onclick="openPartsAddVendorModal()" style="padding:10px 16px; background-color:#3c4142; color:white; border:none; border-radius:4px; cursor:pointer; font-size:14px;">+ VENDOR</button>
+                <button onclick="openPartsAddVendorModal()" style="padding:10px 16px; background-color:#b22222; color:white; border:none; border-radius:4px; cursor:pointer; font-size:14px;">+ VENDOR</button>
             </div>
             <h1 style="text-align:center; margin:0;">PARTS</h1>
             <div style="display:flex; justify-content:flex-end;">
-                <button onclick="openPartsVendorsModal()" style="padding:10px 16px; background-color:#3c4142; color:white; border:none; border-radius:4px; cursor:pointer; font-size:14px;">Vendors</button>
+                <button onclick="openPartsVendorsModal()" style="padding:10px 16px; background-color:#b22222; color:white; border:none; border-radius:4px; cursor:pointer; font-size:14px;">Vendors</button>
             </div>
         </div>
 
