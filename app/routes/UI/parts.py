@@ -820,6 +820,7 @@ def get_parts_script():
 
             body.innerHTML = partsArrivedItems.map((item, idx) => {
                 const rowBg = idx % 2 === 0 ? '#fff' : '#f9f9f9';
+                const descriptionDisplay = String(item.description || '').replace(/\s+/g, ' ').trim();
                 const arrivedDisplay = item.arrived_date
                     ? partsFormatDisplayDate(item.arrived_date)
                     : (item.received_at ? partsFormatDisplayDate(item.received_at) : '—');
@@ -827,7 +828,7 @@ def get_parts_script():
                     <tr style="background:${rowBg};">
                         <td style="padding:10px; border-bottom:1px solid #eee;"><input type="checkbox" class="parts-arrived-check" data-line-id="${item.line_id}" /></td>
                         <td style="padding:10px; border-bottom:1px solid #eee;">${partsEscapeHtml(item.line || '—')}</td>
-                        <td style="padding:10px; border-bottom:1px solid #eee;">${partsEscapeHtml(item.description || '')}</td>
+                        <td style="padding:10px; border-bottom:1px solid #eee; white-space:nowrap;">${partsEscapeHtml(descriptionDisplay)}</td>
                         <td style="padding:10px; border-bottom:1px solid #eee;">${partsEscapeHtml(item.part_number || '—')}</td>
                         <td style="padding:10px; border-bottom:1px solid #eee;">${partsEscapeHtml(item.vendor || '—')}</td>
                         <td style="padding:10px; border-bottom:1px solid #eee; text-align:right;">${partsFormatCurrency(item.list || 0)}</td>
