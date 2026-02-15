@@ -213,6 +213,7 @@ def _ensure_parts_received_table(cur) -> None:
             invoice_number VARCHAR(255),
             invoice_total NUMERIC,
             returned BOOLEAN DEFAULT FALSE,
+            returned_at TIMESTAMP,
             domain VARCHAR(255) NOT NULL,
             received_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
@@ -224,6 +225,7 @@ def _ensure_parts_received_table(cur) -> None:
     cur.execute("ALTER TABLE parts_received ADD COLUMN IF NOT EXISTS invoice_number VARCHAR(255)")
     cur.execute("ALTER TABLE parts_received ADD COLUMN IF NOT EXISTS invoice_total NUMERIC")
     cur.execute("ALTER TABLE parts_received ADD COLUMN IF NOT EXISTS returned BOOLEAN DEFAULT FALSE")
+    cur.execute("ALTER TABLE parts_received ADD COLUMN IF NOT EXISTS returned_at TIMESTAMP")
     cur.execute("CREATE INDEX IF NOT EXISTS idx_parts_received_ro_domain ON parts_received(ro, domain)")
     cur.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_parts_received_unique ON parts_received(ro, line_id, domain)")
 
@@ -3403,7 +3405,8 @@ async def return_arrived_lines(request: Request):
             cur.execute(
                 """
                 UPDATE parts_received
-                SET returned = TRUE
+                                SET returned = TRUE,
+                                        returned_at = CURRENT_TIMESTAMP
                 WHERE domain = %s
                   AND ro = %s
                   AND line_id = %s
@@ -3438,6 +3441,83 @@ async def return_arrived_lines(request: Request):
 
         conn.commit()
         return {"status": "ok", "returned_count": updated_count}
+    finally:
+        cur.close()
+
+
+@router.get("/parts/returned-lines")
+async def list_returned_lines(request: Request, ro: str):
+    domain = get_user_domain(request)
+    if not domain:
+        return JSONResponse(status_code=401, content={"error": "Not authenticated", "items": []})
+
+    ro_value = (ro or "").strip()
+    if not ro_value:
+        return JSONResponse(status_code=400, content={"error": "RO is required", "items": []})
+
+    conn = get_conn()
+    cur = conn.cursor()
+    try:
+        _ensure_parts_received_table(cur)
+        _ensure_saved_estimates_table(cur)
+
+        cur.execute(
+            """
+            SELECT parts_repairs
+            FROM saved_estimates
+            WHERE domain = %s AND ro = %s
+            ORDER BY saved_at DESC, id DESC
+            LIMIT 1
+            """,
+            (domain, ro_value),
+        )
+        estimate_row = cur.fetchone()
+        parts_repairs = _parse_json_field(estimate_row.get("parts_repairs")) if estimate_row else []
+        if not isinstance(parts_repairs, list):
+            parts_repairs = []
+
+        line_metadata = {}
+        for idx, item in enumerate(parts_repairs, start=1):
+            if not isinstance(item, dict):
+                continue
+            parsed_description, parsed_part_number = _parse_part_description_and_number(item)
+            line_metadata[idx] = {
+                "line": item.get("line") or idx,
+                "description": parsed_description,
+                "part_number": parsed_part_number,
+            }
+
+        cur.execute(
+            """
+            SELECT line_id, vendor, part_number, cost, returned_at, received_at
+            FROM parts_received
+            WHERE domain = %s
+              AND ro = %s
+              AND COALESCE(returned, FALSE) = TRUE
+            ORDER BY COALESCE(returned_at, received_at) DESC, line_id
+            """,
+            (domain, ro_value),
+        )
+        rows = cur.fetchall() or []
+
+        items = []
+        for row in rows:
+            line_id = int(row.get("line_id") or 0)
+            metadata = line_metadata.get(line_id, {})
+            return_dt = row.get("returned_at") or row.get("received_at")
+            items.append(
+                {
+                    "line_id": line_id,
+                    "line": metadata.get("line") or line_id,
+                    "description": metadata.get("description") or "",
+                    "part_number": row.get("part_number") or metadata.get("part_number") or "",
+                    "vendor": row.get("vendor") or "",
+                    "cost": float(row.get("cost") or 0),
+                    "return_date": return_dt.isoformat() if return_dt else None,
+                }
+            )
+
+        return {"items": items}
     finally:
         cur.close()
 

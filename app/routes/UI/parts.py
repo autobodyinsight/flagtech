@@ -164,6 +164,31 @@ def get_parts_screen_html():
             </div>
         </div>
 
+        <div id="partsReturnedModal" class="modal" style="display:none;">
+            <div class="modal-content" style="max-width:1100px; max-height:90vh; overflow-y:auto;">
+                <span class="close" onclick="closePartsReturnedModal()">&times;</span>
+                <h2 style="margin-bottom:14px;">RETURNED HISTORY</h2>
+
+                <div style="overflow-x:auto;">
+                    <table style="width:100%; border-collapse:collapse;">
+                        <thead>
+                            <tr style="background:#f5f5f5; text-align:left;">
+                                <th style="padding:10px; border-bottom:2px solid #ddd; width:80px;">Line</th>
+                                <th style="padding:10px; border-bottom:2px solid #ddd;">Description</th>
+                                <th style="padding:10px; border-bottom:2px solid #ddd; width:170px;">Part #</th>
+                                <th style="padding:10px; border-bottom:2px solid #ddd; width:180px;">Vendor</th>
+                                <th style="padding:10px; border-bottom:2px solid #ddd; width:110px; text-align:right;">Cost</th>
+                                <th style="padding:10px; border-bottom:2px solid #ddd; width:120px;">Return Date</th>
+                            </tr>
+                        </thead>
+                        <tbody id="partsReturnedBody">
+                            <tr><td colspan="6" style="padding:12px; text-align:center; color:#777;">Loading...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
         <div id="partsAddVendorModal" class="modal" style="display:none;">
             <div class="modal-content" style="max-width:720px; max-height:90vh; overflow-y:auto;">
                 <span class="close" onclick="closePartsAddVendorModal()">&times;</span>
@@ -289,6 +314,8 @@ def get_parts_script():
         let partsOnOrderReceiveMode = false;
         let partsArrivedRo = null;
         let partsArrivedItems = [];
+        let partsReturnedRo = null;
+        let partsReturnedItems = [];
 
         function partsAddVendor() {
             const name = document.getElementById('partsVendorName').value.trim();
@@ -736,7 +763,11 @@ def get_parts_script():
                                         ${ro.arrived || 0}
                                     </button>
                                 </td>
-                                <td style="padding:12px; border-bottom:1px solid #eee; color:#333;">${ro.returned || 0}</td>
+                                <td style="padding:12px; border-bottom:1px solid #eee; color:#333;">
+                                    <button class="link-button" onclick="openPartsReturnedModal('${ro.ro}')" style="background:none; border:none; color:#0066cc; text-decoration:underline; cursor:pointer; padding:0;">
+                                        ${ro.returned || 0}
+                                    </button>
+                                </td>
                             </tr>
                         `;
                     }).join('');
@@ -880,6 +911,64 @@ def get_parts_script():
                 console.error('Error returning arrived parts:', err);
                 alert(err.message || 'Error returning selected parts.');
             });
+        }
+
+        function openPartsReturnedModal(ro) {
+            partsReturnedRo = ro;
+            const modal = document.getElementById('partsReturnedModal');
+            if (!modal) return;
+            modal.style.display = 'block';
+            partsLoadReturnedLines();
+        }
+
+        function closePartsReturnedModal() {
+            const modal = document.getElementById('partsReturnedModal');
+            if (modal) modal.style.display = 'none';
+            partsReturnedRo = null;
+            partsReturnedItems = [];
+        }
+
+        function partsLoadReturnedLines() {
+            const body = document.getElementById('partsReturnedBody');
+            if (!body || !partsReturnedRo) return;
+
+            body.innerHTML = '<tr><td colspan="6" style="padding:12px; text-align:center; color:#777;">Loading...</td></tr>';
+            fetch(`/api/parts/returned-lines?ro=${encodeURIComponent(partsReturnedRo)}`, { credentials: 'include' })
+                .then(r => r.json())
+                .then(res => {
+                    partsReturnedItems = res.items || [];
+                    partsRenderReturnedLines();
+                })
+                .catch(err => {
+                    console.error('Error loading returned parts:', err);
+                    body.innerHTML = '<tr><td colspan="6" style="padding:12px; text-align:center; color:red;">Error loading returned parts.</td></tr>';
+                });
+        }
+
+        function partsRenderReturnedLines() {
+            const body = document.getElementById('partsReturnedBody');
+            if (!body) return;
+
+            if (!partsReturnedItems || partsReturnedItems.length === 0) {
+                body.innerHTML = '<tr><td colspan="6" style="padding:24px; text-align:center; color:#777;">No parts returned</td></tr>';
+                return;
+            }
+
+            body.innerHTML = partsReturnedItems.map((item, idx) => {
+                const rowBg = idx % 2 === 0 ? '#fff' : '#f9f9f9';
+                const descriptionDisplay = String(item.description || '').replace(/\s+/g, ' ').trim();
+                const returnDateDisplay = item.return_date ? partsFormatDisplayDate(item.return_date) : '—';
+                return `
+                    <tr style="background:${rowBg};">
+                        <td style="padding:10px; border-bottom:1px solid #eee;">${partsEscapeHtml(item.line || '—')}</td>
+                        <td style="padding:10px; border-bottom:1px solid #eee; white-space:nowrap;">${partsEscapeHtml(descriptionDisplay)}</td>
+                        <td style="padding:10px; border-bottom:1px solid #eee;">${partsEscapeHtml(item.part_number || '—')}</td>
+                        <td style="padding:10px; border-bottom:1px solid #eee;">${partsEscapeHtml(item.vendor || '—')}</td>
+                        <td style="padding:10px; border-bottom:1px solid #eee; text-align:right;">${partsFormatCurrency(item.cost || 0)}</td>
+                        <td style="padding:10px; border-bottom:1px solid #eee;">${partsEscapeHtml(returnDateDisplay)}</td>
+                    </tr>
+                `;
+            }).join('');
         }
 
         function partsEnterReceiveMode() {
