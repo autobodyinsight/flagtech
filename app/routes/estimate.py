@@ -2840,18 +2840,18 @@ async def list_parts_ros(request: Request):
         received_rows = cur.fetchall()
         received_map = {row["ro"]: int(row.get("arrived") or 0) for row in received_rows}
 
-                cur.execute(
-                        """
-                        SELECT ro, COUNT(*) as returned
-                        FROM parts_received
-                        WHERE domain = %s
-                            AND COALESCE(returned, FALSE) = TRUE
-                        GROUP BY ro
-                        """,
-                        (domain,),
-                )
-                returned_rows = cur.fetchall() or []
-                returned_map = {row["ro"]: int(row.get("returned") or 0) for row in returned_rows}
+        cur.execute(
+            """
+            SELECT ro, COUNT(*) as returned
+            FROM parts_received
+            WHERE domain = %s
+              AND COALESCE(returned, FALSE) = TRUE
+            GROUP BY ro
+            """,
+            (domain,),
+        )
+        returned_rows = cur.fetchall() or []
+        returned_map = {row["ro"]: int(row.get("returned") or 0) for row in returned_rows}
 
         cur.execute(
             """
