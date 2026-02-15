@@ -410,10 +410,26 @@ def get_parts_script():
         }
 
         function partsFormatDisplayDate(value) {
+            return partsFormatBusinessDate(value);
+        }
+
+        function partsFormatBusinessDate(value) {
             if (!value) return '—';
-            const dateObj = new Date(value);
-            if (Number.isNaN(dateObj.getTime())) return '—';
-            return dateObj.toLocaleDateString();
+            const raw = String(value).trim();
+            if (!raw) return '—';
+            const datePart = raw.split('T')[0];
+            const match = datePart.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+            if (!match) return '—';
+            const [, year, month, day] = match;
+            return `${month}-${day}-${year.slice(-2)}`;
+        }
+
+        function partsGetLocalBusinessDateIso() {
+            const now = new Date();
+            const year = now.getFullYear();
+            const month = String(now.getMonth() + 1).padStart(2, '0');
+            const day = String(now.getDate()).padStart(2, '0');
+            return `${year}-${month}-${day}`;
         }
 
         function partsFormatCurrency(value) {
@@ -685,7 +701,7 @@ def get_parts_script():
 
                     tbody.innerHTML = invoices.map(inv => `
                         <tr>
-                            <td style="padding:8px; border-bottom:1px solid #eee;">${partsFormatDisplayDate(inv.date)}</td>
+                            <td style="padding:8px; border-bottom:1px solid #eee;">${partsFormatBusinessDate(inv.date)}</td>
                             <td style="padding:8px; border-bottom:1px solid #eee;">${partsEscapeHtml(inv.invoice_number || '—')}</td>
                             <td style="padding:8px; border-bottom:1px solid #eee; text-align:right;">${partsFormatCurrency(inv.total_cost)}</td>
                         </tr>
@@ -858,8 +874,8 @@ def get_parts_script():
                 const rowBg = idx % 2 === 0 ? '#fff' : '#f9f9f9';
                 const descriptionDisplay = String(item.description || '').replace(/\s+/g, ' ').trim();
                 const arrivedDisplay = item.arrived_date
-                    ? partsFormatDisplayDate(item.arrived_date)
-                    : (item.received_at ? partsFormatDisplayDate(item.received_at) : '—');
+                    ? partsFormatBusinessDate(item.arrived_date)
+                    : (item.received_at ? partsFormatBusinessDate(item.received_at) : '—');
                 return `
                     <tr style="background:${rowBg};">
                         <td style="padding:10px; border-bottom:1px solid #eee;"><input type="checkbox" class="parts-arrived-check" data-line-id="${item.line_id}" /></td>
@@ -896,6 +912,7 @@ def get_parts_script():
                 credentials: 'include',
                 body: JSON.stringify({
                     ro: partsArrivedRo,
+                    local_business_date: partsGetLocalBusinessDateIso(),
                     line_ids: lineIds,
                 })
             })
@@ -957,7 +974,7 @@ def get_parts_script():
             body.innerHTML = partsReturnedItems.map((item, idx) => {
                 const rowBg = idx % 2 === 0 ? '#fff' : '#f9f9f9';
                 const descriptionDisplay = String(item.description || '').replace(/\s+/g, ' ').trim();
-                const returnDateDisplay = item.return_date ? partsFormatDisplayDate(item.return_date) : '—';
+                const returnDateDisplay = item.return_date ? partsFormatBusinessDate(item.return_date) : '—';
                 return `
                     <tr style="background:${rowBg};">
                         <td style="padding:10px; border-bottom:1px solid #eee;">${partsEscapeHtml(item.line || '—')}</td>
@@ -1144,6 +1161,7 @@ def get_parts_script():
                     vendor: vendorName,
                     invoice_number: invoiceNumber,
                     invoice_total_amount: invoiceTotal,
+                    local_business_date: partsGetLocalBusinessDateIso(),
                     items,
                 })
             })

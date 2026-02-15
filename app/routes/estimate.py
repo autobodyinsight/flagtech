@@ -214,6 +214,8 @@ def _ensure_parts_received_table(cur) -> None:
             invoice_total NUMERIC,
             returned BOOLEAN DEFAULT FALSE,
             returned_at TIMESTAMP,
+            received_business_date DATE,
+            returned_business_date DATE,
             domain VARCHAR(255) NOT NULL,
             received_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
@@ -226,6 +228,8 @@ def _ensure_parts_received_table(cur) -> None:
     cur.execute("ALTER TABLE parts_received ADD COLUMN IF NOT EXISTS invoice_total NUMERIC")
     cur.execute("ALTER TABLE parts_received ADD COLUMN IF NOT EXISTS returned BOOLEAN DEFAULT FALSE")
     cur.execute("ALTER TABLE parts_received ADD COLUMN IF NOT EXISTS returned_at TIMESTAMP")
+    cur.execute("ALTER TABLE parts_received ADD COLUMN IF NOT EXISTS received_business_date DATE")
+    cur.execute("ALTER TABLE parts_received ADD COLUMN IF NOT EXISTS returned_business_date DATE")
     cur.execute("CREATE INDEX IF NOT EXISTS idx_parts_received_ro_domain ON parts_received(ro, domain)")
     cur.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_parts_received_unique ON parts_received(ro, line_id, domain)")
 
@@ -3344,12 +3348,12 @@ async def list_arrived_lines(request: Request, ro: str):
 
         cur.execute(
             """
-                        SELECT line_id, vendor, part_number, list_price, cost, invoice_number, received_at
+                                                SELECT line_id, vendor, part_number, list_price, cost, invoice_number, received_business_date, received_at
             FROM parts_received
             WHERE domain = %s
               AND ro = %s
               AND COALESCE(returned, FALSE) = FALSE
-            ORDER BY received_at DESC, line_id
+                        ORDER BY COALESCE(received_business_date, received_at::date) DESC, line_id
             """,
             (domain, ro_value),
         )
@@ -3369,7 +3373,10 @@ async def list_arrived_lines(request: Request, ro: str):
                     "vendor": row.get("vendor") or "",
                     "cost": float(row.get("cost") or 0),
                     "invoice_number": row.get("invoice_number") or "",
-                    "arrived_date": row.get("received_at").isoformat() if row.get("received_at") else None,
+                    "arrived_date": (
+                        row.get("received_business_date").isoformat() if row.get("received_business_date")
+                        else (row.get("received_at").date().isoformat() if row.get("received_at") else None)
+                    ),
                     "received_at": row.get("received_at").isoformat() if row.get("received_at") else None,
                 }
             )
@@ -3388,6 +3395,14 @@ async def return_arrived_lines(request: Request):
     data = await request.json()
     ro_value = (data.get("ro") or "").strip()
     line_ids = _normalize_line_ids(data.get("line_ids") or [])
+    local_business_date_text = (data.get("local_business_date") or "").strip()
+
+    local_business_date = None
+    if local_business_date_text:
+        try:
+            local_business_date = datetime.strptime(local_business_date_text[:10], "%Y-%m-%d").date()
+        except ValueError:
+            local_business_date = None
 
     if not ro_value:
         return JSONResponse(status_code=400, content={"error": "RO is required"})
@@ -3406,13 +3421,14 @@ async def return_arrived_lines(request: Request):
                 """
                 UPDATE parts_received
                                 SET returned = TRUE,
-                                        returned_at = CURRENT_TIMESTAMP
+                                                                                returned_at = CURRENT_TIMESTAMP,
+                                                                                returned_business_date = COALESCE(%s, CURRENT_DATE)
                 WHERE domain = %s
                   AND ro = %s
                   AND line_id = %s
                   AND COALESCE(returned, FALSE) = FALSE
                 """,
-                (domain, ro_value, line_id),
+                                (local_business_date, domain, ro_value, line_id),
             )
             updated_count += int(cur.rowcount or 0)
 
@@ -3489,12 +3505,12 @@ async def list_returned_lines(request: Request, ro: str):
 
         cur.execute(
             """
-            SELECT line_id, vendor, part_number, cost, returned_at, received_at
+                        SELECT line_id, vendor, part_number, cost, returned_business_date, returned_at, received_business_date, received_at
             FROM parts_received
             WHERE domain = %s
               AND ro = %s
               AND COALESCE(returned, FALSE) = TRUE
-            ORDER BY COALESCE(returned_at, received_at) DESC, line_id
+                        ORDER BY COALESCE(returned_business_date, returned_at::date, received_business_date, received_at::date) DESC, line_id
             """,
             (domain, ro_value),
         )
@@ -3504,7 +3520,12 @@ async def list_returned_lines(request: Request, ro: str):
         for row in rows:
             line_id = int(row.get("line_id") or 0)
             metadata = line_metadata.get(line_id, {})
-            return_dt = row.get("returned_at") or row.get("received_at")
+            return_date_value = (
+                row.get("returned_business_date")
+                or (row.get("returned_at").date() if row.get("returned_at") else None)
+                or row.get("received_business_date")
+                or (row.get("received_at").date() if row.get("received_at") else None)
+            )
             items.append(
                 {
                     "line_id": line_id,
@@ -3513,7 +3534,7 @@ async def list_returned_lines(request: Request, ro: str):
                     "part_number": row.get("part_number") or metadata.get("part_number") or "",
                     "vendor": row.get("vendor") or "",
                     "cost": float(row.get("cost") or 0),
-                    "return_date": return_dt.isoformat() if return_dt else None,
+                    "return_date": return_date_value.isoformat() if return_date_value else None,
                 }
             )
 
@@ -3634,7 +3655,15 @@ async def receive_on_order_lines(request: Request):
     vendor_name_input = (data.get("vendor") or "").strip()
     invoice_number = (data.get("invoice_number") or "").strip()
     invoice_total_amount = data.get("invoice_total_amount")
+    local_business_date_text = (data.get("local_business_date") or "").strip()
     items = data.get("items") or []
+
+    local_business_date = None
+    if local_business_date_text:
+        try:
+            local_business_date = datetime.strptime(local_business_date_text[:10], "%Y-%m-%d").date()
+        except ValueError:
+            local_business_date = None
 
     if not ro_value:
         return JSONResponse(status_code=400, content={"error": "RO is required"})
@@ -3728,9 +3757,9 @@ async def receive_on_order_lines(request: Request):
             cur.execute(
                 """
                 INSERT INTO parts_received
-                    (ro, line_id, vendor, part_number, list_price, cost, eta, invoice_number, invoice_total, returned, domain)
+                    (ro, line_id, vendor, part_number, list_price, cost, eta, invoice_number, invoice_total, returned, received_business_date, domain)
                 VALUES
-                    (%s, %s, %s, %s, %s, %s, %s, %s, %s, FALSE, %s)
+                    (%s, %s, %s, %s, %s, %s, %s, %s, %s, FALSE, COALESCE(%s, CURRENT_DATE), %s)
                 ON CONFLICT (ro, line_id, domain)
                 DO UPDATE SET
                     vendor = EXCLUDED.vendor,
@@ -3741,6 +3770,7 @@ async def receive_on_order_lines(request: Request):
                     invoice_number = EXCLUDED.invoice_number,
                     invoice_total = EXCLUDED.invoice_total,
                     returned = FALSE,
+                    received_business_date = EXCLUDED.received_business_date,
                     received_at = CURRENT_TIMESTAMP
                 """,
                 (
@@ -3753,6 +3783,7 @@ async def receive_on_order_lines(request: Request):
                     item["eta"],
                     invoice_number,
                     invoice_total,
+                    local_business_date,
                     domain,
                 ),
             )
@@ -3847,13 +3878,13 @@ async def list_vendor_invoices(request: Request, vendor_id: int):
             """
             SELECT
                 ro AS invoice_number,
-                MAX(received_at) AS invoice_date,
+                MAX(COALESCE(received_business_date, received_at::date)) AS invoice_date,
                 COALESCE(SUM(cost), 0) AS total_cost
             FROM parts_received
             WHERE domain = %s
               AND LOWER(TRIM(vendor)) = LOWER(TRIM(%s))
             GROUP BY ro
-            ORDER BY MAX(received_at) DESC
+            ORDER BY MAX(COALESCE(received_business_date, received_at::date)) DESC
             """,
             (domain, vendor_name),
         )
