@@ -150,10 +150,10 @@ def get_parts_screen_html():
                                 <th style="padding:10px; border-bottom:2px solid #ddd; width:80px;">Line</th>
                                 <th style="padding:10px; border-bottom:2px solid #ddd;">Description</th>
                                 <th style="padding:10px; border-bottom:2px solid #ddd; width:170px;">Part #</th>
-                                <th style="padding:10px; border-bottom:2px solid #ddd; width:110px; text-align:right;">List</th>
                                 <th style="padding:10px; border-bottom:2px solid #ddd; width:180px;">Vendor</th>
-                                <th style="padding:10px; border-bottom:2px solid #ddd; width:120px;">ETA</th>
+                                <th style="padding:10px; border-bottom:2px solid #ddd; width:110px; text-align:right;">List</th>
                                 <th style="padding:10px; border-bottom:2px solid #ddd; width:110px; text-align:right;">Cost</th>
+                                <th style="padding:10px; border-bottom:2px solid #ddd; width:120px;">Arrived</th>
                             </tr>
                         </thead>
                         <tbody id="partsArrivedBody">
@@ -820,17 +820,19 @@ def get_parts_script():
 
             body.innerHTML = partsArrivedItems.map((item, idx) => {
                 const rowBg = idx % 2 === 0 ? '#fff' : '#f9f9f9';
-                const etaDisplay = item.eta ? partsFormatDisplayDate(item.eta) : '—';
+                const arrivedDisplay = item.arrived_date
+                    ? partsFormatDisplayDate(item.arrived_date)
+                    : (item.received_at ? partsFormatDisplayDate(item.received_at) : '—');
                 return `
                     <tr style="background:${rowBg};">
                         <td style="padding:10px; border-bottom:1px solid #eee;"><input type="checkbox" class="parts-arrived-check" data-line-id="${item.line_id}" /></td>
                         <td style="padding:10px; border-bottom:1px solid #eee;">${partsEscapeHtml(item.line || '—')}</td>
                         <td style="padding:10px; border-bottom:1px solid #eee;">${partsEscapeHtml(item.description || '')}</td>
                         <td style="padding:10px; border-bottom:1px solid #eee;">${partsEscapeHtml(item.part_number || '—')}</td>
-                        <td style="padding:10px; border-bottom:1px solid #eee; text-align:right;">${partsFormatCurrency(item.list || 0)}</td>
                         <td style="padding:10px; border-bottom:1px solid #eee;">${partsEscapeHtml(item.vendor || '—')}</td>
-                        <td style="padding:10px; border-bottom:1px solid #eee;">${partsEscapeHtml(etaDisplay)}</td>
+                        <td style="padding:10px; border-bottom:1px solid #eee; text-align:right;">${partsFormatCurrency(item.list || 0)}</td>
                         <td style="padding:10px; border-bottom:1px solid #eee; text-align:right;">${partsFormatCurrency(item.cost || 0)}</td>
+                        <td style="padding:10px; border-bottom:1px solid #eee;">${partsEscapeHtml(arrivedDisplay)}</td>
                     </tr>
                 `;
             }).join('');

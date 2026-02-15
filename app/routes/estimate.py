@@ -3293,7 +3293,7 @@ async def list_arrived_lines(request: Request, ro: str):
 
         cur.execute(
             """
-            SELECT line_id, vendor, part_number, list_price, eta, cost, invoice_number, received_at
+                        SELECT line_id, vendor, part_number, list_price, cost, invoice_number, received_at
             FROM parts_received
             WHERE domain = %s
               AND ro = %s
@@ -3316,9 +3316,9 @@ async def list_arrived_lines(request: Request, ro: str):
                     "part_number": row.get("part_number") or metadata.get("part_number") or "",
                     "list": float(row.get("list_price") or metadata.get("list") or 0),
                     "vendor": row.get("vendor") or "",
-                    "eta": row.get("eta").isoformat() if row.get("eta") else None,
                     "cost": float(row.get("cost") or 0),
                     "invoice_number": row.get("invoice_number") or "",
+                    "arrived_date": row.get("received_at").isoformat() if row.get("received_at") else None,
                     "received_at": row.get("received_at").isoformat() if row.get("received_at") else None,
                 }
             )
