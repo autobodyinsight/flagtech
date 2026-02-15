@@ -81,6 +81,7 @@ def init_users_table():
             CREATE TABLE IF NOT EXISTS parts_vendors (
                 id SERIAL PRIMARY KEY,
                 name VARCHAR(255) NOT NULL,
+                vendor_type VARCHAR(100),
                 contact_person VARCHAR(255),
                 email VARCHAR(255),
                 phone VARCHAR(50),

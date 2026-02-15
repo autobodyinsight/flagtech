@@ -7,46 +7,9 @@ def get_parts_screen_html():
     <div id="parts" class="screen" style="padding:20px;">
         <h1 style="text-align:center; margin-bottom:20px;">PARTS</h1>
 
-        <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(280px, 1fr)); gap:20px; margin-bottom:30px;">
-            <div style="border:1px solid #ddd; border-radius:8px; padding:20px; background:#fafafa;">
-                <h3 style="margin-bottom:15px;">Add Parts Vendor</h3>
-                <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:10px;">
-                    <div>
-                        <label>Vendor:</label>
-                        <input type="text" id="partsVendorName" style="width:100%; padding:8px; box-sizing:border-box;">
-                    </div>
-                    <div>
-                        <label>Contact:</label>
-                        <input type="text" id="partsVendorContact" style="width:100%; padding:8px; box-sizing:border-box;">
-                    </div>
-                </div>
-
-                <label>Email:</label>
-                <input type="email" id="partsVendorEmail" style="width:100%; padding:8px; margin-bottom:10px; box-sizing:border-box;">
-
-                <label>Phone:</label>
-                <input type="text" id="partsVendorPhone" style="width:100%; padding:8px; margin-bottom:15px; box-sizing:border-box;">
-
-                <label>Street:</label>
-                <input type="text" id="partsVendorStreet" style="width:100%; padding:8px; margin-bottom:10px; box-sizing:border-box;">
-
-                <label>City:</label>
-                <input type="text" id="partsVendorCity" style="width:100%; padding:8px; margin-bottom:10px; box-sizing:border-box;">
-
-                <label>State:</label>
-                <input type="text" id="partsVendorState" style="width:100%; padding:8px; margin-bottom:10px; box-sizing:border-box;">
-
-                <label>Zip:</label>
-                <input type="text" id="partsVendorZip" style="width:100%; padding:8px; margin-bottom:15px; box-sizing:border-box;">
-
-                <button onclick="partsAddVendor()" style="padding:10px 16px; background-color:#505050; color:white; border:none; border-radius:4px; cursor:pointer; font-size:14px;">Add Vendor</button>
-
-            </div>
-
-            <div style="border:1px solid #ddd; border-radius:8px; padding:20px; background:#fff;">
-                <h3 style="margin-bottom:15px;">Parts Vendors</h3>
-                <div id="partsVendorsList"></div>
-            </div>
+        <div style="display:flex; gap:12px; margin-bottom:20px;">
+            <button onclick="openPartsAddVendorModal()" style="padding:10px 16px; background-color:#505050; color:white; border:none; border-radius:4px; cursor:pointer; font-size:14px;">+ VENDOR</button>
+            <button onclick="openPartsVendorsModal()" style="padding:10px 16px; background-color:#505050; color:white; border:none; border-radius:4px; cursor:pointer; font-size:14px;">Vendors</button>
         </div>
 
         <div style="background:#fff; padding:20px; border-radius:8px; box-shadow:0 2px 4px rgba(0,0,0,0.08);">
@@ -108,29 +71,77 @@ def get_parts_screen_html():
             </div>
         </div>
 
-        <div id="partsVendorModal" class="modal" style="display:none;">
-            <div class="modal-content" style="max-width:900px; max-height:90vh; overflow-y:auto;">
-                <span class="close" onclick="closePartsVendorModal()">&times;</span>
-                <h2 id="partsVendorModalName" style="margin-bottom:6px;">Vendor</h2>
-                <div id="partsVendorModalContact" style="margin-bottom:12px; color:#333;"></div>
-                <div id="partsVendorModalAddress" style="color:#333;"></div>
-                <div id="partsVendorModalPhone" style="margin-top:6px; color:#333;"></div>
-                <div id="partsVendorModalEmail" style="margin-top:4px; color:#333;"></div>
+        <div id="partsAddVendorModal" class="modal" style="display:none;">
+            <div class="modal-content" style="max-width:720px; max-height:90vh; overflow-y:auto;">
+                <span class="close" onclick="closePartsAddVendorModal()">&times;</span>
+                <h2 style="margin-bottom:16px;">Add Parts Vendor</h2>
 
-                <hr style="margin:20px 0; border:none; border-top:1px solid #ddd;">
+                <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:10px;">
+                    <div>
+                        <label>Vendor:</label>
+                        <input type="text" id="partsVendorName" style="width:100%; padding:8px; box-sizing:border-box;">
+                    </div>
+                    <div>
+                        <label>Contact:</label>
+                        <input type="text" id="partsVendorContact" style="width:100%; padding:8px; box-sizing:border-box;">
+                    </div>
+                </div>
 
-                <h3 style="margin:0 0 12px 0; color:#333;">Invoices</h3>
+                <label>Type:</label>
+                <select id="partsVendorType" style="width:100%; padding:8px; margin-bottom:10px; box-sizing:border-box;">
+                    <option value="">Select type...</option>
+                    <option value="OEM">OEM</option>
+                    <option value="AFTERMARKET">Aftermarket</option>
+                    <option value="USED">Used</option>
+                    <option value="OTHER">Other</option>
+                </select>
+
+                <label>Email:</label>
+                <input type="email" id="partsVendorEmail" style="width:100%; padding:8px; margin-bottom:10px; box-sizing:border-box;">
+
+                <label>Phone:</label>
+                <input type="text" id="partsVendorPhone" style="width:100%; padding:8px; margin-bottom:10px; box-sizing:border-box;">
+
+                <label>Street:</label>
+                <input type="text" id="partsVendorStreet" style="width:100%; padding:8px; margin-bottom:10px; box-sizing:border-box;">
+
+                <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px; margin-bottom:10px;">
+                    <div>
+                        <label>City:</label>
+                        <input type="text" id="partsVendorCity" style="width:100%; padding:8px; box-sizing:border-box;">
+                    </div>
+                    <div>
+                        <label>State:</label>
+                        <input type="text" id="partsVendorState" style="width:100%; padding:8px; box-sizing:border-box;">
+                    </div>
+                    <div>
+                        <label>Zip:</label>
+                        <input type="text" id="partsVendorZip" style="width:100%; padding:8px; box-sizing:border-box;">
+                    </div>
+                </div>
+
+                <div style="text-align:right; margin-top:16px;">
+                    <button onclick="partsAddVendor()" style="padding:10px 18px; background-color:#505050; color:white; border:none; border-radius:4px; cursor:pointer; font-size:14px;">Save</button>
+                </div>
+            </div>
+        </div>
+
+        <div id="partsVendorsModal" class="modal" style="display:none;">
+            <div class="modal-content" style="max-width:1050px; max-height:90vh; overflow-y:auto;">
+                <span class="close" onclick="closePartsVendorsModal()">&times;</span>
+                <h2 style="margin-bottom:16px;">Vendors</h2>
                 <div style="overflow-x:auto;">
                     <table style="width:100%; border-collapse:collapse;">
                         <thead>
                             <tr style="background:#f5f5f5; text-align:left;">
-                                <th style="padding:10px; border-bottom:2px solid #ddd;">Date</th>
-                                <th style="padding:10px; border-bottom:2px solid #ddd;">Invoice #</th>
-                                <th style="padding:10px; border-bottom:2px solid #ddd; text-align:right;">Total Cost</th>
+                                <th style="padding:10px; border-bottom:2px solid #ddd;">VENDOR</th>
+                                <th style="padding:10px; border-bottom:2px solid #ddd;">TYPE</th>
+                                <th style="padding:10px; border-bottom:2px solid #ddd;">PHONE</th>
+                                <th style="padding:10px; border-bottom:2px solid #ddd;">EMAIL</th>
                             </tr>
                         </thead>
-                        <tbody id="partsVendorInvoicesBody">
-                            <tr><td colspan="3" style="padding:12px; text-align:center; color:#777;">Loading...</td></tr>
+                        <tbody id="partsVendorsTableBody">
+                            <tr><td colspan="4" style="padding:12px; text-align:center; color:#777;">Loading...</td></tr>
                         </tbody>
                     </table>
                 </div>
@@ -177,10 +188,10 @@ def get_parts_script():
         let partsCurrentRo = null;
         let partsCurrentLines = [];
         let partsVendorsCache = [];
-        let partsVendorModalVendor = null;
 
         function partsAddVendor() {
             const name = document.getElementById('partsVendorName').value.trim();
+            const vendorType = document.getElementById('partsVendorType').value.trim();
             const contactPerson = document.getElementById('partsVendorContact').value.trim();
             const email = document.getElementById('partsVendorEmail').value.trim();
             const phone = document.getElementById('partsVendorPhone').value.trim();
@@ -198,22 +209,26 @@ def get_parts_script():
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 credentials: 'include',
-                body: JSON.stringify({ name, contact_person: contactPerson, email, phone, street, city, state, zip })
+                body: JSON.stringify({
+                    name,
+                    vendor_type: vendorType,
+                    contact_person: contactPerson,
+                    email,
+                    phone,
+                    street,
+                    city,
+                    state,
+                    zip
+                })
             })
             .then(r => r.json())
             .then(res => {
                 if (res.error) {
                     throw new Error(res.error);
                 }
-                document.getElementById('partsVendorName').value = '';
-                document.getElementById('partsVendorContact').value = '';
-                document.getElementById('partsVendorEmail').value = '';
-                document.getElementById('partsVendorPhone').value = '';
-                document.getElementById('partsVendorStreet').value = '';
-                document.getElementById('partsVendorCity').value = '';
-                document.getElementById('partsVendorState').value = '';
-                document.getElementById('partsVendorZip').value = '';
-                partsLoadVendors();
+                partsClearVendorForm();
+                closePartsAddVendorModal();
+                partsLoadVendors(true);
             })
             .catch(err => {
                 console.error('Error saving vendor:', err);
@@ -221,32 +236,23 @@ def get_parts_script():
             });
         }
 
-        function partsLoadVendors() {
-            const container = document.getElementById('partsVendorsList');
-            if (!container) return;
-
-            container.innerHTML = '<p style="color:#777;">Loading...</p>';
+        function partsLoadVendors(renderTable = false) {
             fetch('/api/vendors/list', { credentials: 'include' })
                 .then(r => r.json())
                 .then(res => {
                     partsVendorsCache = res.vendors || [];
-                    if (!res.vendors || res.vendors.length === 0) {
-                        container.innerHTML = '<p style="color:#777;">No vendors added yet.</p>';
-                        return;
+                    if (renderTable) {
+                        partsRenderVendorsTable();
                     }
-
-                    container.innerHTML = res.vendors.map(v => {
-                        const parts = [
-                            `<button type="button" onclick="openPartsVendorModal(${v.id})" style="background:none; border:none; color:#0066cc; text-decoration:underline; cursor:pointer; padding:0; font-size:14px;">${partsEscapeHtml(v.name || '—')}</button>`
-                        ];
-                        if (v.phone) parts.push(v.phone);
-                        if (v.email) parts.push(v.email);
-                        return `<div style="padding:8px 0; border-bottom:1px solid #eee;">${parts.join(' • ')}</div>`;
-                    }).join('');
                 })
                 .catch(err => {
                     console.error('Error loading vendors:', err);
-                    container.innerHTML = '<p style="color:red;">Error loading vendors.</p>';
+                    if (renderTable) {
+                        const body = document.getElementById('partsVendorsTableBody');
+                        if (body) {
+                            body.innerHTML = '<tr><td colspan="4" style="padding:12px; text-align:center; color:red;">Error loading vendors.</td></tr>';
+                        }
+                    }
                 });
         }
 
@@ -271,140 +277,270 @@ def get_parts_script():
                 .replace(/'/g, '&#39;');
         }
 
-        function openPartsVendorModal(vendorId) {
-            const vendor = (partsVendorsCache || []).find(v => Number(v.id) === Number(vendorId));
-            if (!vendor) {
-                alert('Vendor not found. Please refresh and try again.');
-                return;
-            }
-
-            partsVendorModalVendor = vendor;
-
-            const modal = document.getElementById('partsVendorModal');
-            const nameEl = document.getElementById('partsVendorModalName');
-            const contactEl = document.getElementById('partsVendorModalContact');
-            const addressEl = document.getElementById('partsVendorModalAddress');
-            const phoneEl = document.getElementById('partsVendorModalPhone');
-            const emailEl = document.getElementById('partsVendorModalEmail');
-            const invoicesBody = document.getElementById('partsVendorInvoicesBody');
-
-            if (!modal || !nameEl || !contactEl || !addressEl || !phoneEl || !emailEl || !invoicesBody) return;
-
-            const cityStateZip = [vendor.city, vendor.state].filter(Boolean).join(', ');
-            const cityStateZipLine = [cityStateZip, vendor.zip].filter(Boolean).join(' ');
-
-            nameEl.textContent = vendor.name || 'Vendor';
-            contactEl.textContent = `Contact: ${vendor.contact_person || '—'}`;
-            addressEl.innerHTML = `
-                <div>${partsEscapeHtml(vendor.street || '—')}</div>
-                <div>${partsEscapeHtml(cityStateZipLine || '—')}</div>
-            `;
-            phoneEl.textContent = `Phone: ${vendor.phone || '—'}`;
-            emailEl.textContent = `Email: ${vendor.email || '—'}`;
-
-            invoicesBody.innerHTML = '<tr><td colspan="3" style="padding:12px; text-align:center; color:#777;">Loading...</td></tr>';
-            modal.style.display = 'block';
-
-            fetch(`/api/vendors/invoices?vendor_id=${encodeURIComponent(vendor.id)}`, { credentials: 'include' })
-                .then(r => r.json())
-                .then(res => {
-                    const invoices = res.invoices || [];
-                    if (invoices.length === 0) {
-                        invoicesBody.innerHTML = '<tr><td colspan="3" style="padding:12px; text-align:center; color:#777;">No invoices found.</td></tr>';
-                        return;
-                    }
-
-                    invoicesBody.innerHTML = invoices.map((inv, idx) => {
-                        const rowBg = idx % 2 === 0 ? '#fff' : '#f9f9f9';
-                        const invoiceNumber = inv.invoice_number || '—';
-                        const invoiceKey = String(invoiceNumber).replace(/[^a-zA-Z0-9_-]/g, '-').replace(/-+/g, '-').toLowerCase();
-                        const toggleId = `parts-vendor-invoice-${vendor.id}-${invoiceKey}`;
-                        return `
-                            <tr style="background:${rowBg};">
-                                <td style="padding:10px; border-bottom:1px solid #eee;">${partsFormatDisplayDate(inv.date)}</td>
-                                <td style="padding:10px; border-bottom:1px solid #eee;">
-                                    <button
-                                        type="button"
-                                        onclick="togglePartsVendorInvoiceParts(this)"
-                                        data-vendor-id="${vendor.id}"
-                                        data-invoice-number="${partsEscapeHtml(invoiceNumber)}"
-                                        data-toggle-id="${toggleId}"
-                                        style="background:none; border:none; color:#0066cc; text-decoration:underline; cursor:pointer; padding:0;"
-                                    >
-                                        ${partsEscapeHtml(invoiceNumber)}
-                                    </button>
-                                </td>
-                                <td style="padding:10px; border-bottom:1px solid #eee; text-align:right;">${partsFormatCurrency(inv.total_cost)}</td>
-                            </tr>
-                            <tr id="${toggleId}" style="display:none; background:${rowBg};">
-                                <td colspan="3" style="padding:12px; border-bottom:1px solid #eee;">
-                                    <div style="background:#fafafa; border:1px solid #ddd; border-radius:6px; padding:10px;">
-                                        <div style="font-weight:bold; margin-bottom:8px;">Parts Received</div>
-                                        <div id="${toggleId}-body" style="color:#777;">Loading...</div>
-                                    </div>
-                                </td>
-                            </tr>
-                        `;
-                    }).join('');
-                })
-                .catch(err => {
-                    console.error('Error loading vendor invoices:', err);
-                    invoicesBody.innerHTML = '<tr><td colspan="3" style="padding:12px; text-align:center; color:red;">Error loading invoices.</td></tr>';
-                });
+        function openPartsAddVendorModal() {
+            const modal = document.getElementById('partsAddVendorModal');
+            if (modal) modal.style.display = 'block';
         }
 
-        function closePartsVendorModal() {
-            const modal = document.getElementById('partsVendorModal');
+        function closePartsAddVendorModal() {
+            const modal = document.getElementById('partsAddVendorModal');
             if (modal) modal.style.display = 'none';
         }
 
-        function togglePartsVendorInvoiceParts(button) {
-            const vendorId = button?.dataset?.vendorId;
-            const invoiceNumber = button?.dataset?.invoiceNumber || '';
-            const toggleId = button?.dataset?.toggleId;
-            const row = document.getElementById(toggleId);
-            const body = document.getElementById(`${toggleId}-body`);
-            if (!row || !body) return;
+        function partsClearVendorForm() {
+            const ids = [
+                'partsVendorName',
+                'partsVendorType',
+                'partsVendorContact',
+                'partsVendorEmail',
+                'partsVendorPhone',
+                'partsVendorStreet',
+                'partsVendorCity',
+                'partsVendorState',
+                'partsVendorZip'
+            ];
+            ids.forEach(id => {
+                const el = document.getElementById(id);
+                if (el) el.value = '';
+            });
+        }
+
+        function openPartsVendorsModal() {
+            const modal = document.getElementById('partsVendorsModal');
+            const body = document.getElementById('partsVendorsTableBody');
+            if (!modal || !body) return;
+
+            body.innerHTML = '<tr><td colspan="4" style="padding:12px; text-align:center; color:#777;">Loading...</td></tr>';
+            modal.style.display = 'block';
+            partsLoadVendors(true);
+        }
+
+        function closePartsVendorsModal() {
+            const modal = document.getElementById('partsVendorsModal');
+            if (modal) modal.style.display = 'none';
+        }
+
+        function partsRenderVendorsTable() {
+            const body = document.getElementById('partsVendorsTableBody');
+            if (!body) return;
+
+            if (!partsVendorsCache || partsVendorsCache.length === 0) {
+                body.innerHTML = '<tr><td colspan="4" style="padding:12px; text-align:center; color:#777;">No vendors found.</td></tr>';
+                return;
+            }
+
+            body.innerHTML = partsVendorsCache.map((vendor, idx) => {
+                const rowBg = idx % 2 === 0 ? '#fff' : '#f9f9f9';
+                const detailRowId = `parts-vendor-detail-row-${vendor.id}`;
+                const detailWrapId = `parts-vendor-detail-wrap-${vendor.id}`;
+                return `
+                    <tr style="background:${rowBg};">
+                        <td style="padding:10px; border-bottom:1px solid #eee;">
+                            <button id="parts-vendor-main-name-${vendor.id}" type="button" onclick="togglePartsVendorRow(${vendor.id})" style="background:none; border:none; color:#0066cc; text-decoration:underline; cursor:pointer; padding:0; font-size:14px;">
+                                ${partsEscapeHtml(vendor.name || '—')}
+                            </button>
+                        </td>
+                        <td id="parts-vendor-main-type-${vendor.id}" style="padding:10px; border-bottom:1px solid #eee;">${partsEscapeHtml(vendor.vendor_type || '—')}</td>
+                        <td id="parts-vendor-main-phone-${vendor.id}" style="padding:10px; border-bottom:1px solid #eee;">${partsEscapeHtml(vendor.phone || '—')}</td>
+                        <td id="parts-vendor-main-email-${vendor.id}" style="padding:10px; border-bottom:1px solid #eee;">${partsEscapeHtml(vendor.email || '—')}</td>
+                    </tr>
+                    <tr id="${detailRowId}" style="display:none; background:${rowBg};">
+                        <td colspan="4" style="padding:12px; border-bottom:1px solid #eee;">
+                            <div id="${detailWrapId}" style="background:#fafafa; border:1px solid #ddd; border-radius:6px; padding:12px;"></div>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        function togglePartsVendorRow(vendorId) {
+            const row = document.getElementById(`parts-vendor-detail-row-${vendorId}`);
+            const wrap = document.getElementById(`parts-vendor-detail-wrap-${vendorId}`);
+            if (!row || !wrap) return;
 
             const isHidden = row.style.display === 'none' || row.style.display === '';
             row.style.display = isHidden ? 'table-row' : 'none';
             if (!isHidden) return;
 
-            body.innerHTML = 'Loading...';
+            const vendor = (partsVendorsCache || []).find(v => Number(v.id) === Number(vendorId));
+            if (!vendor) {
+                wrap.innerHTML = '<div style="color:red;">Vendor not found.</div>';
+                return;
+            }
 
-            fetch(`/api/vendors/invoice-parts?vendor_id=${encodeURIComponent(vendorId)}&invoice_number=${encodeURIComponent(invoiceNumber)}`, { credentials: 'include' })
+            wrap.innerHTML = partsBuildVendorDetailHtml(vendor);
+            partsSetVendorEditMode(vendorId, false);
+            partsLoadVendorInvoices(vendorId);
+        }
+
+        function partsBuildVendorDetailHtml(vendor) {
+            const id = vendor.id;
+            const selectedType = String(vendor.vendor_type || '').toUpperCase();
+            const optionSelected = (value) => selectedType === value ? 'selected' : '';
+            return `
+                <div style="font-weight:bold; margin-bottom:8px;">Vendor Information</div>
+                <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:8px;">
+                    <div>
+                        <label>Vendor Name</label>
+                        <input class="parts-vendor-edit-field-${id}" data-field="name" type="text" value="${partsEscapeHtml(vendor.name || '')}" style="width:100%; padding:8px; box-sizing:border-box;" />
+                    </div>
+                    <div>
+                        <label>Contact Person</label>
+                        <input class="parts-vendor-edit-field-${id}" data-field="contact_person" type="text" value="${partsEscapeHtml(vendor.contact_person || '')}" style="width:100%; padding:8px; box-sizing:border-box;" />
+                    </div>
+                </div>
+                <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px; margin-bottom:8px;">
+                    <div>
+                        <label>Type</label>
+                        <select class="parts-vendor-edit-field-${id}" data-field="vendor_type" style="width:100%; padding:8px; box-sizing:border-box;">
+                            <option value="" ${optionSelected('')}>Select type...</option>
+                            <option value="OEM" ${optionSelected('OEM')}>OEM</option>
+                            <option value="AFTERMARKET" ${optionSelected('AFTERMARKET')}>Aftermarket</option>
+                            <option value="USED" ${optionSelected('USED')}>Used</option>
+                            <option value="OTHER" ${optionSelected('OTHER')}>Other</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label>Phone</label>
+                        <input class="parts-vendor-edit-field-${id}" data-field="phone" type="text" value="${partsEscapeHtml(vendor.phone || '')}" style="width:100%; padding:8px; box-sizing:border-box;" />
+                    </div>
+                    <div>
+                        <label>Email</label>
+                        <input class="parts-vendor-edit-field-${id}" data-field="email" type="email" value="${partsEscapeHtml(vendor.email || '')}" style="width:100%; padding:8px; box-sizing:border-box;" />
+                    </div>
+                </div>
+                <div style="display:grid; grid-template-columns:2fr 1fr 1fr 1fr; gap:10px; margin-bottom:8px;">
+                    <div>
+                        <label>Street</label>
+                        <input class="parts-vendor-edit-field-${id}" data-field="street" type="text" value="${partsEscapeHtml(vendor.street || '')}" style="width:100%; padding:8px; box-sizing:border-box;" />
+                    </div>
+                    <div>
+                        <label>City</label>
+                        <input class="parts-vendor-edit-field-${id}" data-field="city" type="text" value="${partsEscapeHtml(vendor.city || '')}" style="width:100%; padding:8px; box-sizing:border-box;" />
+                    </div>
+                    <div>
+                        <label>State</label>
+                        <input class="parts-vendor-edit-field-${id}" data-field="state" type="text" value="${partsEscapeHtml(vendor.state || '')}" style="width:100%; padding:8px; box-sizing:border-box;" />
+                    </div>
+                    <div>
+                        <label>Zip</label>
+                        <input class="parts-vendor-edit-field-${id}" data-field="zip" type="text" value="${partsEscapeHtml(vendor.zip || '')}" style="width:100%; padding:8px; box-sizing:border-box;" />
+                    </div>
+                </div>
+                <div style="text-align:right; margin:10px 0 14px 0;">
+                    <button id="parts-vendor-edit-btn-${id}" data-mode="view" onclick="partsToggleVendorEdit(${id})" style="padding:8px 14px; background:#505050; color:#fff; border:none; border-radius:4px; cursor:pointer;">EDIT</button>
+                </div>
+                <div style="font-weight:bold; margin-bottom:8px;">Invoices</div>
+                <div style="overflow-x:auto;">
+                    <table style="width:100%; border-collapse:collapse;">
+                        <thead>
+                            <tr style="background:#f5f5f5; text-align:left;">
+                                <th style="padding:8px; border-bottom:1px solid #ddd;">DATE</th>
+                                <th style="padding:8px; border-bottom:1px solid #ddd;">INVOICE#</th>
+                                <th style="padding:8px; border-bottom:1px solid #ddd; text-align:right;">TOTAL</th>
+                            </tr>
+                        </thead>
+                        <tbody id="parts-vendor-invoices-${id}">
+                            <tr><td colspan="3" style="padding:8px; color:#777; text-align:center;">Loading...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            `;
+        }
+
+        function partsSetVendorEditMode(vendorId, isEditable) {
+            const fields = document.querySelectorAll(`.parts-vendor-edit-field-${vendorId}`);
+            fields.forEach(field => {
+                field.disabled = !isEditable;
+                field.style.background = isEditable ? '#fff' : '#f4f4f4';
+            });
+            const button = document.getElementById(`parts-vendor-edit-btn-${vendorId}`);
+            if (button) {
+                button.dataset.mode = isEditable ? 'edit' : 'view';
+                button.textContent = 'EDIT';
+            }
+        }
+
+        function partsToggleVendorEdit(vendorId) {
+            const button = document.getElementById(`parts-vendor-edit-btn-${vendorId}`);
+            if (!button) return;
+
+            const isEditMode = button.dataset.mode === 'edit';
+            if (!isEditMode) {
+                partsSetVendorEditMode(vendorId, true);
+                return;
+            }
+
+            const fields = document.querySelectorAll(`.parts-vendor-edit-field-${vendorId}`);
+            const payload = { vendor_id: vendorId };
+            fields.forEach(field => {
+                payload[field.dataset.field] = (field.value || '').trim();
+            });
+
+            if (!payload.name) {
+                alert('Vendor name is required.');
+                return;
+            }
+
+            fetch('/api/vendors/update', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
+                body: JSON.stringify(payload)
+            })
+            .then(r => r.json())
+            .then(res => {
+                if (res.error) {
+                    throw new Error(res.error);
+                }
+
+                const updated = res.vendor || {};
+                partsVendorsCache = (partsVendorsCache || []).map(v => Number(v.id) === Number(vendorId) ? { ...v, ...updated } : v);
+
+                const typeEl = document.getElementById(`parts-vendor-main-type-${vendorId}`);
+                const phoneEl = document.getElementById(`parts-vendor-main-phone-${vendorId}`);
+                const emailEl = document.getElementById(`parts-vendor-main-email-${vendorId}`);
+                const nameEl = document.getElementById(`parts-vendor-main-name-${vendorId}`);
+
+                if (nameEl) nameEl.textContent = updated.name || '—';
+                if (typeEl) typeEl.textContent = updated.vendor_type || '—';
+                if (phoneEl) phoneEl.textContent = updated.phone || '—';
+                if (emailEl) emailEl.textContent = updated.email || '—';
+
+                partsSetVendorEditMode(vendorId, false);
+            })
+            .catch(err => {
+                console.error('Error updating vendor:', err);
+                alert('Error updating vendor. Please try again.');
+            });
+        }
+
+        function partsLoadVendorInvoices(vendorId) {
+            const tbody = document.getElementById(`parts-vendor-invoices-${vendorId}`);
+            if (!tbody) return;
+
+            tbody.innerHTML = '<tr><td colspan="3" style="padding:8px; color:#777; text-align:center;">Loading...</td></tr>';
+
+            fetch(`/api/vendors/invoices?vendor_id=${encodeURIComponent(vendorId)}`, { credentials: 'include' })
                 .then(r => r.json())
                 .then(res => {
-                    const parts = res.parts || [];
-                    if (parts.length === 0) {
-                        body.innerHTML = '<div style="color:#777;">No received parts found for this invoice.</div>';
+                    const invoices = res.invoices || [];
+                    if (invoices.length === 0) {
+                        tbody.innerHTML = '<tr><td colspan="3" style="padding:8px; color:#777; text-align:center;">No invoices found.</td></tr>';
                         return;
                     }
 
-                    body.innerHTML = `
-                        <table style="width:100%; border-collapse:collapse;">
-                            <thead>
-                                <tr style="text-align:left; background:#f5f5f5;">
-                                    <th style="padding:8px; border-bottom:1px solid #ddd; width:80px;">Line</th>
-                                    <th style="padding:8px; border-bottom:1px solid #ddd;">Description</th>
-                                    <th style="padding:8px; border-bottom:1px solid #ddd; width:140px; text-align:right;">Cost</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                ${parts.map((part) => `
-                                    <tr>
-                                        <td style="padding:8px; border-bottom:1px solid #eee;">${partsEscapeHtml(part.line)}</td>
-                                        <td style="padding:8px; border-bottom:1px solid #eee;">${partsEscapeHtml(part.description || '—')}</td>
-                                        <td style="padding:8px; border-bottom:1px solid #eee; text-align:right;">${partsFormatCurrency(part.cost)}</td>
-                                    </tr>
-                                `).join('')}
-                            </tbody>
-                        </table>
-                    `;
+                    tbody.innerHTML = invoices.map(inv => `
+                        <tr>
+                            <td style="padding:8px; border-bottom:1px solid #eee;">${partsFormatDisplayDate(inv.date)}</td>
+                            <td style="padding:8px; border-bottom:1px solid #eee;">${partsEscapeHtml(inv.invoice_number || '—')}</td>
+                            <td style="padding:8px; border-bottom:1px solid #eee; text-align:right;">${partsFormatCurrency(inv.total_cost)}</td>
+                        </tr>
+                    `).join('');
                 })
                 .catch(err => {
-                    console.error('Error loading invoice parts:', err);
-                    body.innerHTML = '<div style="color:red;">Error loading received parts.</div>';
+                    console.error('Error loading vendor invoices:', err);
+                    tbody.innerHTML = '<tr><td colspan="3" style="padding:8px; color:red; text-align:center;">Error loading invoices.</td></tr>';
                 });
         }
 
