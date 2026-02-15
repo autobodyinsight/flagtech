@@ -12,6 +12,19 @@ from fastapi.responses import JSONResponse
 router = APIRouter()
 
 
+def _normalize_line_ids(values) -> set[int]:
+    ids = set()
+    if not isinstance(values, list):
+        return ids
+    for value in values:
+        try:
+            parsed = int(value)
+        except (TypeError, ValueError):
+            continue
+        ids.add(parsed)
+    return ids
+
+
 def _ensure_parts_vendors_table(cur) -> None:
     """Create parts_vendors table if it doesn't exist (safety for older DBs)."""
     cur.execute(
@@ -127,11 +140,13 @@ def _ensure_parts_received_table(cur) -> None:
             line_id INTEGER NOT NULL,
             vendor VARCHAR(255) NOT NULL,
             cost NUMERIC,
+            returned BOOLEAN DEFAULT FALSE,
             domain VARCHAR(255) NOT NULL,
             received_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
         """
     )
+    cur.execute("ALTER TABLE parts_received ADD COLUMN IF NOT EXISTS returned BOOLEAN DEFAULT FALSE")
     cur.execute("CREATE INDEX IF NOT EXISTS idx_parts_received_ro_domain ON parts_received(ro, domain)")
     cur.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_parts_received_unique ON parts_received(ro, line_id, domain)")
 
@@ -2783,6 +2798,7 @@ async def list_parts_ros(request: Request):
         _ensure_saved_estimates_table(cur)
         _ensure_parts_orders_table(cur)
         _ensure_parts_received_table(cur)
+        _ensure_ro_line_assignments_table(cur)
 
         cur.execute(
             """
@@ -2824,26 +2840,51 @@ async def list_parts_ros(request: Request):
         received_rows = cur.fetchall()
         received_map = {row["ro"]: int(row.get("arrived") or 0) for row in received_rows}
 
+                cur.execute(
+                        """
+                        SELECT ro, COUNT(*) as returned
+                        FROM parts_received
+                        WHERE domain = %s
+                            AND COALESCE(returned, FALSE) = TRUE
+                        GROUP BY ro
+                        """,
+                        (domain,),
+                )
+                returned_rows = cur.fetchall() or []
+                returned_map = {row["ro"]: int(row.get("returned") or 0) for row in returned_rows}
+
+        cur.execute(
+            """
+            SELECT ro, repair_type, tech_name
+            FROM ro_line_assignments
+            WHERE domain = %s
+              AND ro IS NOT NULL
+              AND ro <> ''
+              AND tech_name IS NOT NULL
+              AND TRIM(tech_name) <> ''
+            ORDER BY ro, CASE WHEN repair_type = 'body' THEN 0 WHEN repair_type = 'paint' THEN 1 ELSE 2 END
+            """,
+            (domain,),
+        )
+        tech_rows = cur.fetchall() or []
+        tech_by_ro = {}
+        for tech_row in tech_rows:
+            ro_value = tech_row.get("ro")
+            if not ro_value or ro_value in tech_by_ro:
+                continue
+            tech_by_ro[ro_value] = (tech_row.get("tech_name") or "").strip()
+
         order_summary = {}
         for order in orders:
             ro = order["ro"]
             if ro not in order_summary:
                 order_summary[ro] = {
-                    "on_order": 0,
+                    "ordered_ids": set(),
                     "arrival_date": order.get("arrival_date"),
-                    "arrived": 0,
-                    "returned": 0,
                 }
 
-            ordered_lines = order.get("ordered_lines") or []
-            try:
-                ordered_count = len(ordered_lines)
-            except Exception:
-                ordered_count = 0
-
-            order_summary[ro]["on_order"] += ordered_count
-            order_summary[ro]["arrived"] += int(order.get("arrived_count") or 0)
-            order_summary[ro]["returned"] += int(order.get("returned_count") or 0)
+            ordered_ids = _normalize_line_ids(order.get("ordered_lines") or [])
+            order_summary[ro]["ordered_ids"].update(ordered_ids)
 
         ros = []
         for row in rows:
@@ -2868,15 +2909,19 @@ async def list_parts_ros(request: Request):
                     parts_qty += 1
 
             summary = order_summary.get(ro, {})
+            ordered_ids = summary.get("ordered_ids", set())
+            returned_count = returned_map.get(ro, 0)
+            on_order = max(0, len(ordered_ids) - returned_count)
             ros.append(
                 {
                     "ro": ro,
                     "vehicle": row.get("vehicle"),
+                    "tech": tech_by_ro.get(ro, "—"),
                     "parts_qty": float(parts_qty or line_count or 0),
-                    "on_order": summary.get("on_order", 0),
+                    "on_order": on_order,
                     "arrival_date": summary.get("arrival_date"),
                     "arrived": received_map.get(ro, 0),
-                    "returned": summary.get("returned", 0),
+                    "returned": returned_count,
                 }
             )
 
@@ -2895,6 +2940,39 @@ async def list_parts_lines(request: Request, ro: str):
     cur = conn.cursor()
     try:
         _ensure_saved_estimates_table(cur)
+        _ensure_parts_orders_table(cur)
+        _ensure_parts_received_table(cur)
+
+        cur.execute(
+            """
+            SELECT ordered_lines
+            FROM parts_orders
+            WHERE domain = %s AND ro = %s
+            """,
+            (domain, ro),
+        )
+        order_rows = cur.fetchall() or []
+        ordered_ids = set()
+        for order_row in order_rows:
+            ordered_ids.update(_normalize_line_ids(order_row.get("ordered_lines") or []))
+
+        cur.execute(
+            """
+            SELECT line_id
+            FROM parts_received
+            WHERE domain = %s AND ro = %s AND COALESCE(returned, FALSE) = TRUE
+            """,
+            (domain, ro),
+        )
+        returned_rows = cur.fetchall() or []
+        returned_ids = {
+            int(returned_row.get("line_id"))
+            for returned_row in returned_rows
+            if returned_row.get("line_id") is not None
+        }
+
+        blocked_ids = ordered_ids - returned_ids
+
         cur.execute(
             """
             SELECT parts_repairs
@@ -2922,6 +3000,7 @@ async def list_parts_lines(request: Request, ro: str):
                     "part_type": item.get("part_type"),
                     "price": float(item.get("price") or 0),
                     "qty": float(item.get("qty") or 0),
+                    "is_ordered": idx in blocked_ids,
                 }
             )
         return {"lines": lines}
@@ -2940,7 +3019,7 @@ async def save_parts_order(request: Request):
     vendor_id = data.get("vendor_id")
     vendor_name = data.get("vendor_name")
     arrival_date = data.get("arrival_date")
-    ordered_lines = data.get("ordered_lines") or []
+    ordered_lines = _normalize_line_ids(data.get("ordered_lines") or [])
 
     if not ro:
         return JSONResponse(status_code=400, content={"error": "RO is required"})
@@ -2951,6 +3030,46 @@ async def save_parts_order(request: Request):
     cur = conn.cursor()
     try:
         _ensure_parts_orders_table(cur)
+        _ensure_parts_received_table(cur)
+
+        cur.execute(
+            """
+            SELECT ordered_lines
+            FROM parts_orders
+            WHERE domain = %s AND ro = %s
+            """,
+            (domain, ro),
+        )
+        existing_orders = cur.fetchall() or []
+        already_ordered = set()
+        for existing_order in existing_orders:
+            already_ordered.update(_normalize_line_ids(existing_order.get("ordered_lines") or []))
+
+        cur.execute(
+            """
+            SELECT line_id
+            FROM parts_received
+            WHERE domain = %s AND ro = %s AND COALESCE(returned, FALSE) = TRUE
+            """,
+            (domain, ro),
+        )
+        returned_rows = cur.fetchall() or []
+        returned_ids = {
+            int(returned_row.get("line_id"))
+            for returned_row in returned_rows
+            if returned_row.get("line_id") is not None
+        }
+
+        unavailable_ids = already_ordered - returned_ids
+        duplicate_lines = sorted(line_id for line_id in ordered_lines if line_id in unavailable_ids)
+        if duplicate_lines:
+            return JSONResponse(
+                status_code=400,
+                content={
+                    "error": "Some selected lines are already on order and not returned",
+                    "duplicate_lines": duplicate_lines,
+                },
+            )
 
         if vendor_id and not vendor_name:
             _ensure_parts_vendors_table(cur)
@@ -2972,7 +3091,7 @@ async def save_parts_order(request: Request):
                 vendor_id,
                 vendor_name,
                 arrival_date,
-                json.dumps(ordered_lines),
+                json.dumps(sorted(ordered_lines)),
                 domain,
             ),
         )
@@ -2994,7 +3113,7 @@ async def list_parts_received(request: Request, ro: str):
         _ensure_parts_received_table(cur)
         cur.execute(
             """
-            SELECT line_id, vendor, cost, received_at
+            SELECT line_id, vendor, cost, returned, received_at
             FROM parts_received
             WHERE ro = %s AND domain = %s
             ORDER BY received_at DESC
@@ -3007,6 +3126,7 @@ async def list_parts_received(request: Request, ro: str):
                 "line_id": row.get("line_id"),
                 "vendor": row.get("vendor"),
                 "cost": float(row.get("cost") or 0),
+                "returned": bool(row.get("returned")),
                 "received_at": row.get("received_at"),
             }
             for row in rows
@@ -3189,15 +3309,39 @@ async def save_parts_received(request: Request):
             line_id = item.get("line_id")
             vendor = (item.get("vendor") or "").strip()
             cost = item.get("cost")
+            returned = bool(item.get("returned"))
             if not line_id or not vendor:
                 continue
             cur.execute(
                 """
-                INSERT INTO parts_received (ro, line_id, vendor, cost, domain)
-                VALUES (%s, %s, %s, %s, %s)
+                INSERT INTO parts_received (ro, line_id, vendor, cost, returned, domain)
+                VALUES (%s, %s, %s, %s, %s, %s)
                 """,
-                (ro, line_id, vendor, cost, domain),
+                (ro, line_id, vendor, cost, returned, domain),
             )
+
+        cur.execute(
+            """
+            UPDATE parts_orders
+            SET
+                returned_count = (
+                    SELECT COUNT(*)
+                    FROM parts_received pr
+                    WHERE pr.domain = parts_orders.domain
+                      AND pr.ro = parts_orders.ro
+                      AND COALESCE(pr.returned, FALSE) = TRUE
+                ),
+                arrived_count = (
+                    SELECT COUNT(*)
+                    FROM parts_received pr
+                    WHERE pr.domain = parts_orders.domain
+                      AND pr.ro = parts_orders.ro
+                )
+            WHERE parts_orders.domain = %s
+              AND parts_orders.ro = %s
+            """,
+            (domain, ro),
+        )
 
         conn.commit()
         return {"status": "ok"}

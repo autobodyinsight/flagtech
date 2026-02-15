@@ -23,6 +23,7 @@ def get_parts_screen_html():
                         <tr style="background:#f5f5f5; text-align:left;">
                             <th style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold; color:#555;">RO#</th>
                             <th style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold; color:#555;">Vehicle</th>
+                            <th style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold; color:#555;">Tech</th>
                             <th style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold; color:#555;">Parts Qty</th>
                             <th style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold; color:#555;">On Order</th>
                             <th style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold; color:#555;">Arrival Date</th>
@@ -32,7 +33,7 @@ def get_parts_screen_html():
                     </thead>
                     <tbody id="partsRoBody">
                         <tr>
-                            <td colspan="7" style="padding:20px; text-align:center; color:#999;">Loading...</td>
+                            <td colspan="8" style="padding:20px; text-align:center; color:#999;">Loading...</td>
                         </tr>
                     </tbody>
                 </table>
@@ -59,11 +60,19 @@ def get_parts_screen_html():
 
                 <div>
                     <div style="display:flex; font-weight:bold; padding:10px 0; border-bottom:2px solid #ddd;">
-                        <div style="width:40px;"></div>
-                        <div style="width:80px;">Line</div>
+                        <div style="width:40px;"><input type="checkbox" id="partsOrderSelectAll" onchange="partsToggleOrderSelectAll(this.checked)" /></div>
+                        <div style="width:80px;"><button type="button" onclick="partsSortOrderLines('line')" style="background:none; border:none; font-weight:bold; cursor:pointer; padding:0;">Line <span id="partsOrderSortLine"></span></button></div>
                         <div style="flex:2;">Description</div>
-                        <div style="flex:1;">Part Type</div>
-                        <div style="width:120px; text-align:right;">Price</div>
+                        <div style="flex:1; display:flex; align-items:center; gap:8px;">
+                            <button type="button" onclick="partsSortOrderLines('part_type')" style="background:none; border:none; font-weight:bold; cursor:pointer; padding:0;">Part Type <span id="partsOrderSortPartType"></span></button>
+                            <select id="partsOrderTypeQuickSelect" onchange="partsSelectByOrderType(this.value)" style="padding:4px; font-size:12px;">
+                                <option value="">Select Type</option>
+                                <option value="OEM">OEM</option>
+                                <option value="A/M">A/M</option>
+                                <option value="LKQ">LKQ</option>
+                            </select>
+                        </div>
+                        <div style="width:120px; text-align:right;"><button type="button" onclick="partsSortOrderLines('price')" style="background:none; border:none; font-weight:bold; cursor:pointer; padding:0;">Price <span id="partsOrderSortPrice"></span></button></div>
                     </div>
                     <div id="partsOrderLines"></div>
                 </div>
@@ -190,6 +199,9 @@ def get_parts_script():
     return """
         let partsCurrentRo = null;
         let partsCurrentLines = [];
+        let partsOrderSelectedIds = new Set();
+        let partsOrderSortField = 'line';
+        let partsOrderSortDirection = 'asc';
         let partsVendorsCache = [];
 
         function partsAddVendor() {
@@ -576,13 +588,13 @@ def get_parts_script():
             const tbody = document.getElementById('partsRoBody');
             if (!tbody) return;
 
-            tbody.innerHTML = '<tr><td colspan="7" style="padding:20px; text-align:center; color:#999;">Loading...</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="8" style="padding:20px; text-align:center; color:#999;">Loading...</td></tr>';
 
             fetch('/api/parts/ros', { credentials: 'include' })
                 .then(r => r.json())
                 .then(res => {
                     if (!res.ros || res.ros.length === 0) {
-                        tbody.innerHTML = '<tr><td colspan="7" style="padding:20px; text-align:center; color:#999;">No repair orders found</td></tr>';
+                        tbody.innerHTML = '<tr><td colspan="8" style="padding:20px; text-align:center; color:#999;">No repair orders found</td></tr>';
                         return;
                     }
 
@@ -594,6 +606,7 @@ def get_parts_script():
                             <tr style="background:${rowBg};">
                                 <td style="padding:12px; border-bottom:1px solid #eee; color:#333;">${ro.ro}</td>
                                 <td style="padding:12px; border-bottom:1px solid #eee; color:#333;">${ro.vehicle || '—'}</td>
+                                <td style="padding:12px; border-bottom:1px solid #eee; color:#333;">${ro.tech || '—'}</td>
                                 <td style="padding:12px; border-bottom:1px solid #eee; color:#333;">
                                     <button class="link-button" onclick="openPartsOrderModal('${ro.ro}')" style="background:none; border:none; color:#0066cc; text-decoration:underline; cursor:pointer; padding:0;">
                                         ${ro.parts_qty || 0}
@@ -609,7 +622,7 @@ def get_parts_script():
                                 <td style="padding:12px; border-bottom:1px solid #eee; color:#333;">${ro.returned || 0}</td>
                             </tr>
                             <tr id="parts-recv-row-${rowId}" style="display:none; background:${rowBg};">
-                                <td colspan="7" style="padding:12px 16px; border-bottom:1px solid #eee;">
+                                <td colspan="8" style="padding:12px 16px; border-bottom:1px solid #eee;">
                                     <div style="background:#fafafa; border:1px solid #ddd; border-radius:6px; padding:12px;">
                                         <div style="font-weight:bold; margin-bottom:8px;">Received Parts</div>
                                         <div style="display:flex; font-weight:bold; padding:8px 0; border-bottom:1px solid #ddd;">
@@ -617,6 +630,7 @@ def get_parts_script():
                                             <div style="width:80px;">Line</div>
                                             <div style="flex:2;">Description</div>
                                             <div style="flex:1;">Vendor</div>
+                                            <div style="width:100px; text-align:center;">Returned</div>
                                             <div style="width:120px; text-align:right;">Cost</div>
                                         </div>
                                         <div id="parts-recv-body-${rowId}"></div>
@@ -631,7 +645,7 @@ def get_parts_script():
                 })
                 .catch(err => {
                     console.error('Error loading parts ROs:', err);
-                    tbody.innerHTML = '<tr><td colspan="7" style="padding:20px; text-align:center; color:red;">Error loading repair orders.</td></tr>';
+                    tbody.innerHTML = '<tr><td colspan="8" style="padding:20px; text-align:center; color:red;">Error loading repair orders.</td></tr>';
                 });
         }
 
@@ -675,6 +689,7 @@ def get_parts_script():
                 body.innerHTML = lines.map(line => {
                     const existing = receivedMap[line.id] || {};
                     const checked = existing.line_id ? 'checked' : '';
+                    const returnedChecked = existing.returned ? 'checked' : '';
                     const vendorVal = existing.vendor ? existing.vendor.replace(/"/g, '&quot;') : '';
                     const costVal = existing.cost ? Number(existing.cost).toFixed(2) : '';
                     return `
@@ -683,6 +698,7 @@ def get_parts_script():
                             <div style="width:80px;">${line.line || '—'}</div>
                             <div style="flex:2;">${line.description || ''}</div>
                             <div style="flex:1;"><input type="text" class="parts-recv-vendor" data-id="${line.id}" value="${vendorVal}" style="width:100%; padding:6px;" placeholder="Vendor" /></div>
+                            <div style="width:100px; text-align:center;"><input type="checkbox" class="parts-recv-returned" data-id="${line.id}" ${returnedChecked} /></div>
                             <div style="width:120px; text-align:right;"><input type="number" step="0.01" class="parts-recv-cost" data-id="${line.id}" value="${costVal}" style="width:100px; padding:6px;" placeholder="0.00" /></div>
                         </div>
                     `;
@@ -703,8 +719,10 @@ def get_parts_script():
                 if (!check.checked) return;
                 const lineId = parseInt(check.dataset.id, 10);
                 const vendorInput = document.querySelector(`#parts-recv-body-${rowId} .parts-recv-vendor[data-id="${lineId}"]`);
+                const returnedInput = document.querySelector(`#parts-recv-body-${rowId} .parts-recv-returned[data-id="${lineId}"]`);
                 const costInput = document.querySelector(`#parts-recv-body-${rowId} .parts-recv-cost[data-id="${lineId}"]`);
                 const vendor = (vendorInput?.value || '').trim();
+                const returned = Boolean(returnedInput?.checked);
                 const costVal = costInput?.value ? parseFloat(costInput.value) : null;
                 if (!vendor) {
                     return;
@@ -712,6 +730,7 @@ def get_parts_script():
                 items.push({
                     line_id: lineId,
                     vendor,
+                    returned,
                     cost: Number.isFinite(costVal) ? costVal : null
                 });
             });
@@ -741,10 +760,171 @@ def get_parts_script():
             });
         }
 
+        function partsNormalizeOrderType(value) {
+            const text = String(value || '').trim().toUpperCase();
+            if (!text) return '';
+            if (text === 'OEM' || text.includes('OEM')) return 'OEM';
+            if (text === 'A/M' || text === 'AM' || text.includes('AFTERMARKET') || text.includes('A/M')) return 'A/M';
+            if (text === 'LKQ' || text.includes('LKQ') || text.includes('RECYCLED') || text.includes('USED')) return 'LKQ';
+            return text;
+        }
+
+        function partsSetOrderLineChecked(lineId, checked) {
+            const idNum = Number(lineId);
+            if (!Number.isFinite(idNum)) return;
+            if (checked) {
+                partsOrderSelectedIds.add(idNum);
+            } else {
+                partsOrderSelectedIds.delete(idNum);
+            }
+            partsRefreshOrderSelectAllState();
+        }
+
+        function partsToggleOrderSelectAll(checked) {
+            (partsCurrentLines || []).forEach(line => {
+                const lineId = Number(line.id);
+                if (!Number.isFinite(lineId)) return;
+                if (line.is_ordered) return;
+                if (checked) {
+                    partsOrderSelectedIds.add(lineId);
+                } else {
+                    partsOrderSelectedIds.delete(lineId);
+                }
+            });
+            partsRenderOrderLines();
+        }
+
+        function partsSelectByOrderType(typeValue) {
+            const normalizedTarget = partsNormalizeOrderType(typeValue);
+            if (!normalizedTarget) return;
+
+            (partsCurrentLines || []).forEach(line => {
+                const lineId = Number(line.id);
+                if (!Number.isFinite(lineId)) return;
+                if (line.is_ordered) return;
+                if (partsNormalizeOrderType(line.part_type) === normalizedTarget) {
+                    partsOrderSelectedIds.add(lineId);
+                }
+            });
+            partsRenderOrderLines();
+        }
+
+        function partsSortOrderLines(field) {
+            if (partsOrderSortField === field) {
+                partsOrderSortDirection = partsOrderSortDirection === 'asc' ? 'desc' : 'asc';
+            } else {
+                partsOrderSortField = field;
+                partsOrderSortDirection = 'asc';
+            }
+            partsRenderOrderLines();
+        }
+
+        function partsUpdateOrderSortIndicators() {
+            const indicators = {
+                line: document.getElementById('partsOrderSortLine'),
+                part_type: document.getElementById('partsOrderSortPartType'),
+                price: document.getElementById('partsOrderSortPrice')
+            };
+
+            Object.entries(indicators).forEach(([field, el]) => {
+                if (!el) return;
+                if (partsOrderSortField === field) {
+                    el.textContent = partsOrderSortDirection === 'asc' ? '↑' : '↓';
+                } else {
+                    el.textContent = '';
+                }
+            });
+        }
+
+        function partsRefreshOrderSelectAllState() {
+            const selectAll = document.getElementById('partsOrderSelectAll');
+            if (!selectAll) return;
+
+            const eligibleLines = (partsCurrentLines || []).filter(line => !line.is_ordered);
+            const total = eligibleLines.length;
+            const selected = eligibleLines.filter(line => partsOrderSelectedIds.has(Number(line.id))).length;
+
+            selectAll.checked = total > 0 && selected === total;
+            selectAll.indeterminate = selected > 0 && selected < total;
+        }
+
+        function partsRenderOrderLines() {
+            const linesContainer = document.getElementById('partsOrderLines');
+            if (!linesContainer) return;
+
+            if (!partsCurrentLines || partsCurrentLines.length === 0) {
+                linesContainer.innerHTML = '<div style="padding:12px; color:#777;">No parts found.</div>';
+                partsRefreshOrderSelectAllState();
+                partsUpdateOrderSortIndicators();
+                return;
+            }
+
+            const sorted = [...partsCurrentLines].sort((a, b) => {
+                const direction = partsOrderSortDirection === 'asc' ? 1 : -1;
+
+                if (partsOrderSortField === 'price') {
+                    const aVal = Number(a.price || 0);
+                    const bVal = Number(b.price || 0);
+                    return (aVal - bVal) * direction;
+                }
+
+                if (partsOrderSortField === 'part_type') {
+                    const aVal = partsNormalizeOrderType(a.part_type);
+                    const bVal = partsNormalizeOrderType(b.part_type);
+                    return aVal.localeCompare(bVal) * direction;
+                }
+
+                const aNum = Number(a.line);
+                const bNum = Number(b.line);
+                if (Number.isFinite(aNum) && Number.isFinite(bNum)) {
+                    return (aNum - bNum) * direction;
+                }
+
+                const aText = String(a.line || '');
+                const bText = String(b.line || '');
+                return aText.localeCompare(bText, undefined, { numeric: true, sensitivity: 'base' }) * direction;
+            });
+
+            linesContainer.innerHTML = sorted.map(line => {
+                const lineId = Number(line.id);
+                const isChecked = partsOrderSelectedIds.has(lineId) ? 'checked' : '';
+                const price = line.price ? `$${Number(line.price).toFixed(2)}` : '—';
+                const isBlocked = Boolean(line.is_ordered);
+                const disabledAttr = isBlocked ? 'disabled' : '';
+                const rowOpacity = isBlocked ? '0.6' : '1';
+                const blockedLabel = isBlocked ? '<div style="color:#a33; font-size:11px;">Already on order (return first)</div>' : '';
+                return `
+                    <div style="display:flex; align-items:center; padding:10px 0; border-bottom:1px solid #eee; opacity:${rowOpacity};">
+                        <div style="width:40px;"><input type="checkbox" class="parts-order-check" data-id="${lineId}" ${isChecked} ${disabledAttr} onchange="partsSetOrderLineChecked(${lineId}, this.checked)" /></div>
+                        <div style="width:80px;">${line.line || '—'}</div>
+                        <div style="flex:2;">${line.description || ''}${blockedLabel}</div>
+                        <div style="flex:1;">${line.part_type || '—'}</div>
+                        <div style="width:120px; text-align:right;">${price}</div>
+                    </div>
+                `;
+            }).join('');
+
+            partsRefreshOrderSelectAllState();
+            partsUpdateOrderSortIndicators();
+        }
+
         function openPartsOrderModal(ro) {
             partsCurrentRo = ro;
             const modal = document.getElementById('partsOrderModal');
             const linesContainer = document.getElementById('partsOrderLines');
+            const selectAll = document.getElementById('partsOrderSelectAll');
+            const typeSelect = document.getElementById('partsOrderTypeQuickSelect');
+
+            partsOrderSelectedIds = new Set();
+            partsOrderSortField = 'line';
+            partsOrderSortDirection = 'asc';
+            if (selectAll) {
+                selectAll.checked = false;
+                selectAll.indeterminate = false;
+            }
+            if (typeSelect) {
+                typeSelect.value = '';
+            }
 
             linesContainer.innerHTML = '<div style="padding:12px; color:#777;">Loading...</div>';
             partsLoadVendorOptions();
@@ -753,23 +933,7 @@ def get_parts_script():
                 .then(r => r.json())
                 .then(res => {
                     partsCurrentLines = res.lines || [];
-                    if (partsCurrentLines.length === 0) {
-                        linesContainer.innerHTML = '<div style="padding:12px; color:#777;">No parts found.</div>';
-                        return;
-                    }
-
-                    linesContainer.innerHTML = partsCurrentLines.map(line => {
-                        const price = line.price ? `$${Number(line.price).toFixed(2)}` : '—';
-                        return `
-                            <div style="display:flex; align-items:center; padding:10px 0; border-bottom:1px solid #eee;">
-                                <div style="width:40px;"><input type="checkbox" class="parts-order-check" data-id="${line.id}" /></div>
-                                <div style="width:80px;">${line.line || '—'}</div>
-                                <div style="flex:2;">${line.description || ''}</div>
-                                <div style="flex:1;">${line.part_type || '—'}</div>
-                                <div style="width:120px; text-align:right;">${price}</div>
-                            </div>
-                        `;
-                    }).join('');
+                    partsRenderOrderLines();
                 })
                 .catch(err => {
                     console.error('Error loading parts lines:', err);
@@ -795,8 +959,8 @@ def get_parts_script():
             const vendorName = vendorSelect.options[vendorSelect.selectedIndex]?.dataset?.name || '';
             const arrivalDate = document.getElementById('partsOrderArrival').value;
 
-            const checked = Array.from(document.querySelectorAll('.parts-order-check:checked'))
-                .map(el => parseInt(el.dataset.id, 10))
+            const checked = Array.from(partsOrderSelectedIds)
+                .map(id => parseInt(id, 10))
                 .filter(id => !Number.isNaN(id));
 
             if (!vendorId) {
@@ -829,6 +993,21 @@ def get_parts_script():
             .then(r => r.json())
             .then(res => {
                 if (res.error) {
+                    if (Array.isArray(res.duplicate_lines) && res.duplicate_lines.length > 0) {
+                        fetch(`/api/parts/ro-lines?ro=${encodeURIComponent(partsCurrentRo)}`, { credentials: 'include' })
+                            .then(resp => resp.json())
+                            .then(fresh => {
+                                partsCurrentLines = fresh.lines || [];
+                                partsOrderSelectedIds = new Set(
+                                    Array.from(partsOrderSelectedIds).filter(id => {
+                                        const line = (partsCurrentLines || []).find(l => Number(l.id) === Number(id));
+                                        return line && !line.is_ordered;
+                                    })
+                                );
+                                partsRenderOrderLines();
+                            })
+                            .catch(() => {});
+                    }
                     throw new Error(res.error);
                 }
                 closePartsOrderModal();
