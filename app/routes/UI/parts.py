@@ -133,6 +133,37 @@ def get_parts_screen_html():
             </div>
         </div>
 
+        <div id="partsArrivedModal" class="modal" style="display:none;">
+            <div class="modal-content" style="max-width:1100px; max-height:90vh; overflow-y:auto;">
+                <span class="close" onclick="closePartsArrivedModal()">&times;</span>
+                <h2 style="margin-bottom:14px;">ARRIVED</h2>
+
+                <div style="display:flex; gap:10px; margin-bottom:12px;">
+                    <button onclick="partsReturnArrivedLines()" style="padding:10px 16px; background-color:#b22222; color:white; border:none; border-radius:4px; cursor:pointer; font-size:14px;">Return</button>
+                </div>
+
+                <div style="overflow-x:auto;">
+                    <table style="width:100%; border-collapse:collapse;">
+                        <thead>
+                            <tr style="background:#f5f5f5; text-align:left;">
+                                <th style="padding:10px; border-bottom:2px solid #ddd; width:40px;"></th>
+                                <th style="padding:10px; border-bottom:2px solid #ddd; width:80px;">Line</th>
+                                <th style="padding:10px; border-bottom:2px solid #ddd;">Description</th>
+                                <th style="padding:10px; border-bottom:2px solid #ddd; width:170px;">Part #</th>
+                                <th style="padding:10px; border-bottom:2px solid #ddd; width:110px; text-align:right;">List</th>
+                                <th style="padding:10px; border-bottom:2px solid #ddd; width:180px;">Vendor</th>
+                                <th style="padding:10px; border-bottom:2px solid #ddd; width:120px;">ETA</th>
+                                <th style="padding:10px; border-bottom:2px solid #ddd; width:110px; text-align:right;">Cost</th>
+                            </tr>
+                        </thead>
+                        <tbody id="partsArrivedBody">
+                            <tr><td colspan="8" style="padding:12px; text-align:center; color:#777;">Loading...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
         <div id="partsAddVendorModal" class="modal" style="display:none;">
             <div class="modal-content" style="max-width:720px; max-height:90vh; overflow-y:auto;">
                 <span class="close" onclick="closePartsAddVendorModal()">&times;</span>
@@ -256,6 +287,8 @@ def get_parts_script():
         let partsOnOrderRo = null;
         let partsOnOrderLines = [];
         let partsOnOrderReceiveMode = false;
+        let partsArrivedRo = null;
+        let partsArrivedItems = [];
 
         function partsAddVendor() {
             const name = document.getElementById('partsVendorName').value.trim();
@@ -693,7 +726,11 @@ def get_parts_script():
                                         ${ro.on_order || 0}
                                     </button>
                                 </td>
-                                <td style="padding:12px; border-bottom:1px solid #eee; color:#333;">${ro.arrived || 0}</td>
+                                <td style="padding:12px; border-bottom:1px solid #eee; color:#333;">
+                                    <button class="link-button" onclick="openPartsArrivedModal('${ro.ro}')" style="background:none; border:none; color:#0066cc; text-decoration:underline; cursor:pointer; padding:0;">
+                                        ${ro.arrived || 0}
+                                    </button>
+                                </td>
                                 <td style="padding:12px; border-bottom:1px solid #eee; color:#333;">${ro.returned || 0}</td>
                             </tr>
                         `;
@@ -738,6 +775,103 @@ def get_parts_script():
             const modal = document.getElementById('partsOnOrderModal');
             if (modal) modal.style.display = 'none';
             partsOnOrderReceiveMode = false;
+        }
+
+        function openPartsArrivedModal(ro) {
+            partsArrivedRo = ro;
+            const modal = document.getElementById('partsArrivedModal');
+            if (!modal) return;
+            modal.style.display = 'block';
+            partsLoadArrivedLines();
+        }
+
+        function closePartsArrivedModal() {
+            const modal = document.getElementById('partsArrivedModal');
+            if (modal) modal.style.display = 'none';
+            partsArrivedRo = null;
+            partsArrivedItems = [];
+        }
+
+        function partsLoadArrivedLines() {
+            const body = document.getElementById('partsArrivedBody');
+            if (!body || !partsArrivedRo) return;
+
+            body.innerHTML = '<tr><td colspan="8" style="padding:12px; text-align:center; color:#777;">Loading...</td></tr>';
+            fetch(`/api/parts/arrived-lines?ro=${encodeURIComponent(partsArrivedRo)}`, { credentials: 'include' })
+                .then(r => r.json())
+                .then(res => {
+                    partsArrivedItems = res.items || [];
+                    partsRenderArrivedLines();
+                })
+                .catch(err => {
+                    console.error('Error loading arrived parts:', err);
+                    body.innerHTML = '<tr><td colspan="8" style="padding:12px; text-align:center; color:red;">Error loading arrived parts.</td></tr>';
+                });
+        }
+
+        function partsRenderArrivedLines() {
+            const body = document.getElementById('partsArrivedBody');
+            if (!body) return;
+
+            if (!partsArrivedItems || partsArrivedItems.length === 0) {
+                body.innerHTML = '<tr><td colspan="8" style="padding:12px; text-align:center; color:#777;">No arrived parts for this RO.</td></tr>';
+                return;
+            }
+
+            body.innerHTML = partsArrivedItems.map((item, idx) => {
+                const rowBg = idx % 2 === 0 ? '#fff' : '#f9f9f9';
+                const etaDisplay = item.eta ? partsFormatDisplayDate(item.eta) : '—';
+                return `
+                    <tr style="background:${rowBg};">
+                        <td style="padding:10px; border-bottom:1px solid #eee;"><input type="checkbox" class="parts-arrived-check" data-line-id="${item.line_id}" /></td>
+                        <td style="padding:10px; border-bottom:1px solid #eee;">${partsEscapeHtml(item.line || '—')}</td>
+                        <td style="padding:10px; border-bottom:1px solid #eee;">${partsEscapeHtml(item.description || '')}</td>
+                        <td style="padding:10px; border-bottom:1px solid #eee;">${partsEscapeHtml(item.part_number || '—')}</td>
+                        <td style="padding:10px; border-bottom:1px solid #eee; text-align:right;">${partsFormatCurrency(item.list || 0)}</td>
+                        <td style="padding:10px; border-bottom:1px solid #eee;">${partsEscapeHtml(item.vendor || '—')}</td>
+                        <td style="padding:10px; border-bottom:1px solid #eee;">${partsEscapeHtml(etaDisplay)}</td>
+                        <td style="padding:10px; border-bottom:1px solid #eee; text-align:right;">${partsFormatCurrency(item.cost || 0)}</td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        function partsReturnArrivedLines() {
+            if (!partsArrivedRo) {
+                return;
+            }
+
+            const checked = Array.from(document.querySelectorAll('#partsArrivedBody .parts-arrived-check:checked'));
+            const lineIds = checked
+                .map(el => parseInt(el.dataset.lineId, 10))
+                .filter(id => !Number.isNaN(id));
+
+            if (lineIds.length === 0) {
+                alert('Select at least one arrived part to return.');
+                return;
+            }
+
+            fetch('/api/parts/arrived-return', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
+                body: JSON.stringify({
+                    ro: partsArrivedRo,
+                    line_ids: lineIds,
+                })
+            })
+            .then(r => r.json())
+            .then(res => {
+                if (res.error) {
+                    throw new Error(res.error);
+                }
+                partsLoadRos();
+                partsLoadArrivedLines();
+            })
+            .catch(err => {
+                console.error('Error returning arrived parts:', err);
+                alert(err.message || 'Error returning selected parts.');
+            });
         }
 
         function partsEnterReceiveMode() {

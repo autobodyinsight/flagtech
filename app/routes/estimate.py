@@ -3248,6 +3248,151 @@ async def list_parts_received(request: Request, ro: str):
         cur.close()
 
 
+@router.get("/parts/arrived-lines")
+async def list_arrived_lines(request: Request, ro: str):
+    domain = get_user_domain(request)
+    if not domain:
+        return JSONResponse(status_code=401, content={"error": "Not authenticated", "items": []})
+
+    ro_value = (ro or "").strip()
+    if not ro_value:
+        return JSONResponse(status_code=400, content={"error": "RO is required", "items": []})
+
+    conn = get_conn()
+    cur = conn.cursor()
+    try:
+        _ensure_parts_received_table(cur)
+        _ensure_saved_estimates_table(cur)
+
+        cur.execute(
+            """
+            SELECT parts_repairs
+            FROM saved_estimates
+            WHERE domain = %s AND ro = %s
+            ORDER BY saved_at DESC, id DESC
+            LIMIT 1
+            """,
+            (domain, ro_value),
+        )
+        estimate_row = cur.fetchone()
+        parts_repairs = _parse_json_field(estimate_row.get("parts_repairs")) if estimate_row else []
+        if not isinstance(parts_repairs, list):
+            parts_repairs = []
+
+        metadata_by_line = {}
+        for idx, item in enumerate(parts_repairs, start=1):
+            if not isinstance(item, dict):
+                continue
+            parsed_description, parsed_part_number = _parse_part_description_and_number(item)
+            metadata_by_line[idx] = {
+                "line": item.get("line") or idx,
+                "description": parsed_description,
+                "part_number": parsed_part_number,
+                "list": float(item.get("price") or 0),
+            }
+
+        cur.execute(
+            """
+            SELECT line_id, vendor, part_number, list_price, eta, cost, invoice_number, received_at
+            FROM parts_received
+            WHERE domain = %s
+              AND ro = %s
+              AND COALESCE(returned, FALSE) = FALSE
+            ORDER BY received_at DESC, line_id
+            """,
+            (domain, ro_value),
+        )
+        rows = cur.fetchall() or []
+
+        items = []
+        for row in rows:
+            line_id = int(row.get("line_id") or 0)
+            metadata = metadata_by_line.get(line_id, {})
+            items.append(
+                {
+                    "line_id": line_id,
+                    "line": metadata.get("line") or line_id,
+                    "description": metadata.get("description") or "",
+                    "part_number": row.get("part_number") or metadata.get("part_number") or "",
+                    "list": float(row.get("list_price") or metadata.get("list") or 0),
+                    "vendor": row.get("vendor") or "",
+                    "eta": row.get("eta").isoformat() if row.get("eta") else None,
+                    "cost": float(row.get("cost") or 0),
+                    "invoice_number": row.get("invoice_number") or "",
+                    "received_at": row.get("received_at").isoformat() if row.get("received_at") else None,
+                }
+            )
+
+        return {"items": items}
+    finally:
+        cur.close()
+
+
+@router.post("/parts/arrived-return")
+async def return_arrived_lines(request: Request):
+    domain = get_user_domain(request)
+    if not domain:
+        return JSONResponse(status_code=401, content={"error": "Not authenticated"})
+
+    data = await request.json()
+    ro_value = (data.get("ro") or "").strip()
+    line_ids = _normalize_line_ids(data.get("line_ids") or [])
+
+    if not ro_value:
+        return JSONResponse(status_code=400, content={"error": "RO is required"})
+    if not line_ids:
+        return JSONResponse(status_code=400, content={"error": "Select at least one line"})
+
+    conn = get_conn()
+    cur = conn.cursor()
+    try:
+        _ensure_parts_received_table(cur)
+        _ensure_parts_orders_table(cur)
+
+        updated_count = 0
+        for line_id in line_ids:
+            cur.execute(
+                """
+                UPDATE parts_received
+                SET returned = TRUE
+                WHERE domain = %s
+                  AND ro = %s
+                  AND line_id = %s
+                  AND COALESCE(returned, FALSE) = FALSE
+                """,
+                (domain, ro_value, line_id),
+            )
+            updated_count += int(cur.rowcount or 0)
+
+        cur.execute(
+            """
+            UPDATE parts_orders
+            SET
+                returned_count = (
+                    SELECT COUNT(*)
+                    FROM parts_received pr
+                    WHERE pr.domain = parts_orders.domain
+                      AND pr.ro = parts_orders.ro
+                      AND COALESCE(pr.returned, FALSE) = TRUE
+                ),
+                arrived_count = (
+                    SELECT COUNT(*)
+                    FROM parts_received pr
+                    WHERE pr.domain = parts_orders.domain
+                      AND pr.ro = parts_orders.ro
+                )
+            WHERE parts_orders.domain = %s
+              AND parts_orders.ro = %s
+            """,
+            (domain, ro_value),
+        )
+
+        conn.commit()
+        return {"status": "ok", "returned_count": updated_count}
+    finally:
+        cur.close()
+
+
 @router.get("/parts/on-order-lines")
 async def list_on_order_lines(request: Request, ro: str):
     domain = get_user_domain(request)
