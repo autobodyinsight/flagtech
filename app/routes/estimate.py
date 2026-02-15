@@ -1,6 +1,7 @@
 from fastapi import APIRouter, UploadFile, File, Request
 import json
 import math
+import re
 from datetime import date, datetime, timedelta
 from app.services.extractor import load_pdf
 from app.services.parser import parse_estimate_pdf
@@ -23,6 +24,42 @@ def _normalize_line_ids(values) -> set[int]:
             continue
         ids.add(parsed)
     return ids
+
+
+_TRAILING_PART_NUMBER_RE = re.compile(r"\b([A-Z0-9-]{6,})\s*$", re.IGNORECASE)
+
+
+def _parse_part_description_and_number(item: dict) -> tuple[str, str]:
+    description = str(item.get("description") or "").strip()
+    explicit_part_number = (
+        item.get("part_number")
+        or item.get("part_no")
+        or item.get("part#")
+        or item.get("pn")
+        or ""
+    )
+    part_number = str(explicit_part_number or "").strip()
+
+    if not part_number:
+        trailing_match = _TRAILING_PART_NUMBER_RE.search(description)
+        if trailing_match:
+            candidate = (trailing_match.group(1) or "").strip()
+            has_alpha = any(ch.isalpha() for ch in candidate)
+            has_digit = any(ch.isdigit() for ch in candidate)
+            if has_alpha and has_digit:
+                part_number = candidate
+                description = description[:trailing_match.start()].strip()
+
+    for pattern in [
+        r"\bQTY\s*[:#-]?\s*\d+(?:\.\d+)?\b",
+        r"\b\d+(?:\.\d+)?\s*(?:HRS?|HR)\b",
+        r"\b(?:LABOR|LIST|PRICE|LP)\s*[:$-]?\s*\d+(?:\.\d+)?\b",
+        r"\$\s*\d+(?:\.\d+)?",
+    ]:
+        description = re.sub(pattern, "", description, flags=re.IGNORECASE)
+
+    description = re.sub(r"\s{2,}", " ", description).strip(" -|,;:")
+    return description, part_number
 
 
 def _ensure_parts_vendors_table(cur) -> None:
@@ -3232,16 +3269,10 @@ async def list_on_order_lines(request: Request, ro: str):
         for idx, item in enumerate(parts_repairs, start=1):
             if not isinstance(item, dict):
                 continue
-            part_number = (
-                item.get("part_number")
-                or item.get("part_no")
-                or item.get("part#")
-                or item.get("pn")
-                or ""
-            )
+            parsed_description, part_number = _parse_part_description_and_number(item)
             line_metadata[idx] = {
                 "line": item.get("line") or idx,
-                "description": item.get("description") or "",
+                "description": parsed_description,
                 "part_number": str(part_number or ""),
                 "list": float(item.get("price") or 0),
             }
@@ -3296,12 +3327,15 @@ async def receive_on_order_lines(request: Request):
 
     data = await request.json()
     ro_value = (data.get("ro") or "").strip()
+    vendor_name_input = (data.get("vendor") or "").strip()
     invoice_number = (data.get("invoice_number") or "").strip()
     invoice_total_amount = data.get("invoice_total_amount")
     items = data.get("items") or []
 
     if not ro_value:
         return JSONResponse(status_code=400, content={"error": "RO is required"})
+    if not vendor_name_input:
+        return JSONResponse(status_code=400, content={"error": "Vendor is required"})
     if not invoice_number:
         return JSONResponse(status_code=400, content={"error": "Invoice number is required"})
     if not isinstance(items, list) or len(items) == 0:
@@ -3322,7 +3356,7 @@ async def receive_on_order_lines(request: Request):
         except (TypeError, ValueError):
             return JSONResponse(status_code=400, content={"error": "Invalid selected item data"})
 
-        vendor = (item.get("vendor") or "").strip()
+        vendor = vendor_name_input or (item.get("vendor") or "").strip()
         if not vendor:
             return JSONResponse(status_code=400, content={"error": "Vendor is required for selected lines"})
 

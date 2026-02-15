@@ -89,12 +89,16 @@ def get_parts_screen_html():
                 <h2 style="margin-bottom:14px;">ON ORDER</h2>
 
                 <div style="display:flex; gap:10px; margin-bottom:12px;">
-                    <button onclick="partsEnterReceiveMode()" style="padding:10px 16px; background-color:#b22222; color:white; border:none; border-radius:4px; cursor:pointer; font-size:14px;">Receive</button>
-                    <button onclick="partsSaveOnOrderReceive()" style="padding:10px 16px; background-color:#b22222; color:white; border:none; border-radius:4px; cursor:pointer; font-size:14px;">Save</button>
+                    <button id="partsOnOrderReceiveBtn" onclick="partsEnterReceiveMode()" style="padding:10px 16px; background-color:#b22222; color:white; border:none; border-radius:4px; cursor:pointer; font-size:14px;">Receive</button>
+                    <button id="partsOnOrderSaveBtn" onclick="partsSaveOnOrderReceive()" style="display:none; padding:10px 16px; background-color:#b22222; color:white; border:none; border-radius:4px; cursor:pointer; font-size:14px;">Save</button>
                 </div>
 
                 <div id="partsOnOrderInvoiceWrap" style="display:none; margin-bottom:14px;">
-                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; max-width:520px;">
+                    <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px; max-width:820px;">
+                        <div>
+                            <label>Vendor:</label>
+                            <input type="text" id="partsOnOrderVendorInput" style="width:100%; padding:8px; box-sizing:border-box;" />
+                        </div>
                         <div>
                             <label>Invoice Number:</label>
                             <input type="text" id="partsOnOrderInvoiceNumber" style="width:100%; padding:8px; box-sizing:border-box;" />
@@ -683,6 +687,18 @@ def get_parts_script():
             const modal = document.getElementById('partsOnOrderModal');
             if (!modal) return;
             modal.style.display = 'block';
+
+            const receiveBtn = document.getElementById('partsOnOrderReceiveBtn');
+            const saveBtn = document.getElementById('partsOnOrderSaveBtn');
+            const vendorInput = document.getElementById('partsOnOrderVendorInput');
+            const invoiceNumberInput = document.getElementById('partsOnOrderInvoiceNumber');
+            const invoiceTotalInput = document.getElementById('partsOnOrderInvoiceTotal');
+            if (receiveBtn) receiveBtn.textContent = 'Receive';
+            if (saveBtn) saveBtn.style.display = 'none';
+            if (vendorInput) vendorInput.value = '';
+            if (invoiceNumberInput) invoiceNumberInput.value = '';
+            if (invoiceTotalInput) invoiceTotalInput.value = '';
+
             partsLoadOnOrderLines();
         }
 
@@ -694,7 +710,22 @@ def get_parts_script():
 
         function partsEnterReceiveMode() {
             if (!partsOnOrderRo) return;
-            partsOnOrderReceiveMode = true;
+            partsOnOrderReceiveMode = !partsOnOrderReceiveMode;
+
+            const receiveBtn = document.getElementById('partsOnOrderReceiveBtn');
+            const saveBtn = document.getElementById('partsOnOrderSaveBtn');
+            if (receiveBtn) receiveBtn.textContent = partsOnOrderReceiveMode ? 'Receive (On)' : 'Receive';
+            if (saveBtn) saveBtn.style.display = partsOnOrderReceiveMode ? 'inline-block' : 'none';
+
+            if (!partsOnOrderReceiveMode) {
+                const vendorInput = document.getElementById('partsOnOrderVendorInput');
+                const invoiceNumberInput = document.getElementById('partsOnOrderInvoiceNumber');
+                const invoiceTotalInput = document.getElementById('partsOnOrderInvoiceTotal');
+                if (vendorInput) vendorInput.value = '';
+                if (invoiceNumberInput) invoiceNumberInput.value = '';
+                if (invoiceTotalInput) invoiceTotalInput.value = '';
+            }
+
             partsRenderOnOrderLines();
         }
 
@@ -720,11 +751,13 @@ def get_parts_script():
             const checkHeader = document.getElementById('partsOnOrderCheckHeader');
             const costHeader = document.getElementById('partsOnOrderCostHeader');
             const invoiceWrap = document.getElementById('partsOnOrderInvoiceWrap');
+            const saveBtn = document.getElementById('partsOnOrderSaveBtn');
             if (!body || !checkHeader || !costHeader || !invoiceWrap) return;
 
             checkHeader.style.display = partsOnOrderReceiveMode ? 'table-cell' : 'none';
             costHeader.style.display = partsOnOrderReceiveMode ? 'table-cell' : 'none';
             invoiceWrap.style.display = partsOnOrderReceiveMode ? 'block' : 'none';
+            if (saveBtn) saveBtn.style.display = partsOnOrderReceiveMode ? 'inline-block' : 'none';
 
             if (!partsOnOrderLines || partsOnOrderLines.length === 0) {
                 body.innerHTML = '<tr><td colspan="8" style="padding:12px; text-align:center; color:#777;">No parts currently on order.</td></tr>';
@@ -751,13 +784,9 @@ def get_parts_script():
                     ? `<input type="number" step="0.01" class="parts-onorder-list" data-line-id="${lineId}" value="${listValue}" style="width:100%; padding:6px; text-align:right;" />`
                     : `$${listValue}`;
 
-                const vendorCell = partsOnOrderReceiveMode
-                    ? `<input type="text" class="parts-onorder-vendor" data-line-id="${lineId}" value="${vendorValue}" style="width:100%; padding:6px;" />`
-                    : (vendorValue || '—');
+                const vendorCell = vendorValue || '—';
 
-                const etaCell = partsOnOrderReceiveMode
-                    ? `<input type="date" class="parts-onorder-eta" data-line-id="${lineId}" value="${partsEscapeHtml(etaValue || '')}" style="width:100%; padding:6px;" />`
-                    : displayEta;
+                const etaCell = displayEta;
 
                 const costCell = partsOnOrderReceiveMode
                     ? `<td style="padding:10px; border-bottom:1px solid #eee; text-align:right;"><input type="number" step="0.01" min="0" class="parts-onorder-cost" data-line-id="${lineId}" value="" style="width:100px; padding:6px; text-align:right;" /></td>`
@@ -784,9 +813,15 @@ def get_parts_script():
                 return;
             }
 
+            const vendorName = (document.getElementById('partsOnOrderVendorInput')?.value || '').trim();
             const invoiceNumber = (document.getElementById('partsOnOrderInvoiceNumber')?.value || '').trim();
             const invoiceTotalText = (document.getElementById('partsOnOrderInvoiceTotal')?.value || '').trim();
             const invoiceTotal = parseFloat(invoiceTotalText || '0');
+
+            if (!vendorName) {
+                alert('Vendor is required.');
+                return;
+            }
 
             if (!invoiceNumber) {
                 alert('Invoice Number is required.');
@@ -811,16 +846,10 @@ def get_parts_script():
                 const orderId = Number(check.dataset.orderId);
                 const partNumberInput = document.querySelector(`.parts-onorder-partnum[data-line-id="${lineId}"]`);
                 const listInput = document.querySelector(`.parts-onorder-list[data-line-id="${lineId}"]`);
-                const vendorInput = document.querySelector(`.parts-onorder-vendor[data-line-id="${lineId}"]`);
-                const etaInput = document.querySelector(`.parts-onorder-eta[data-line-id="${lineId}"]`);
                 const costInput = document.querySelector(`.parts-onorder-cost[data-line-id="${lineId}"]`);
+                const lineMeta = (partsOnOrderLines || []).find(item => Number(item.line_id) === lineId && Number(item.order_id) === orderId) || {};
 
-                const vendor = (vendorInput?.value || '').trim();
                 const cost = parseFloat((costInput?.value || '').trim());
-                if (!vendor) {
-                    alert('Vendor is required for selected parts.');
-                    return;
-                }
                 if (!Number.isFinite(cost) || cost < 0) {
                     alert('Enter a valid cost for selected parts.');
                     return;
@@ -832,8 +861,8 @@ def get_parts_script():
                     line_id: lineId,
                     part_number: (partNumberInput?.value || '').trim(),
                     list: parseFloat((listInput?.value || '').trim() || '0'),
-                    vendor,
-                    eta: (etaInput?.value || '').trim(),
+                    vendor: vendorName,
+                    eta: (lineMeta.eta || '').trim(),
                     cost,
                 });
             }
@@ -849,6 +878,7 @@ def get_parts_script():
                 credentials: 'include',
                 body: JSON.stringify({
                     ro: partsOnOrderRo,
+                    vendor: vendorName,
                     invoice_number: invoiceNumber,
                     invoice_total_amount: invoiceTotal,
                     items,
@@ -861,8 +891,14 @@ def get_parts_script():
                 }
 
                 partsOnOrderReceiveMode = false;
+                const receiveBtn = document.getElementById('partsOnOrderReceiveBtn');
+                const saveBtn = document.getElementById('partsOnOrderSaveBtn');
+                const vendorInput = document.getElementById('partsOnOrderVendorInput');
                 const invoiceNumberInput = document.getElementById('partsOnOrderInvoiceNumber');
                 const invoiceTotalInput = document.getElementById('partsOnOrderInvoiceTotal');
+                if (receiveBtn) receiveBtn.textContent = 'Receive';
+                if (saveBtn) saveBtn.style.display = 'none';
+                if (vendorInput) vendorInput.value = '';
                 if (invoiceNumberInput) invoiceNumberInput.value = '';
                 if (invoiceTotalInput) invoiceTotalInput.value = '';
 
