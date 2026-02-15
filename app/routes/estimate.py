@@ -19,14 +19,24 @@ def _ensure_parts_vendors_table(cur) -> None:
         CREATE TABLE IF NOT EXISTS parts_vendors (
             id SERIAL PRIMARY KEY,
             name VARCHAR(255) NOT NULL,
+            contact_person VARCHAR(255),
             email VARCHAR(255),
             phone VARCHAR(50),
+            street VARCHAR(255),
+            city VARCHAR(100),
+            state VARCHAR(100),
+            zip VARCHAR(20),
             domain VARCHAR(255) NOT NULL,
             active BOOLEAN DEFAULT TRUE,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
         """
     )
+    cur.execute("ALTER TABLE parts_vendors ADD COLUMN IF NOT EXISTS contact_person VARCHAR(255)")
+    cur.execute("ALTER TABLE parts_vendors ADD COLUMN IF NOT EXISTS street VARCHAR(255)")
+    cur.execute("ALTER TABLE parts_vendors ADD COLUMN IF NOT EXISTS city VARCHAR(100)")
+    cur.execute("ALTER TABLE parts_vendors ADD COLUMN IF NOT EXISTS state VARCHAR(100)")
+    cur.execute("ALTER TABLE parts_vendors ADD COLUMN IF NOT EXISTS zip VARCHAR(20)")
     cur.execute(
         """
         CREATE INDEX IF NOT EXISTS idx_parts_vendors_domain ON parts_vendors(domain)
@@ -995,8 +1005,13 @@ async def add_vendor(request: Request):
 
     data = await request.json()
     name = (data.get("name") or "").strip()
+    contact_person = (data.get("contact_person") or "").strip()
     email = (data.get("email") or "").strip()
     phone = (data.get("phone") or "").strip()
+    street = (data.get("street") or "").strip()
+    city = (data.get("city") or "").strip()
+    state = (data.get("state") or "").strip()
+    zip_code = (data.get("zip") or "").strip()
 
     if not name:
         return JSONResponse(status_code=400, content={"error": "Vendor name is required"})
@@ -1007,11 +1022,21 @@ async def add_vendor(request: Request):
         _ensure_parts_vendors_table(cur)
         cur.execute(
             """
-            INSERT INTO parts_vendors (name, email, phone, domain)
-            VALUES (%s, %s, %s, %s)
-            RETURNING id, name, email, phone, active
+            INSERT INTO parts_vendors (name, contact_person, email, phone, street, city, state, zip, domain)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+            RETURNING id, name, contact_person, email, phone, street, city, state, zip, active
             """,
-            (name, email or None, phone or None, domain),
+            (
+                name,
+                contact_person or None,
+                email or None,
+                phone or None,
+                street or None,
+                city or None,
+                state or None,
+                zip_code or None,
+                domain,
+            ),
         )
 
         row = cur.fetchone()
@@ -1021,8 +1046,13 @@ async def add_vendor(request: Request):
             "vendor": {
                 "id": row["id"],
                 "name": row["name"],
+                "contact_person": row["contact_person"],
                 "email": row["email"],
                 "phone": row["phone"],
+                "street": row["street"],
+                "city": row["city"],
+                "state": row["state"],
+                "zip": row["zip"],
                 "active": row["active"],
             }
         }
@@ -1043,7 +1073,7 @@ async def list_vendors(request: Request):
         _ensure_parts_vendors_table(cur)
         cur.execute(
             """
-            SELECT id, name, email, phone, active
+            SELECT id, name, contact_person, email, phone, street, city, state, zip, active
             FROM parts_vendors
             WHERE active = TRUE AND domain = %s
             ORDER BY name
@@ -1056,8 +1086,13 @@ async def list_vendors(request: Request):
             {
                 "id": row["id"],
                 "name": row["name"],
+                "contact_person": row["contact_person"],
                 "email": row["email"],
                 "phone": row["phone"],
+                "street": row["street"],
+                "city": row["city"],
+                "state": row["state"],
+                "zip": row["zip"],
                 "active": row["active"],
             }
             for row in rows
@@ -2886,6 +2921,154 @@ async def list_parts_received(request: Request, ro: str):
             for row in rows
         ]
         return {"items": items}
+    finally:
+        cur.close()
+
+
+@router.get("/vendors/invoices")
+async def list_vendor_invoices(request: Request, vendor_id: int):
+    domain = get_user_domain(request)
+    if not domain:
+        return JSONResponse(status_code=401, content={"error": "Not authenticated", "invoices": []})
+
+    conn = get_conn()
+    cur = conn.cursor()
+    try:
+        _ensure_parts_vendors_table(cur)
+        _ensure_parts_received_table(cur)
+
+        cur.execute(
+            """
+            SELECT name
+            FROM parts_vendors
+            WHERE id = %s AND domain = %s AND active = TRUE
+            LIMIT 1
+            """,
+            (vendor_id, domain),
+        )
+        vendor_row = cur.fetchone()
+        if not vendor_row:
+            return JSONResponse(status_code=404, content={"error": "Vendor not found", "invoices": []})
+
+        vendor_name = (vendor_row.get("name") or "").strip()
+        if not vendor_name:
+            return {"invoices": []}
+
+        cur.execute(
+            """
+            SELECT
+                ro AS invoice_number,
+                MAX(received_at) AS invoice_date,
+                COALESCE(SUM(cost), 0) AS total_cost
+            FROM parts_received
+            WHERE domain = %s
+              AND LOWER(TRIM(vendor)) = LOWER(TRIM(%s))
+            GROUP BY ro
+            ORDER BY MAX(received_at) DESC
+            """,
+            (domain, vendor_name),
+        )
+        rows = cur.fetchall() or []
+
+        invoices = [
+            {
+                "date": row.get("invoice_date").isoformat() if row.get("invoice_date") else None,
+                "invoice_number": row.get("invoice_number"),
+                "total_cost": float(row.get("total_cost") or 0),
+            }
+            for row in rows
+        ]
+
+        return {"invoices": invoices}
+    finally:
+        cur.close()
+
+
+@router.get("/vendors/invoice-parts")
+async def list_vendor_invoice_parts(request: Request, vendor_id: int, invoice_number: str):
+    domain = get_user_domain(request)
+    if not domain:
+        return JSONResponse(status_code=401, content={"error": "Not authenticated", "parts": []})
+
+    invoice_value = (invoice_number or "").strip()
+    if not invoice_value:
+        return JSONResponse(status_code=400, content={"error": "invoice_number is required", "parts": []})
+
+    conn = get_conn()
+    cur = conn.cursor()
+    try:
+        _ensure_parts_vendors_table(cur)
+        _ensure_parts_received_table(cur)
+        _ensure_saved_estimates_table(cur)
+
+        cur.execute(
+            """
+            SELECT name
+            FROM parts_vendors
+            WHERE id = %s AND domain = %s AND active = TRUE
+            LIMIT 1
+            """,
+            (vendor_id, domain),
+        )
+        vendor_row = cur.fetchone()
+        if not vendor_row:
+            return JSONResponse(status_code=404, content={"error": "Vendor not found", "parts": []})
+
+        vendor_name = (vendor_row.get("name") or "").strip()
+        if not vendor_name:
+            return {"parts": []}
+
+        cur.execute(
+            """
+            SELECT parts_repairs
+            FROM saved_estimates
+            WHERE domain = %s AND ro = %s
+            ORDER BY saved_at DESC, id DESC
+            LIMIT 1
+            """,
+            (domain, invoice_value),
+        )
+        estimate_row = cur.fetchone()
+        parts_repairs = _parse_json_field(estimate_row.get("parts_repairs")) if estimate_row else []
+        if not isinstance(parts_repairs, list):
+            parts_repairs = []
+
+        line_lookup = {}
+        for idx, item in enumerate(parts_repairs, start=1):
+            if not isinstance(item, dict):
+                continue
+            line_lookup[idx] = {
+                "line": item.get("line") or idx,
+                "description": item.get("description") or "",
+            }
+
+        cur.execute(
+            """
+            SELECT line_id, cost, received_at
+            FROM parts_received
+            WHERE domain = %s
+              AND ro = %s
+              AND LOWER(TRIM(vendor)) = LOWER(TRIM(%s))
+            ORDER BY line_id
+            """,
+            (domain, invoice_value, vendor_name),
+        )
+        rows = cur.fetchall() or []
+        parts = []
+        for row in rows:
+            line_id = int(row.get("line_id") or 0)
+            metadata = line_lookup.get(line_id, {})
+            parts.append(
+                {
+                    "line_id": line_id,
+                    "line": metadata.get("line") or line_id,
+                    "description": metadata.get("description") or "",
+                    "cost": float(row.get("cost") or 0),
+                    "received_at": row.get("received_at").isoformat() if row.get("received_at") else None,
+                }
+            )
+
+        return {"parts": parts}
     finally:
         cur.close()
 

@@ -81,8 +81,13 @@ def init_users_table():
             CREATE TABLE IF NOT EXISTS parts_vendors (
                 id SERIAL PRIMARY KEY,
                 name VARCHAR(255) NOT NULL,
+                contact_person VARCHAR(255),
                 email VARCHAR(255),
                 phone VARCHAR(50),
+                street VARCHAR(255),
+                city VARCHAR(100),
+                state VARCHAR(100),
+                zip VARCHAR(20),
                 domain VARCHAR(255) NOT NULL,
                 active BOOLEAN DEFAULT TRUE,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
