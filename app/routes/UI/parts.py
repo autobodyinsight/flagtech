@@ -11,7 +11,7 @@ def get_parts_screen_html():
             </div>
             <h1 style="text-align:center; margin:0;">PARTS</h1>
             <div>
-                <button onclick="openPartsVendorsModal()" style="padding:10px 16px; background-color:#b22222; color:white; border:none; border-radius:4px; cursor:pointer; font-size:14px;">Vendors</button>
+                <button onclick="openPartsVendorsModal()" style="padding:10px 16px; background-color:#b22222; color:white; border:none; border-radius:4px; cursor:pointer; font-size:14px;">Manage Vendors</button>
             </div>
         </div>
 
@@ -189,65 +189,63 @@ def get_parts_screen_html():
             </div>
         </div>
 
-        <div id="partsAddVendorModal" class="modal" style="display:none;">
-            <div class="modal-content" style="max-width:720px; max-height:90vh; overflow-y:auto;">
-                <span class="close" onclick="closePartsAddVendorModal()">&times;</span>
-                <h2 style="margin-bottom:16px;">Add Parts Vendor</h2>
-
-                <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:10px;">
-                    <div>
-                        <label>Vendor:</label>
-                        <input type="text" id="partsVendorName" style="width:100%; padding:8px; box-sizing:border-box;">
-                    </div>
-                    <div>
-                        <label>Contact:</label>
-                        <input type="text" id="partsVendorContact" style="width:100%; padding:8px; box-sizing:border-box;">
-                    </div>
-                </div>
-
-                <label>Type:</label>
-                <select id="partsVendorType" style="width:100%; padding:8px; margin-bottom:10px; box-sizing:border-box;">
-                    <option value="">Select type...</option>
-                    <option value="OEM">OEM</option>
-                    <option value="AFTERMARKET">Aftermarket</option>
-                    <option value="USED">Used</option>
-                    <option value="OTHER">Other</option>
-                </select>
-
-                <label>Email:</label>
-                <input type="email" id="partsVendorEmail" style="width:100%; padding:8px; margin-bottom:10px; box-sizing:border-box;">
-
-                <label>Phone:</label>
-                <input type="text" id="partsVendorPhone" style="width:100%; padding:8px; margin-bottom:10px; box-sizing:border-box;">
-
-                <label>Street:</label>
-                <input type="text" id="partsVendorStreet" style="width:100%; padding:8px; margin-bottom:10px; box-sizing:border-box;">
-
-                <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px; margin-bottom:10px;">
-                    <div>
-                        <label>City:</label>
-                        <input type="text" id="partsVendorCity" style="width:100%; padding:8px; box-sizing:border-box;">
-                    </div>
-                    <div>
-                        <label>State:</label>
-                        <input type="text" id="partsVendorState" style="width:100%; padding:8px; box-sizing:border-box;">
-                    </div>
-                    <div>
-                        <label>Zip:</label>
-                        <input type="text" id="partsVendorZip" style="width:100%; padding:8px; box-sizing:border-box;">
-                    </div>
-                </div>
-
-                <div style="text-align:right; margin-top:16px;">
-                    <button onclick="partsAddVendor()" style="padding:10px 18px; background-color:#505050; color:white; border:none; border-radius:4px; cursor:pointer; font-size:14px;">Save</button>
-                </div>
-            </div>
-        </div>
-
         <div id="partsVendorsModal" class="modal" style="display:none;">
             <div class="modal-content" style="max-width:1050px; max-height:90vh; overflow-y:auto;">
                 <span class="close" onclick="closePartsVendorsModal()">&times;</span>
-                <h2 style="margin-bottom:16px;">Vendors</h2>
+                <h2 style="margin-bottom:16px;">Manage Vendors</h2>
+
+                <div style="background:#fff; border:1px solid #ddd; border-radius:6px; padding:12px; margin-bottom:14px;">
+                    <div style="font-weight:bold; margin-bottom:10px;">Add Vendor</div>
+
+                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:10px;">
+                        <div>
+                            <label>Vendor:</label>
+                            <input type="text" id="partsVendorName" style="width:100%; padding:8px; box-sizing:border-box;">
+                        </div>
+                        <div>
+                            <label>Contact:</label>
+                            <input type="text" id="partsVendorContact" style="width:100%; padding:8px; box-sizing:border-box;">
+                        </div>
+                    </div>
+
+                    <label>Type:</label>
+                    <select id="partsVendorType" style="width:100%; padding:8px; margin-bottom:10px; box-sizing:border-box;">
+                        <option value="">Select type...</option>
+                        <option value="OEM">OEM</option>
+                        <option value="AFTERMARKET">Aftermarket</option>
+                        <option value="USED">Used</option>
+                        <option value="OTHER">Other</option>
+                    </select>
+
+                    <label>Email:</label>
+                    <input type="email" id="partsVendorEmail" style="width:100%; padding:8px; margin-bottom:10px; box-sizing:border-box;">
+
+                    <label>Phone:</label>
+                    <input type="text" id="partsVendorPhone" style="width:100%; padding:8px; margin-bottom:10px; box-sizing:border-box;">
+
+                    <label>Street:</label>
+                    <input type="text" id="partsVendorStreet" style="width:100%; padding:8px; margin-bottom:10px; box-sizing:border-box;">
+
+                    <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px; margin-bottom:10px;">
+                        <div>
+                            <label>City:</label>
+                            <input type="text" id="partsVendorCity" style="width:100%; padding:8px; box-sizing:border-box;">
+                        </div>
+                        <div>
+                            <label>State:</label>
+                            <input type="text" id="partsVendorState" style="width:100%; padding:8px; box-sizing:border-box;">
+                        </div>
+                        <div>
+                            <label>Zip:</label>
+                            <input type="text" id="partsVendorZip" style="width:100%; padding:8px; box-sizing:border-box;">
+                        </div>
+                    </div>
+
+                    <div style="text-align:right; margin-top:10px;">
+                        <button onclick="partsAddVendor()" style="padding:10px 18px; background-color:#505050; color:white; border:none; border-radius:4px; cursor:pointer; font-size:14px;">Save</button>
+                    </div>
+                </div>
+
                 <div style="overflow-x:auto;">
                     <table style="width:100%; border-collapse:collapse;">
                         <thead>
@@ -355,7 +353,6 @@ def get_parts_script():
                     throw new Error(res.error);
                 }
                 partsClearVendorForm();
-                closePartsAddVendorModal();
                 partsLoadVendors(true);
             })
             .catch(err => {
@@ -447,13 +444,11 @@ def get_parts_script():
         }
 
         function openPartsAddVendorModal() {
-            const modal = document.getElementById('partsAddVendorModal');
-            if (modal) modal.style.display = 'block';
+            openPartsVendorsModal();
         }
 
         function closePartsAddVendorModal() {
-            const modal = document.getElementById('partsAddVendorModal');
-            if (modal) modal.style.display = 'none';
+            closePartsVendorsModal();
         }
 
         function partsClearVendorForm() {
