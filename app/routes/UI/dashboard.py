@@ -185,7 +185,7 @@ def get_dashboard_screen_html():
                                 <th data-sort-key="insurance" onclick="sortRoListByHeader('insurance')" style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold; color:#555; cursor:pointer; user-select:none;">Insurance <span data-sort-indicator="insurance" style="font-size:12px;"></span></th>
                                 <th data-sort-key="phase" onclick="sortRoListByHeader('phase')" style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold; color:#555; cursor:pointer; user-select:none;">Phase <span data-sort-indicator="phase" style="font-size:12px;"></span></th>
                                 <th data-sort-key="in_date" onclick="sortRoListByHeader('in_date')" style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold; color:#555; cursor:pointer; user-select:none;">In <span data-sort-indicator="in_date" style="font-size:12px;"></span></th>
-                                <th style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold; color:#555; text-align:center;" title="Days Since In Date">⏳</th>
+                                <th data-sort-key="days_since_in" onclick="sortRoListByHeader('days_since_in')" style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold; color:#555; text-align:center; cursor:pointer; user-select:none;" title="Days Since In Date">⏳ <span data-sort-indicator="days_since_in" style="font-size:12px;"></span></th>
                                 <th data-sort-key="ecd_date" onclick="sortRoListByHeader('ecd_date')" style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold; color:#555; cursor:pointer; user-select:none;">ECD <span data-sort-indicator="ecd_date" style="font-size:12px;"></span></th>
                                 <th data-sort-key="hours" onclick="sortRoListByHeader('hours')" style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold; color:#555; text-align:right; cursor:pointer; user-select:none;">HRS <span data-sort-indicator="hours" style="font-size:12px;"></span></th>
                                 <th data-sort-key="total" onclick="sortRoListByHeader('total')" style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold; color:#555; text-align:right; cursor:pointer; user-select:none;">Total <span data-sort-indicator="total" style="font-size:12px;"></span></th>
@@ -561,6 +561,11 @@ def get_dashboard_screen_html():
                 toggleRoSlideDown(roNumber, 'insurance-claim');
             }
 
+            function toggleVehicleVin(event, roNumber) {
+                if (event) event.stopPropagation();
+                toggleRoSlideDown(roNumber, 'vehicle-vin');
+            }
+
             function loadRoNotes(roNumber) {
                 const listEl = document.getElementById(`notes-list-${safeId(roNumber)}`);
                 if (!listEl) return;
@@ -716,6 +721,68 @@ def get_dashboard_screen_html():
                     'complete/finish': 'Complete/Finish'
                 };
                 return labelMap[key] || phase || 'Teardown';
+            }
+
+            function normalizePhaseValue(phase) {
+                const key = String(phase || 'teardown').trim().toLowerCase();
+                if (key === 'wash/qc') return 'washqc';
+                if (key === 'complete/finish') return 'complete';
+                return key || 'teardown';
+            }
+
+            function getPhaseDropdownOptions(selectedPhase) {
+                const selected = normalizePhaseValue(selectedPhase);
+                const options = [
+                    { value: 'teardown', label: 'Teardown' },
+                    { value: 'auth', label: 'Auth' },
+                    { value: 'parts', label: 'Parts' },
+                    { value: 'body', label: 'Body' },
+                    { value: 'refinish', label: 'Refinish' },
+                    { value: 'reassy', label: 'Reassy' },
+                    { value: 'sublet', label: 'Sublet' },
+                    { value: 'washqc', label: 'Wash/QC' },
+                    { value: 'complete', label: 'Complete/Finish' }
+                ];
+                return options
+                    .map((option) => `<option value="${option.value}" ${selected === option.value ? 'selected' : ''}>${option.label}</option>`)
+                    .join('');
+            }
+
+            async function changeRoPhase(event, roNumber, phaseValue) {
+                if (event) event.stopPropagation();
+                const normalizedPhase = normalizePhaseValue(phaseValue);
+
+                try {
+                    const response = await fetch('/api/phase/update', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        credentials: 'include',
+                        body: JSON.stringify({ ro: roNumber, phase: normalizedPhase })
+                    });
+                    const result = await response.json();
+                    if (!response.ok || result.error) {
+                        throw new Error(result.error || 'Failed to save phase');
+                    }
+
+                    if (dashboardData && Array.isArray(dashboardData.roList)) {
+                        dashboardData.roList = dashboardData.roList.map((row) => (
+                            row && row.ro === roNumber
+                                ? { ...row, phase: normalizedPhase }
+                                : row
+                        ));
+                        updateRoListTable(dashboardData.roList);
+                    }
+
+                    if (typeof loadPhaseData === 'function') {
+                        loadPhaseData();
+                    }
+                } catch (error) {
+                    console.error('Error updating phase from dashboard:', error);
+                    alert('Error updating phase.');
+                    if (typeof loadDashboardData === 'function') {
+                        loadDashboardData();
+                    }
+                }
             }
 
             function formatShortDate(value) {
@@ -893,6 +960,11 @@ def get_dashboard_screen_html():
 
                 if (sortKey === 'hours' || sortKey === 'total') {
                     return Number(ro[sortKey] || 0);
+                }
+
+                if (sortKey === 'days_since_in') {
+                    const days = calculateDaysSince(ro.in_date || '');
+                    return days === null ? -1 : Number(days);
                 }
 
                 if (sortKey === 'in_date' || sortKey === 'ecd_date') {
@@ -1085,6 +1157,8 @@ def get_dashboard_screen_html():
                     const insuranceDisplay = (ro.insurance || '-').split(/\s+/).slice(0, 2).join(' ');
                     const claimDisplay = ro.claim_number || '-';
                     const phaseDisplay = formatPhaseDisplay(ro.phase);
+                    const phaseSelectOptions = getPhaseDropdownOptions(ro.phase);
+                    const vinDisplay = ro.vin || '-';
                     const phoneOriginal = cleanPhoneNumber(ro.phone_original) || phoneDisplay || '-';
                     const inIso = ro.in_date || '';
                     const ecdIso = ro.ecd_date || computeEcdIso(inIso, Number(ro.hours || 0));
@@ -1153,7 +1227,11 @@ def get_dashboard_screen_html():
                                     </div>
                                 </div>
                             </td>
-                            <td style="padding:12px; border-bottom:1px solid #eee; color:#333;">${ro.vehicle || 'N/A'}</td>
+                            <td style="padding:12px; border-bottom:1px solid #eee; color:#333;">
+                                <button type="button" onclick="toggleVehicleVin(event, '${ro.ro}')" style="background:none; border:none; color:#0066cc; text-decoration:underline; cursor:pointer; padding:0; font:inherit; text-align:left;">
+                                    ${ro.vehicle || 'N/A'}
+                                </button>
+                            </td>
                             <td style="padding:12px; border-bottom:1px solid #eee; color:#333;">
                                 <button type="button" onclick="toggleCustomerContact(event, '${ro.ro}')" style="background:none; border:none; color:#0066cc; text-decoration:underline; cursor:pointer; padding:0; font:inherit; text-align:left;">
                                     ${customerDisplay}
@@ -1164,7 +1242,11 @@ def get_dashboard_screen_html():
                                     ${insuranceDisplay}
                                 </button>
                             </td>
-                            <td style="padding:12px; border-bottom:1px solid #eee; color:#333;">${phaseDisplay}</td>
+                            <td style="padding:12px; border-bottom:1px solid #eee; color:#333;">
+                                <select onchange="changeRoPhase(event, '${ro.ro}', this.value)" style="padding:4px 6px; border:1px solid #ccc; border-radius:4px; background:#fff; color:#333; font-size:13px; max-width:160px;">
+                                    ${phaseSelectOptions}
+                                </select>
+                            </td>
                             <td style="padding:12px; border-bottom:1px solid #eee; color:#333;">
                                 <button id="ro-date-in_date-${rowId}" class="ro-date-btn" data-iso="${inIso}" type="button" onclick="openRoDatePicker(event, '${rowId}', '${ro.ro}', 'in_date', ${Number(ro.hours || 0)})" style="background:none; border:none; color:#0066cc; text-decoration:underline; cursor:pointer; padding:0; font:inherit;">
                                     ${inDisplay}
@@ -1182,6 +1264,16 @@ def get_dashboard_screen_html():
                                 </button>
                             </td>
                             <td style="padding:12px; border-bottom:1px solid #eee; color:#333; text-align:right; font-weight:bold;">$${ro.total.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                        </tr>
+                        <tr id="vehicle-vin-row-${rowId}" style="display:none; background:${rowBg};">
+                            <td colspan="10" style="padding:0 16px 10px 16px; border-bottom:1px solid #eee;">
+                                <div class="ro-slide-panel" style="max-height:0; overflow:hidden; opacity:0; transition:max-height 0.22s ease, opacity 0.22s ease;">
+                                    <div style="background:#fafafa; border:1px solid #ddd; border-radius:6px; padding:10px 12px;">
+                                        <span style="font-weight:bold; color:#555;">VIN:</span>
+                                        <span style="margin-left:8px; color:#333;">${vinDisplay}</span>
+                                    </div>
+                                </div>
+                            </td>
                         </tr>
                         <tr id="customer-contact-row-${rowId}" style="display:none; background:${rowBg};">
                             <td colspan="10" style="padding:0 16px 10px 16px; border-bottom:1px solid #eee;">

@@ -249,6 +249,9 @@ def get_phase_screen_html():
                         throw new Error(res.error);
                     }
                     loadPhaseData();
+                    if (typeof loadDashboardData === 'function') {
+                        loadDashboardData();
+                    }
                 })
                 .catch(err => {
                     console.error('Error updating phase:', err);
