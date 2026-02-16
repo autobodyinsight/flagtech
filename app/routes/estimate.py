@@ -2093,6 +2093,7 @@ async def get_ro_assignment_lines(
 
         lines = []
         for row in line_rows:
+            lines.append(
                 {
                     "repair_type": _normalize_repair_type(row.get("repair_type")),
                     "line_key": str(row.get("line_key") or ""),
@@ -2130,8 +2131,6 @@ async def save_ro_assignment_lines(request: Request):
     if not domain:
         return JSONResponse(status_code=401, content={"error": "Not authenticated"})
 
-                    "first_name": row.get("first_name"),
-                    "last_name": row.get("last_name"),
     data = await request.json()
     ro_value = (data.get("ro") or "").strip()
     source = data.get("source") or {}
@@ -2703,6 +2702,11 @@ async def tech_flag_out_lines(request: Request):
             "remaining_count": remaining_count,
             "ro_completed": remaining_count == 0,
         }
+    except Exception as exc:
+        conn.rollback()
+        return JSONResponse(status_code=500, content={"error": str(exc)})
+    finally:
+        cur.close()
 
 
 @router.post("/tech-flag-out-ros")
@@ -2833,8 +2837,6 @@ async def tech_flag_out_ros(request: Request):
     except Exception as exc:
         conn.rollback()
         return JSONResponse(status_code=500, content={"error": str(exc)})
-    finally:
-        cur.close()
     finally:
         cur.close()
 
