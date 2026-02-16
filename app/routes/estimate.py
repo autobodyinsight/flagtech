@@ -9,6 +9,7 @@ from app.models.estimate import EstimateResponse
 from app.services.db import get_conn
 from app.services.middleware import get_user_domain
 from fastapi.responses import JSONResponse
+from psycopg2 import sql
 
 router = APIRouter()
 
@@ -1332,32 +1333,35 @@ async def update_vendor(request: Request):
 
 @router.post("/flash")
 async def flash_data():
-    """Delete uploaded estimate data across screens."""
+    """Delete all row data from public tables while preserving table structure."""
     conn = get_conn()
     cur = conn.cursor()
 
-    tables = [
-        "parts_received",
-        "parts_orders",
-        "parts_vendors",
-        "ro_notes",
-        "ro_phases",
-        "ro_assignments",
-        "ro_line_assignments",
-        "estimate_uploads",
-        "saved_estimates",
-        "techs",
-    ]
-
     deleted_counts = {}
     try:
-        for table in tables:
-            cur.execute("SELECT to_regclass(%s) AS reg", (table,))
-            row = cur.fetchone()
-            if not row or not row.get("reg"):
+        cur.execute(
+            """
+            SELECT table_schema, table_name
+            FROM information_schema.tables
+            WHERE table_schema = 'public'
+              AND table_type = 'BASE TABLE'
+            ORDER BY table_name
+            """
+        )
+        table_rows = cur.fetchall() or []
+
+        for table_row in table_rows:
+            table_schema = table_row.get("table_schema")
+            table_name = table_row.get("table_name")
+            if not table_schema or not table_name:
                 continue
-            cur.execute(f"DELETE FROM {table}")
-            deleted_counts[table] = cur.rowcount
+            delete_stmt = sql.SQL("DELETE FROM {}.{}").format(
+                sql.Identifier(table_schema),
+                sql.Identifier(table_name),
+            )
+            cur.execute(delete_stmt)
+            deleted_counts[f"{table_schema}.{table_name}"] = cur.rowcount
+
         conn.commit()
     except Exception as exc:
         conn.rollback()
