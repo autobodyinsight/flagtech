@@ -28,6 +28,7 @@ async def home_screen(request: Request):
     """Main UI screen with sidebar navigation."""
     
     return f"""
+<!DOCTYPE html>
 <html>
 <head>
     <title>FlagTech</title>
@@ -109,6 +110,48 @@ async def home_screen(request: Request):
     </div>
     
     <script>
+        function normalizeFormAccessibility(root = document) {{
+            const fields = root.querySelectorAll('input, select, textarea');
+            let counter = window.__flagtechFieldCounter || 0;
+
+            fields.forEach((field) => {{
+                const type = (field.getAttribute('type') || '').toLowerCase();
+                if (!field.id) {{
+                    counter += 1;
+                    field.id = `ft-field-${{counter}}`;
+                }}
+                if (!field.name && !['button', 'submit', 'reset', 'image'].includes(type)) {{
+                    field.name = field.id;
+                }}
+            }});
+
+            window.__flagtechFieldCounter = counter;
+
+            const labels = Array.from(root.querySelectorAll('label'));
+            labels.forEach((label) => {{
+                if (label.htmlFor) return;
+
+                let target = label.querySelector('input, select, textarea');
+                if (!target && label.nextElementSibling && label.nextElementSibling.matches('input, select, textarea')) {{
+                    target = label.nextElementSibling;
+                }}
+
+                if (target) {{
+                    if (!target.id) {{
+                        counter += 1;
+                        target.id = `ft-field-${{counter}}`;
+                    }}
+                    label.htmlFor = target.id;
+                }}
+            }});
+
+            window.__flagtechFieldCounter = counter;
+        }}
+
+        normalizeFormAccessibility();
+        const a11yObserver = new MutationObserver(() => normalizeFormAccessibility());
+        a11yObserver.observe(document.body, {{ childList: true, subtree: true }});
+
         function switchScreen(screenName) {{
             const screens = document.querySelectorAll('.screen');
             screens.forEach(screen => screen.classList.remove('active'));
