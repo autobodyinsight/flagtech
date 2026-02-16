@@ -10,7 +10,7 @@ def get_techs_screen_html():
 
         <div style="display:flex; justify-content:center; gap:12px; margin-bottom:30px;">
             <button onclick="openManageTechsModal()"
-                    style="padding:12px 24px; font-size:16px; cursor:pointer; background-color:#505050; color:white; border:none; border-radius:4px; font-weight:bold;">
+                    style="padding:12px 24px; font-size:16px; cursor:pointer; background-color:#b22222; color:white; border:none; border-radius:4px; font-weight:bold;">
                 Manage Techs
             </button>
         </div>
@@ -57,7 +57,7 @@ def get_techs_screen_html():
                             <label for="manageNewTechRate" style="display:block; margin-bottom:4px;">Pay Rate</label>
                             <input id="manageNewTechRate" type="number" step="0.01" min="0" placeholder="0.00" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:4px; text-align:right;" />
                         </div>
-                        <button onclick="queueManageTechAdd()" style="padding:10px 14px; background:#505050; color:#fff; border:none; border-radius:4px; cursor:pointer; font-weight:bold;">Queue Add</button>
+                        <button onclick="queueManageTechAdd()" style="padding:10px 14px; background:#b22222; color:#fff; border:none; border-radius:4px; cursor:pointer; font-weight:bold;">ADD</button>
                     </div>
                     <div id="managePendingAdds" style="margin-top:10px;"></div>
                 </div>
