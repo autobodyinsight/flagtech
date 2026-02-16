@@ -24,7 +24,6 @@ def get_techs_screen_html():
                     <div style="flex:0.9; text-align:center;">Role</div>
                     <div style="flex:0.8; text-align:center;">Total RO's</div>
                     <div style="flex:0.9; text-align:center;">Pay Rate</div>
-                    <div style="flex:0.8; text-align:center;">Action</div>
                 </div>
                 <div id="techsListContainer"></div>
             </div>
@@ -442,17 +441,11 @@ def get_techs_screen_html():
                             beginInlineRateEdit(techId);
                         });
 
-                        const actionCell = document.createElement('div');
-                        actionCell.style.flex = '0.8';
-                        actionCell.style.textAlign = 'center';
-                        actionCell.textContent = '-';
-
                         row.appendChild(statusCell);
                         row.appendChild(nameCell);
                         row.appendChild(roleCell);
                         row.appendChild(totalRosCell);
                         row.appendChild(rateCell);
-                        row.appendChild(actionCell);
 
                         const slideDown = document.createElement('div');
                         slideDown.id = `tech-slide-${techId}`;

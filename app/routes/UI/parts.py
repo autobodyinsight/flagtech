@@ -68,6 +68,7 @@ def get_parts_screen_html():
                                 <option value="LKQ">LKQ</option>
                             </select>
                         </div>
+                        <div style="width:80px; text-align:right;">QTY</div>
                         <div style="width:120px; text-align:right;"><button type="button" onclick="partsSortOrderLines('price')" style="background:none; border:none; font-weight:bold; cursor:pointer; padding:0;">Price <span id="partsOrderSortPrice"></span></button></div>
                     </div>
                     <div id="partsOrderLines"></div>
@@ -115,6 +116,7 @@ def get_parts_screen_html():
                                 <th id="partsOnOrderCheckHeader" style="padding:10px; border-bottom:2px solid #ddd; width:40px; display:none;"></th>
                                 <th style="padding:10px; border-bottom:2px solid #ddd; width:80px;">Line</th>
                                 <th style="padding:10px; border-bottom:2px solid #ddd;">Description</th>
+                                <th style="padding:10px; border-bottom:2px solid #ddd; width:80px; text-align:right;">QTY</th>
                                 <th style="padding:10px; border-bottom:2px solid #ddd; width:170px;">Part #</th>
                                 <th style="padding:10px; border-bottom:2px solid #ddd; width:110px; text-align:right;">List</th>
                                 <th style="padding:10px; border-bottom:2px solid #ddd; width:180px;">Vendor</th>
@@ -123,7 +125,7 @@ def get_parts_screen_html():
                             </tr>
                         </thead>
                         <tbody id="partsOnOrderBody">
-                            <tr><td colspan="8" style="padding:12px; text-align:center; color:#777;">Loading...</td></tr>
+                            <tr><td colspan="9" style="padding:12px; text-align:center; color:#777;">Loading...</td></tr>
                         </tbody>
                     </table>
                 </div>
@@ -1087,7 +1089,7 @@ def get_parts_script():
             const body = document.getElementById('partsOnOrderBody');
             if (!body || !partsOnOrderRo) return;
 
-            body.innerHTML = '<tr><td colspan="8" style="padding:12px; text-align:center; color:#777;">Loading...</td></tr>';
+            body.innerHTML = '<tr><td colspan="9" style="padding:12px; text-align:center; color:#777;">Loading...</td></tr>';
             fetch(`/api/parts/on-order-lines?ro=${encodeURIComponent(partsOnOrderRo)}`, { credentials: 'include' })
                 .then(r => r.json())
                 .then(res => {
@@ -1096,7 +1098,7 @@ def get_parts_script():
                 })
                 .catch(err => {
                     console.error('Error loading on-order lines:', err);
-                    body.innerHTML = '<tr><td colspan="8" style="padding:12px; text-align:center; color:red;">Error loading on-order parts.</td></tr>';
+                    body.innerHTML = '<tr><td colspan="9" style="padding:12px; text-align:center; color:red;">Error loading on-order parts.</td></tr>';
                 });
         }
 
@@ -1114,7 +1116,7 @@ def get_parts_script():
             if (saveBtn) saveBtn.style.display = partsOnOrderReceiveMode ? 'inline-block' : 'none';
 
             if (!partsOnOrderLines || partsOnOrderLines.length === 0) {
-                body.innerHTML = '<tr><td colspan="8" style="padding:12px; text-align:center; color:#777;">No parts currently on order.</td></tr>';
+                body.innerHTML = '<tr><td colspan="9" style="padding:12px; text-align:center; color:#777;">No parts currently on order.</td></tr>';
                 return;
             }
 
@@ -1129,6 +1131,10 @@ def get_parts_script():
                 const vendorValue = partsEscapeHtml(item.vendor || '');
                 const etaValue = item.eta || '';
                 const displayEta = etaValue ? partsFormatDisplayDate(etaValue) : '—';
+                const qtyRaw = Number(item.qty || 0);
+                const qtyDisplay = Number.isFinite(qtyRaw)
+                    ? (Number.isInteger(qtyRaw) ? String(qtyRaw) : qtyRaw.toFixed(2).replace(/\.00$/, ''))
+                    : '0';
 
                 const partNumberCell = partsOnOrderReceiveMode
                     ? `<input type="text" class="parts-onorder-partnum" data-line-id="${lineId}" value="${partNumberValue}" style="width:100%; padding:6px;" />`
@@ -1137,6 +1143,10 @@ def get_parts_script():
                 const listCell = partsOnOrderReceiveMode
                     ? `<input type="number" step="0.01" class="parts-onorder-list" data-line-id="${lineId}" value="${listValue}" style="width:100%; padding:6px; text-align:right;" />`
                     : `$${listValue}`;
+
+                const qtyCell = partsOnOrderReceiveMode
+                    ? `<input type="number" min="0" step="0.01" class="parts-onorder-qty" data-line-id="${lineId}" value="${qtyDisplay}" style="width:80px; padding:6px; text-align:right;" />`
+                    : qtyDisplay;
 
                 const vendorCell = vendorValue || '—';
 
@@ -1151,6 +1161,7 @@ def get_parts_script():
                         ${checkboxCell}
                         <td style="padding:10px; border-bottom:1px solid #eee;">${partsEscapeHtml(item.line || '—')}</td>
                         <td style="padding:10px; border-bottom:1px solid #eee;">${partsEscapeHtml(item.description || '')}</td>
+                        <td style="padding:10px; border-bottom:1px solid #eee; text-align:right;">${qtyCell}</td>
                         <td style="padding:10px; border-bottom:1px solid #eee;">${partNumberCell}</td>
                         <td style="padding:10px; border-bottom:1px solid #eee; text-align:right;">${listCell}</td>
                         <td style="padding:10px; border-bottom:1px solid #eee;">${vendorCell}</td>
@@ -1200,6 +1211,7 @@ def get_parts_script():
                 const orderId = Number(check.dataset.orderId);
                 const partNumberInput = document.querySelector(`.parts-onorder-partnum[data-line-id="${lineId}"]`);
                 const listInput = document.querySelector(`.parts-onorder-list[data-line-id="${lineId}"]`);
+                const qtyInput = document.querySelector(`.parts-onorder-qty[data-line-id="${lineId}"]`);
                 const costInput = document.querySelector(`.parts-onorder-cost[data-line-id="${lineId}"]`);
                 const lineMeta = (partsOnOrderLines || []).find(item => Number(item.line_id) === lineId && Number(item.order_id) === orderId) || {};
 
@@ -1209,12 +1221,19 @@ def get_parts_script():
                     return;
                 }
 
+                const qtyReceived = parseFloat((qtyInput?.value || '').trim());
+                if (!Number.isFinite(qtyReceived) || qtyReceived <= 0) {
+                    alert('Enter a valid received QTY for selected parts.');
+                    return;
+                }
+
                 selectedCostTotal += cost;
                 items.push({
                     order_id: orderId,
                     line_id: lineId,
                     part_number: (partNumberInput?.value || '').trim(),
                     list: parseFloat((listInput?.value || '').trim() || '0'),
+                    qty_received: qtyReceived,
                     vendor: vendorName,
                     eta: (lineMeta.eta || '').trim(),
                     cost,
@@ -1395,6 +1414,10 @@ def get_parts_script():
                 const lineId = Number(line.id);
                 const isChecked = partsOrderSelectedIds.has(lineId) ? 'checked' : '';
                 const price = line.price ? `$${Number(line.price).toFixed(2)}` : '—';
+                const qtyNumber = Number(line.qty || 0);
+                const qtyText = Number.isFinite(qtyNumber)
+                    ? (Number.isInteger(qtyNumber) ? String(qtyNumber) : qtyNumber.toFixed(2).replace(/\.00$/, ''))
+                    : '0';
                 const isBlocked = Boolean(line.is_ordered);
                 const disabledAttr = isBlocked ? 'disabled' : '';
                 const rowOpacity = isBlocked ? '0.6' : '1';
@@ -1405,6 +1428,7 @@ def get_parts_script():
                         <div style="width:80px;">${line.line || '—'}</div>
                         <div style="flex:2;">${line.description || ''}${blockedLabel}</div>
                         <div style="flex:1;">${line.part_type || '—'}</div>
+                        <div style="width:80px; text-align:right;">${qtyText}</div>
                         <div style="width:120px; text-align:right;">${price}</div>
                     </div>
                 `;

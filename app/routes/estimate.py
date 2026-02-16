@@ -220,6 +220,7 @@ def _ensure_parts_received_table(cur) -> None:
             line_id INTEGER NOT NULL,
             vendor VARCHAR(255) NOT NULL,
             part_number VARCHAR(255),
+            qty_received NUMERIC,
             list_price NUMERIC,
             cost NUMERIC,
             eta DATE,
@@ -235,6 +236,7 @@ def _ensure_parts_received_table(cur) -> None:
         """
     )
     cur.execute("ALTER TABLE parts_received ADD COLUMN IF NOT EXISTS part_number VARCHAR(255)")
+    cur.execute("ALTER TABLE parts_received ADD COLUMN IF NOT EXISTS qty_received NUMERIC")
     cur.execute("ALTER TABLE parts_received ADD COLUMN IF NOT EXISTS list_price NUMERIC")
     cur.execute("ALTER TABLE parts_received ADD COLUMN IF NOT EXISTS eta DATE")
     cur.execute("ALTER TABLE parts_received ADD COLUMN IF NOT EXISTS invoice_number VARCHAR(255)")
@@ -4147,6 +4149,7 @@ async def list_on_order_lines(request: Request, ro: str):
                 "line": item.get("line") or idx,
                 "description": parsed_description,
                 "part_number": str(part_number or ""),
+                "qty": float(item.get("qty") or 0),
                 "list": float(item.get("price") or 0),
             }
 
@@ -4180,6 +4183,7 @@ async def list_on_order_lines(request: Request, ro: str):
                         "line": metadata.get("line") or line_id,
                         "description": metadata.get("description") or "",
                         "part_number": metadata.get("part_number") or "",
+                        "qty": float(metadata.get("qty") or 0),
                         "list": float(metadata.get("list") or 0),
                         "vendor": vendor_name,
                         "eta": arrival_date.isoformat() if arrival_date else None,
@@ -4242,6 +4246,14 @@ async def receive_on_order_lines(request: Request):
             return JSONResponse(status_code=400, content={"error": "Vendor is required for selected lines"})
 
         part_number = (item.get("part_number") or "").strip()
+        qty_received_value = item.get("qty_received")
+        try:
+            qty_received = float(qty_received_value)
+        except (TypeError, ValueError):
+            qty_received = 1.0
+        if qty_received <= 0:
+            return JSONResponse(status_code=400, content={"error": "Received quantity must be greater than zero"})
+
         list_value = item.get("list")
         try:
             list_price = float(list_value) if list_value not in (None, "") else None
@@ -4264,6 +4276,7 @@ async def receive_on_order_lines(request: Request):
                 "cost": cost,
                 "vendor": vendor,
                 "part_number": part_number,
+                "qty_received": qty_received,
                 "list_price": list_price,
                 "eta": eta_date,
             }
@@ -4305,13 +4318,14 @@ async def receive_on_order_lines(request: Request):
             cur.execute(
                 """
                 INSERT INTO parts_received
-                    (ro, line_id, vendor, part_number, list_price, cost, eta, invoice_number, invoice_total, returned, received_business_date, domain)
+                    (ro, line_id, vendor, part_number, qty_received, list_price, cost, eta, invoice_number, invoice_total, returned, received_business_date, domain)
                 VALUES
-                    (%s, %s, %s, %s, %s, %s, %s, %s, %s, FALSE, COALESCE(%s, CURRENT_DATE), %s)
+                    (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, FALSE, COALESCE(%s, CURRENT_DATE), %s)
                 ON CONFLICT (ro, line_id, domain)
                 DO UPDATE SET
                     vendor = EXCLUDED.vendor,
                     part_number = EXCLUDED.part_number,
+                    qty_received = EXCLUDED.qty_received,
                     list_price = EXCLUDED.list_price,
                     cost = EXCLUDED.cost,
                     eta = EXCLUDED.eta,
@@ -4326,6 +4340,7 @@ async def receive_on_order_lines(request: Request):
                     item["line_id"],
                     item["vendor"],
                     item["part_number"] or None,
+                    item["qty_received"],
                     item["list_price"],
                     item["cost"],
                     item["eta"],
