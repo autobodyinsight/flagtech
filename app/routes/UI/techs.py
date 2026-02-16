@@ -785,6 +785,7 @@ def get_techs_screen_html():
             const printWindow = window.open('', '_blank', 'width=900,height=700');
             if (!printWindow) return;
             printWindow.document.write(`
+                <!DOCTYPE html>
                 <html>
                 <head>
                     <title>${title}</title>

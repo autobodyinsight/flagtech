@@ -276,6 +276,7 @@ def get_flagtech_screen_html():
                 }).join('');
 
                 printWindow.document.write(`
+                    <!DOCTYPE html>
                     <html>
                     <head>
                         <title>Flagout Payout Summary</title>

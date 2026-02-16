@@ -1784,6 +1784,7 @@ def get_dashboard_screen_html():
                 if (!printWindow) return;
 
                 printWindow.document.write(`
+                    <!DOCTYPE html>
                     <html>
                         <head>
                             <title>Tech Assignment Print</title>
