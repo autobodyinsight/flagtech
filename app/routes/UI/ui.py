@@ -88,8 +88,8 @@ async def home_screen(request: Request):
             display: block;
         }}
         :root {{
-            --app-bg: #3c4142;
-            --card-bg: #a9a9a9;
+            --app-bg: #a9a9a9;
+            --card-bg: #e4e4e4;
         }}
         body,
         .tab-bar,
