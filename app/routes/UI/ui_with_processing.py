@@ -9,6 +9,7 @@ from .flagout import get_flagtech_screen_html
 from .parts import get_parts_screen_html, get_parts_script
 from .techs import get_techs_screen_html
 from .phase import get_phase_screen_html
+from .payments import get_payments_screen_html
 try:
     from .upload_ui.upload import get_upload_screen_html, get_upload_script
     from .upload_ui.save_estimate import (
@@ -318,6 +319,7 @@ async def home_screen():
 <body>
     <div class="sidebar">
         <div class="nav-box active" onclick="switchScreen('upload')">UPLOAD</div>
+        <div class="nav-box" onclick="switchScreen('payments')">PAYMENTS</div>
         <div class="nav-box" onclick="switchScreen('tech')">TECHS</div>
         <div class="nav-box" onclick="switchScreen('phase')">ROADMAP</div>
         <div class="nav-box" onclick="switchScreen('parts')">PARTS</div>
@@ -326,6 +328,7 @@ async def home_screen():
     
     <div class="content-area">
         {get_upload_screen_html()}
+        {get_payments_screen_html()}
         {get_parts_screen_html()}
         {get_techs_screen_html()}
         {get_phase_screen_html()}
@@ -393,6 +396,10 @@ async def home_screen():
             if (screenName === 'parts' && typeof partsLoadRos === 'function') {{
                 partsLoadRos();
                 partsLoadVendors();
+            }}
+
+            if (screenName === 'payments' && typeof loadPaymentsData === 'function') {{
+                loadPaymentsData();
             }}
 
             if (screenName === 'phase' && typeof loadPhaseData === 'function') {{

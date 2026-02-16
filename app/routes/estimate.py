@@ -1631,6 +1631,154 @@ async def get_dashboard_data(request: Request):
         cur.close()
 
 
+@router.get("/payments/open-ros")
+async def list_open_ros_for_payments(request: Request):
+    domain = get_user_domain(request)
+    if not domain:
+        return JSONResponse(status_code=401, content={"error": "Not authenticated", "rows": []})
+
+    conn = get_conn()
+    cur = conn.cursor()
+    try:
+        _ensure_saved_estimates_table(cur)
+        _ensure_ro_phases_table(cur)
+
+        cur.execute(
+            """
+            SELECT DISTINCT ON (ro)
+                   ro,
+                   vehicle,
+                   year,
+                   make,
+                   model,
+                   owner_info,
+                   grand_total,
+                   customer_pay,
+                   insurance_pay,
+                   deductible,
+                   saved_at
+            FROM saved_estimates
+            WHERE domain = %s
+              AND ro IS NOT NULL
+              AND ro <> ''
+            ORDER BY ro, saved_at DESC, id DESC
+            """,
+            (domain,),
+        )
+        rows = cur.fetchall() or []
+
+        cur.execute(
+            """
+            SELECT ro, phase
+            FROM ro_phases
+            WHERE domain = %s
+            """,
+            (domain,),
+        )
+        phase_rows = cur.fetchall() or []
+        phase_map = {str(row.get("ro") or ""): str(row.get("phase") or "").strip().lower() for row in phase_rows}
+
+        payments_rows = []
+        closed_phase_keys = {"complete", "complete/finish"}
+
+        for row in rows:
+            ro = str(row.get("ro") or "").strip()
+            if not ro:
+                continue
+
+            phase_value = phase_map.get(ro, "teardown")
+            if phase_value in closed_phase_keys:
+                continue
+
+            customer_name, _ = _parse_owner_info((row.get("owner_info") or "").strip())
+
+            year = (row.get("year") or "").strip()
+            make = (row.get("make") or "").strip()
+            model = (row.get("model") or "").strip()
+            vehicle_display = " ".join(part for part in (year, make, model) if part) or (row.get("vehicle") or "")
+
+            grand_total = _parse_float_value(row.get("grand_total"))
+            customer_total = _parse_float_value(row.get("customer_pay"))
+            insurance_total = _parse_float_value(row.get("insurance_pay"))
+            deductible = _parse_float_value(row.get("deductible"))
+
+            if customer_total == 0 and deductible > 0:
+                customer_total = deductible
+            if insurance_total == 0 and grand_total > 0:
+                insurance_total = max(0.0, grand_total - customer_total)
+
+            payments_rows.append(
+                {
+                    "ro": ro,
+                    "customer": customer_name,
+                    "vehicle": vehicle_display,
+                    "insurance_total": insurance_total,
+                    "customer_total": customer_total,
+                    "grand_total": grand_total,
+                }
+            )
+
+        payments_rows.sort(key=lambda item: str(item.get("ro") or ""))
+        return {"rows": payments_rows}
+    finally:
+        cur.close()
+
+
+@router.get("/payments/log")
+async def get_ro_payment_log(request: Request, ro: str):
+    domain = get_user_domain(request)
+    if not domain:
+        return JSONResponse(status_code=401, content={"error": "Not authenticated", "entries": []})
+
+    ro_value = (ro or "").strip()
+    if not ro_value:
+        return JSONResponse(status_code=400, content={"error": "ro is required", "entries": []})
+
+    conn = get_conn()
+    cur = conn.cursor()
+    try:
+        _ensure_ro_flagout_lines_table(cur)
+
+        cur.execute(
+            """
+            SELECT
+                paid_at,
+                COALESCE(NULLIF(TRIM(tech_name), ''), 'Unassigned') AS tech_name,
+                COALESCE(SUM(pay_amount), 0) AS amount
+            FROM ro_flagout_lines
+            WHERE domain = %s
+              AND ro = %s
+              AND paid_at IS NOT NULL
+            GROUP BY paid_at, COALESCE(NULLIF(TRIM(tech_name), ''), 'Unassigned')
+            ORDER BY paid_at DESC, tech_name ASC
+            """,
+            (domain, ro_value),
+        )
+        rows = cur.fetchall() or []
+
+        entries = []
+        for row in rows:
+            paid_at = row.get("paid_at")
+            if isinstance(paid_at, datetime):
+                paid_display = paid_at.strftime("%Y-%m-%d %I:%M %p")
+            elif isinstance(paid_at, date):
+                paid_display = paid_at.isoformat()
+            else:
+                paid_display = str(paid_at or "")
+
+            entries.append(
+                {
+                    "paid_at": paid_display,
+                    "tech_name": row.get("tech_name") or "Unassigned",
+                    "amount": _parse_float_value(row.get("amount")),
+                }
+            )
+
+        return {"entries": entries}
+    finally:
+        cur.close()
+
+
 @router.post("/ro-phone")
 async def update_ro_phone(request: Request):
     domain = get_user_domain(request)
