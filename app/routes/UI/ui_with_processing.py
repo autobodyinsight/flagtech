@@ -319,7 +319,7 @@ async def home_screen():
     <div class="sidebar">
         <div class="nav-box active" onclick="switchScreen('upload')">UPLOAD</div>
         <div class="nav-box" onclick="switchScreen('tech')">TECHS</div>
-        <div class="nav-box" onclick="switchScreen('phase')">PHASE</div>
+        <div class="nav-box" onclick="switchScreen('phase')">ROADMAP</div>
         <div class="nav-box" onclick="switchScreen('parts')">PARTS</div>
         <div class="nav-box" onclick="switchScreen('flagtech')">FLAG TECH</div>
     </div>
