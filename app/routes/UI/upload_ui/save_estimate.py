@@ -555,6 +555,8 @@ function executeSaveEstimate() {{
   if (totalsData.parts_total === null || totalsData.parts_total === undefined) {{
     totalsData.parts_total = partsResult.total;
   }}
+  const nowLocal = new Date();
+  const localUploadDate = `${{nowLocal.getFullYear()}}-${{String(nowLocal.getMonth() + 1).padStart(2, '0')}}-${{String(nowLocal.getDate()).padStart(2, '0')}}`;
   
   const payload = {{
     ro: saveRoNumber,
@@ -570,6 +572,7 @@ function executeSaveEstimate() {{
     paint_repairs: paintData,
     parts_repairs: partsResult.items,
     estimate_totals: totalsData,
+    local_upload_date: localUploadDate,
     timestamp: new Date().toISOString()
   }};
   

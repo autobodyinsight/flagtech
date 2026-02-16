@@ -2,7 +2,8 @@ from fastapi import APIRouter, UploadFile, File, Request
 import json
 import math
 import re
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
+from zoneinfo import ZoneInfo
 from app.services.extractor import load_pdf
 from app.services.parser import parse_estimate_pdf
 from app.models.estimate import EstimateResponse
@@ -12,6 +13,22 @@ from fastapi.responses import JSONResponse
 from psycopg2 import sql
 
 router = APIRouter()
+
+LOCAL_BUSINESS_TIMEZONE = os.getenv("LOCAL_BUSINESS_TIMEZONE", "America/Los_Angeles")
+
+
+def _to_local_business_date(value) -> date | None:
+    if isinstance(value, date) and not isinstance(value, datetime):
+        return value
+    if not isinstance(value, datetime):
+        return None
+    try:
+        local_tz = ZoneInfo(LOCAL_BUSINESS_TIMEZONE)
+    except Exception:
+        local_tz = timezone.utc
+    if value.tzinfo is None:
+        value = value.replace(tzinfo=timezone.utc)
+    return value.astimezone(local_tz).date()
 
 
 def _normalize_line_ids(values) -> set[int]:
@@ -1496,7 +1513,7 @@ async def get_dashboard_data(request: Request):
             phone_override = (row.get("phone_override") or "").strip()
             phone_original = (row.get("phone_original") or customer_phone).strip()
             current_phone = phone_override or customer_phone
-            in_date_value = _coerce_date(row.get("in_date")) or _coerce_date(row.get("saved_at"))
+            in_date_value = _coerce_date(row.get("in_date")) or _to_local_business_date(row.get("saved_at"))
             ecd_date_value = _coerce_date(row.get("ecd_date")) or _calculate_ecd_date(in_date_value, ro_hours)
 
             _ensure_ro_line_assignments_for_ro(cur, domain, ro)

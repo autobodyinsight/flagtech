@@ -558,7 +558,13 @@ async def save_estimate(request: Request):
 
     estimate_totals = data.get("estimate_totals") or {}
     domain = get_user_domain(request)
+    local_upload_date = (data.get("local_upload_date") or "").strip()
     in_date_value = date.today()
+    if local_upload_date:
+        try:
+            in_date_value = date.fromisoformat(local_upload_date)
+        except ValueError:
+            in_date_value = date.today()
     ecd_date_value = _add_weekdays(in_date_value, _weekday_days_from_hours(_estimate_hours_for_ecd(data)))
 
     try:
