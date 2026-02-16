@@ -1340,6 +1340,7 @@ async def get_dashboard_data(request: Request):
     cur = conn.cursor()
     try:
         _ensure_saved_estimates_table(cur)
+        _ensure_ro_phases_table(cur)
         _ensure_ro_assignments_table(cur)
         _ensure_ro_line_assignments_table(cur)
         _ensure_techs_table(cur)
@@ -1389,6 +1390,17 @@ async def get_dashboard_data(request: Request):
             (domain,),
         )
         rows = cur.fetchall()
+
+        cur.execute(
+            """
+            SELECT ro, phase
+            FROM ro_phases
+            WHERE domain = %s
+            """,
+            (domain,),
+        )
+        phase_rows = cur.fetchall()
+        phase_map = {row.get("ro"): row.get("phase") for row in phase_rows}
 
         total_sales = 0.0
         total_parts = 0.0
@@ -1479,6 +1491,7 @@ async def get_dashboard_data(request: Request):
                     "phone_original": phone_original,
                     "insurance": row.get("insurance_company") or "",
                     "claim_number": row.get("claim_number") or "",
+                    "phase": phase_map.get(ro, "teardown"),
                     "tech": labor_tech,
                     "painter": paint_tech,
                     "in_date": in_date_value.isoformat() if in_date_value else None,

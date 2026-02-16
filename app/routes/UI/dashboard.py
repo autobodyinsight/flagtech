@@ -172,9 +172,8 @@ def get_dashboard_screen_html():
                                 <th data-sort-key="ro" onclick="sortRoListByHeader('ro')" style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold; color:#555; cursor:pointer; user-select:none;">RO# <span data-sort-indicator="ro" style="font-size:12px;"></span></th>
                                 <th data-sort-key="vehicle" onclick="sortRoListByHeader('vehicle')" style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold; color:#555; cursor:pointer; user-select:none;">Vehicle <span data-sort-indicator="vehicle" style="font-size:12px;"></span></th>
                                 <th data-sort-key="customer" onclick="sortRoListByHeader('customer')" style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold; color:#555; cursor:pointer; user-select:none;">Customer <span data-sort-indicator="customer" style="font-size:12px;"></span></th>
-                                <th data-sort-key="phone" onclick="sortRoListByHeader('phone')" style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold; color:#555; cursor:pointer; user-select:none;">Phone <span data-sort-indicator="phone" style="font-size:12px;"></span></th>
                                 <th data-sort-key="insurance" onclick="sortRoListByHeader('insurance')" style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold; color:#555; cursor:pointer; user-select:none;">Insurance <span data-sort-indicator="insurance" style="font-size:12px;"></span></th>
-                                <th data-sort-key="claim_number" onclick="sortRoListByHeader('claim_number')" style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold; color:#555; cursor:pointer; user-select:none;">Claim # <span data-sort-indicator="claim_number" style="font-size:12px;"></span></th>
+                                <th data-sort-key="phase" onclick="sortRoListByHeader('phase')" style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold; color:#555; cursor:pointer; user-select:none;">Phase <span data-sort-indicator="phase" style="font-size:12px;"></span></th>
                                 <th data-sort-key="in_date" onclick="sortRoListByHeader('in_date')" style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold; color:#555; cursor:pointer; user-select:none;">In <span data-sort-indicator="in_date" style="font-size:12px;"></span></th>
                                 <th style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold; color:#555; text-align:center;" title="Days Since In Date">⏳</th>
                                 <th data-sort-key="ecd_date" onclick="sortRoListByHeader('ecd_date')" style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold; color:#555; cursor:pointer; user-select:none;">ECD <span data-sort-indicator="ecd_date" style="font-size:12px;"></span></th>
@@ -184,7 +183,7 @@ def get_dashboard_screen_html():
                         </thead>
                         <tbody id="roListBody">
                             <tr>
-                                <td colspan="11" style="padding:20px; text-align:center; color:#999;">Loading...</td>
+                                <td colspan="10" style="padding:20px; text-align:center; color:#999;">Loading...</td>
                             </tr>
                         </tbody>
                     </table>
@@ -501,11 +500,40 @@ def get_dashboard_screen_html():
 
             let currentRoSlideDown = null;
 
+            function openRoSlideDownRow(rowEl) {
+                if (!rowEl) return;
+                rowEl.style.display = 'table-row';
+                const panel = rowEl.querySelector('.ro-slide-panel');
+                if (!panel) return;
+                panel.style.maxHeight = '0px';
+                panel.style.opacity = '0';
+                requestAnimationFrame(() => {
+                    panel.style.maxHeight = `${panel.scrollHeight}px`;
+                    panel.style.opacity = '1';
+                });
+            }
+
+            function closeRoSlideDownRow(rowEl) {
+                if (!rowEl) return;
+                const panel = rowEl.querySelector('.ro-slide-panel');
+                if (!panel) {
+                    rowEl.style.display = 'none';
+                    return;
+                }
+                panel.style.maxHeight = '0px';
+                panel.style.opacity = '0';
+                setTimeout(() => {
+                    if (panel.style.maxHeight === '0px') {
+                        rowEl.style.display = 'none';
+                    }
+                }, 220);
+            }
+
             function closeRoSlideDown() {
                 if (!currentRoSlideDown) return;
                 const { roId, type } = currentRoSlideDown;
                 const rowEl = document.getElementById(`${type}-row-${roId}`);
-                if (rowEl) rowEl.style.display = 'none';
+                closeRoSlideDownRow(rowEl);
                 currentRoSlideDown = null;
             }
 
@@ -521,12 +549,12 @@ def get_dashboard_screen_html():
 
                 const isHidden = rowEl.style.display === 'none' || rowEl.style.display === '';
                 if (isHidden && !isSame) {
-                    rowEl.style.display = 'table-row';
+                    openRoSlideDownRow(rowEl);
                     currentRoSlideDown = { roId, type };
                     return true;
                 }
 
-                rowEl.style.display = 'none';
+                closeRoSlideDownRow(rowEl);
                 currentRoSlideDown = null;
                 return false;
             }
@@ -536,6 +564,16 @@ def get_dashboard_screen_html():
                 if (opened) {
                     loadRoNotes(roNumber);
                 }
+            }
+
+            function toggleCustomerContact(event, roNumber) {
+                if (event) event.stopPropagation();
+                toggleRoSlideDown(roNumber, 'customer-contact');
+            }
+
+            function toggleInsuranceClaim(event, roNumber) {
+                if (event) event.stopPropagation();
+                toggleRoSlideDown(roNumber, 'insurance-claim');
             }
 
             function loadRoNotes(roNumber) {
@@ -675,6 +713,24 @@ def get_dashboard_screen_html():
                     return `(${digits.slice(0,3)}) ${digits.slice(3,6)}-${digits.slice(6)}`;
                 }
                 return digits;
+            }
+
+            function formatPhaseDisplay(phase) {
+                const key = String(phase || 'teardown').trim().toLowerCase();
+                const labelMap = {
+                    teardown: 'Teardown',
+                    auth: 'Auth',
+                    parts: 'Parts',
+                    body: 'Body',
+                    refinish: 'Refinish',
+                    reassy: 'Reassy',
+                    sublet: 'Sublet',
+                    washqc: 'Wash/QC',
+                    'wash/qc': 'Wash/QC',
+                    complete: 'Complete/Finish',
+                    'complete/finish': 'Complete/Finish'
+                };
+                return labelMap[key] || phase || 'Teardown';
             }
 
             function formatShortDate(value) {
@@ -1011,7 +1067,7 @@ def get_dashboard_screen_html():
                 updateRoSortIndicators();
                 
                 if (sortedList.length === 0) {
-                    tbody.innerHTML = '<tr><td colspan="11" style="padding:20px; text-align:center; color:#999;">No repair orders found</td></tr>';
+                    tbody.innerHTML = '<tr><td colspan="10" style="padding:20px; text-align:center; color:#999;">No repair orders found</td></tr>';
                     return;
                 }
                 
@@ -1023,6 +1079,7 @@ def get_dashboard_screen_html():
                     const phoneDisplay = cleanPhoneNumber(ro.phone);
                     const insuranceDisplay = (ro.insurance || '-').split(/\s+/).slice(0, 2).join(' ');
                     const claimDisplay = ro.claim_number || '-';
+                    const phaseDisplay = formatPhaseDisplay(ro.phase);
                     const phoneOriginal = cleanPhoneNumber(ro.phone_original) || phoneDisplay || '-';
                     const inIso = ro.in_date || '';
                     const ecdIso = ro.ecd_date || computeEcdIso(inIso, Number(ro.hours || 0));
@@ -1062,23 +1119,17 @@ def get_dashboard_screen_html():
                                 </div>
                             </td>
                             <td style="padding:12px; border-bottom:1px solid #eee; color:#333;">${ro.vehicle || 'N/A'}</td>
-                            <td style="padding:12px; border-bottom:1px solid #eee; color:#333;">${customerDisplay}</td>
                             <td style="padding:12px; border-bottom:1px solid #eee; color:#333;">
-                                <span id="phone-display-${rowId}" style="display:inline-flex; align-items:center; gap:6px;">
-                                    <button type="button" onclick="startPhoneEdit(event, '${rowId}')" style="background:none; border:none; color:#0066cc; text-decoration:underline; cursor:pointer; padding:0; font:inherit;">
-                                        <span id="phone-current-${rowId}">${phoneDisplay}</span>
-                                    </button>
-                                    <button type="button" onclick="toggleOldPhone(event, '${rowId}')" style="background:#eee; border:1px solid #ccc; border-radius:3px; padding:0 6px; font-size:12px; cursor:pointer;">+</button>
-                                    <span id="phone-old-${rowId}" style="display:none; font-size:12px; color:#777;">Old: <span id="phone-old-value-${rowId}">${phoneOriginal}</span></span>
-                                </span>
-                                <span id="phone-edit-${rowId}" style="display:none; align-items:center; gap:6px;">
-                                    <input id="phone-input-${rowId}" value="${phoneDisplay === '-' ? '' : phoneDisplay}" style="padding:4px 6px; width:140px;" />
-                                    <button type="button" onclick="confirmPhoneEdit(event, '${rowId}', '${ro.ro}')" style="padding:4px 8px; font-size:12px; background:#4CAF50; color:#fff; border:none; border-radius:4px; cursor:pointer;">Confirm</button>
-                                    <button type="button" onclick="cancelPhoneEdit(event, '${rowId}')" style="padding:4px 8px; font-size:12px; background:#999; color:#fff; border:none; border-radius:4px; cursor:pointer;">Cancel</button>
-                                </span>
+                                <button type="button" onclick="toggleCustomerContact(event, '${ro.ro}')" style="background:none; border:none; color:#0066cc; text-decoration:underline; cursor:pointer; padding:0; font:inherit; text-align:left;">
+                                    ${customerDisplay}
+                                </button>
                             </td>
-                            <td style="padding:12px; border-bottom:1px solid #eee; color:#333;">${insuranceDisplay}</td>
-                            <td style="padding:12px; border-bottom:1px solid #eee; color:#333;">${claimDisplay}</td>
+                            <td style="padding:12px; border-bottom:1px solid #eee; color:#333;">
+                                <button type="button" onclick="toggleInsuranceClaim(event, '${ro.ro}')" style="background:none; border:none; color:#0066cc; text-decoration:underline; cursor:pointer; padding:0; font:inherit; text-align:left;">
+                                    ${insuranceDisplay}
+                                </button>
+                            </td>
+                            <td style="padding:12px; border-bottom:1px solid #eee; color:#333;">${phaseDisplay}</td>
                             <td style="padding:12px; border-bottom:1px solid #eee; color:#333;">
                                 <button id="ro-date-in_date-${rowId}" class="ro-date-btn" data-iso="${inIso}" type="button" onclick="openRoDatePicker(event, '${rowId}', '${ro.ro}', 'in_date', ${Number(ro.hours || 0)})" style="background:none; border:none; color:#0066cc; text-decoration:underline; cursor:pointer; padding:0; font:inherit;">
                                     ${inDisplay}
@@ -1097,8 +1148,39 @@ def get_dashboard_screen_html():
                             </td>
                             <td style="padding:12px; border-bottom:1px solid #eee; color:#333; text-align:right; font-weight:bold;">$${ro.total.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
                         </tr>
+                        <tr id="customer-contact-row-${rowId}" style="display:none; background:${rowBg};">
+                            <td colspan="10" style="padding:0 16px 10px 16px; border-bottom:1px solid #eee;">
+                                <div class="ro-slide-panel" style="max-height:0; overflow:hidden; opacity:0; transition:max-height 0.22s ease, opacity 0.22s ease;">
+                                    <div style="background:#fafafa; border:1px solid #ddd; border-radius:6px; padding:10px 12px; display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+                                        <span style="font-weight:bold; color:#555;">Phone:</span>
+                                        <span id="phone-display-${rowId}" style="display:inline-flex; align-items:center; gap:6px;">
+                                            <button type="button" onclick="startPhoneEdit(event, '${rowId}')" style="background:none; border:none; color:#0066cc; text-decoration:underline; cursor:pointer; padding:0; font:inherit;">
+                                                <span id="phone-current-${rowId}">${phoneDisplay}</span>
+                                            </button>
+                                            <button type="button" onclick="toggleOldPhone(event, '${rowId}')" style="background:#eee; border:1px solid #ccc; border-radius:3px; padding:0 6px; font-size:12px; cursor:pointer;">+</button>
+                                            <span id="phone-old-${rowId}" style="display:none; font-size:12px; color:#777;">Old: <span id="phone-old-value-${rowId}">${phoneOriginal}</span></span>
+                                        </span>
+                                        <span id="phone-edit-${rowId}" style="display:none; align-items:center; gap:6px;">
+                                            <input id="phone-input-${rowId}" value="${phoneDisplay === '-' ? '' : phoneDisplay}" style="padding:4px 6px; width:140px;" />
+                                            <button type="button" onclick="confirmPhoneEdit(event, '${rowId}', '${ro.ro}')" style="padding:4px 8px; font-size:12px; background:#4CAF50; color:#fff; border:none; border-radius:4px; cursor:pointer;">Confirm</button>
+                                            <button type="button" onclick="cancelPhoneEdit(event, '${rowId}')" style="padding:4px 8px; font-size:12px; background:#999; color:#fff; border:none; border-radius:4px; cursor:pointer;">Cancel</button>
+                                        </span>
+                                    </div>
+                                </div>
+                            </td>
+                        </tr>
+                        <tr id="insurance-claim-row-${rowId}" style="display:none; background:${rowBg};">
+                            <td colspan="10" style="padding:0 16px 10px 16px; border-bottom:1px solid #eee;">
+                                <div class="ro-slide-panel" style="max-height:0; overflow:hidden; opacity:0; transition:max-height 0.22s ease, opacity 0.22s ease;">
+                                    <div style="background:#fafafa; border:1px solid #ddd; border-radius:6px; padding:10px 12px;">
+                                        <span style="font-weight:bold; color:#555;">Claim Number:</span>
+                                        <span style="margin-left:8px; color:#333;">${claimDisplay}</span>
+                                    </div>
+                                </div>
+                            </td>
+                        </tr>
                         <tr id="tech-assignment-row-${rowId}" style="display:none; background:${rowBg};">
-                            <td colspan="11" style="padding:16px; border-bottom:1px solid #eee;">
+                            <td colspan="10" style="padding:16px; border-bottom:1px solid #eee;">
                                 <div style="background:#fafafa; border:1px solid #ddd; border-radius:6px; padding:16px;">
                                     <div style="font-weight:bold; color:#333; margin-bottom:10px;">Tech List</div>
                                     <div id="tech-assignment-list-${rowId}" style="margin-top:12px;">
@@ -1108,7 +1190,7 @@ def get_dashboard_screen_html():
                             </td>
                         </tr>
                         <tr id="notes-row-${rowId}" style="display:none; background:${rowBg};">
-                            <td colspan="11" style="padding:12px 16px; border-bottom:1px solid #eee;">
+                            <td colspan="10" style="padding:12px 16px; border-bottom:1px solid #eee;">
                                 <div style="background:#fafafa; border:1px solid #ddd; border-radius:6px; padding:12px;">
                                     <div style="font-weight:bold; margin-bottom:8px;">Notes</div>
                                     <div id="notes-list-${rowId}" style="max-height:180px; overflow-y:auto; margin-bottom:10px;"></div>
