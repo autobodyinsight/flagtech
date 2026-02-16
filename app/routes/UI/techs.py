@@ -144,6 +144,7 @@ def get_techs_screen_html():
                 padding:9px 10px;
                 border-bottom:1px solid #e6e6e6;
                 vertical-align:top;
+                text-align:left;
             }
             .tech-ro-table thead tr {
                 background:#efefef;
@@ -573,30 +574,47 @@ def get_techs_screen_html():
                         const status = escapeHtml(item.status || 'Assigned');
                         const checked = selectedRos.includes(ro) ? 'checked' : '';
                         const nestedRowId = `nested-lines-${techId}-${ro.replace(/[^a-zA-Z0-9_-]/g, '_')}`;
+                        const mainColumns = mode === 'flagout'
+                            ? `
+                                <td style="width:46px;"><input type="checkbox" class="tech-ro-checkbox" data-tech-id="${techId}" data-ro="${roEscaped}" ${checked} /></td>
+                                <td><button type="button" class="tech-link ro-link" data-tech-id="${techId}" data-ro="${roEscaped}" data-tech-name="${escapeHtml(techName)}" data-tech-rate="${Number(techRate || 0).toFixed(2)}">${roEscaped}</button></td>
+                                <td>${vehicle}</td>
+                                <td style="font-weight:bold;">${totalHours}</td>
+                            `
+                            : `
+                                <td><button type="button" class="tech-link ro-link" data-tech-id="${techId}" data-ro="${roEscaped}" data-tech-name="${escapeHtml(techName)}" data-tech-rate="${Number(techRate || 0).toFixed(2)}">${roEscaped}</button></td>
+                                <td>${vehicle}</td>
+                                <td style="font-weight:bold;">${totalHours}</td>
+                                <td>${status}</td>
+                            `;
                         return `
                             <tr class="tech-ro-entry" data-tech-id="${techId}" data-ro="${roEscaped}">
-                                <td style="width:46px; text-align:center;"><input type="checkbox" class="tech-ro-checkbox" data-tech-id="${techId}" data-ro="${roEscaped}" ${checked} /></td>
-                                <td><button type="button" class="tech-link ro-link" data-tech-id="${techId}" data-ro="${roEscaped}" data-tech-name="${escapeHtml(techName)}" data-tech-rate="${Number(techRate || 0).toFixed(2)}">RO# ${roEscaped}</button></td>
-                                <td>${vehicle}</td>
-                                <td style="text-align:right; font-weight:bold;">${totalHours}</td>
-                                <td>${status}</td>
+                                ${mainColumns}
                             </tr>
                             <tr id="${nestedRowId}" style="display:none;">
-                                <td colspan="5" style="padding:10px 6px;"></td>
+                                <td colspan="4" style="padding:10px 6px;"></td>
                             </tr>
                         `;
                     }).join('');
 
+                    const headerColumns = mode === 'flagout'
+                        ? `
+                            <th style="width:46px;">Sel</th>
+                            <th>RO#</th>
+                            <th>Vehicle</th>
+                            <th>Hours</th>
+                        `
+                        : `
+                            <th>RO#</th>
+                            <th>Vehicle</th>
+                            <th>Hours</th>
+                            <th>Status</th>
+                        `;
+
                     listContainer.innerHTML = `
                         <table class="tech-ro-table">
                             <thead>
-                                <tr>
-                                    <th style="width:46px; text-align:center;">Sel</th>
-                                    <th>RO#</th>
-                                    <th>Vehicle</th>
-                                    <th style="text-align:right;">Hours</th>
-                                    <th>Status</th>
-                                </tr>
+                                <tr>${headerColumns}</tr>
                             </thead>
                             <tbody>${rows}</tbody>
                         </table>
@@ -612,24 +630,23 @@ def get_techs_screen_html():
         }
 
         function bindRosAndNestedLines(techId, mode) {
-            const checkboxes = document.querySelectorAll(`.tech-ro-checkbox[data-tech-id="${techId}"]`);
-            checkboxes.forEach(chk => {
-                chk.addEventListener('change', () => {
-                    const ro = (chk.getAttribute('data-ro') || '').trim();
-                    updateTechRoSelection(techId, ro, chk.checked);
-                    if (mode === 'flagout') {
+            if (mode === 'flagout') {
+                const checkboxes = document.querySelectorAll(`.tech-ro-checkbox[data-tech-id="${techId}"]`);
+                checkboxes.forEach(chk => {
+                    chk.addEventListener('change', () => {
+                        const ro = (chk.getAttribute('data-ro') || '').trim();
+                        updateTechRoSelection(techId, ro, chk.checked);
                         syncSelectAllCheckbox(techId);
-                    }
+                    });
                 });
-            });
+            }
 
             document.querySelectorAll(`.ro-link[data-tech-id="${techId}"]`).forEach(button => {
                 button.addEventListener('click', (event) => {
                     event.stopPropagation();
                     const ro = (button.getAttribute('data-ro') || '').trim();
                     const techName = button.getAttribute('data-tech-name') || '';
-                    const techRate = parseFloat(button.getAttribute('data-tech-rate') || '0') || 0;
-                    toggleNestedRoLines(techId, ro, techName, techRate);
+                    toggleNestedRoLines(techId, ro, techName);
                 });
             });
         }
@@ -699,7 +716,7 @@ def get_techs_screen_html():
             });
         }
 
-        function toggleNestedRoLines(techId, ro, techName, techRate) {
+        function toggleNestedRoLines(techId, ro, techName) {
             const safeRo = ro.replace(/[^a-zA-Z0-9_-]/g, '_');
             const nestedRow = document.getElementById(`nested-lines-${techId}-${safeRo}`);
             if (!nestedRow) return;
@@ -737,86 +754,31 @@ def get_techs_screen_html():
                     }
 
                     const lineRows = lines.map((line, idx) => {
-                        const lineKey = escapeHtml(line.line_key || String(idx + 1));
                         const lineNum = escapeHtml(line.line || '—');
                         const desc = escapeHtml(line.description || '');
                         const repairType = escapeHtml(line.repair_type || '');
                         const hours = Number(line.value || 0).toFixed(1);
                         return `
                             <div class="nested-line-row">
-                                <input type="checkbox" class="nested-line-checkbox" data-line-key="${lineKey}" data-hours="${hours}" checked />
                                 <div style="flex:1;"><strong>Line ${lineNum}</strong> <span style="font-size:12px; color:#666;">[${repairType}]</span> - ${desc}</div>
-                                <div style="min-width:72px; text-align:right; font-weight:bold;">${hours} hrs</div>
+                                <div style="min-width:72px; font-weight:bold;">${hours} hrs</div>
                             </div>
                         `;
                     }).join('');
 
                     nestedRow.querySelector('td').innerHTML = `
                         <div class="nested-ro-lines">
-                            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; gap:8px; flex-wrap:wrap;">
+                            <div style="margin-bottom:8px;">
                                 <div style="font-weight:bold;">RO# ${escapeHtml(ro)} — ${escapeHtml(techName)}</div>
-                                <button type="button" class="flag-lines-btn" data-tech-id="${techId}" data-ro="${escapeHtml(ro)}" data-rate="${Number(techRate || 0).toFixed(2)}" style="padding:8px 12px; background:#d32f2f; color:#fff; border:none; border-radius:4px; cursor:pointer; font-weight:bold;">Flag selected lines</button>
                             </div>
                             <div>${lineRows}</div>
-                            <div class="nested-lines-summary" style="margin-top:10px; font-size:13px; color:#555;"></div>
                         </div>
                     `;
-
-                    attachNestedLineHandlers(nestedRow);
                 })
                 .catch(err => {
                     console.error('Error loading assigned repair lines:', err);
                     nestedRow.querySelector('td').innerHTML = '<div class="nested-ro-lines" style="color:red;">Error loading repair lines.</div>';
                 });
-        }
-
-        function attachNestedLineHandlers(nestedRow) {
-            const summary = nestedRow.querySelector('.nested-lines-summary');
-            const checkboxes = Array.from(nestedRow.querySelectorAll('.nested-line-checkbox'));
-            const flagBtn = nestedRow.querySelector('.flag-lines-btn');
-
-            const recalc = () => {
-                if (!summary) return;
-                const selected = checkboxes.filter(chk => chk.checked);
-                const totalHours = selected.reduce((sum, chk) => sum + (parseFloat(chk.getAttribute('data-hours') || '0') || 0), 0);
-                summary.innerHTML = `<strong>Selected Lines:</strong> ${selected.length} <span style="margin-left:14px;"><strong>Total HRS:</strong> ${totalHours.toFixed(1)}</span>`;
-            };
-
-            checkboxes.forEach(chk => chk.addEventListener('change', recalc));
-            recalc();
-
-            if (!flagBtn) return;
-            flagBtn.addEventListener('click', () => {
-                const ro = (flagBtn.getAttribute('data-ro') || '').trim();
-                const techId = parseInt(flagBtn.getAttribute('data-tech-id') || '0', 10);
-                const payRate = parseFloat(flagBtn.getAttribute('data-rate') || '0') || 0;
-                const selectedKeys = checkboxes.filter(chk => chk.checked).map(chk => chk.getAttribute('data-line-key')).filter(Boolean);
-                if (!selectedKeys.length) {
-                    alert('Select at least one line to flag.');
-                    return;
-                }
-
-                fetch('/api/tech-flag-out', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    credentials: 'include',
-                    body: JSON.stringify({
-                        ro,
-                        tech_id: techId,
-                        line_keys: selectedKeys,
-                        pay_rate: payRate
-                    })
-                })
-                .then(r => r.json())
-                .then(res => {
-                    if (res.error) throw new Error(res.error);
-                    loadTechsList();
-                })
-                .catch(err => {
-                    console.error('Error flagging selected lines:', err);
-                    alert('Error flagging selected lines.');
-                });
-            });
         }
 
         function openManageTechsModal() {
