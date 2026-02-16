@@ -87,6 +87,91 @@ async def home_screen(request: Request):
         .screen.active {{
             display: block;
         }}
+        :root {{
+            --app-bg: #3c4142;
+            --card-bg: #a9a9a9;
+        }}
+        body,
+        .tab-bar,
+        .nav-tab,
+        .nav-tab:hover,
+        .nav-tab.active,
+        .content-area,
+        .screen {{
+            background-color: var(--app-bg) !important;
+        }}
+        [style*="background:#d32f2f"],
+        [style*="background: #d32f2f"],
+        [style*="background-color:#d32f2f"],
+        [style*="background-color: #d32f2f"],
+        [style*="background:#b22222"],
+        [style*="background: #b22222"],
+        [style*="background-color:#b22222"],
+        [style*="background-color: #b22222"],
+        [style*="background:#505050"],
+        [style*="background: #505050"],
+        [style*="background-color:#505050"],
+        [style*="background-color: #505050"],
+        [style*="background:#666666"],
+        [style*="background: #666666"],
+        [style*="background-color:#666666"],
+        [style*="background-color: #666666"],
+        [style*="background:#707070"],
+        [style*="background: #707070"],
+        [style*="background-color:#707070"],
+        [style*="background-color: #707070"] {{
+            background: var(--app-bg) !important;
+            background-color: var(--app-bg) !important;
+        }}
+        .modal-content,
+        .dash-center-card,
+        .dash-mini-card,
+        .mini-popup-panel,
+        .phase-card,
+        .phase-cards,
+        #estimateSummary,
+        #flagoutTechTable,
+        #techsTableContainer,
+        #statusDropdownMenu,
+        [style*="background:#fff"],
+        [style*="background: #fff"],
+        [style*="background-color:#fff"],
+        [style*="background-color: #fff"],
+        [style*="background:#f9f9f9"],
+        [style*="background: #f9f9f9"],
+        [style*="background-color:#f9f9f9"],
+        [style*="background-color: #f9f9f9"],
+        [style*="background:#f2f2f2"],
+        [style*="background: #f2f2f2"],
+        [style*="background-color:#f2f2f2"],
+        [style*="background-color: #f2f2f2"],
+        [style*="background:#f0f0f0"],
+        [style*="background: #f0f0f0"],
+        [style*="background-color:#f0f0f0"],
+        [style*="background-color: #f0f0f0"],
+        [style*="background:#f5f5f5"],
+        [style*="background: #f5f5f5"],
+        [style*="background-color:#f5f5f5"],
+        [style*="background-color: #f5f5f5"],
+        [style*="background:#f7f7f7"],
+        [style*="background: #f7f7f7"],
+        [style*="background-color:#f7f7f7"],
+        [style*="background-color: #f7f7f7"],
+        [style*="background:#fafafa"],
+        [style*="background: #fafafa"],
+        [style*="background-color:#fafafa"],
+        [style*="background-color: #fafafa"],
+        [style*="background:#e0e0e0"],
+        [style*="background: #e0e0e0"],
+        [style*="background-color:#e0e0e0"],
+        [style*="background-color: #e0e0e0"],
+        [style*="background:#d9d9d9"],
+        [style*="background: #d9d9d9"],
+        [style*="background-color:#d9d9d9"],
+        [style*="background-color: #d9d9d9"] {{
+            background: var(--card-bg) !important;
+            background-color: var(--card-bg) !important;
+        }}
     </style>
 </head>
 <body>
