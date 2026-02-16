@@ -485,16 +485,29 @@ def get_dashboard_screen_html():
 
             const openRoSlideDownState = new Map();
 
-            function getRoSlideDownStateKey(roNumber, type) {
-                return `${type}::${String(roNumber || '')}`;
+            function normalizeRoKey(roNumber) {
+                return String(roNumber || '');
             }
 
             function rememberRoSlideDownOpen(roNumber, type) {
-                openRoSlideDownState.set(getRoSlideDownStateKey(roNumber, type), { roNumber, type });
+                openRoSlideDownState.set(normalizeRoKey(roNumber), type);
             }
 
             function forgetRoSlideDownOpen(roNumber, type) {
-                openRoSlideDownState.delete(getRoSlideDownStateKey(roNumber, type));
+                const roKey = normalizeRoKey(roNumber);
+                if (openRoSlideDownState.get(roKey) === type) {
+                    openRoSlideDownState.delete(roKey);
+                }
+            }
+
+            function closeOtherRoSlideDownsForSameRo(roNumber, keepType) {
+                const roKey = normalizeRoKey(roNumber);
+                const openType = openRoSlideDownState.get(roKey);
+                if (!openType || openType === keepType) return;
+                const roId = safeId(roNumber);
+                const otherRowEl = document.getElementById(`${openType}-row-${roId}`);
+                closeRoSlideDownRow(otherRowEl);
+                openRoSlideDownState.delete(roKey);
             }
 
             function loadRoSlideDownContent(roNumber, type) {
@@ -508,22 +521,32 @@ def get_dashboard_screen_html():
             }
 
             function restoreOpenRoSlideDowns() {
-                const openEntries = Array.from(openRoSlideDownState.values());
-                openEntries.forEach(({ roNumber, type }) => {
+                const openEntries = Array.from(openRoSlideDownState.entries());
+                openEntries.forEach(([roNumber, type]) => {
                     const roId = safeId(roNumber);
                     const rowEl = document.getElementById(`${type}-row-${roId}`);
                     if (!rowEl) {
                         forgetRoSlideDownOpen(roNumber, type);
                         return;
                     }
-                    rowEl.style.display = 'table-row';
-                    const panel = rowEl.querySelector('.ro-slide-panel');
-                    if (panel) {
-                        panel.style.maxHeight = `${panel.scrollHeight}px`;
-                        panel.style.opacity = '1';
-                    }
+                    openRoSlideDownRow(rowEl);
                     loadRoSlideDownContent(roNumber, type);
                 });
+            }
+
+            function refreshRoSlideDownHeight(roNumber, type) {
+                const rowEl = document.getElementById(`${type}-row-${safeId(roNumber)}`);
+                if (!rowEl || rowEl.style.display === 'none' || rowEl.style.display === '') return;
+                const panel = rowEl.querySelector('.ro-slide-panel');
+                if (!panel) return;
+                panel.style.overflow = 'visible';
+                panel.style.maxHeight = `${panel.scrollHeight}px`;
+                panel.style.opacity = '1';
+                setTimeout(() => {
+                    if (rowEl.style.display === 'table-row') {
+                        panel.style.maxHeight = 'none';
+                    }
+                }, 230);
             }
 
             function openRoSlideDownRow(rowEl) {
@@ -531,11 +554,17 @@ def get_dashboard_screen_html():
                 rowEl.style.display = 'table-row';
                 const panel = rowEl.querySelector('.ro-slide-panel');
                 if (!panel) return;
+                panel.style.overflow = 'visible';
                 panel.style.maxHeight = '0px';
                 panel.style.opacity = '0';
                 requestAnimationFrame(() => {
                     panel.style.maxHeight = `${panel.scrollHeight}px`;
                     panel.style.opacity = '1';
+                    setTimeout(() => {
+                        if (rowEl.style.display === 'table-row') {
+                            panel.style.maxHeight = 'none';
+                        }
+                    }, 230);
                 });
             }
 
@@ -545,6 +574,10 @@ def get_dashboard_screen_html():
                 if (!panel) {
                     rowEl.style.display = 'none';
                     return;
+                }
+                if (panel.style.maxHeight === 'none') {
+                    panel.style.maxHeight = `${panel.scrollHeight}px`;
+                    void panel.offsetHeight;
                 }
                 panel.style.maxHeight = '0px';
                 panel.style.opacity = '0';
@@ -562,6 +595,7 @@ def get_dashboard_screen_html():
 
                 const isHidden = rowEl.style.display === 'none' || rowEl.style.display === '';
                 if (isHidden) {
+                    closeOtherRoSlideDownsForSameRo(roNumber, type);
                     openRoSlideDownRow(rowEl);
                     rememberRoSlideDownOpen(roNumber, type);
                     return true;
@@ -617,6 +651,7 @@ def get_dashboard_screen_html():
                         const entries = Array.isArray(res.entries) ? res.entries : [];
                         if (entries.length === 0) {
                             listEl.innerHTML = '<div style="color:#999;">No activity found.</div>';
+                            refreshRoSlideDownHeight(roNumber, 'activity');
                             return;
                         }
                         listEl.innerHTML = entries.map((entry) => {
@@ -629,11 +664,13 @@ def get_dashboard_screen_html():
                                 </div>
                             `;
                         }).join('');
+                        refreshRoSlideDownHeight(roNumber, 'activity');
                     })
                     .catch(err => {
                         console.error('Error loading RO activity:', err);
                         if (listEl) {
                             listEl.innerHTML = '<div style="color:red;">Error loading activity.</div>';
+                            refreshRoSlideDownHeight(roNumber, 'activity');
                         }
                     });
             }
@@ -649,6 +686,7 @@ def get_dashboard_screen_html():
                         if (!listEl) return;
                         if (!res.notes || res.notes.length === 0) {
                             listEl.innerHTML = '<div style="color:#999;">No notes yet.</div>';
+                            refreshRoSlideDownHeight(roNumber, 'notes');
                             return;
                         }
                         listEl.innerHTML = res.notes.map(note => {
@@ -660,11 +698,13 @@ def get_dashboard_screen_html():
                                 </div>
                             `;
                         }).join('');
+                        refreshRoSlideDownHeight(roNumber, 'notes');
                     })
                     .catch(err => {
                         console.error('Error loading notes:', err);
                         if (listEl) {
                             listEl.innerHTML = '<div style="color:red;">Error loading notes.</div>';
+                            refreshRoSlideDownHeight(roNumber, 'notes');
                         }
                     });
             }
@@ -1483,12 +1523,14 @@ def get_dashboard_screen_html():
 
                         if (listEl) {
                             listEl.innerHTML = html;
+                            refreshRoSlideDownHeight(roNumber, 'tech-assignment');
                         }
                     })
                     .catch(err => {
                         console.error('Error loading repair data:', err);
                         if (listEl) {
                             listEl.innerHTML = '<div style="color:red; padding:12px;">Error loading data. Check console.</div>';
+                            refreshRoSlideDownHeight(roNumber, 'tech-assignment');
                         }
                     });
             }
