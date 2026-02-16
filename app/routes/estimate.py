@@ -766,6 +766,10 @@ async def add_tech(request: Request):
         return JSONResponse(status_code=401, content={"error": "Not authenticated"})
 
     data = await request.json()
+    role_value = (data.get("role") or "").strip()
+    allowed_roles = {"Body", "Frame", "Mech", "Paint"}
+    if role_value and role_value not in allowed_roles:
+        return JSONResponse(status_code=400, content={"error": "role must be Body, Frame, Mech, or Paint"})
     conn = get_conn()
     cur = conn.cursor()
 
@@ -773,15 +777,15 @@ async def add_tech(request: Request):
         _ensure_techs_table(cur)
         cur.execute("""
             INSERT INTO techs (first_name, last_name, pay_rate, domain, status, role, total_ros)
-            VALUES (%s, %s, %s, %s, 'Active', '', 0)
+            VALUES (%s, %s, %s, %s, 'Active', %s, 0)
             RETURNING id, first_name, last_name, pay_rate, active, status, role, total_ros
         """, (
             data["first_name"],
             data["last_name"],
             data["pay_rate"],
             domain,
+            role_value or "",
         ))
-
         row = cur.fetchone()
         conn.commit()
 
@@ -2064,36 +2068,59 @@ async def get_ro_assignment_lines(
         tech_rows = cur.fetchall()
 
         lines = []
+        first_name = (data.get("first_name") or "").strip()
+        last_name = (data.get("last_name") or "").strip()
         for row in line_rows:
-            lines.append(
+        allowed_roles = {"Body", "Frame", "Paint", "Mech"}
                 {
                     "repair_type": _normalize_repair_type(row.get("repair_type")),
-                    "line_key": str(row.get("line_key") or ""),
-                    "line_number": row.get("line_number") or "",
-                    "description": row.get("description") or "",
-                    "hours": _parse_float_value(row.get("hours")),
-                }
-            )
+        if role_value and role_value not in allowed_roles:
+            return JSONResponse(status_code=400, content={"error": "role must be Body, Frame, Paint, or Mech"})
 
-        techs = []
-        for row in tech_rows:
-            first_name = (row.get("first_name") or "").strip()
+        pay_rate_value = None
+        if pay_rate_raw is not None:
+            try:
+                pay_rate_value = float(pay_rate_raw)
+            except Exception:
+                return JSONResponse(status_code=400, content={"error": "pay_rate must be numeric"})
+
+            if pay_rate_value <= 0:
+                return JSONResponse(status_code=400, content={"error": "pay_rate must be greater than zero"})
+
+        if (first_name and not last_name) or (last_name and not first_name):
+            return JSONResponse(status_code=400, content={"error": "first_name and last_name must both be provided"})
+
+        update_fields = []
+        params = []
+
+        if role_value:
+            update_fields.append("role = %s")
+            params.append(role_value)
+        if pay_rate_value is not None:
+            update_fields.append("pay_rate = %s")
+            params.append(pay_rate_value)
+        if first_name and last_name:
+            update_fields.append("first_name = %s")
+            update_fields.append("last_name = %s")
+            params.extend([first_name, last_name])
+
+        if not update_fields:
+            return JSONResponse(status_code=400, content={"error": "No valid fields to update"})
             last_name = (row.get("last_name") or "").strip()
             label = " ".join(part for part in [first_name, last_name] if part)
             techs.append(
                 {
                     "id": row.get("id"),
                     "name": label,
-                    "pay_rate": _parse_float_value(row.get("pay_rate")),
-                }
-            )
-
-        return {
-            "lines": lines,
-            "techs": techs,
-            "types": ["body", "paint", "mech", "frame"],
-        }
-    finally:
+                f"""
+                UPDATE techs
+                SET {', '.join(update_fields)}
+                WHERE id = %s
+                  AND active = TRUE
+                  AND (domain = %s OR domain IS NULL)
+                RETURNING id, first_name, last_name, role, pay_rate
+                """,
+                params + [tech_id, domain],
         cur.close()
 
 
@@ -2103,6 +2130,8 @@ async def save_ro_assignment_lines(request: Request):
     if not domain:
         return JSONResponse(status_code=401, content={"error": "Not authenticated"})
 
+                    "first_name": row.get("first_name"),
+                    "last_name": row.get("last_name"),
     data = await request.json()
     ro_value = (data.get("ro") or "").strip()
     source = data.get("source") or {}
@@ -2475,6 +2504,7 @@ async def get_tech_assignments(request: Request, tech_id: int):
                     "ro": row.get("ro"),
                     "total_hours": _parse_float_value(row.get("total_hours")),
                     "vehicle": vehicle_text,
+                    "status": "Assigned",
                 }
             )
 
@@ -2673,6 +2703,138 @@ async def tech_flag_out_lines(request: Request):
             "remaining_count": remaining_count,
             "ro_completed": remaining_count == 0,
         }
+
+
+@router.post("/tech-flag-out-ros")
+async def tech_flag_out_ros(request: Request):
+    domain = get_user_domain(request)
+    if not domain:
+        return JSONResponse(status_code=401, content={"error": "Not authenticated"})
+
+    data = await request.json()
+    tech_id = data.get("tech_id")
+    selected_ros = data.get("ros") or []
+    pay_rate = _parse_float_value(data.get("pay_rate"))
+
+    if not tech_id:
+        return JSONResponse(status_code=400, content={"error": "tech_id is required"})
+
+    ro_values = []
+    for value in selected_ros:
+        ro_value = (value or "").strip()
+        if ro_value and ro_value not in ro_values:
+            ro_values.append(ro_value)
+
+    if not ro_values:
+        return JSONResponse(status_code=400, content={"error": "ros is required"})
+
+    conn = get_conn()
+    cur = conn.cursor()
+    try:
+        _ensure_ro_line_assignments_table(cur)
+        _ensure_ro_flagout_lines_table(cur)
+
+        total_flagged_count = 0
+        total_flagged_hours = 0.0
+        total_flagged_pay = 0.0
+
+        for ro_value in ro_values:
+            _ensure_ro_line_assignments_for_ro(cur, domain, ro_value)
+            cur.execute(
+                """
+                SELECT id, line_key, line_number, description, hours, tech_name, repair_type
+                FROM ro_line_assignments
+                WHERE domain = %s
+                  AND ro = %s
+                  AND tech_id = %s
+                  AND COALESCE(ready_to_flag, FALSE) = FALSE
+                """,
+                (domain, ro_value, tech_id),
+            )
+            rows = cur.fetchall() or []
+            if not rows:
+                continue
+
+            row_ids = [int(row.get("id")) for row in rows if row.get("id") is not None]
+            for row in rows:
+                line_hours = _parse_float_value(row.get("hours"))
+                line_pay = line_hours * pay_rate
+                total_flagged_hours += line_hours
+                total_flagged_pay += line_pay
+                total_flagged_count += 1
+
+                cur.execute(
+                    """
+                    INSERT INTO ro_flagout_lines (
+                        ro,
+                        tech_id,
+                        tech_name,
+                        repair_type,
+                        line_key,
+                        line_number,
+                        description,
+                        hours,
+                        pay_rate,
+                        pay_amount,
+                        status,
+                        domain,
+                        flagged_at
+                    )
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 'ready_to_flag', %s, CURRENT_TIMESTAMP)
+                    ON CONFLICT (ro, tech_id, repair_type, line_key, domain)
+                    DO UPDATE SET
+                        line_number = EXCLUDED.line_number,
+                        description = EXCLUDED.description,
+                        hours = EXCLUDED.hours,
+                        pay_rate = EXCLUDED.pay_rate,
+                        pay_amount = EXCLUDED.pay_amount,
+                        status = 'ready_to_flag',
+                        flagged_at = CURRENT_TIMESTAMP
+                    """,
+                    (
+                        ro_value,
+                        tech_id,
+                        row.get("tech_name"),
+                        row.get("repair_type") or "body",
+                        row.get("line_key"),
+                        row.get("line_number"),
+                        row.get("description"),
+                        row.get("hours"),
+                        pay_rate,
+                        line_pay,
+                        domain,
+                    ),
+                )
+
+            if row_ids:
+                cur.execute(
+                    """
+                    UPDATE ro_line_assignments
+                    SET ready_to_flag = TRUE,
+                        flagged_at = CURRENT_TIMESTAMP,
+                        updated_at = CURRENT_TIMESTAMP
+                    WHERE id = ANY(%s)
+                    """,
+                    (row_ids,),
+                )
+
+        conn.commit()
+
+        if total_flagged_count == 0:
+            return JSONResponse(status_code=404, content={"error": "No matching unpaid assigned lines found for selected ROs"})
+
+        return {
+            "status": "ok",
+            "flagged_count": total_flagged_count,
+            "flagged_hours": total_flagged_hours,
+            "flagged_pay": total_flagged_pay,
+            "ros": ro_values,
+        }
+    except Exception as exc:
+        conn.rollback()
+        return JSONResponse(status_code=500, content={"error": str(exc)})
+    finally:
+        cur.close()
     finally:
         cur.close()
 
