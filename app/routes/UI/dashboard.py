@@ -161,9 +161,19 @@ def get_dashboard_screen_html():
             
             <!-- RO List Table -->
             <div style="margin-top:30px; background:#fff; padding:20px; border-radius:8px; box-shadow:0 2px 4px rgba(0,0,0,0.1);">
-                <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:20px;">
+                <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:20px; position:relative;">
                     <h3 style="margin:0; color:#333;">Repair Orders</h3>
-                    <button onclick="openPrintOptionsModal()" style="padding:8px 16px; background:#b22222; color:#fff; border:none; border-radius:4px; cursor:pointer; font-weight:bold; font-size:14px;">Print</button>
+                    <button id="dashboardPrintTrigger" class="mini-popup-trigger" onclick="openPrintOptionsModal()" style="padding:8px 16px; background:#b22222; color:#fff; border:none; border-radius:4px; cursor:pointer; font-weight:bold; font-size:14px;">Print</button>
+                    <div id="printOptionsModal" class="mini-popup-panel" style="display:none; right:0; left:auto;">
+                        <h2 style="margin:0 0 14px 0; color:#333; font-size:18px;">Print RO List</h2>
+                        <p style="margin:0 0 12px 0; font-weight:bold; color:#555;">Print by:</p>
+                        <div style="display:flex; flex-direction:column; gap:8px;">
+                            <button onclick="printRoList('ro')" style="padding:10px 12px; background:#f5f5f5; color:#333; border:1px solid #ddd; border-radius:4px; cursor:pointer; text-align:left; font-size:14px;">RO #</button>
+                            <button onclick="printRoList('insurance')" style="padding:10px 12px; background:#f5f5f5; color:#333; border:1px solid #ddd; border-radius:4px; cursor:pointer; text-align:left; font-size:14px;">Insurance</button>
+                            <button onclick="printRoList('in_date')" style="padding:10px 12px; background:#f5f5f5; color:#333; border:1px solid #ddd; border-radius:4px; cursor:pointer; text-align:left; font-size:14px;">In date</button>
+                            <button onclick="printRoList('ecd_date')" style="padding:10px 12px; background:#f5f5f5; color:#333; border:1px solid #ddd; border-radius:4px; cursor:pointer; text-align:left; font-size:14px;">ECD</button>
+                        </div>
+                    </div>
                 </div>
                 <div style="overflow-x:auto;">
                     <table id="roListTable" style="width:100%; border-collapse:collapse;">
@@ -231,55 +241,30 @@ def get_dashboard_screen_html():
             <input id="roDatePickerInput" type="date" style="padding:4px 6px;" />
         </div>
 
-        <div id="printOptionsModal" class="modal" style="display:none;">
-            <div class="modal-content" style="max-width:400px;">
-                <span class="close" onclick="closePrintOptionsModal()">&times;</span>
-                <h2 style="margin-bottom:24px; color:#333;">Print RO List</h2>
-                <p style="margin-bottom:16px; font-weight:bold; color:#555;">Print by:</p>
-                <div style="display:flex; flex-direction:column; gap:12px;">
-                    <button onclick="printRoList('ro')" style="padding:12px 20px; background:#f5f5f5; color:#333; border:1px solid #ddd; border-radius:4px; cursor:pointer; text-align:left; font-size:15px; transition:background 0.2s;" onmouseover="this.style.background='#e8e8e8'" onmouseout="this.style.background='#f5f5f5'">RO #</button>
-                    <button onclick="printRoList('insurance')" style="padding:12px 20px; background:#f5f5f5; color:#333; border:1px solid #ddd; border-radius:4px; cursor:pointer; text-align:left; font-size:15px; transition:background 0.2s;" onmouseover="this.style.background='#e8e8e8'" onmouseout="this.style.background='#f5f5f5'">Insurance</button>
-                    <button onclick="printRoList('in_date')" style="padding:12px 20px; background:#f5f5f5; color:#333; border:1px solid #ddd; border-radius:4px; cursor:pointer; text-align:left; font-size:15px; transition:background 0.2s;" onmouseover="this.style.background='#e8e8e8'" onmouseout="this.style.background='#f5f5f5'">In date</button>
-                    <button onclick="printRoList('ecd_date')" style="padding:12px 20px; background:#f5f5f5; color:#333; border:1px solid #ddd; border-radius:4px; cursor:pointer; text-align:left; font-size:15px; transition:background 0.2s;" onmouseover="this.style.background='#e8e8e8'" onmouseout="this.style.background='#f5f5f5'">ECD</button>
-                </div>
-            </div>
-        </div>
-
-        <div id="roPrintModal" class="modal" style="display:none;">
-            <div class="modal-content" style="max-width:500px;">
-                <span class="close" onclick="closeRoPrintModal()">&times;</span>
-                <h2 id="roPrintTitle" style="margin-bottom:24px; color:#333;">Print Reports</h2>
-                <p style="margin-bottom:16px; font-weight:bold; color:#555;">Select reports to print:</p>
-                <div style="display:flex; flex-direction:column; gap:10px; margin-bottom:24px;">
-                    <label style="display:flex; align-items:center; gap:10px; padding:10px; background:#f9f9f9; border-radius:4px; cursor:pointer;">
-                        <input type="checkbox" id="printFileCover" style="width:18px; height:18px; cursor:pointer;" />
-                        <span style="font-size:15px;">File Cover Page</span>
-                    </label>
-                    <label style="display:flex; align-items:center; gap:10px; padding:10px; background:#f9f9f9; border-radius:4px; cursor:pointer;">
-                        <input type="checkbox" id="printVehicleTag" style="width:18px; height:18px; cursor:pointer;" />
-                        <span style="font-size:15px;">Vehicle Tag</span>
-                    </label>
-                    <label style="display:flex; align-items:center; gap:10px; padding:10px; background:#f9f9f9; border-radius:4px; cursor:pointer;">
-                        <input type="checkbox" id="printTechBody" style="width:18px; height:18px; cursor:pointer;" />
-                        <span style="font-size:15px;">Tech Body</span>
-                    </label>
-                    <label style="display:flex; align-items:center; gap:10px; padding:10px; background:#f9f9f9; border-radius:4px; cursor:pointer;">
-                        <input type="checkbox" id="printTechPaint" style="width:18px; height:18px; cursor:pointer;" />
-                        <span style="font-size:15px;">Tech Paint</span>
-                    </label>
-                    <label style="display:flex; align-items:center; gap:10px; padding:10px; background:#f9f9f9; border-radius:4px; cursor:pointer;">
-                        <input type="checkbox" id="printTechMech" style="width:18px; height:18px; cursor:pointer;" />
-                        <span style="font-size:15px;">Tech Mech</span>
-                    </label>
-                </div>
-                <div style="display:flex; justify-content:flex-end; gap:10px;">
-                    <button onclick="closeRoPrintModal()" style="padding:10px 20px; background:#999; color:#fff; border:none; border-radius:4px; cursor:pointer;">Cancel</button>
-                    <button onclick="generateSelectedPrints()" style="padding:10px 20px; background:#d32f2f; color:#fff; border:none; border-radius:4px; cursor:pointer; font-weight:bold;">Print</button>
-                </div>
-            </div>
-        </div>
-
         <style>
+            .mini-popup-panel {
+                position: absolute;
+                top: 100%;
+                left: 0;
+                z-index: 1000;
+                background: #fff;
+                border: 2px solid #b22222;
+                border-radius: 6px;
+                padding: 12px;
+                min-width: 300px;
+                max-width: 500px;
+                box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+                margin-top: 4px;
+                opacity: 0;
+                transform: translateY(-6px);
+                transition: opacity 0.18s ease, transform 0.18s ease;
+                pointer-events: none;
+            }
+            .mini-popup-panel.open {
+                opacity: 1;
+                transform: translateY(0);
+                pointer-events: auto;
+            }
             .modal {
                 position: fixed;
                 z-index: 1000;
@@ -1001,8 +986,43 @@ def get_dashboard_screen_html():
                 return subletItems.length > 0;
             }
             
-            // Track currently open sublet panel
-            let currentOpenSubletPanel = null;
+            // Track currently open mini popup panel
+            let currentOpenMiniPopup = null;
+
+            function openMiniPopup(panel) {
+                if (!panel) return;
+                if (currentOpenMiniPopup && currentOpenMiniPopup !== panel) {
+                    closeMiniPopup(currentOpenMiniPopup);
+                }
+                panel.style.display = 'block';
+                requestAnimationFrame(() => {
+                    panel.classList.add('open');
+                });
+                currentOpenMiniPopup = panel;
+            }
+
+            function closeMiniPopup(panel) {
+                if (!panel) return;
+                panel.classList.remove('open');
+                setTimeout(() => {
+                    if (!panel.classList.contains('open')) {
+                        panel.style.display = 'none';
+                    }
+                }, 200);
+                if (currentOpenMiniPopup === panel) {
+                    currentOpenMiniPopup = null;
+                }
+            }
+
+            function toggleMiniPopup(panel) {
+                if (!panel) return;
+                const shouldOpen = panel.style.display === 'none' || panel.style.display === '';
+                if (shouldOpen) {
+                    openMiniPopup(panel);
+                } else {
+                    closeMiniPopup(panel);
+                }
+            }
             
             function toggleSubletPanel(event, roNumber) {
                 event.stopPropagation();
@@ -1012,31 +1032,16 @@ def get_dashboard_screen_html():
                 const panel = document.getElementById(panelId);
                 
                 if (!panel) return;
-                
-                // If clicking the same panel, just close it
-                if (currentOpenSubletPanel && currentOpenSubletPanel.id === panelId) {
-                    panel.style.display = 'none';
-                    currentOpenSubletPanel = null;
-                    return;
-                }
-                
-                // Close any currently open panel
-                if (currentOpenSubletPanel) {
-                    currentOpenSubletPanel.style.display = 'none';
-                }
-                
-                // Open the new panel
-                panel.style.display = 'block';
-                currentOpenSubletPanel = panel;
+
+                toggleMiniPopup(panel);
             }
             
             // Close panel when clicking outside
             document.addEventListener('click', function(event) {
-                if (currentOpenSubletPanel && 
-                    !event.target.closest('.sublet-warning-icon') &&
-                    !event.target.closest('.sublet-panel')) {
-                    currentOpenSubletPanel.style.display = 'none';
-                    currentOpenSubletPanel = null;
+                if (currentOpenMiniPopup &&
+                    !event.target.closest('.mini-popup-trigger') &&
+                    !event.target.closest('.mini-popup-panel')) {
+                    closeMiniPopup(currentOpenMiniPopup);
                 }
             });
 
@@ -1098,13 +1103,13 @@ def get_dashboard_screen_html():
                         <tr style="background:${rowBg};">
                             <td style="padding:12px; border-bottom:1px solid #eee; position:relative;">
                                 <div style="display:inline-flex; align-items:center; gap:6px;">
-                                    <button type="button" onclick="openRoPrintModal(event, '${ro.ro}')" style="background:none; border:none; color:#333; cursor:pointer; padding:0; font-size:16px; line-height:1;" title="Print Reports">🖨️</button>
+                                    <button type="button" class="mini-popup-trigger" onclick="openRoPrintModal(event, '${ro.ro}')" style="background:none; border:none; color:#333; cursor:pointer; padding:0; font-size:16px; line-height:1;" title="Print Reports">🖨️</button>
                                     <button type="button" onclick="toggleRoNotesFromLink(event, '${ro.ro}')" style="background:none; border:none; color:#0066cc; text-decoration:underline; cursor:pointer; padding:0; font:inherit;">
                                         ${ro.ro}
                                     </button>
                                     ${showSubletWarning ? `
-                                        <span class="sublet-warning-icon" onclick="toggleSubletPanel(event, '${ro.ro}')" style="cursor:pointer; color:#ff9800; font-size:18px; line-height:1;" title="Pending Sublets">⚠️</span>
-                                        <div id="sublet-panel-${rowId}" class="sublet-panel" style="display:none; position:absolute; top:100%; left:0; z-index:1000; background:#fff; border:2px solid #ff9800; border-radius:6px; padding:12px; min-width:300px; max-width:500px; box-shadow:0 4px 8px rgba(0,0,0,0.2); margin-top:4px;">
+                                        <span class="sublet-warning-icon mini-popup-trigger" onclick="toggleSubletPanel(event, '${ro.ro}')" style="cursor:pointer; color:#ff9800; font-size:18px; line-height:1;" title="Pending Sublets">⚠️</span>
+                                        <div id="sublet-panel-${rowId}" class="sublet-panel mini-popup-panel" style="display:none;">
                                             <div style="font-weight:bold; color:#e65100; margin-bottom:8px; font-size:14px;">Pending Sublet Items:</div>
                                             <ul style="margin:0; padding-left:20px; font-size:13px;">
                                                 ${subletItems.map(item => `
@@ -1116,6 +1121,36 @@ def get_dashboard_screen_html():
                                             </ul>
                                         </div>
                                     ` : ''}
+                                    <div id="ro-print-panel-${rowId}" class="mini-popup-panel" style="display:none;">
+                                        <h2 id="roPrintTitle-${rowId}" style="margin:0 0 12px 0; color:#333; font-size:16px;">Print Reports - RO# ${ro.ro}</h2>
+                                        <p style="margin:0 0 10px 0; font-weight:bold; color:#555;">Select reports to print:</p>
+                                        <div style="display:flex; flex-direction:column; gap:8px; margin-bottom:12px;">
+                                            <label style="display:flex; align-items:center; gap:8px; padding:8px; background:#f9f9f9; border-radius:4px; cursor:pointer;">
+                                                <input type="checkbox" id="printFileCover-${rowId}" style="width:16px; height:16px; cursor:pointer;" />
+                                                <span style="font-size:14px;">File Cover Page</span>
+                                            </label>
+                                            <label style="display:flex; align-items:center; gap:8px; padding:8px; background:#f9f9f9; border-radius:4px; cursor:pointer;">
+                                                <input type="checkbox" id="printVehicleTag-${rowId}" style="width:16px; height:16px; cursor:pointer;" />
+                                                <span style="font-size:14px;">Vehicle Tag</span>
+                                            </label>
+                                            <label style="display:flex; align-items:center; gap:8px; padding:8px; background:#f9f9f9; border-radius:4px; cursor:pointer;">
+                                                <input type="checkbox" id="printTechBody-${rowId}" style="width:16px; height:16px; cursor:pointer;" />
+                                                <span style="font-size:14px;">Tech Body</span>
+                                            </label>
+                                            <label style="display:flex; align-items:center; gap:8px; padding:8px; background:#f9f9f9; border-radius:4px; cursor:pointer;">
+                                                <input type="checkbox" id="printTechPaint-${rowId}" style="width:16px; height:16px; cursor:pointer;" />
+                                                <span style="font-size:14px;">Tech Paint</span>
+                                            </label>
+                                            <label style="display:flex; align-items:center; gap:8px; padding:8px; background:#f9f9f9; border-radius:4px; cursor:pointer;">
+                                                <input type="checkbox" id="printTechMech-${rowId}" style="width:16px; height:16px; cursor:pointer;" />
+                                                <span style="font-size:14px;">Tech Mech</span>
+                                            </label>
+                                        </div>
+                                        <div style="display:flex; justify-content:flex-end; gap:8px;">
+                                            <button onclick="closeRoPrintModal()" style="padding:8px 14px; background:#999; color:#fff; border:none; border-radius:4px; cursor:pointer;">Cancel</button>
+                                            <button onclick="generateSelectedPrints()" style="padding:8px 14px; background:#d32f2f; color:#fff; border:none; border-radius:4px; cursor:pointer; font-weight:bold;">Print</button>
+                                        </div>
+                                    </div>
                                 </div>
                             </td>
                             <td style="padding:12px; border-bottom:1px solid #eee; color:#333;">${ro.vehicle || 'N/A'}</td>
@@ -1567,11 +1602,11 @@ def get_dashboard_screen_html():
             
             // Print Options Modal Functions
             function openPrintOptionsModal() {
-                document.getElementById('printOptionsModal').style.display = 'block';
+                toggleMiniPopup(document.getElementById('printOptionsModal'));
             }
             
             function closePrintOptionsModal() {
-                document.getElementById('printOptionsModal').style.display = 'none';
+                closeMiniPopup(document.getElementById('printOptionsModal'));
             }
             
             function printRoList(sortBy) {
@@ -1757,26 +1792,38 @@ def get_dashboard_screen_html():
             
             function openRoPrintModal(event, roNumber) {
                 if (event) event.stopPropagation();
+                const rowId = safeId(roNumber);
+                const panel = document.getElementById(`ro-print-panel-${rowId}`);
+                if (!panel) return;
                 
                 // Reset checkboxes
-                document.getElementById('printFileCover').checked = false;
-                document.getElementById('printVehicleTag').checked = false;
-                document.getElementById('printTechBody').checked = false;
-                document.getElementById('printTechPaint').checked = false;
-                document.getElementById('printTechMech').checked = false;
+                const fileCoverEl = document.getElementById(`printFileCover-${rowId}`);
+                const vehicleTagEl = document.getElementById(`printVehicleTag-${rowId}`);
+                const techBodyEl = document.getElementById(`printTechBody-${rowId}`);
+                const techPaintEl = document.getElementById(`printTechPaint-${rowId}`);
+                const techMechEl = document.getElementById(`printTechMech-${rowId}`);
+                if (fileCoverEl) fileCoverEl.checked = false;
+                if (vehicleTagEl) vehicleTagEl.checked = false;
+                if (techBodyEl) techBodyEl.checked = false;
+                if (techPaintEl) techPaintEl.checked = false;
+                if (techMechEl) techMechEl.checked = false;
                 
                 // Update title
-                document.getElementById('roPrintTitle').textContent = `Print Reports - RO# ${roNumber}`;
+                const titleEl = document.getElementById(`roPrintTitle-${rowId}`);
+                if (titleEl) titleEl.textContent = `Print Reports - RO# ${roNumber}`;
                 
                 // Store RO number for later use
-                currentRoPrintData = { ro: roNumber };
+                currentRoPrintData = { ro: roNumber, rowId };
                 
-                // Show modal
-                document.getElementById('roPrintModal').style.display = 'block';
+                // Show popup
+                toggleMiniPopup(panel);
             }
             
             function closeRoPrintModal() {
-                document.getElementById('roPrintModal').style.display = 'none';
+                const rowId = currentRoPrintData?.rowId;
+                if (rowId) {
+                    closeMiniPopup(document.getElementById(`ro-print-panel-${rowId}`));
+                }
                 currentRoPrintData = null;
             }
             
@@ -1785,11 +1832,12 @@ def get_dashboard_screen_html():
                     return;
                 }
                 
-                const fileCover = document.getElementById('printFileCover').checked;
-                const vehicleTag = document.getElementById('printVehicleTag').checked;
-                const techBody = document.getElementById('printTechBody').checked;
-                const techPaint = document.getElementById('printTechPaint').checked;
-                const techMech = document.getElementById('printTechMech').checked;
+                const rowId = currentRoPrintData.rowId;
+                const fileCover = !!document.getElementById(`printFileCover-${rowId}`)?.checked;
+                const vehicleTag = !!document.getElementById(`printVehicleTag-${rowId}`)?.checked;
+                const techBody = !!document.getElementById(`printTechBody-${rowId}`)?.checked;
+                const techPaint = !!document.getElementById(`printTechPaint-${rowId}`)?.checked;
+                const techMech = !!document.getElementById(`printTechMech-${rowId}`)?.checked;
                 
                 if (!fileCover && !vehicleTag && !techBody && !techPaint && !techMech) {
                     alert('Please select at least one report to print.');
