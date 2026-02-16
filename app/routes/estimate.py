@@ -2454,7 +2454,6 @@ async def get_tech_assignments(request: Request, tech_id: int):
             WHERE a.domain = %s
               AND a.tech_id = %s
               AND a.tech_name IS NOT NULL
-              AND a.repair_type = 'body'
               AND COALESCE(a.ready_to_flag, FALSE) = FALSE
             GROUP BY a.ro, le.year, le.make, le.model, le.vehicle
             ORDER BY ro
@@ -2507,12 +2506,12 @@ async def get_tech_assignment_lines(request: Request, tech_id: int, ro: str):
                 line_key,
                 line_number,
                 description,
-                hours
+                                hours,
+                                repair_type
             FROM ro_line_assignments
             WHERE domain = %s
               AND ro = %s
               AND tech_id = %s
-              AND repair_type = 'body'
               AND COALESCE(ready_to_flag, FALSE) = FALSE
             ORDER BY line_number
             """,
@@ -2531,6 +2530,7 @@ async def get_tech_assignment_lines(request: Request, tech_id: int, ro: str):
                     "line": row.get("line_number") or "",
                     "description": row.get("description") or "",
                     "value": hours,
+                    "repair_type": _normalize_repair_type(row.get("repair_type")),
                 }
             )
 
@@ -2575,7 +2575,6 @@ async def tech_flag_out_lines(request: Request):
             WHERE domain = %s
               AND ro = %s
               AND tech_id = %s
-              AND repair_type = 'body'
               AND COALESCE(ready_to_flag, FALSE) = FALSE
               AND line_key = ANY(%s)
             """,
@@ -2584,7 +2583,7 @@ async def tech_flag_out_lines(request: Request):
         rows = cur.fetchall()
 
         if not rows:
-            return JSONResponse(status_code=404, content={"error": "No matching unpaid labor lines found"})
+            return JSONResponse(status_code=404, content={"error": "No matching unpaid assigned lines found"})
 
         row_ids = [int(row.get("id")) for row in rows if row.get("id") is not None]
         flagged_hours = 0.0

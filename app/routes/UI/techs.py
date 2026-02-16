@@ -613,7 +613,7 @@ def get_techs_screen_html():
             const body = document.getElementById('techAssignmentBody');
             if (!modal || !title || !body) return;
 
-            title.textContent = `Labor Lines - RO# ${roNumber} (${techName})`;
+            title.textContent = `Assigned Lines - RO# ${roNumber} (${techName})`;
             body.innerHTML = '<div style="color:#777;">Loading...</div>';
             modal.style.display = 'block';
             const resolvedRate = Number.isFinite(Number(techRate)) ? Number(techRate) : Number(techPayRateById[String(techId)] || 0);
@@ -636,12 +636,14 @@ def get_techs_screen_html():
                     const rowsHtml = visible.map(item => {
                         const line = item.line || '—';
                         const desc = item.description || '';
+                        const repairType = (item.repair_type || '').trim();
+                        const repairTag = repairType ? `<span style="font-size:12px; color:#666; margin-left:8px; text-transform:uppercase;">[${repairType}]</span>` : '';
                         const value = Number.isFinite(parseFloat(item.value)) ? parseFloat(item.value).toFixed(1) : '0.0';
                         const key = item.line_key || String(line);
                         return `
                             <label style="display:flex; align-items:center; gap:10px; padding:10px 8px; border-bottom:1px solid #eee; cursor:pointer;">
                                 <input type="checkbox" class="flagout-line-checkbox" data-line-key="${key}" data-hours="${value}" checked onchange="updateFlagOutMasterCheckbox()" style="width:16px; height:16px; cursor:pointer;" />
-                                <div class="print-line-desc" style="flex:1;"><strong>Line ${line}</strong> - ${desc}</div>
+                                <div class="print-line-desc" style="flex:1;"><strong>Line ${line}</strong>${repairTag} - ${desc}</div>
                                 <div class="print-line-hours" style="min-width:80px; text-align:right; font-weight:bold;">${value} hrs</div>
                             </label>
                         `;
