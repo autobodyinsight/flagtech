@@ -57,6 +57,15 @@ def get_payments_screen_html():
                 return String(value || '').replace(/'/g, "\\'");
             }
 
+            function paymentsEscapeHtml(value) {
+                return String(value || '')
+                    .replace(/&/g, '&amp;')
+                    .replace(/</g, '&lt;')
+                    .replace(/>/g, '&gt;')
+                    .replace(/\"/g, '&quot;')
+                    .replace(/'/g, '&#39;');
+            }
+
             function paymentsOpenRow(rowEl) {
                 if (!rowEl) return;
                 rowEl.style.display = 'table-row';
@@ -162,6 +171,8 @@ def get_payments_screen_html():
                 const insurancePaid = Number(rowData.insurance_paid || 0);
                 const customerPaid = Number(rowData.customer_paid || 0);
                 const invoiceReceivedTotal = insurancePaid + customerPaid;
+                const invoicePayments = Array.isArray(rowData.invoice_payments) ? rowData.invoice_payments : [];
+                const invoicePaymentsTotal = invoicePayments.reduce((sum, entry) => sum + Number(entry.amount_paid || 0), 0);
 
                 const rows = Array.isArray(techEntries) ? techEntries : [];
                 const isLoadingTech = techEntries === null;
@@ -189,6 +200,19 @@ def get_payments_screen_html():
                     ? `<div style="margin-top:8px; color:#c62828; font-size:12px;">${String(errorMessage)}</div>`
                     : '';
 
+                const invoiceRowsHtml = invoicePayments.length > 0
+                    ? invoicePayments.map((entry) => {
+                        const invoiceNumber = paymentsEscapeHtml(String(entry.invoice_number || '-'));
+                        const amountPaid = Number(entry.amount_paid || 0);
+                        return `
+                            <tr>
+                                <td style="padding:8px; border-bottom:1px solid #ececec; color:#333;">${invoiceNumber}</td>
+                                <td style="padding:8px; border-bottom:1px solid #ececec; text-align:right; color:#333;">${paymentsFormatMoney(amountPaid)}</td>
+                            </tr>
+                        `;
+                    }).join('')
+                    : '<tr><td colspan="2" style="padding:8px; border-bottom:1px solid #ececec; text-align:center; color:#777;">No invoice payments saved in Parts</td></tr>';
+
                 contentEl.innerHTML = `
                     <div style="display:grid; grid-template-columns:1fr 1fr; gap:14px; align-items:start;">
                         <div>
@@ -196,22 +220,15 @@ def get_payments_screen_html():
                             <table style="width:100%; border-collapse:collapse;">
                                 <thead>
                                     <tr style="background:#f7f7f7; text-align:left;">
-                                        <th style="padding:8px; border-bottom:1px solid #ddd; font-weight:bold; color:#666;">Type</th>
+                                        <th style="padding:8px; border-bottom:1px solid #ddd; font-weight:bold; color:#666;">Invoice #</th>
                                         <th style="padding:8px; border-bottom:1px solid #ddd; font-weight:bold; color:#666; text-align:right;">Amount</th>
                                     </tr>
                                 </thead>
                                 <tbody>
+                                    ${invoiceRowsHtml}
                                     <tr>
-                                        <td style="padding:8px; border-bottom:1px solid #ececec; color:#333;">Insurance Received</td>
-                                        <td style="padding:8px; border-bottom:1px solid #ececec; text-align:right; color:#333;">${paymentsFormatMoney(insurancePaid)}</td>
-                                    </tr>
-                                    <tr>
-                                        <td style="padding:8px; border-bottom:1px solid #ececec; color:#333;">Customer Received</td>
-                                        <td style="padding:8px; border-bottom:1px solid #ececec; text-align:right; color:#333;">${paymentsFormatMoney(customerPaid)}</td>
-                                    </tr>
-                                    <tr>
-                                        <td style="padding:8px; border-bottom:1px solid #ececec; font-weight:bold; color:#333;">Received Invoices Total</td>
-                                        <td style="padding:8px; border-bottom:1px solid #ececec; text-align:right; font-weight:bold; color:#333;">${paymentsFormatMoney(invoiceReceivedTotal)}</td>
+                                        <td style="padding:8px; border-bottom:1px solid #ececec; font-weight:bold; color:#333;">Invoices Paid Total</td>
+                                        <td style="padding:8px; border-bottom:1px solid #ececec; text-align:right; font-weight:bold; color:#333;">${paymentsFormatMoney(invoicePaymentsTotal)}</td>
                                     </tr>
                                 </tbody>
                             </table>

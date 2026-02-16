@@ -1665,6 +1665,7 @@ async def list_open_ros_for_payments(request: Request):
         _ensure_saved_estimates_table(cur)
         _ensure_ro_phases_table(cur)
         _ensure_ro_payment_totals_table(cur)
+        _ensure_parts_received_table(cur)
 
         cur.execute(
             """
@@ -1720,6 +1721,39 @@ async def list_open_ros_for_payments(request: Request):
             if str(payment_row.get("ro") or "").strip()
         }
 
+        cur.execute(
+            """
+            SELECT
+                ro,
+                invoice_number,
+                COALESCE(NULLIF(SUM(DISTINCT invoice_total), 0), SUM(cost), 0) AS invoice_paid_total,
+                MAX(COALESCE(received_business_date, received_at::date)) AS latest_received_date
+            FROM parts_received
+            WHERE domain = %s
+              AND ro IS NOT NULL
+              AND ro <> ''
+              AND invoice_number IS NOT NULL
+              AND TRIM(invoice_number) <> ''
+            GROUP BY ro, invoice_number
+            ORDER BY ro, latest_received_date DESC, invoice_number
+            """,
+            (domain,),
+        )
+        invoice_rows = cur.fetchall() or []
+
+        invoices_by_ro = {}
+        for invoice_row in invoice_rows:
+            ro_key = str(invoice_row.get("ro") or "").strip()
+            invoice_number = str(invoice_row.get("invoice_number") or "").strip()
+            if not ro_key or not invoice_number:
+                continue
+            invoices_by_ro.setdefault(ro_key, []).append(
+                {
+                    "invoice_number": invoice_number,
+                    "amount_paid": _parse_float_value(invoice_row.get("invoice_paid_total")),
+                }
+            )
+
         payments_rows = []
         closed_phase_keys = {"complete", "complete/finish"}
 
@@ -1766,6 +1800,7 @@ async def list_open_ros_for_payments(request: Request):
                     "customer_paid": customer_paid,
                     "grand_total": grand_total,
                     "balance": balance,
+                    "invoice_payments": invoices_by_ro.get(ro, []),
                 }
             )
 
