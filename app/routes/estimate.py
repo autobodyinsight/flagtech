@@ -190,6 +190,28 @@ def _ensure_saved_estimates_table(cur) -> None:
     cur.execute("CREATE INDEX IF NOT EXISTS idx_saved_estimates_ro_domain ON saved_estimates(ro, domain)")
 
 
+def _ensure_ro_payment_totals_table(cur) -> None:
+    cur.execute(
+        """
+        CREATE TABLE IF NOT EXISTS ro_payment_totals (
+            id SERIAL PRIMARY KEY,
+            ro VARCHAR(255) NOT NULL,
+            domain VARCHAR(255) NOT NULL,
+            insurance_paid NUMERIC DEFAULT 0,
+            customer_paid NUMERIC DEFAULT 0,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE(domain, ro)
+        )
+        """
+    )
+    cur.execute("ALTER TABLE ro_payment_totals ADD COLUMN IF NOT EXISTS insurance_paid NUMERIC DEFAULT 0")
+    cur.execute("ALTER TABLE ro_payment_totals ADD COLUMN IF NOT EXISTS customer_paid NUMERIC DEFAULT 0")
+    cur.execute("ALTER TABLE ro_payment_totals ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP")
+    cur.execute("ALTER TABLE ro_payment_totals ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP")
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_ro_payment_totals_domain_ro ON ro_payment_totals(domain, ro)")
+
+
 def _ensure_parts_orders_table(cur) -> None:
     cur.execute(
         """
@@ -1642,6 +1664,7 @@ async def list_open_ros_for_payments(request: Request):
     try:
         _ensure_saved_estimates_table(cur)
         _ensure_ro_phases_table(cur)
+        _ensure_ro_payment_totals_table(cur)
 
         cur.execute(
             """
@@ -1678,6 +1701,24 @@ async def list_open_ros_for_payments(request: Request):
         phase_rows = cur.fetchall() or []
         phase_map = {str(row.get("ro") or ""): str(row.get("phase") or "").strip().lower() for row in phase_rows}
 
+        cur.execute(
+            """
+            SELECT ro, insurance_paid, customer_paid
+            FROM ro_payment_totals
+            WHERE domain = %s
+            """,
+            (domain,),
+        )
+        payment_rows = cur.fetchall() or []
+        payment_map = {
+            str(payment_row.get("ro") or "").strip(): {
+                "insurance_paid": _parse_float_value(payment_row.get("insurance_paid")),
+                "customer_paid": _parse_float_value(payment_row.get("customer_paid")),
+            }
+            for payment_row in payment_rows
+            if str(payment_row.get("ro") or "").strip()
+        }
+
         payments_rows = []
         closed_phase_keys = {"complete", "complete/finish"}
 
@@ -1707,6 +1748,11 @@ async def list_open_ros_for_payments(request: Request):
             if insurance_total == 0 and grand_total > 0:
                 insurance_total = max(0.0, grand_total - customer_total)
 
+            paid_values = payment_map.get(ro) or {}
+            insurance_paid = _parse_float_value(paid_values.get("insurance_paid"))
+            customer_paid = _parse_float_value(paid_values.get("customer_paid"))
+            balance = max(0.0, grand_total - insurance_paid - customer_paid)
+
             payments_rows.append(
                 {
                     "ro": ro,
@@ -1714,12 +1760,102 @@ async def list_open_ros_for_payments(request: Request):
                     "vehicle": vehicle_display,
                     "insurance_total": insurance_total,
                     "customer_total": customer_total,
+                    "insurance_paid": insurance_paid,
+                    "customer_paid": customer_paid,
                     "grand_total": grand_total,
+                    "balance": balance,
                 }
             )
 
         payments_rows.sort(key=lambda item: str(item.get("ro") or ""))
         return {"rows": payments_rows}
+    finally:
+        cur.close()
+
+
+@router.post("/payments/save")
+async def save_ro_payments(request: Request):
+    domain = get_user_domain(request)
+    if not domain:
+        return JSONResponse(status_code=401, content={"error": "Not authenticated"})
+
+    data = await request.json()
+    ro_value = str(data.get("ro") or "").strip()
+
+    if not ro_value:
+        return JSONResponse(status_code=400, content={"error": "ro is required"})
+
+    insurance_paid_raw = data.get("insurance_paid", 0)
+    customer_paid_raw = data.get("customer_paid", 0)
+
+    def _parse_payment_amount(raw_value) -> float:
+        cleaned = str(raw_value if raw_value is not None else "").replace("$", "").replace(",", "").strip()
+        if cleaned == "":
+            return 0.0
+        parsed = float(cleaned)
+        if not math.isfinite(parsed):
+            raise ValueError("amount must be finite")
+        return parsed
+
+    try:
+        insurance_paid = _parse_payment_amount(insurance_paid_raw)
+        customer_paid = _parse_payment_amount(customer_paid_raw)
+    except (TypeError, ValueError):
+        return JSONResponse(
+            status_code=400,
+            content={"error": "insurance_paid and customer_paid must be valid currency values"},
+        )
+
+    if insurance_paid < 0 or customer_paid < 0:
+        return JSONResponse(status_code=400, content={"error": "payment amounts cannot be negative"})
+
+    conn = get_conn()
+    cur = conn.cursor()
+    try:
+        _ensure_saved_estimates_table(cur)
+        _ensure_ro_payment_totals_table(cur)
+
+        cur.execute(
+            """
+            SELECT grand_total
+            FROM saved_estimates
+            WHERE domain = %s
+              AND ro = %s
+            ORDER BY saved_at DESC, id DESC
+            LIMIT 1
+            """,
+            (domain, ro_value),
+        )
+        ro_row = cur.fetchone()
+        if not ro_row:
+            return JSONResponse(status_code=404, content={"error": "RO not found"})
+
+        grand_total = _parse_float_value(ro_row.get("grand_total"))
+
+        cur.execute(
+            """
+            INSERT INTO ro_payment_totals (ro, domain, insurance_paid, customer_paid, updated_at)
+            VALUES (%s, %s, %s, %s, CURRENT_TIMESTAMP)
+            ON CONFLICT (domain, ro)
+            DO UPDATE SET
+                insurance_paid = EXCLUDED.insurance_paid,
+                customer_paid = EXCLUDED.customer_paid,
+                updated_at = CURRENT_TIMESTAMP
+            """,
+            (ro_value, domain, insurance_paid, customer_paid),
+        )
+
+        conn.commit()
+
+        balance = max(0.0, grand_total - insurance_paid - customer_paid)
+        return {
+            "status": "success",
+            "ro": ro_value,
+            "insurance_paid": insurance_paid,
+            "customer_paid": customer_paid,
+            "grand_total": grand_total,
+            "balance": balance,
+        }
     finally:
         cur.close()
 
