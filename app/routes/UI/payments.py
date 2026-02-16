@@ -33,6 +33,8 @@ def get_payments_screen_html():
 
         <script>
             let paymentsRows = [];
+            let paymentsTechPaymentsByRo = {};
+            let openPaymentsRoDetailId = null;
 
             function paymentsSafeId(value) {
                 return String(value || '').replace(/[^a-zA-Z0-9_-]/g, '_');
@@ -124,6 +126,163 @@ def get_payments_screen_html():
                 paymentsCloseRow(detailRow);
             }
 
+            function findPaymentsRow(roNumber) {
+                const roValue = String(roNumber || '');
+                return paymentsRows.find((row) => String(row.ro || '') === roValue) || null;
+            }
+
+            async function loadPaymentsTechLog(roNumber) {
+                const roKey = String(roNumber || '');
+                if (!roKey) return [];
+                if (Array.isArray(paymentsTechPaymentsByRo[roKey])) {
+                    return paymentsTechPaymentsByRo[roKey];
+                }
+
+                const response = await fetch(`/api/payments/log?ro=${encodeURIComponent(roKey)}`, { credentials: 'include' });
+                const payload = await response.json();
+                if (!response.ok) {
+                    throw new Error(payload.error || 'Unable to load tech payment log');
+                }
+
+                const entries = Array.isArray(payload.entries) ? payload.entries : [];
+                paymentsTechPaymentsByRo[roKey] = entries;
+                return entries;
+            }
+
+            function renderPaymentsRoDetailContent(roNumber, rowData, techEntries, errorMessage) {
+                const rowId = paymentsSafeId(roNumber);
+                const contentEl = document.getElementById(`payments-ro-details-content-${rowId}`);
+                if (!contentEl) return;
+
+                if (!rowData) {
+                    contentEl.innerHTML = '<div style="color:#c62828;">Unable to load RO payment details.</div>';
+                    return;
+                }
+
+                const insurancePaid = Number(rowData.insurance_paid || 0);
+                const customerPaid = Number(rowData.customer_paid || 0);
+                const invoiceReceivedTotal = insurancePaid + customerPaid;
+
+                const rows = Array.isArray(techEntries) ? techEntries : [];
+                const isLoadingTech = techEntries === null;
+                const techPaymentsTotal = rows.reduce((sum, entry) => sum + Number(entry.amount || 0), 0);
+                const combinedGrandTotal = invoiceReceivedTotal + techPaymentsTotal;
+
+                const techRowsHtml = isLoadingTech
+                    ? '<tr><td colspan="3" style="padding:8px; border-bottom:1px solid #ececec; text-align:center; color:#777;">Loading tech payments...</td></tr>'
+                    : rows.length > 0
+                    ? rows.map((entry) => {
+                        const paidAt = String(entry.paid_at || '-');
+                        const techName = String(entry.tech_name || 'Unassigned');
+                        const amount = Number(entry.amount || 0);
+                        return `
+                            <tr>
+                                <td style="padding:8px; border-bottom:1px solid #ececec; color:#333;">${paidAt}</td>
+                                <td style="padding:8px; border-bottom:1px solid #ececec; color:#333;">${techName}</td>
+                                <td style="padding:8px; border-bottom:1px solid #ececec; text-align:right; color:#333;">${paymentsFormatMoney(amount)}</td>
+                            </tr>
+                        `;
+                    }).join('')
+                    : '<tr><td colspan="3" style="padding:8px; border-bottom:1px solid #ececec; text-align:center; color:#777;">No tech payments recorded</td></tr>';
+
+                const errorHtml = errorMessage
+                    ? `<div style="margin-top:8px; color:#c62828; font-size:12px;">${String(errorMessage)}</div>`
+                    : '';
+
+                contentEl.innerHTML = `
+                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:14px; align-items:start;">
+                        <div>
+                            <div style="font-weight:bold; color:#555; margin-bottom:6px;">Payments Made for Invoices</div>
+                            <table style="width:100%; border-collapse:collapse;">
+                                <thead>
+                                    <tr style="background:#f7f7f7; text-align:left;">
+                                        <th style="padding:8px; border-bottom:1px solid #ddd; font-weight:bold; color:#666;">Type</th>
+                                        <th style="padding:8px; border-bottom:1px solid #ddd; font-weight:bold; color:#666; text-align:right;">Amount</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td style="padding:8px; border-bottom:1px solid #ececec; color:#333;">Insurance Received</td>
+                                        <td style="padding:8px; border-bottom:1px solid #ececec; text-align:right; color:#333;">${paymentsFormatMoney(insurancePaid)}</td>
+                                    </tr>
+                                    <tr>
+                                        <td style="padding:8px; border-bottom:1px solid #ececec; color:#333;">Customer Received</td>
+                                        <td style="padding:8px; border-bottom:1px solid #ececec; text-align:right; color:#333;">${paymentsFormatMoney(customerPaid)}</td>
+                                    </tr>
+                                    <tr>
+                                        <td style="padding:8px; border-bottom:1px solid #ececec; font-weight:bold; color:#333;">Received Invoices Total</td>
+                                        <td style="padding:8px; border-bottom:1px solid #ececec; text-align:right; font-weight:bold; color:#333;">${paymentsFormatMoney(invoiceReceivedTotal)}</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <div>
+                            <div style="font-weight:bold; color:#555; margin-bottom:6px;">Payments Made to Techs</div>
+                            <table style="width:100%; border-collapse:collapse;">
+                                <thead>
+                                    <tr style="background:#f7f7f7; text-align:left;">
+                                        <th style="padding:8px; border-bottom:1px solid #ddd; font-weight:bold; color:#666;">Paid At</th>
+                                        <th style="padding:8px; border-bottom:1px solid #ddd; font-weight:bold; color:#666;">Tech</th>
+                                        <th style="padding:8px; border-bottom:1px solid #ddd; font-weight:bold; color:#666; text-align:right;">Amount</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    ${techRowsHtml}
+                                    <tr>
+                                        <td colspan="2" style="padding:8px; border-bottom:1px solid #ececec; font-weight:bold; color:#333;">Tech Payments Total</td>
+                                        <td style="padding:8px; border-bottom:1px solid #ececec; text-align:right; font-weight:bold; color:#333;">${paymentsFormatMoney(techPaymentsTotal)}</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <div style="margin-top:12px; padding-top:10px; border-top:1px solid #ddd; display:flex; justify-content:flex-end; gap:10px; align-items:center;">
+                        <div style="font-weight:bold; color:#555;">Grand Total (Received Invoices + Tech Payments):</div>
+                        <div style="font-weight:bold; color:#333; font-size:15px;">${paymentsFormatMoney(combinedGrandTotal)}</div>
+                    </div>
+                    ${errorHtml}
+                `;
+            }
+
+            async function togglePaymentsRoDetails(event, roNumber) {
+                if (event) event.stopPropagation();
+
+                const rowId = paymentsSafeId(roNumber);
+                const detailRow = document.getElementById(`payments-ro-details-row-${rowId}`);
+                if (!detailRow) return;
+
+                const isOpen = detailRow.style.display === 'table-row';
+                if (isOpen) {
+                    paymentsCloseRow(detailRow);
+                    if (openPaymentsRoDetailId === rowId) {
+                        openPaymentsRoDetailId = null;
+                    }
+                    return;
+                }
+
+                if (openPaymentsRoDetailId && openPaymentsRoDetailId !== rowId) {
+                    const previousRow = document.getElementById(`payments-ro-details-row-${openPaymentsRoDetailId}`);
+                    paymentsCloseRow(previousRow);
+                }
+
+                openPaymentsRoDetailId = rowId;
+                const rowData = findPaymentsRow(roNumber);
+                renderPaymentsRoDetailContent(roNumber, rowData, null, null);
+                paymentsOpenRow(detailRow);
+
+                try {
+                    const techEntries = await loadPaymentsTechLog(roNumber);
+                    if (openPaymentsRoDetailId !== rowId) return;
+                    renderPaymentsRoDetailContent(roNumber, rowData, techEntries, null);
+                } catch (err) {
+                    console.error('Error loading RO payment details:', err);
+                    if (openPaymentsRoDetailId !== rowId) return;
+                    renderPaymentsRoDetailContent(roNumber, rowData, [], err.message || 'Unable to load tech payments');
+                }
+            }
+
             async function savePaymentsForRo(event, roNumber) {
                 if (event) event.stopPropagation();
 
@@ -180,6 +339,7 @@ def get_payments_screen_html():
             function renderPaymentsTable(rows) {
                 const tbody = document.getElementById('paymentsRoTableBody');
                 if (!tbody) return;
+                openPaymentsRoDetailId = null;
 
                 if (!Array.isArray(rows) || rows.length === 0) {
                     tbody.innerHTML = '<tr><td colspan="7" style="padding:20px; text-align:center; color:#999;">No open repair orders found</td></tr>';
@@ -205,7 +365,11 @@ def get_payments_screen_html():
 
                     html += `
                         <tr style="background:${rowBg};">
-                            <td style="padding:12px; border-bottom:1px solid #eee; color:#333;">${ro || '-'}</td>
+                            <td style="padding:12px; border-bottom:1px solid #eee; color:#333;">
+                                <button type="button" onclick="togglePaymentsRoDetails(event, '${roEscaped}')" style="background:none; border:none; color:#0066cc; text-decoration:underline; cursor:pointer; padding:0; font:inherit; font-weight:bold;">
+                                    ${ro || '-'}
+                                </button>
+                            </td>
                             <td style="padding:12px; border-bottom:1px solid #eee; color:#333;">${row.customer || '-'}</td>
                             <td style="padding:12px; border-bottom:1px solid #eee; color:#333;">${row.vehicle || '-'}</td>
                             <td style="padding:12px; border-bottom:1px solid #eee; text-align:right; color:#333;">${paymentsFormatMoney(insuranceTotal)}</td>
@@ -219,6 +383,15 @@ def get_payments_screen_html():
                                 <button type="button" onclick="togglePaymentsLedger(event, '${roEscaped}')" style="background:none; border:none; color:#0066cc; text-decoration:underline; cursor:pointer; padding:0; font:inherit; font-weight:bold;">
                                     ${paymentsFormatMoney(balance)}
                                 </button>
+                            </td>
+                        </tr>
+                        <tr id="payments-ro-details-row-${rowId}" style="display:none; background:${rowBg};">
+                            <td colspan="7" style="padding:0 16px 12px 16px; border-bottom:1px solid #eee;">
+                                <div class="ro-slide-panel" style="max-height:0; overflow:hidden; opacity:0; transition:max-height 0.22s ease, opacity 0.22s ease;">
+                                    <div style="background:#fafafa; border:1px solid #ddd; border-radius:6px; padding:12px;">
+                                        <div id="payments-ro-details-content-${rowId}" style="color:#777;">Loading payment details...</div>
+                                    </div>
+                                </div>
                             </td>
                         </tr>
                         <tr id="payments-editor-row-${rowId}" style="display:none; background:${rowBg};">
@@ -302,6 +475,8 @@ def get_payments_screen_html():
                     const response = await fetch('/api/payments/open-ros', { credentials: 'include' });
                     const payload = await response.json();
                     paymentsRows = Array.isArray(payload.rows) ? payload.rows : [];
+                    paymentsTechPaymentsByRo = {};
+                    openPaymentsRoDetailId = null;
                     renderPaymentsTable(paymentsRows);
                 } catch (err) {
                     console.error('Error loading payments data:', err);
