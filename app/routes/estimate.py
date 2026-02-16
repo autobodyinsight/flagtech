@@ -2109,7 +2109,26 @@ async def save_ro_assignment_lines(request: Request):
         _ensure_saved_estimates_table(cur)
         _ensure_ro_line_assignments_table(cur)
         _ensure_techs_table(cur)
+        _ensure_ro_activity_log_table(cur)
         _ensure_ro_line_assignments_for_ro(cur, domain, ro_value)
+
+        cur.execute(
+            """
+            SELECT repair_type, COALESCE(SUM(hours), 0) AS total_hours
+            FROM ro_line_assignments
+            WHERE domain = %s
+              AND ro = %s
+              AND tech_name IS NOT NULL
+            GROUP BY repair_type
+            """,
+            (domain, ro_value),
+        )
+        before_rows = cur.fetchall() or []
+        before_by_type = {
+            _normalize_repair_type(row.get("repair_type")): _parse_float_value(row.get("total_hours"))
+            for row in before_rows
+        }
+        before_total_assigned = sum(before_by_type.values())
 
         if target_tech_id:
             cur.execute(
