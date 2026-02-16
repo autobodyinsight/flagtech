@@ -1,9 +1,9 @@
 from fastapi import APIRouter, UploadFile, File, Request
+import os
 import json
 import math
 import re
 from datetime import date, datetime, timedelta, timezone
-from zoneinfo import ZoneInfo
 from app.services.extractor import load_pdf
 from app.services.parser import parse_estimate_pdf
 from app.models.estimate import EstimateResponse
@@ -14,18 +14,13 @@ from psycopg2 import sql
 
 router = APIRouter()
 
-LOCAL_BUSINESS_TIMEZONE = os.getenv("LOCAL_BUSINESS_TIMEZONE", "America/Los_Angeles")
-
 
 def _to_local_business_date(value) -> date | None:
     if isinstance(value, date) and not isinstance(value, datetime):
         return value
     if not isinstance(value, datetime):
         return None
-    try:
-        local_tz = ZoneInfo(LOCAL_BUSINESS_TIMEZONE)
-    except Exception:
-        local_tz = timezone.utc
+    local_tz = datetime.now().astimezone().tzinfo or timezone.utc
     if value.tzinfo is None:
         value = value.replace(tzinfo=timezone.utc)
     return value.astimezone(local_tz).date()
