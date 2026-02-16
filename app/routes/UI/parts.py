@@ -691,17 +691,99 @@ def get_parts_script():
                         return;
                     }
 
-                    tbody.innerHTML = invoices.map(inv => `
-                        <tr>
-                            <td style="padding:8px; border-bottom:1px solid #eee;">${partsFormatBusinessDate(inv.date)}</td>
-                            <td style="padding:8px; border-bottom:1px solid #eee;">${partsEscapeHtml(inv.invoice_number || '—')}</td>
-                            <td style="padding:8px; border-bottom:1px solid #eee; text-align:right;">${partsFormatCurrency(inv.total_cost)}</td>
-                        </tr>
-                    `).join('');
+                    tbody.innerHTML = invoices.map(inv => {
+                        const invoiceNumber = String(inv.invoice_number || '').trim();
+                        const invoiceDisplay = partsEscapeHtml(invoiceNumber || '—');
+                        const safeKey = String(invoiceNumber || 'blank').replace(/[^a-zA-Z0-9_-]/g, '_');
+                        const detailRowId = `parts-vendor-invoice-detail-row-${vendorId}-${safeKey}`;
+                        const detailWrapId = `parts-vendor-invoice-detail-wrap-${vendorId}-${safeKey}`;
+                        return `
+                            <tr>
+                                <td style="padding:8px; border-bottom:1px solid #eee;">${partsFormatBusinessDate(inv.date)}</td>
+                                <td style="padding:8px; border-bottom:1px solid #eee;">
+                                    <button type="button" onclick="togglePartsVendorInvoiceRow(${vendorId}, ${JSON.stringify(invoiceNumber)}, ${JSON.stringify(safeKey)})" style="background:none; border:none; color:#0066cc; text-decoration:underline; cursor:pointer; padding:0;">
+                                        ${invoiceDisplay}
+                                    </button>
+                                </td>
+                                <td style="padding:8px; border-bottom:1px solid #eee; text-align:right;">${partsFormatCurrency(inv.total_cost)}</td>
+                            </tr>
+                            <tr id="${detailRowId}" style="display:none;">
+                                <td colspan="3" style="padding:10px 8px; border-bottom:1px solid #eee;">
+                                    <div id="${detailWrapId}" style="background:#fafafa; border:1px solid #ddd; border-radius:6px; padding:10px;">Loading...</div>
+                                </td>
+                            </tr>
+                        `;
+                    }).join('');
                 })
                 .catch(err => {
                     console.error('Error loading vendor invoices:', err);
                     tbody.innerHTML = '<tr><td colspan="3" style="padding:8px; color:red; text-align:center;">Error loading invoices.</td></tr>';
+                });
+        }
+
+        function togglePartsVendorInvoiceRow(vendorId, invoiceNumber, safeKey) {
+            const detailRow = document.getElementById(`parts-vendor-invoice-detail-row-${vendorId}-${safeKey}`);
+            const detailWrap = document.getElementById(`parts-vendor-invoice-detail-wrap-${vendorId}-${safeKey}`);
+            const invoicesBody = document.getElementById(`parts-vendor-invoices-${vendorId}`);
+            if (!detailRow || !detailWrap || !invoicesBody) return;
+
+            const isOpening = detailRow.style.display === 'none' || detailRow.style.display === '';
+
+            Array.from(invoicesBody.querySelectorAll(`tr[id^="parts-vendor-invoice-detail-row-${vendorId}-"]`)).forEach(row => {
+                if (row.id !== `parts-vendor-invoice-detail-row-${vendorId}-${safeKey}`) {
+                    row.style.display = 'none';
+                }
+            });
+
+            detailRow.style.display = isOpening ? 'table-row' : 'none';
+            if (!isOpening) return;
+
+            detailWrap.innerHTML = '<div style="color:#777;">Loading invoiced parts...</div>';
+            partsLoadVendorInvoiceParts(vendorId, invoiceNumber, detailWrap);
+        }
+
+        function partsLoadVendorInvoiceParts(vendorId, invoiceNumber, container) {
+            if (!container) return;
+            fetch(`/api/vendors/invoice-parts?vendor_id=${encodeURIComponent(vendorId)}&invoice_number=${encodeURIComponent(invoiceNumber || '')}`, { credentials: 'include' })
+                .then(r => r.json())
+                .then(res => {
+                    if (res.error) {
+                        throw new Error(res.error);
+                    }
+
+                    const parts = res.parts || [];
+                    if (!parts.length) {
+                        container.innerHTML = '<div style="color:#777;">No invoiced parts lines found.</div>';
+                        return;
+                    }
+
+                    const rows = parts.map(item => `
+                        <tr>
+                            <td style="padding:8px; border-bottom:1px solid #eee; width:80px;">${partsEscapeHtml(item.line || '—')}</td>
+                            <td style="padding:8px; border-bottom:1px solid #eee;">${partsEscapeHtml(item.description || '')}</td>
+                            <td style="padding:8px; border-bottom:1px solid #eee; text-align:right; width:120px;">${partsFormatCurrency(item.cost || 0)}</td>
+                        </tr>
+                    `).join('');
+
+                    container.innerHTML = `
+                        <div style="font-weight:bold; margin-bottom:8px;">Invoiced Parts Lines</div>
+                        <div style="overflow-x:auto;">
+                            <table style="width:100%; border-collapse:collapse;">
+                                <thead>
+                                    <tr style="background:#f5f5f5; text-align:left;">
+                                        <th style="padding:8px; border-bottom:1px solid #ddd; width:80px;">LINE</th>
+                                        <th style="padding:8px; border-bottom:1px solid #ddd;">DESCRIPTION</th>
+                                        <th style="padding:8px; border-bottom:1px solid #ddd; width:120px; text-align:right;">COST</th>
+                                    </tr>
+                                </thead>
+                                <tbody>${rows}</tbody>
+                            </table>
+                        </div>
+                    `;
+                })
+                .catch(err => {
+                    console.error('Error loading invoice parts:', err);
+                    container.innerHTML = '<div style="color:red;">Error loading invoiced parts lines.</div>';
                 });
         }
 
