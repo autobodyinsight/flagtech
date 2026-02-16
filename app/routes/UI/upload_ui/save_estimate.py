@@ -242,7 +242,7 @@ function parseVehicleInfo(vehicleStr) {{
   const remaining = yearMatch ? vehicleStr.replace(yearMatch[0], '').trim() : vehicleStr.trim();
   
   // Split remaining text - typically: Make Model [trim/body info]
-  const parts = remaining.split(/\s+/);
+  const parts = remaining.split(/\\s+/);
   const make = parts.length > 0 ? parts[0] : null;
   const model = parts.length > 1 ? parts.slice(1, 3).join(' ') : null;
   
@@ -381,7 +381,7 @@ function extractClaimNumberFromDisplayedEstimate() {{
   for (let i = 0; i < nodes.length; i += 1) {{
     const text = (nodes[i].textContent || '').trim();
     if (!text) continue;
-    const match = text.match(/\bclaim\b\s*[:#-]?\s*([A-Za-z0-9-]+)/i);
+    const match = text.match(/\\bclaim\\b\\s*[:#-]?\\s*([A-Za-z0-9-]+)/i);
     if (match && match[1]) {{
       return match[1];
     }}

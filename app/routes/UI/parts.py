@@ -414,7 +414,7 @@ def get_parts_script():
             const raw = String(value).trim();
             if (!raw) return '—';
             const datePart = raw.split('T')[0];
-            const match = datePart.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+            const match = datePart.match(/^(\\d{4})-(\\d{2})-(\\d{2})$/);
             if (!match) return '—';
             const [, year, month, day] = match;
             return `${month}-${day}-${year.slice(-2)}`;
@@ -948,7 +948,7 @@ def get_parts_script():
 
             body.innerHTML = partsArrivedItems.map((item, idx) => {
                 const rowBg = idx % 2 === 0 ? '#fff' : '#f9f9f9';
-                const descriptionDisplay = String(item.description || '').replace(/\s+/g, ' ').trim();
+                const descriptionDisplay = String(item.description || '').replace(/\\s+/g, ' ').trim();
                 const arrivedDisplay = item.arrived_date
                     ? partsFormatBusinessDate(item.arrived_date)
                     : (item.received_at ? partsFormatBusinessDate(item.received_at) : '—');
@@ -1049,7 +1049,7 @@ def get_parts_script():
 
             body.innerHTML = partsReturnedItems.map((item, idx) => {
                 const rowBg = idx % 2 === 0 ? '#fff' : '#f9f9f9';
-                const descriptionDisplay = String(item.description || '').replace(/\s+/g, ' ').trim();
+                const descriptionDisplay = String(item.description || '').replace(/\\s+/g, ' ').trim();
                 const returnDateDisplay = item.return_date ? partsFormatBusinessDate(item.return_date) : '—';
                 return `
                     <tr style="background:${rowBg};">
@@ -1133,7 +1133,7 @@ def get_parts_script():
                 const displayEta = etaValue ? partsFormatDisplayDate(etaValue) : '—';
                 const qtyRaw = Number(item.qty || 0);
                 const qtyDisplay = Number.isFinite(qtyRaw)
-                    ? (Number.isInteger(qtyRaw) ? String(qtyRaw) : qtyRaw.toFixed(2).replace(/\.00$/, ''))
+                    ? (Number.isInteger(qtyRaw) ? String(qtyRaw) : qtyRaw.toFixed(2).replace(/\\.00$/, ''))
                     : '0';
 
                 const partNumberCell = partsOnOrderReceiveMode
@@ -1416,7 +1416,7 @@ def get_parts_script():
                 const price = line.price ? `$${Number(line.price).toFixed(2)}` : '—';
                 const qtyNumber = Number(line.qty || 0);
                 const qtyText = Number.isFinite(qtyNumber)
-                    ? (Number.isInteger(qtyNumber) ? String(qtyNumber) : qtyNumber.toFixed(2).replace(/\.00$/, ''))
+                    ? (Number.isInteger(qtyNumber) ? String(qtyNumber) : qtyNumber.toFixed(2).replace(/\\.00$/, ''))
                     : '0';
                 const isBlocked = Boolean(line.is_ordered);
                 const disabledAttr = isBlocked ? 'disabled' : '';

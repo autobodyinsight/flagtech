@@ -22,7 +22,7 @@ except ImportError:
 router = APIRouter()
 
 
-@router.get("/", response_class=HTMLResponse)
+@router.api_route("/", methods=["GET", "HEAD"], response_class=HTMLResponse)
 async def home_screen():
     """Main UI screen with sidebar navigation."""
     return f"""

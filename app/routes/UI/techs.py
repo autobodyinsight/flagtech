@@ -197,7 +197,7 @@ def get_techs_screen_html():
         }
 
         function splitNameParts(fullNameRaw) {
-            const fullName = (fullNameRaw || '').trim().replace(/\s+/g, ' ');
+            const fullName = (fullNameRaw || '').trim().replace(/\\s+/g, ' ');
             if (!fullName) return null;
             const parts = fullName.split(' ');
             if (parts.length < 2) return null;
@@ -903,7 +903,7 @@ def get_techs_screen_html():
                         continue;
                     }
 
-                    const currentName = (row.querySelector('.manage-name')?.value || '').trim().replace(/\s+/g, ' ');
+                    const currentName = (row.querySelector('.manage-name')?.value || '').trim().replace(/\\s+/g, ' ');
                     const currentRole = (row.querySelector('.manage-role')?.value || '').trim();
                     const currentRate = parseFloat(row.querySelector('.manage-rate')?.value || '0');
 
