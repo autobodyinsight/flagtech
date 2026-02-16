@@ -1675,6 +1675,7 @@ async def list_open_ros_for_payments(request: Request):
                    make,
                    model,
                    owner_info,
+                     insurance_company,
                    grand_total,
                    customer_pay,
                    insurance_pay,
@@ -1757,6 +1758,7 @@ async def list_open_ros_for_payments(request: Request):
                 {
                     "ro": ro,
                     "customer": customer_name,
+                    "insurance_name": (row.get("insurance_company") or "").strip(),
                     "vehicle": vehicle_display,
                     "insurance_total": insurance_total,
                     "customer_total": customer_total,
