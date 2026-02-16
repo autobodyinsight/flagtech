@@ -910,36 +910,58 @@ async def update_tech_line(request: Request):
     tech_id = data.get("id")
     role_value = (data.get("role") or "").strip()
     pay_rate_raw = data.get("pay_rate")
+    first_name = (data.get("first_name") or "").strip()
+    last_name = (data.get("last_name") or "").strip()
 
-    allowed_roles = {"Body", "Paint", "Mech"}
+    allowed_roles = {"Body", "Frame", "Paint", "Mech"}
     if not tech_id:
         return JSONResponse(status_code=400, content={"error": "id is required"})
-    if role_value not in allowed_roles:
-        return JSONResponse(status_code=400, content={"error": "role must be Body, Paint, or Mech"})
+    if role_value and role_value not in allowed_roles:
+        return JSONResponse(status_code=400, content={"error": "role must be Body, Frame, Paint, or Mech"})
 
-    try:
-        pay_rate_value = float(pay_rate_raw)
-    except Exception:
-        return JSONResponse(status_code=400, content={"error": "pay_rate must be numeric"})
+    pay_rate_value = None
+    if pay_rate_raw is not None:
+        try:
+            pay_rate_value = float(pay_rate_raw)
+        except Exception:
+            return JSONResponse(status_code=400, content={"error": "pay_rate must be numeric"})
 
-    if pay_rate_value <= 0:
-        return JSONResponse(status_code=400, content={"error": "pay_rate must be greater than zero"})
+        if pay_rate_value <= 0:
+            return JSONResponse(status_code=400, content={"error": "pay_rate must be greater than zero"})
+
+    if (first_name and not last_name) or (last_name and not first_name):
+        return JSONResponse(status_code=400, content={"error": "first_name and last_name must both be provided"})
+
+    update_fields = []
+    params = []
+    if role_value:
+        update_fields.append("role = %s")
+        params.append(role_value)
+    if pay_rate_value is not None:
+        update_fields.append("pay_rate = %s")
+        params.append(pay_rate_value)
+    if first_name and last_name:
+        update_fields.append("first_name = %s")
+        update_fields.append("last_name = %s")
+        params.extend([first_name, last_name])
+
+    if not update_fields:
+        return JSONResponse(status_code=400, content={"error": "No valid fields to update"})
 
     conn = get_conn()
     cur = conn.cursor()
     try:
         _ensure_techs_table(cur)
         cur.execute(
-            """
+            f"""
             UPDATE techs
-            SET role = %s,
-                pay_rate = %s
+            SET {', '.join(update_fields)}
             WHERE id = %s
               AND active = TRUE
               AND (domain = %s OR domain IS NULL)
-            RETURNING id, role, pay_rate
+            RETURNING id, first_name, last_name, role, pay_rate
             """,
-            (role_value, pay_rate_value, tech_id, domain),
+            params + [tech_id, domain],
         )
         row = cur.fetchone()
         conn.commit()
@@ -951,8 +973,10 @@ async def update_tech_line(request: Request):
             "status": "ok",
             "tech": {
                 "id": row.get("id"),
+                "first_name": row.get("first_name"),
+                "last_name": row.get("last_name"),
                 "role": row.get("role") or "",
-                "pay_rate": float(row.get("pay_rate") or 0),
+                "pay_rate": _parse_float_value(row.get("pay_rate")),
             },
         }
     finally:
@@ -2059,7 +2083,7 @@ async def get_ro_assignment_lines(
             SELECT id, first_name, last_name, pay_rate
             FROM techs
             WHERE active = TRUE
-                            AND status = 'Active'
+              AND status = 'Active'
               AND (domain = %s OR domain IS NULL)
             ORDER BY first_name, last_name
             """,
@@ -2068,59 +2092,35 @@ async def get_ro_assignment_lines(
         tech_rows = cur.fetchall()
 
         lines = []
-        first_name = (data.get("first_name") or "").strip()
-        last_name = (data.get("last_name") or "").strip()
         for row in line_rows:
-        allowed_roles = {"Body", "Frame", "Paint", "Mech"}
                 {
                     "repair_type": _normalize_repair_type(row.get("repair_type")),
-        if role_value and role_value not in allowed_roles:
-            return JSONResponse(status_code=400, content={"error": "role must be Body, Frame, Paint, or Mech"})
+                    "line_key": str(row.get("line_key") or ""),
+                    "line_number": row.get("line_number") or "",
+                    "description": row.get("description") or "",
+                    "hours": _parse_float_value(row.get("hours")),
+                }
+            )
 
-        pay_rate_value = None
-        if pay_rate_raw is not None:
-            try:
-                pay_rate_value = float(pay_rate_raw)
-            except Exception:
-                return JSONResponse(status_code=400, content={"error": "pay_rate must be numeric"})
-
-            if pay_rate_value <= 0:
-                return JSONResponse(status_code=400, content={"error": "pay_rate must be greater than zero"})
-
-        if (first_name and not last_name) or (last_name and not first_name):
-            return JSONResponse(status_code=400, content={"error": "first_name and last_name must both be provided"})
-
-        update_fields = []
-        params = []
-
-        if role_value:
-            update_fields.append("role = %s")
-            params.append(role_value)
-        if pay_rate_value is not None:
-            update_fields.append("pay_rate = %s")
-            params.append(pay_rate_value)
-        if first_name and last_name:
-            update_fields.append("first_name = %s")
-            update_fields.append("last_name = %s")
-            params.extend([first_name, last_name])
-
-        if not update_fields:
-            return JSONResponse(status_code=400, content={"error": "No valid fields to update"})
+        techs = []
+        for row in tech_rows:
+            first_name = (row.get("first_name") or "").strip()
             last_name = (row.get("last_name") or "").strip()
             label = " ".join(part for part in [first_name, last_name] if part)
             techs.append(
                 {
                     "id": row.get("id"),
                     "name": label,
-                f"""
-                UPDATE techs
-                SET {', '.join(update_fields)}
-                WHERE id = %s
-                  AND active = TRUE
-                  AND (domain = %s OR domain IS NULL)
-                RETURNING id, first_name, last_name, role, pay_rate
-                """,
-                params + [tech_id, domain],
+                    "pay_rate": _parse_float_value(row.get("pay_rate")),
+                }
+            )
+
+        return {
+            "lines": lines,
+            "techs": techs,
+            "types": ["body", "paint", "mech", "frame"],
+        }
+    finally:
         cur.close()
 
 
