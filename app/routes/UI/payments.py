@@ -199,8 +199,8 @@ def get_payments_screen_html():
                     const balance = Number(row.balance || 0);
                     const insuranceBalance = Math.max(0, insuranceTotal - insurancePaid);
                     const customerBalance = Math.max(0, customerTotal - customerPaid);
-                    const insuranceName = String(row.insurance_name || row.insurance || 'INSURANCE');
-                    const customerName = String(row.customer || 'CUSTOMER');
+                    const insuranceName = String(row.insurance_name || row.insurance || '').trim();
+                    const customerName = String(row.customer || '').trim();
                     const roEscaped = paymentsEscapedRoValue(ro);
 
                     html += `
@@ -250,11 +250,11 @@ def get_payments_screen_html():
                                     <div style="background:#fafafa; border:1px solid #ddd; border-radius:6px; padding:12px;">
                                         <div style="font-weight:bold; color:#333; margin-bottom:8px;">Running Ledger</div>
 
-                                        <div style="font-weight:bold; color:#555; margin-bottom:6px;">INSURANCE</div>
+                                        <div style="font-weight:bold; color:#555; margin-bottom:2px;">INSURANCE</div>
+                                        <div style="color:#333; margin-bottom:6px;">${insuranceName || '-'}</div>
                                         <table style="width:100%; border-collapse:collapse; margin-bottom:10px;">
                                             <thead>
                                                 <tr style="background:#f7f7f7; text-align:left;">
-                                                    <th style="padding:8px; border-bottom:1px solid #ddd; font-weight:bold; color:#666;">INSURANCE</th>
                                                     <th style="padding:8px; border-bottom:1px solid #ddd; font-weight:bold; color:#666; text-align:right;">TOTAL</th>
                                                     <th style="padding:8px; border-bottom:1px solid #ddd; font-weight:bold; color:#666; text-align:right;">PAYMENTS</th>
                                                     <th style="padding:8px; border-bottom:1px solid #ddd; font-weight:bold; color:#666; text-align:right;">BALANCE</th>
@@ -262,7 +262,6 @@ def get_payments_screen_html():
                                             </thead>
                                             <tbody>
                                                 <tr>
-                                                    <td style="padding:8px; border-bottom:1px solid #ececec; color:#333;">${insuranceName || 'INSURANCE'}</td>
                                                     <td style="padding:8px; border-bottom:1px solid #ececec; text-align:right; color:#333;">${paymentsFormatMoney(insuranceTotal)}</td>
                                                     <td style="padding:8px; border-bottom:1px solid #ececec; text-align:right; color:#333;">${paymentsFormatMoney(insurancePaid)}</td>
                                                     <td style="padding:8px; border-bottom:1px solid #ececec; text-align:right; font-weight:bold; color:#333;">${paymentsFormatMoney(insuranceBalance)}</td>
@@ -270,11 +269,11 @@ def get_payments_screen_html():
                                             </tbody>
                                         </table>
 
-                                        <div style="font-weight:bold; color:#555; margin-bottom:6px;">CUSTOMER</div>
+                                        <div style="font-weight:bold; color:#555; margin-bottom:2px;">CUSTOMER</div>
+                                        <div style="color:#333; margin-bottom:6px;">${customerName || '-'}</div>
                                         <table style="width:100%; border-collapse:collapse;">
                                             <thead>
                                                 <tr style="background:#f7f7f7; text-align:left;">
-                                                    <th style="padding:8px; border-bottom:1px solid #ddd; font-weight:bold; color:#666;">CUSTOMER</th>
                                                     <th style="padding:8px; border-bottom:1px solid #ddd; font-weight:bold; color:#666; text-align:right;">TOTAL</th>
                                                     <th style="padding:8px; border-bottom:1px solid #ddd; font-weight:bold; color:#666; text-align:right;">PAYMENTS</th>
                                                     <th style="padding:8px; border-bottom:1px solid #ddd; font-weight:bold; color:#666; text-align:right;">BALANCE</th>
@@ -282,7 +281,6 @@ def get_payments_screen_html():
                                             </thead>
                                             <tbody>
                                                 <tr>
-                                                    <td style="padding:8px; border-bottom:1px solid #ececec; color:#333;">${customerName || 'CUSTOMER'}</td>
                                                     <td style="padding:8px; border-bottom:1px solid #ececec; text-align:right; color:#333;">${paymentsFormatMoney(customerTotal)}</td>
                                                     <td style="padding:8px; border-bottom:1px solid #ececec; text-align:right; color:#333;">${paymentsFormatMoney(customerPaid)}</td>
                                                     <td style="padding:8px; border-bottom:1px solid #ececec; text-align:right; font-weight:bold; color:#333;">${paymentsFormatMoney(customerBalance)}</td>
