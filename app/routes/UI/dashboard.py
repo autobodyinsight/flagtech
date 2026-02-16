@@ -483,7 +483,48 @@ def get_dashboard_screen_html():
                     .toLowerCase();
             }
 
-            let currentRoSlideDown = null;
+            const openRoSlideDownState = new Map();
+
+            function getRoSlideDownStateKey(roNumber, type) {
+                return `${type}::${String(roNumber || '')}`;
+            }
+
+            function rememberRoSlideDownOpen(roNumber, type) {
+                openRoSlideDownState.set(getRoSlideDownStateKey(roNumber, type), { roNumber, type });
+            }
+
+            function forgetRoSlideDownOpen(roNumber, type) {
+                openRoSlideDownState.delete(getRoSlideDownStateKey(roNumber, type));
+            }
+
+            function loadRoSlideDownContent(roNumber, type) {
+                if (type === 'notes') {
+                    loadRoNotes(roNumber);
+                } else if (type === 'tech-assignment') {
+                    loadTechAssignments(roNumber);
+                } else if (type === 'activity') {
+                    loadRoActivityLog(roNumber);
+                }
+            }
+
+            function restoreOpenRoSlideDowns() {
+                const openEntries = Array.from(openRoSlideDownState.values());
+                openEntries.forEach(({ roNumber, type }) => {
+                    const roId = safeId(roNumber);
+                    const rowEl = document.getElementById(`${type}-row-${roId}`);
+                    if (!rowEl) {
+                        forgetRoSlideDownOpen(roNumber, type);
+                        return;
+                    }
+                    rowEl.style.display = 'table-row';
+                    const panel = rowEl.querySelector('.ro-slide-panel');
+                    if (panel) {
+                        panel.style.maxHeight = `${panel.scrollHeight}px`;
+                        panel.style.opacity = '1';
+                    }
+                    loadRoSlideDownContent(roNumber, type);
+                });
+            }
 
             function openRoSlideDownRow(rowEl) {
                 if (!rowEl) return;
@@ -514,33 +555,20 @@ def get_dashboard_screen_html():
                 }, 220);
             }
 
-            function closeRoSlideDown() {
-                if (!currentRoSlideDown) return;
-                const { roId, type } = currentRoSlideDown;
-                const rowEl = document.getElementById(`${type}-row-${roId}`);
-                closeRoSlideDownRow(rowEl);
-                currentRoSlideDown = null;
-            }
-
             function toggleRoSlideDown(roNumber, type) {
                 const roId = safeId(roNumber);
                 const rowEl = document.getElementById(`${type}-row-${roId}`);
                 if (!rowEl) return false;
 
-                const isSame = currentRoSlideDown && currentRoSlideDown.roId === roId && currentRoSlideDown.type === type;
-                if (currentRoSlideDown && !isSame) {
-                    closeRoSlideDown();
-                }
-
                 const isHidden = rowEl.style.display === 'none' || rowEl.style.display === '';
-                if (isHidden && !isSame) {
+                if (isHidden) {
                     openRoSlideDownRow(rowEl);
-                    currentRoSlideDown = { roId, type };
+                    rememberRoSlideDownOpen(roNumber, type);
                     return true;
                 }
 
                 closeRoSlideDownRow(rowEl);
-                currentRoSlideDown = null;
+                forgetRoSlideDownOpen(roNumber, type);
                 return false;
             }
 
@@ -564,6 +592,50 @@ def get_dashboard_screen_html():
             function toggleVehicleVin(event, roNumber) {
                 if (event) event.stopPropagation();
                 toggleRoSlideDown(roNumber, 'vehicle-vin');
+            }
+
+            function toggleRoActivityLogFromRow(event, roNumber) {
+                if (!event) return;
+                if (event.target && event.target.closest && event.target.closest('button, select, input, textarea, label, .mini-popup-panel, .ro-slide-panel')) {
+                    return;
+                }
+                const opened = toggleRoSlideDown(roNumber, 'activity');
+                if (opened) {
+                    loadRoActivityLog(roNumber);
+                }
+            }
+
+            function loadRoActivityLog(roNumber) {
+                const listEl = document.getElementById(`activity-list-${safeId(roNumber)}`);
+                if (!listEl) return;
+                listEl.innerHTML = '<div style="color:#777;">Loading...</div>';
+
+                fetch(`/api/ro-activity?ro=${encodeURIComponent(roNumber)}`, { credentials: 'include' })
+                    .then(r => r.json())
+                    .then(res => {
+                        if (!listEl) return;
+                        const entries = Array.isArray(res.entries) ? res.entries : [];
+                        if (entries.length === 0) {
+                            listEl.innerHTML = '<div style="color:#999;">No activity found.</div>';
+                            return;
+                        }
+                        listEl.innerHTML = entries.map((entry) => {
+                            const dateText = entry.date || '-';
+                            const message = entry.message || '';
+                            return `
+                                <div style="padding:8px 0; border-bottom:1px solid #eee;">
+                                    <div style="font-size:12px; color:#777; margin-bottom:2px;">${dateText}</div>
+                                    <div style="color:#333;">${message}</div>
+                                </div>
+                            `;
+                        }).join('');
+                    })
+                    .catch(err => {
+                        console.error('Error loading RO activity:', err);
+                        if (listEl) {
+                            listEl.innerHTML = '<div style="color:red;">Error loading activity.</div>';
+                        }
+                    });
             }
 
             function loadRoNotes(roNumber) {
@@ -1174,7 +1246,7 @@ def get_dashboard_screen_html():
                     const subletItems = showSubletWarning ? getPendingSubletItems(ro) : [];
                     
                     html += `
-                        <tr style="background:${rowBg};">
+                        <tr style="background:${rowBg};" onclick="toggleRoActivityLogFromRow(event, '${ro.ro}')">
                             <td style="padding:12px; border-bottom:1px solid #eee; position:relative;">
                                 <div style="display:inline-flex; align-items:center; gap:6px;">
                                     <button type="button" class="mini-popup-trigger" onclick="openRoPrintModal(event, '${ro.ro}')" style="background:none; border:none; color:#333; cursor:pointer; padding:0; font-size:16px; line-height:1;" title="Print Reports">🖨️</button>
@@ -1275,6 +1347,16 @@ def get_dashboard_screen_html():
                                 </div>
                             </td>
                         </tr>
+                        <tr id="activity-row-${rowId}" style="display:none; background:${rowBg};">
+                            <td colspan="10" style="padding:0 16px 10px 16px; border-bottom:1px solid #eee;">
+                                <div class="ro-slide-panel" style="max-height:0; overflow:hidden; opacity:0; transition:max-height 0.22s ease, opacity 0.22s ease;">
+                                    <div style="background:#fafafa; border:1px solid #ddd; border-radius:6px; padding:10px 12px;">
+                                        <div style="font-weight:bold; margin-bottom:8px; color:#333;">RO Activity Log</div>
+                                        <div id="activity-list-${rowId}" style="max-height:220px; overflow-y:auto;"></div>
+                                    </div>
+                                </div>
+                            </td>
+                        </tr>
                         <tr id="customer-contact-row-${rowId}" style="display:none; background:${rowBg};">
                             <td colspan="10" style="padding:0 16px 10px 16px; border-bottom:1px solid #eee;">
                                 <div class="ro-slide-panel" style="max-height:0; overflow:hidden; opacity:0; transition:max-height 0.22s ease, opacity 0.22s ease;">
@@ -1332,6 +1414,7 @@ def get_dashboard_screen_html():
                 });
                 
                 tbody.innerHTML = html;
+                restoreOpenRoSlideDowns();
             }
 
             function toggleTechAssignment(event, roNumber) {

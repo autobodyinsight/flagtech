@@ -264,6 +264,44 @@ def _ensure_ro_notes_table(cur) -> None:
     cur.execute("CREATE INDEX IF NOT EXISTS idx_ro_notes_ro_domain ON ro_notes(ro, domain)")
 
 
+def _ensure_ro_activity_log_table(cur) -> None:
+    cur.execute(
+        """
+        CREATE TABLE IF NOT EXISTS ro_activity_log (
+            id SERIAL PRIMARY KEY,
+            ro VARCHAR(255) NOT NULL,
+            activity_type VARCHAR(64) NOT NULL,
+            message TEXT NOT NULL,
+            occurred_on DATE NOT NULL DEFAULT CURRENT_DATE,
+            domain VARCHAR(255) NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+        """
+    )
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_ro_activity_ro_domain ON ro_activity_log(ro, domain, created_at DESC)")
+
+
+def _activity_to_datetime(value) -> datetime:
+    if isinstance(value, datetime):
+        return value
+    if isinstance(value, date):
+        return datetime.combine(value, datetime.min.time())
+    return datetime.utcnow()
+
+
+def _log_ro_activity(cur, domain: str, ro: str, activity_type: str, message: str, occurred_at=None) -> None:
+    if not domain or not ro or not message:
+        return
+    occurred_dt = _activity_to_datetime(occurred_at)
+    cur.execute(
+        """
+        INSERT INTO ro_activity_log (ro, activity_type, message, occurred_on, domain, created_at)
+        VALUES (%s, %s, %s, %s, %s, %s)
+        """,
+        (ro, activity_type, message, occurred_dt.date(), domain, occurred_dt),
+    )
+
+
 def _ensure_ro_assignments_table(cur) -> None:
     cur.execute(
         """
@@ -1564,9 +1602,10 @@ async def update_ro_phone(request: Request):
     cur = conn.cursor()
     try:
         _ensure_saved_estimates_table(cur)
+        _ensure_ro_activity_log_table(cur)
         cur.execute(
             """
-            SELECT id, owner_info, phone_original
+            SELECT id, owner_info, phone_original, phone_override
             FROM saved_estimates
             WHERE domain = %s AND ro = %s
             ORDER BY saved_at DESC, id DESC
@@ -1579,6 +1618,7 @@ async def update_ro_phone(request: Request):
             return JSONResponse(status_code=404, content={"error": "RO not found"})
 
         _, parsed_phone = _parse_owner_info(row.get("owner_info") or "")
+        old_phone = (row.get("phone_override") or parsed_phone or "").strip()
         phone_original = (row.get("phone_original") or parsed_phone or "").strip()
 
         cur.execute(
@@ -1590,6 +1630,16 @@ async def update_ro_phone(request: Request):
             """,
             (new_phone, phone_original, row.get("id")),
         )
+
+        if old_phone != new_phone:
+            old_display = old_phone or "-"
+            _log_ro_activity(
+                cur,
+                domain,
+                ro_value,
+                "phone_changed",
+                f"Phone changed: {old_display} → {new_phone}",
+            )
         conn.commit()
         return {"status": "success", "phone": new_phone, "phone_original": phone_original}
     finally:
@@ -1619,9 +1669,10 @@ async def update_ro_dates(request: Request):
     cur = conn.cursor()
     try:
         _ensure_saved_estimates_table(cur)
+        _ensure_ro_activity_log_table(cur)
         cur.execute(
             """
-            SELECT id
+            SELECT id, in_date, ecd_date
             FROM saved_estimates
             WHERE domain = %s AND ro = %s
             ORDER BY saved_at DESC, id DESC
@@ -1632,6 +1683,9 @@ async def update_ro_dates(request: Request):
         row = cur.fetchone()
         if not row:
             return JSONResponse(status_code=404, content={"error": "RO not found"})
+
+        old_in_date = _coerce_date(row.get("in_date"))
+        old_ecd_date = _coerce_date(row.get("ecd_date"))
 
         if field == "in_date":
             cur.execute(
@@ -1650,6 +1704,18 @@ async def update_ro_dates(request: Request):
                 WHERE id = %s
                 """,
                 (parsed_date, row.get("id")),
+            )
+
+        old_value = old_in_date if field == "in_date" else old_ecd_date
+        if old_value != parsed_date:
+            label = "In-date" if field == "in_date" else "ECD"
+            old_display = old_value.isoformat() if old_value else "-"
+            _log_ro_activity(
+                cur,
+                domain,
+                ro_value,
+                "date_changed",
+                f"{label} changed: {old_display} → {parsed_date.isoformat()}",
             )
 
         conn.commit()
@@ -1736,7 +1802,26 @@ async def get_ro_tech_lines(request: Request, ro: str):
         _ensure_saved_estimates_table(cur)
         _ensure_ro_line_assignments_table(cur)
         _ensure_techs_table(cur)
+        _ensure_ro_activity_log_table(cur)
         _ensure_ro_line_assignments_for_ro(cur, domain, ro_value)
+
+        cur.execute(
+            """
+            SELECT repair_type, COALESCE(SUM(hours), 0) AS total_hours
+            FROM ro_line_assignments
+            WHERE domain = %s
+              AND ro = %s
+              AND tech_name IS NOT NULL
+            GROUP BY repair_type
+            """,
+            (domain, ro_value),
+        )
+        before_rows = cur.fetchall() or []
+        before_by_type = {
+            _normalize_repair_type(row.get("repair_type")): _parse_float_value(row.get("total_hours"))
+            for row in before_rows
+        }
+        before_total_assigned = sum(before_by_type.values())
 
         cur.execute(
             """
@@ -2092,6 +2177,67 @@ async def save_ro_assignment_lines(request: Request):
                 WHERE id = ANY(%s)
                 """,
                 (remainder_ids,),
+            )
+
+        cur.execute(
+            """
+            SELECT repair_type, COALESCE(SUM(hours), 0) AS total_hours
+            FROM ro_line_assignments
+            WHERE domain = %s
+              AND ro = %s
+              AND tech_name IS NOT NULL
+            GROUP BY repair_type
+            """,
+            (domain, ro_value),
+        )
+        after_rows = cur.fetchall() or []
+        after_by_type = {
+            _normalize_repair_type(row.get("repair_type")): _parse_float_value(row.get("total_hours"))
+            for row in after_rows
+        }
+        after_total_assigned = sum(after_by_type.values())
+
+        type_label_map = {
+            "body": "Body",
+            "paint": "Paint",
+            "mech": "Mechanical",
+            "frame": "Frame",
+        }
+
+        if selected_ids:
+            tech_label = (target_tech_name or "").strip()
+            if not tech_label and target_tech_id:
+                tech_label = f"Tech #{target_tech_id}"
+            role_label = type_label_map.get(target_type, target_type.title())
+            _log_ro_activity(
+                cur,
+                domain,
+                ro_value,
+                "tech_assignment",
+                f"{role_label} tech assigned → {tech_label or 'Unassigned'}",
+            )
+
+        for repair_type in sorted(set(before_by_type.keys()) | set(after_by_type.keys())):
+            before_hours = before_by_type.get(repair_type, 0.0)
+            after_hours = after_by_type.get(repair_type, 0.0)
+            if abs(before_hours - after_hours) < 1e-6:
+                continue
+            role_label = type_label_map.get(repair_type, repair_type.title())
+            _log_ro_activity(
+                cur,
+                domain,
+                ro_value,
+                "assigned_hours_changed",
+                f"Assigned hours changed ({role_label}): {before_hours:.1f} → {after_hours:.1f}",
+            )
+
+        if abs(before_total_assigned - after_total_assigned) >= 1e-6:
+            _log_ro_activity(
+                cur,
+                domain,
+                ro_value,
+                "total_assigned_hours_changed",
+                f"Total assigned hours changed: {before_total_assigned:.1f} → {after_total_assigned:.1f}",
             )
 
         conn.commit()
@@ -2737,6 +2883,19 @@ async def phase_update(request: Request):
     cur = conn.cursor()
     try:
         _ensure_ro_phases_table(cur)
+        _ensure_ro_activity_log_table(cur)
+
+        cur.execute(
+            """
+            SELECT phase
+            FROM ro_phases
+            WHERE ro = %s AND domain = %s
+            """,
+            (ro, domain),
+        )
+        prev_row = cur.fetchone() or {}
+        previous_phase = (prev_row.get("phase") or "").strip().lower()
+
         cur.execute(
             """
             INSERT INTO ro_phases (ro, phase, domain)
@@ -2746,6 +2905,31 @@ async def phase_update(request: Request):
             """,
             (ro, phase, domain),
         )
+
+        if previous_phase != phase:
+            phase_label_map = {
+                "teardown": "Teardown",
+                "auth": "Auth",
+                "parts": "Parts",
+                "body": "Body",
+                "refinish": "Refinish",
+                "reassy": "Reassy",
+                "sublet": "Sublet",
+                "washqc": "Wash/QC",
+                "wash/qc": "Wash/QC",
+                "complete": "Complete/Finish",
+                "complete/finish": "Complete/Finish",
+            }
+            old_label = phase_label_map.get(previous_phase, previous_phase or "Unassigned")
+            new_label = phase_label_map.get(phase, phase or "Unassigned")
+            _log_ro_activity(
+                cur,
+                domain,
+                ro,
+                "phase_changed",
+                f"Phase changed: {old_label} → {new_label}",
+            )
+
         conn.commit()
         return {"status": "ok"}
     finally:
@@ -2849,6 +3033,135 @@ async def list_ro_notes(request: Request, ro: str):
             for row in rows
         ]
         return {"notes": notes}
+    finally:
+        cur.close()
+
+
+@router.get("/ro-activity")
+async def list_ro_activity(request: Request, ro: str):
+    domain = get_user_domain(request)
+    if not domain:
+        return JSONResponse(status_code=401, content={"error": "Not authenticated"})
+
+    ro_value = (ro or "").strip()
+    if not ro_value:
+        return JSONResponse(status_code=400, content={"error": "ro is required"})
+
+    conn = get_conn()
+    cur = conn.cursor()
+    try:
+        _ensure_saved_estimates_table(cur)
+        _ensure_ro_activity_log_table(cur)
+        _ensure_ro_flagout_lines_table(cur)
+
+        timeline = []
+
+        def add_entry(message: str, when_value) -> None:
+            if not message:
+                return
+            ts = _activity_to_datetime(when_value)
+            timeline.append(
+                {
+                    "date": ts.date().isoformat(),
+                    "message": message,
+                    "_ts": ts,
+                }
+            )
+
+        cur.execute(
+            """
+            SELECT saved_at, in_date, ecd_date, labor_repairs, paint_repairs
+            FROM saved_estimates
+            WHERE domain = %s
+              AND ro = %s
+            ORDER BY saved_at ASC, id ASC
+            """,
+            (domain, ro_value),
+        )
+        estimate_rows = cur.fetchall() or []
+
+        if estimate_rows:
+            first_saved_at = estimate_rows[0].get("saved_at")
+            add_entry("RO uploaded", first_saved_at)
+
+            prev_total_hours = None
+            prev_in_date = None
+            prev_ecd_date = None
+            for row in estimate_rows:
+                labor_repairs = _parse_json_field(row.get("labor_repairs"))
+                paint_repairs = _parse_json_field(row.get("paint_repairs"))
+                labor_hours = _sum_hours(labor_repairs if isinstance(labor_repairs, list) else [])
+                paint_hours = _sum_hours(paint_repairs if isinstance(paint_repairs, list) else [])
+                total_hours = labor_hours + paint_hours
+
+                current_in_date = _coerce_date(row.get("in_date"))
+                current_ecd_date = _coerce_date(row.get("ecd_date"))
+                saved_at = row.get("saved_at")
+
+                if prev_total_hours is not None and abs(total_hours - prev_total_hours) >= 1e-6:
+                    add_entry(f"Total hours changed: {prev_total_hours:.1f} → {total_hours:.1f}", saved_at)
+
+                if prev_in_date is not None and current_in_date != prev_in_date:
+                    old_display = prev_in_date.isoformat() if prev_in_date else "-"
+                    new_display = current_in_date.isoformat() if current_in_date else "-"
+                    add_entry(f"In-date changed: {old_display} → {new_display}", saved_at)
+
+                if prev_ecd_date is not None and current_ecd_date != prev_ecd_date:
+                    old_display = prev_ecd_date.isoformat() if prev_ecd_date else "-"
+                    new_display = current_ecd_date.isoformat() if current_ecd_date else "-"
+                    add_entry(f"ECD changed: {old_display} → {new_display}", saved_at)
+
+                prev_total_hours = total_hours
+                prev_in_date = current_in_date
+                prev_ecd_date = current_ecd_date
+
+        cur.execute(
+            """
+            SELECT activity_type, message, occurred_on, created_at
+            FROM ro_activity_log
+            WHERE domain = %s
+              AND ro = %s
+            ORDER BY created_at DESC, id DESC
+            """,
+            (domain, ro_value),
+        )
+        activity_rows = cur.fetchall() or []
+        for row in activity_rows:
+            add_entry(row.get("message") or "", row.get("created_at") or row.get("occurred_on"))
+
+        cur.execute(
+            """
+            SELECT
+                COALESCE(NULLIF(TRIM(tech_name), ''), 'Unassigned') AS tech_name,
+                paid_at,
+                COALESCE(SUM(pay_amount), 0) AS total_paid
+            FROM ro_flagout_lines
+            WHERE domain = %s
+              AND ro = %s
+              AND paid_at IS NOT NULL
+            GROUP BY COALESCE(NULLIF(TRIM(tech_name), ''), 'Unassigned'), paid_at
+            ORDER BY paid_at DESC
+            """,
+            (domain, ro_value),
+        )
+        payment_rows = cur.fetchall() or []
+        for row in payment_rows:
+            tech_name = row.get("tech_name") or "Unassigned"
+            total_paid = _parse_float_value(row.get("total_paid"))
+            add_entry(f"Payment made ({tech_name}): ${total_paid:,.2f}", row.get("paid_at"))
+
+        timeline.sort(key=lambda item: item.get("_ts") or datetime.min, reverse=True)
+
+        deduped = []
+        seen = set()
+        for item in timeline:
+            key = (item.get("date"), item.get("message"))
+            if key in seen:
+                continue
+            seen.add(key)
+            deduped.append({"date": item.get("date"), "message": item.get("message")})
+
+        return {"entries": deduped}
     finally:
         cur.close()
 
