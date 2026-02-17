@@ -218,9 +218,9 @@ def get_payments_screen_html():
                             </colgroup>
                             <thead>
                                 <tr style="background:#f7f7f7; text-align:left;">
-                                    <th style="padding:8px; border-bottom:1px solid #ddd; font-weight:bold; color:#666;">${insuranceInputHtml}</th>
-                                    <th style="padding:8px; border-bottom:1px solid #ddd; font-weight:bold; color:#666; text-align:right;">PAYMENTS</th>
-                                    <th style="padding:8px; border-bottom:1px solid #ddd; font-weight:bold; color:#666; text-align:right;">BALANCE</th>
+                                    <th style="padding:8px; border-bottom:1px solid #ddd; font-weight:bold; color:#000;">${insuranceInputHtml}</th>
+                                    <th style="padding:8px; border-bottom:1px solid #ddd; font-weight:bold; color:#000; text-align:right;">PAYMENTS</th>
+                                    <th style="padding:8px; border-bottom:1px solid #ddd; font-weight:bold; color:#000; text-align:right;">BALANCE</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -237,9 +237,9 @@ def get_payments_screen_html():
                             </colgroup>
                             <thead>
                                 <tr style="background:#f7f7f7; text-align:left;">
-                                    <th style="padding:8px; border-bottom:1px solid #ddd; font-weight:bold; color:#666;">${customerInputHtml}</th>
-                                    <th style="padding:8px; border-bottom:1px solid #ddd; font-weight:bold; color:#666; text-align:right;">PAYMENTS</th>
-                                    <th style="padding:8px; border-bottom:1px solid #ddd; font-weight:bold; color:#666; text-align:right;">BALANCE</th>
+                                    <th style="padding:8px; border-bottom:1px solid #ddd; font-weight:bold; color:#000;"></th>
+                                    <th style="padding:8px; border-bottom:1px solid #ddd; font-weight:bold; color:#000; text-align:right;">PAYMENTS</th>
+                                    <th style="padding:8px; border-bottom:1px solid #ddd; font-weight:bold; color:#000; text-align:right;">BALANCE</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -258,9 +258,9 @@ def get_payments_screen_html():
                             </colgroup>
                             <thead>
                                 <tr style="background:#f7f7f7; text-align:left;">
-                                    <th style="padding:8px; border-bottom:1px solid #ddd; font-weight:bold; color:#666;"></th>
-                                    <th style="padding:8px; border-bottom:1px solid #ddd; font-weight:bold; color:#666; text-align:right;">PAYMENTS</th>
-                                    <th style="padding:8px; border-bottom:1px solid #ddd; font-weight:bold; color:#666; text-align:right;">BALANCE</th>
+                                    <th style="padding:8px; border-bottom:1px solid #ddd; font-weight:bold; color:#000;">${customerInputHtml}</th>
+                                    <th style="padding:8px; border-bottom:1px solid #ddd; font-weight:bold; color:#000; text-align:right;">PAYMENTS</th>
+                                    <th style="padding:8px; border-bottom:1px solid #ddd; font-weight:bold; color:#000; text-align:right;">BALANCE</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -277,9 +277,9 @@ def get_payments_screen_html():
                             </colgroup>
                             <thead>
                                 <tr style="background:#f7f7f7; text-align:left;">
-                                    <th style="padding:8px; border-bottom:1px solid #ddd; font-weight:bold; color:#666;"></th>
-                                    <th style="padding:8px; border-bottom:1px solid #ddd; font-weight:bold; color:#666; text-align:right;">PAYMENTS</th>
-                                    <th style="padding:8px; border-bottom:1px solid #ddd; font-weight:bold; color:#666; text-align:right;">BALANCE</th>
+                                    <th style="padding:8px; border-bottom:1px solid #ddd; font-weight:bold; color:#000;"></th>
+                                    <th style="padding:8px; border-bottom:1px solid #ddd; font-weight:bold; color:#000; text-align:right;">PAYMENTS</th>
+                                    <th style="padding:8px; border-bottom:1px solid #ddd; font-weight:bold; color:#000; text-align:right;">BALANCE</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -292,16 +292,18 @@ def get_payments_screen_html():
                     <div style="background:#fafafa; border:1px solid #ddd; border-radius:6px; padding:12px;">
                         ${saveControlsHtml}
                         <div style="display:flex; align-items:center; gap:8px; margin-bottom:2px;">
-                            <div style="font-weight:bold; color:#555;">INSURANCE</div>
-                            <div style="font-weight:bold; color:#555;">TOTAL:</div>
+                            <div style="font-weight:bold; color:#000;">INSURANCE</div>
+                            <div style="font-weight:bold; color:#000;">TOTAL:</div>
                             <div style="font-weight:bold; color:${insuranceTotalColor};">${paymentsFormatMoney(insuranceTotal)}</div>
                         </div>
                         <div style="color:#333; margin-bottom:6px;">${insuranceName || '-'}</div>
                         ${insuranceTableHtml}
 
+                        <div style="border-top:2px dotted #bbb; margin:12px 0 10px 0;"></div>
+
                         <div style="display:flex; align-items:center; gap:8px; margin-bottom:2px;">
-                            <div style="font-weight:bold; color:#555;">CUSTOMER</div>
-                            <div style="font-weight:bold; color:#555;">TOTAL:</div>
+                            <div style="font-weight:bold; color:#000;">CUSTOMER</div>
+                            <div style="font-weight:bold; color:#000;">TOTAL:</div>
                             <div style="font-weight:bold; color:${customerTotalColor};">${paymentsFormatMoney(customerTotal)}</div>
                         </div>
                         <div style="color:#333; margin-bottom:6px;">${customerName || '-'}</div>
