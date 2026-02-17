@@ -1446,7 +1446,7 @@ def get_dashboard_screen_html():
                                 <div style="background:#fafafa; border:1px solid #ddd; border-radius:6px; padding:16px;">
                                     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
                                         <div style="font-weight:bold; color:#333;">Tech List</div>
-                                        <div style="font-weight:bold; color:#333; font-style:italic;">*${escapeHtml(estimatorDisplay)}*</div>
+                                        <div style="font-weight:bold; color:#333;">${escapeHtml(estimatorDisplay)}</div>
                                     </div>
                                     <div id="tech-assignment-list-${rowId}" style="margin-top:12px;">
                                         <div style="color:#777;">Loading...</div>
@@ -1492,24 +1492,34 @@ def get_dashboard_screen_html():
             }
 
             function getRoEstimatorDisplay(ro) {
-                const preferred = String(ro?.written_by || '').trim() || String(ro?.estimator || '').trim();
-                if (preferred) {
-                    return preferred.toUpperCase();
+                const toTitleCaseName = (value) => String(value || '')
+                    .trim()
+                    .toLowerCase()
+                    .replace(/\b([a-z])/g, (match) => match.toUpperCase());
+
+                let preferred = String(ro?.written_by || '').trim() || String(ro?.estimator || '').trim();
+
+                if (!preferred) {
+                    const ownerInfo = String(ro?.owner_info || '').trim();
+                    if (ownerInfo) {
+                        const writtenByMatch = ownerInfo.match(/written\s*by\s*:\s*([^\n,]+)/i);
+                        if (writtenByMatch && writtenByMatch[1]) {
+                            preferred = String(writtenByMatch[1]).trim();
+                        }
+                        if (!preferred) {
+                            const estimatorMatch = ownerInfo.match(/estimator\s*:\s*([^\n,]+)/i);
+                            if (estimatorMatch && estimatorMatch[1]) {
+                                preferred = String(estimatorMatch[1]).trim();
+                            }
+                        }
+                    }
                 }
 
-                const ownerInfo = String(ro?.owner_info || '').trim();
-                if (ownerInfo) {
-                    const writtenByMatch = ownerInfo.match(/written\s*by\s*:\s*([^\n,]+)/i);
-                    if (writtenByMatch && writtenByMatch[1]) {
-                        return String(writtenByMatch[1]).trim().toUpperCase();
-                    }
-                    const estimatorMatch = ownerInfo.match(/estimator\s*:\s*([^\n,]+)/i);
-                    if (estimatorMatch && estimatorMatch[1]) {
-                        return String(estimatorMatch[1]).trim().toUpperCase();
-                    }
+                if (!preferred) {
+                    return '-';
                 }
 
-                return '-';
+                return `${toTitleCaseName(preferred)} (estimator / written by)`;
             }
 
             function closeTechAssignModal() {
