@@ -68,6 +68,48 @@ def get_payments_screen_html():
                 event.target.value = paymentsFormatCurrencyInputValue(event.target.value);
             }
 
+            function paymentsGetLocalBusinessDateISO() {
+                const now = new Date();
+                const year = now.getFullYear();
+                const month = String(now.getMonth() + 1).padStart(2, '0');
+                const day = String(now.getDate()).padStart(2, '0');
+                return `${year}-${month}-${day}`;
+            }
+
+            function paymentsFormatBusinessDate(value) {
+                const raw = String(value || '').trim().slice(0, 10);
+                const parts = raw.split('-');
+                if (parts.length !== 3) return '-';
+
+                const [year, month, day] = parts;
+                if (!year || !month || !day) return '-';
+                return `${month}/${day}/${year.slice(-2)}`;
+            }
+
+            function buildPaymentsEntryRows(entries, includeInputColumn) {
+                if (!Array.isArray(entries) || entries.length === 0) return '';
+                return entries.map((entry) => {
+                    const amount = Number(entry.amount || 0);
+                    const dateDisplay = paymentsFormatBusinessDate(entry.business_date);
+                    if (includeInputColumn) {
+                        return `
+                            <tr>
+                                <td style="padding:8px; border-bottom:1px solid #ececec; color:#333;">${dateDisplay}</td>
+                                <td style="padding:8px; border-bottom:1px solid #ececec; text-align:right; color:#333;">${paymentsFormatMoney(amount)}</td>
+                                <td style="padding:8px; border-bottom:1px solid #ececec;"></td>
+                            </tr>
+                        `;
+                    }
+                    return `
+                        <tr>
+                            <td style="padding:8px; border-bottom:1px solid #ececec; color:#333;">${dateDisplay}</td>
+                            <td style="padding:8px; border-bottom:1px solid #ececec; text-align:right; color:#333;">${paymentsFormatMoney(amount)}</td>
+                            <td style="padding:8px; border-bottom:1px solid #ececec;"></td>
+                        </tr>
+                    `;
+                }).join('');
+            }
+
             function paymentsEscapedRoValue(value) {
                 return String(value || '').replace(/'/g, "\\'");
             }
@@ -93,76 +135,174 @@ def get_payments_screen_html():
                     customerPaid,
                     insuranceBalance,
                     customerBalance,
+                    insurancePaymentEntries,
+                    customerPaymentEntries,
                     editable,
                 } = options;
 
+                const insuranceTotalColor = insuranceBalance === 0 ? '#2e7d32' : '#333';
+                const customerTotalColor = customerBalance === 0 ? '#2e7d32' : '#333';
+
                 const saveControlsHtml = editable
                     ? `
-                        <div style="display:flex; align-items:center; gap:12px; margin-bottom:10px;">
+                        <div style="display:flex; justify-content:flex-end; align-items:center; gap:12px; margin-bottom:10px;">
+                            <div id="payments-save-msg-${rowId}" style="font-size:12px; color:#666;"></div>
                             <button id="payments-save-btn-${rowId}" type="button" onclick="saveGrandTotalPaymentsForRo(event, '${roEscaped}')" style="padding:8px 14px; background:#4caf50; color:#fff; border:none; border-radius:4px; cursor:pointer; font-weight:bold;">
                                 SAVE
                             </button>
-                            <div id="payments-save-msg-${rowId}" style="font-size:12px; color:#666;"></div>
                         </div>
                     `
                     : '';
 
                 const insuranceInputHtml = editable
                     ? `
-                        <input id="payments-ins-paid-${rowId}" type="text" inputmode="decimal" value="${paymentsFormatMoney(insurancePaid)}" oninput="paymentsHandleCurrencyInput(event)" style="padding:8px; border:1px solid #ccc; border-radius:4px; width:170px; text-align:right; margin-bottom:8px;" />
+                        <input id="payments-ins-paid-${rowId}" type="text" inputmode="decimal" value="${paymentsFormatMoney(0)}" oninput="paymentsHandleCurrencyInput(event)" style="padding:8px; border:1px solid #ccc; border-radius:4px; width:170px; text-align:right;" />
                     `
                     : '';
 
                 const customerInputHtml = editable
                     ? `
-                        <input id="payments-cust-paid-${rowId}" type="text" inputmode="decimal" value="${paymentsFormatMoney(customerPaid)}" oninput="paymentsHandleCurrencyInput(event)" style="padding:8px; border:1px solid #ccc; border-radius:4px; width:170px; text-align:right; margin-bottom:8px;" />
+                        <input id="payments-cust-paid-${rowId}" type="text" inputmode="decimal" value="${paymentsFormatMoney(0)}" oninput="paymentsHandleCurrencyInput(event)" style="padding:8px; border:1px solid #ccc; border-radius:4px; width:170px; text-align:right;" />
                     `
                     : '';
+
+                const buildSectionRows = (entries, totalAmount, paidTotal, includeInput, inputHtml) => {
+                    let runningBalance = Math.max(0, Number(totalAmount || 0) - Number(paidTotal || 0));
+                    const rows = [];
+
+                    if (includeInput) {
+                        rows.push(`
+                            <tr>
+                                <td style="padding:8px; border-bottom:1px solid #ececec;">${inputHtml}</td>
+                                <td style="padding:8px; border-bottom:1px solid #ececec;"></td>
+                                <td style="padding:8px; border-bottom:1px solid #ececec;"></td>
+                            </tr>
+                        `);
+                    }
+
+                    (Array.isArray(entries) ? entries : []).forEach((entry, index) => {
+                        const amount = Number(entry.amount || 0);
+                        const dateDisplay = paymentsFormatBusinessDate(entry.business_date);
+                        const rowBalance = runningBalance;
+                        const balanceColor = index === 0
+                            ? (rowBalance === 0 ? '#2e7d32' : '#c62828')
+                            : '#333';
+
+                        rows.push(`
+                            <tr>
+                                <td style="padding:8px; border-bottom:1px solid #ececec; color:#333;">${dateDisplay}</td>
+                                <td style="padding:8px; border-bottom:1px solid #ececec; text-align:right; color:#333;">${paymentsFormatMoney(amount)}</td>
+                                <td style="padding:8px; border-bottom:1px solid #ececec; text-align:right; color:${balanceColor}; font-weight:${index === 0 ? 'bold' : 'normal'};">${paymentsFormatMoney(rowBalance)}</td>
+                            </tr>
+                        `);
+
+                        runningBalance = Math.max(0, rowBalance + amount);
+                    });
+
+                    return rows.join('');
+                };
+
+                const insuranceRowsHtml = buildSectionRows(insurancePaymentEntries, insuranceTotal, insurancePaid, editable, insuranceInputHtml);
+                const customerRowsHtml = buildSectionRows(customerPaymentEntries, customerTotal, customerPaid, editable, customerInputHtml);
+
+                const insuranceTableHtml = editable
+                    ? `
+                        <table style="width:100%; border-collapse:collapse; table-layout:fixed; margin-bottom:10px;">
+                            <colgroup>
+                                <col style="width:34%;" />
+                                <col style="width:33%;" />
+                                <col style="width:33%;" />
+                            </colgroup>
+                            <thead>
+                                <tr style="background:#f7f7f7; text-align:left;">
+                                    <th style="padding:8px; border-bottom:1px solid #ddd; font-weight:bold; color:#666;"></th>
+                                    <th style="padding:8px; border-bottom:1px solid #ddd; font-weight:bold; color:#666; text-align:right;">PAYMENTS</th>
+                                    <th style="padding:8px; border-bottom:1px solid #ddd; font-weight:bold; color:#666; text-align:right;">BALANCE</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${insuranceRowsHtml}
+                            </tbody>
+                        </table>
+                    `
+                    : `
+                        <table style="width:100%; border-collapse:collapse; table-layout:fixed; margin-bottom:10px;">
+                            <colgroup>
+                                <col style="width:34%;" />
+                                <col style="width:33%;" />
+                                <col style="width:33%;" />
+                            </colgroup>
+                            <thead>
+                                <tr style="background:#f7f7f7; text-align:left;">
+                                    <th style="padding:8px; border-bottom:1px solid #ddd; font-weight:bold; color:#666;"></th>
+                                    <th style="padding:8px; border-bottom:1px solid #ddd; font-weight:bold; color:#666; text-align:right;">PAYMENTS</th>
+                                    <th style="padding:8px; border-bottom:1px solid #ddd; font-weight:bold; color:#666; text-align:right;">BALANCE</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${insuranceRowsHtml}
+                            </tbody>
+                        </table>
+                    `;
+
+                const customerTableHtml = editable
+                    ? `
+                        <table style="width:100%; border-collapse:collapse; table-layout:fixed;">
+                            <colgroup>
+                                <col style="width:34%;" />
+                                <col style="width:33%;" />
+                                <col style="width:33%;" />
+                            </colgroup>
+                            <thead>
+                                <tr style="background:#f7f7f7; text-align:left;">
+                                    <th style="padding:8px; border-bottom:1px solid #ddd; font-weight:bold; color:#666;"></th>
+                                    <th style="padding:8px; border-bottom:1px solid #ddd; font-weight:bold; color:#666; text-align:right;">PAYMENTS</th>
+                                    <th style="padding:8px; border-bottom:1px solid #ddd; font-weight:bold; color:#666; text-align:right;">BALANCE</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${customerRowsHtml}
+                            </tbody>
+                        </table>
+                    `
+                    : `
+                        <table style="width:100%; border-collapse:collapse; table-layout:fixed;">
+                            <colgroup>
+                                <col style="width:34%;" />
+                                <col style="width:33%;" />
+                                <col style="width:33%;" />
+                            </colgroup>
+                            <thead>
+                                <tr style="background:#f7f7f7; text-align:left;">
+                                    <th style="padding:8px; border-bottom:1px solid #ddd; font-weight:bold; color:#666;"></th>
+                                    <th style="padding:8px; border-bottom:1px solid #ddd; font-weight:bold; color:#666; text-align:right;">PAYMENTS</th>
+                                    <th style="padding:8px; border-bottom:1px solid #ddd; font-weight:bold; color:#666; text-align:right;">BALANCE</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${customerRowsHtml}
+                            </tbody>
+                        </table>
+                    `;
 
                 return `
                     <div style="background:#fafafa; border:1px solid #ddd; border-radius:6px; padding:12px;">
                         ${saveControlsHtml}
-                        <div style="font-weight:bold; color:#333; margin-bottom:8px;">Running Ledger</div>
-
-                        <div style="font-weight:bold; color:#555; margin-bottom:2px;">INSURANCE</div>
+                        <div style="display:flex; align-items:center; gap:8px; margin-bottom:2px;">
+                            <div style="font-weight:bold; color:#555;">INSURANCE</div>
+                            <div style="font-weight:bold; color:#555;">TOTAL:</div>
+                            <div style="font-weight:bold; color:${insuranceTotalColor};">${paymentsFormatMoney(insuranceTotal)}</div>
+                        </div>
                         <div style="color:#333; margin-bottom:6px;">${insuranceName || '-'}</div>
-                        ${insuranceInputHtml}
-                        <table style="width:100%; border-collapse:collapse; margin-bottom:10px;">
-                            <thead>
-                                <tr style="background:#f7f7f7; text-align:left;">
-                                    <th style="padding:8px; border-bottom:1px solid #ddd; font-weight:bold; color:#666; text-align:right;">TOTAL</th>
-                                    <th style="padding:8px; border-bottom:1px solid #ddd; font-weight:bold; color:#666; text-align:right;">PAYMENTS</th>
-                                    <th style="padding:8px; border-bottom:1px solid #ddd; font-weight:bold; color:#666; text-align:right;">BALANCE</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <tr>
-                                    <td style="padding:8px; border-bottom:1px solid #ececec; text-align:right; color:#333;">${paymentsFormatMoney(insuranceTotal)}</td>
-                                    <td style="padding:8px; border-bottom:1px solid #ececec; text-align:right; color:#333;">${paymentsFormatMoney(insurancePaid)}</td>
-                                    <td style="padding:8px; border-bottom:1px solid #ececec; text-align:right; font-weight:bold; color:#333;">${paymentsFormatMoney(insuranceBalance)}</td>
-                                </tr>
-                            </tbody>
-                        </table>
+                        ${insuranceTableHtml}
 
-                        <div style="font-weight:bold; color:#555; margin-bottom:2px;">CUSTOMER</div>
+                        <div style="display:flex; align-items:center; gap:8px; margin-bottom:2px;">
+                            <div style="font-weight:bold; color:#555;">CUSTOMER</div>
+                            <div style="font-weight:bold; color:#555;">TOTAL:</div>
+                            <div style="font-weight:bold; color:${customerTotalColor};">${paymentsFormatMoney(customerTotal)}</div>
+                        </div>
                         <div style="color:#333; margin-bottom:6px;">${customerName || '-'}</div>
-                        ${customerInputHtml}
-                        <table style="width:100%; border-collapse:collapse;">
-                            <thead>
-                                <tr style="background:#f7f7f7; text-align:left;">
-                                    <th style="padding:8px; border-bottom:1px solid #ddd; font-weight:bold; color:#666; text-align:right;">TOTAL</th>
-                                    <th style="padding:8px; border-bottom:1px solid #ddd; font-weight:bold; color:#666; text-align:right;">PAYMENTS</th>
-                                    <th style="padding:8px; border-bottom:1px solid #ddd; font-weight:bold; color:#666; text-align:right;">BALANCE</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <tr>
-                                    <td style="padding:8px; border-bottom:1px solid #ececec; text-align:right; color:#333;">${paymentsFormatMoney(customerTotal)}</td>
-                                    <td style="padding:8px; border-bottom:1px solid #ececec; text-align:right; color:#333;">${paymentsFormatMoney(customerPaid)}</td>
-                                    <td style="padding:8px; border-bottom:1px solid #ececec; text-align:right; font-weight:bold; color:#333;">${paymentsFormatMoney(customerBalance)}</td>
-                                </tr>
-                            </tbody>
-                        </table>
+                        ${customerTableHtml}
                     </div>
                 `;
             }
@@ -412,12 +552,18 @@ def get_payments_screen_html():
 
                 if (!insuranceInput || !customerInput || !messageEl || !saveBtn) return;
 
-                const insurancePaid = paymentsToNumber(insuranceInput.value);
-                const customerPaid = paymentsToNumber(customerInput.value);
+                const insurancePayment = paymentsToNumber(insuranceInput.value);
+                const customerPayment = paymentsToNumber(customerInput.value);
 
-                if (!Number.isFinite(insurancePaid) || !Number.isFinite(customerPaid) || insurancePaid < 0 || customerPaid < 0) {
+                if (!Number.isFinite(insurancePayment) || !Number.isFinite(customerPayment) || insurancePayment < 0 || customerPayment < 0) {
                     messageEl.style.color = '#c62828';
                     messageEl.textContent = 'Enter valid non-negative currency amounts.';
+                    return;
+                }
+
+                if (insurancePayment === 0 && customerPayment === 0) {
+                    messageEl.style.color = '#c62828';
+                    messageEl.textContent = 'Enter a payment amount greater than 0.00.';
                     return;
                 }
 
@@ -432,8 +578,9 @@ def get_payments_screen_html():
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
                             ro: roNumber,
-                            insurance_paid: insurancePaid,
-                            customer_paid: customerPaid,
+                            insurance_payment: insurancePayment,
+                            customer_payment: customerPayment,
+                            business_date: paymentsGetLocalBusinessDateISO(),
                         }),
                     });
 
@@ -444,7 +591,16 @@ def get_payments_screen_html():
 
                     messageEl.style.color = '#2e7d32';
                     messageEl.textContent = 'Saved';
-                    await loadPaymentsData();
+                    insuranceInput.value = paymentsFormatMoney(0);
+                    customerInput.value = paymentsFormatMoney(0);
+                    await loadPaymentsData({ reopenEditorRo: roNumber });
+
+                    const refreshedRowId = paymentsSafeId(roNumber);
+                    const refreshedMessageEl = document.getElementById(`payments-save-msg-${refreshedRowId}`);
+                    if (refreshedMessageEl) {
+                        refreshedMessageEl.style.color = '#2e7d32';
+                        refreshedMessageEl.textContent = 'Saved';
+                    }
                 } catch (err) {
                     console.error('Error saving grand total payments:', err);
                     messageEl.style.color = '#c62828';
@@ -479,6 +635,8 @@ def get_payments_screen_html():
                     const customerBalance = Math.max(0, customerTotal - customerPaid);
                     const insuranceName = String(row.insurance_name || row.insurance || '').trim();
                     const customerName = String(row.customer || '').trim();
+                    const insurancePaymentEntries = Array.isArray(row.insurance_payment_entries) ? row.insurance_payment_entries : [];
+                    const customerPaymentEntries = Array.isArray(row.customer_payment_entries) ? row.customer_payment_entries : [];
                     const roEscaped = paymentsEscapedRoValue(ro);
 
                     html += `
@@ -526,6 +684,8 @@ def get_payments_screen_html():
                                         customerPaid,
                                         insuranceBalance,
                                         customerBalance,
+                                        insurancePaymentEntries,
+                                        customerPaymentEntries,
                                         editable: true,
                                     })}
                                 </div>
@@ -545,6 +705,8 @@ def get_payments_screen_html():
                                         customerPaid,
                                         insuranceBalance,
                                         customerBalance,
+                                        insurancePaymentEntries,
+                                        customerPaymentEntries,
                                         editable: false,
                                     })}
                                 </div>
@@ -556,7 +718,7 @@ def get_payments_screen_html():
                 tbody.innerHTML = html;
             }
 
-            async function loadPaymentsData() {
+            async function loadPaymentsData(options) {
                 try {
                     const response = await fetch('/api/payments/open-ros', { credentials: 'include' });
                     const payload = await response.json();
@@ -564,6 +726,15 @@ def get_payments_screen_html():
                     paymentsTechPaymentsByRo = {};
                     openPaymentsRoDetailId = null;
                     renderPaymentsTable(paymentsRows);
+
+                    const reopenEditorRo = options && options.reopenEditorRo ? String(options.reopenEditorRo) : '';
+                    if (reopenEditorRo) {
+                        const rowId = paymentsSafeId(reopenEditorRo);
+                        const editorRow = document.getElementById(`payments-editor-row-${rowId}`);
+                        if (editorRow) {
+                            paymentsOpenRow(editorRow);
+                        }
+                    }
                 } catch (err) {
                     console.error('Error loading payments data:', err);
                     const tbody = document.getElementById('paymentsRoTableBody');

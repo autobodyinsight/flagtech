@@ -212,6 +212,30 @@ def _ensure_ro_payment_totals_table(cur) -> None:
     cur.execute("CREATE INDEX IF NOT EXISTS idx_ro_payment_totals_domain_ro ON ro_payment_totals(domain, ro)")
 
 
+def _ensure_ro_payment_entries_table(cur) -> None:
+    cur.execute(
+        """
+        CREATE TABLE IF NOT EXISTS ro_payment_entries (
+            id SERIAL PRIMARY KEY,
+            ro VARCHAR(255) NOT NULL,
+            domain VARCHAR(255) NOT NULL,
+            payer_type VARCHAR(32) NOT NULL,
+            amount NUMERIC NOT NULL,
+            business_date DATE,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+        """
+    )
+    cur.execute("ALTER TABLE ro_payment_entries ADD COLUMN IF NOT EXISTS ro VARCHAR(255)")
+    cur.execute("ALTER TABLE ro_payment_entries ADD COLUMN IF NOT EXISTS domain VARCHAR(255)")
+    cur.execute("ALTER TABLE ro_payment_entries ADD COLUMN IF NOT EXISTS payer_type VARCHAR(32)")
+    cur.execute("ALTER TABLE ro_payment_entries ADD COLUMN IF NOT EXISTS amount NUMERIC")
+    cur.execute("ALTER TABLE ro_payment_entries ADD COLUMN IF NOT EXISTS business_date DATE")
+    cur.execute("ALTER TABLE ro_payment_entries ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP")
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_ro_payment_entries_domain_ro ON ro_payment_entries(domain, ro)")
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_ro_payment_entries_domain_ro_type ON ro_payment_entries(domain, ro, payer_type)")
+
+
 def _ensure_parts_orders_table(cur) -> None:
     cur.execute(
         """
@@ -1665,6 +1689,7 @@ async def list_open_ros_for_payments(request: Request):
         _ensure_saved_estimates_table(cur)
         _ensure_ro_phases_table(cur)
         _ensure_ro_payment_totals_table(cur)
+        _ensure_ro_payment_entries_table(cur)
         _ensure_parts_received_table(cur)
 
         cur.execute(
@@ -1720,6 +1745,39 @@ async def list_open_ros_for_payments(request: Request):
             for payment_row in payment_rows
             if str(payment_row.get("ro") or "").strip()
         }
+
+        cur.execute(
+            """
+            SELECT ro, payer_type, amount, business_date
+            FROM ro_payment_entries
+            WHERE domain = %s
+            ORDER BY business_date DESC NULLS LAST, id DESC
+            """,
+            (domain,),
+        )
+        payment_entry_rows = cur.fetchall() or []
+        payment_entries_by_ro = {}
+        for entry_row in payment_entry_rows:
+            ro_key = str(entry_row.get("ro") or "").strip()
+            payer_type = str(entry_row.get("payer_type") or "").strip().lower()
+            if not ro_key or payer_type not in {"insurance", "customer"}:
+                continue
+
+            business_date = entry_row.get("business_date")
+            if isinstance(business_date, datetime):
+                business_date_display = business_date.date().isoformat()
+            elif isinstance(business_date, date):
+                business_date_display = business_date.isoformat()
+            else:
+                business_date_display = str(business_date or "")[:10]
+
+            entry_bucket = payment_entries_by_ro.setdefault(ro_key, {"insurance": [], "customer": []})
+            entry_bucket[payer_type].append(
+                {
+                    "amount": _parse_float_value(entry_row.get("amount")),
+                    "business_date": business_date_display,
+                }
+            )
 
         cur.execute(
             """
@@ -1801,6 +1859,8 @@ async def list_open_ros_for_payments(request: Request):
                     "grand_total": grand_total,
                     "balance": balance,
                     "invoice_payments": invoices_by_ro.get(ro, []),
+                    "insurance_payment_entries": (payment_entries_by_ro.get(ro) or {}).get("insurance", []),
+                    "customer_payment_entries": (payment_entries_by_ro.get(ro) or {}).get("customer", []),
                 }
             )
 
@@ -1824,6 +1884,10 @@ async def save_ro_payments(request: Request):
 
     insurance_paid_raw = data.get("insurance_paid", 0)
     customer_paid_raw = data.get("customer_paid", 0)
+    insurance_payment_raw = data.get("insurance_payment", None)
+    customer_payment_raw = data.get("customer_payment", None)
+    business_date_raw = str(data.get("business_date") or "").strip()
+    has_incremental_values = insurance_payment_raw is not None or customer_payment_raw is not None
 
     def _parse_payment_amount(raw_value) -> float:
         cleaned = str(raw_value if raw_value is not None else "").replace("$", "").replace(",", "").strip()
@@ -1846,11 +1910,20 @@ async def save_ro_payments(request: Request):
     if insurance_paid < 0 or customer_paid < 0:
         return JSONResponse(status_code=400, content={"error": "payment amounts cannot be negative"})
 
+    business_date_value = None
+    if business_date_raw:
+        raw_date = business_date_raw[:10]
+        try:
+            business_date_value = date.fromisoformat(raw_date)
+        except ValueError:
+            return JSONResponse(status_code=400, content={"error": "business_date must be YYYY-MM-DD"})
+
     conn = get_conn()
     cur = conn.cursor()
     try:
         _ensure_saved_estimates_table(cur)
         _ensure_ro_payment_totals_table(cur)
+        _ensure_ro_payment_entries_table(cur)
 
         cur.execute(
             """
@@ -1871,6 +1944,39 @@ async def save_ro_payments(request: Request):
 
         cur.execute(
             """
+            SELECT insurance_paid, customer_paid
+            FROM ro_payment_totals
+            WHERE domain = %s
+              AND ro = %s
+            LIMIT 1
+            """,
+            (domain, ro_value),
+        )
+        existing_row = cur.fetchone() or {}
+        existing_insurance_paid = _parse_float_value(existing_row.get("insurance_paid"))
+        existing_customer_paid = _parse_float_value(existing_row.get("customer_paid"))
+
+        insurance_entry_amount = 0.0
+        customer_entry_amount = 0.0
+
+        if has_incremental_values:
+            try:
+                insurance_entry_amount = _parse_payment_amount(insurance_payment_raw)
+                customer_entry_amount = _parse_payment_amount(customer_payment_raw)
+            except (TypeError, ValueError):
+                return JSONResponse(
+                    status_code=400,
+                    content={"error": "insurance_payment and customer_payment must be valid currency values"},
+                )
+
+            if insurance_entry_amount < 0 or customer_entry_amount < 0:
+                return JSONResponse(status_code=400, content={"error": "payment amounts cannot be negative"})
+
+            insurance_paid = existing_insurance_paid + insurance_entry_amount
+            customer_paid = existing_customer_paid + customer_entry_amount
+
+        cur.execute(
+            """
             INSERT INTO ro_payment_totals (ro, domain, insurance_paid, customer_paid, updated_at)
             VALUES (%s, %s, %s, %s, CURRENT_TIMESTAMP)
             ON CONFLICT (domain, ro)
@@ -1882,6 +1988,24 @@ async def save_ro_payments(request: Request):
             (ro_value, domain, insurance_paid, customer_paid),
         )
 
+        if insurance_entry_amount > 0:
+            cur.execute(
+                """
+                INSERT INTO ro_payment_entries (ro, domain, payer_type, amount, business_date, created_at)
+                VALUES (%s, %s, 'insurance', %s, %s, CURRENT_TIMESTAMP)
+                """,
+                (ro_value, domain, insurance_entry_amount, business_date_value),
+            )
+
+        if customer_entry_amount > 0:
+            cur.execute(
+                """
+                INSERT INTO ro_payment_entries (ro, domain, payer_type, amount, business_date, created_at)
+                VALUES (%s, %s, 'customer', %s, %s, CURRENT_TIMESTAMP)
+                """,
+                (ro_value, domain, customer_entry_amount, business_date_value),
+            )
+
         conn.commit()
 
         balance = max(0.0, grand_total - insurance_paid - customer_paid)
@@ -1890,6 +2014,8 @@ async def save_ro_payments(request: Request):
             "ro": ro_value,
             "insurance_paid": insurance_paid,
             "customer_paid": customer_paid,
+            "insurance_payment_saved": insurance_entry_amount,
+            "customer_payment_saved": customer_entry_amount,
             "grand_total": grand_total,
             "balance": balance,
         }
