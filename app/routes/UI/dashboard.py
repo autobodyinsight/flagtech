@@ -95,21 +95,21 @@ def get_dashboard_screen_html():
                             <div class="dash-cell" style="flex:1 1 220px; max-width:320px;">
                                 <h3 style="margin:0 0 10px 0; text-align:center; color:#333; font-weight:bold;">Current Sales</h3>
                                 <div style="position:relative; background:#e0e0e0; border-radius:4px; overflow:hidden;" class="dash-card-fill">
-                                    <div id="totalSalesBar" style="position:absolute; bottom:0; width:100%; background:linear-gradient(to top, #4caf50, #81c784); transition:height 0.5s ease;"></div>
+                                    <div id="totalSalesBar" style="position:absolute; bottom:0; width:100%; background:linear-gradient(to top, #1E90FF, #1E90FF); transition:height 0.5s ease;"></div>
                                 </div>
-                                <div id="totalSalesValue" style="text-align:center; font-size:20px; font-weight:bold; color:#4caf50; margin-top:10px;">$0</div>
+                                <div id="totalSalesValue" style="text-align:center; font-size:20px; font-weight:bold; color:#1E90FF; margin-top:10px;">$0</div>
                             </div>
 
                             <!-- Average Hrs + Average RO -->
                             <div class="dash-cell" style="flex:1 1 260px; max-width:360px;">
                                 <div class="dash-avg-row">
-                                    <div class="dash-mini-card" style="border-color:#9c27b0; box-shadow:none;">
+                                    <div class="dash-mini-card" style="border-color:#FF8C00; box-shadow:none;">
                                         <h4 style="margin:0 0 8px 0; color:#666; font-size:18px; font-weight:bold;">Average Hrs</h4>
-                                        <div id="averageHrs" style="font-size:24px; font-weight:bold; color:#9c27b0;">0.0</div>
+                                        <div id="averageHrs" style="font-size:24px; font-weight:bold; color:#FF8C00;">0.0</div>
                                     </div>
-                                    <div class="dash-mini-card" style="border-color:#ff5722; box-shadow:none;">
+                                    <div class="dash-mini-card" style="border-color:#FF8C00; box-shadow:none;">
                                         <h4 style="margin:0 0 8px 0; color:#666; font-size:18px; font-weight:bold;">Average RO</h4>
-                                        <div id="averageRO" style="font-size:24px; font-weight:bold; color:#ff5722;">$0</div>
+                                        <div id="averageRO" style="font-size:24px; font-weight:bold; color:#FF8C00;">$0</div>
                                     </div>
                                 </div>
                             </div>
@@ -118,9 +118,9 @@ def get_dashboard_screen_html():
                             <div class="dash-cell" style="flex:1 1 220px; max-width:320px;">
                                 <h3 style="margin:0 0 10px 0; text-align:center; color:#333; font-weight:bold;">Total RO's</h3>
                                 <div style="position:relative; background:#e0e0e0; border-radius:4px; overflow:hidden;" class="dash-card-fill">
-                                    <div id="totalRosBar" style="position:absolute; bottom:0; width:100%; background:linear-gradient(to top, #42a5f5, #90caf9); transition:height 0.5s ease;"></div>
+                                    <div id="totalRosBar" style="position:absolute; bottom:0; width:100%; background:linear-gradient(to top, #1E90FF, #1E90FF); transition:height 0.5s ease;"></div>
                                 </div>
-                                <div id="totalRosValue" style="text-align:center; font-size:20px; font-weight:bold; color:#42a5f5; margin-top:10px;">0</div>
+                                <div id="totalRosValue" style="text-align:center; font-size:20px; font-weight:bold; color:#1E90FF; margin-top:10px;">0</div>
                             </div>
                         </div>
 
@@ -408,8 +408,13 @@ def get_dashboard_screen_html():
                 
                 // Generate colors for each tech
                 const colors = [
-                    '#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', 
-                    '#9966FF', '#FF9F40', '#FF6384', '#C9CBCF'
+                    '#00BFFF',
+                    '#FF8C00',
+                    '#32CD32',
+                    '#FFD700',
+                    '#40E0D0',
+                    '#8A2BE2',
+                    '#708090'
                 ];
                 
                 // Destroy existing chart if it exists
@@ -423,7 +428,7 @@ def get_dashboard_screen_html():
                         labels: labels,
                         datasets: [{
                             data: dataValues,
-                            backgroundColor: colors.slice(0, labels.length),
+                            backgroundColor: labels.map((_, idx) => colors[idx % colors.length]),
                             borderWidth: 2,
                             borderColor: '#fff'
                         }]
