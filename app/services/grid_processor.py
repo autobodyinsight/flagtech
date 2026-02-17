@@ -683,12 +683,16 @@ def process_pdf_grid(pages: List[Dict]) -> Dict[str, Any]:
                 return (match.group(1) or "").strip()
         return ""
 
+    def _sanitize_name_only(value: str) -> str:
+        without_digits = re.sub(r"\d+", "", value or "")
+        return re.sub(r"\s+", " ", without_digits).strip()
+
     written_by = ""
     estimator = ""
     if not written_by:
-        written_by = _extract_line_value(full_text_lines, r"\bwritten\s+by\b\s*:\s*(.*)$")
+        written_by = _sanitize_name_only(_extract_line_value(full_text_lines, r"\bwritten\s+by\b\s*:\s*(.*)$"))
     if not estimator:
-        estimator = _extract_line_value(full_text_lines, r"\bestimator\b\s*:\s*(.*)$")
+        estimator = _sanitize_name_only(_extract_line_value(full_text_lines, r"\bestimator\b\s*:\s*(.*)$"))
 
     total_labor = sum(item["value"] for item in labor_items)
     total_paint = sum(item["value"] for item in paint_items)
