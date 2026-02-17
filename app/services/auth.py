@@ -27,6 +27,8 @@ def ensure_auth_tables() -> None:
             email VARCHAR(255) UNIQUE NOT NULL,
             domain VARCHAR(255) NOT NULL,
             company_name VARCHAR(255) NOT NULL,
+            first_name VARCHAR(120),
+            last_name VARCHAR(120),
             password_hash VARCHAR(255) NOT NULL,
             access_level VARCHAR(32) DEFAULT 'support',
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -36,6 +38,8 @@ def ensure_auth_tables() -> None:
         """
     )
     cur.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS access_level VARCHAR(32) DEFAULT 'support'")
+    cur.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS first_name VARCHAR(120)")
+    cur.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS last_name VARCHAR(120)")
     cur.execute("CREATE INDEX IF NOT EXISTS idx_users_email ON users(email)")
     cur.execute("CREATE INDEX IF NOT EXISTS idx_users_domain ON users(domain)")
     cur.execute(
@@ -178,6 +182,8 @@ def upsert_user(
     company_name: str | None = None,
     active: bool = True,
     access_level: str = "support",
+    first_name: str | None = None,
+    last_name: str | None = None,
 ) -> None:
     ensure_auth_tables()
     normalized_email = (email or "").strip().lower()
@@ -186,6 +192,8 @@ def upsert_user(
 
     domain = normalized_email.split("@", 1)[1]
     user_company = company_name or domain
+    normalized_first_name = (first_name or "").strip() or None
+    normalized_last_name = (last_name or "").strip() or None
     password_hash = hash_password(password)
     normalized_access_level = (access_level or "support").strip().lower()
     if normalized_access_level not in ACCESS_LEVELS:
@@ -195,16 +203,27 @@ def upsert_user(
     cur = conn.cursor()
     cur.execute(
         """
-        INSERT INTO users (email, domain, company_name, password_hash, active, access_level)
-        VALUES (%s, %s, %s, %s, %s, %s)
+        INSERT INTO users (email, domain, company_name, first_name, last_name, password_hash, active, access_level)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
         ON CONFLICT (email)
         DO UPDATE SET
             domain = EXCLUDED.domain,
             company_name = EXCLUDED.company_name,
+            first_name = EXCLUDED.first_name,
+            last_name = EXCLUDED.last_name,
             password_hash = EXCLUDED.password_hash,
             active = EXCLUDED.active,
             access_level = EXCLUDED.access_level
         """,
-        (normalized_email, domain, user_company, password_hash, active, normalized_access_level),
+        (
+            normalized_email,
+            domain,
+            user_company,
+            normalized_first_name,
+            normalized_last_name,
+            password_hash,
+            active,
+            normalized_access_level,
+        ),
     )
     cur.close()

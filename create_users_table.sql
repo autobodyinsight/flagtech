@@ -4,7 +4,10 @@ CREATE TABLE IF NOT EXISTS users (
     email VARCHAR(255) UNIQUE NOT NULL,
     domain VARCHAR(255) NOT NULL,
     company_name VARCHAR(255) NOT NULL,
+    first_name VARCHAR(120),
+    last_name VARCHAR(120),
     password_hash VARCHAR(255) NOT NULL,
+    access_level VARCHAR(32) DEFAULT 'support',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     last_login TIMESTAMP,
     active BOOLEAN DEFAULT TRUE
@@ -23,6 +26,7 @@ CREATE TABLE IF NOT EXISTS sessions (
     email VARCHAR(255),
     domain VARCHAR(255),
     company_name VARCHAR(255),
+    access_level VARCHAR(32) DEFAULT 'support',
     expires_at TIMESTAMP,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );

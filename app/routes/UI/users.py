@@ -12,7 +12,10 @@ def get_users_screen_html():
                 <div id="usersDomainLabel" style="font-weight:bold;">-</div>
                 <div id="usersAccessLevelLabel" style="font-size:12px; color:#666; margin-top:4px;"></div>
             </div>
-            <div id="usersStatus" style="font-size:12px; color:#666; min-height:18px;"></div>
+            <div style="display:flex; align-items:center; gap:10px;">
+                <div id="usersStatus" style="font-size:12px; color:#666; min-height:18px;"></div>
+                <button onclick="logoutCurrentUser()" style="padding:10px 14px; background:#b22222; color:#fff; border:none; border-radius:4px; font-weight:bold; cursor:pointer;">Log Out</button>
+            </div>
         </div>
 
         <div id="usersArchitectPanel" style="display:none; background:#fff; border:1px solid #ddd; border-radius:6px; padding:12px; margin-bottom:16px;">
@@ -37,10 +40,18 @@ def get_users_screen_html():
 
         <div id="usersAddPanel" style="background:#fff; border:1px solid #ddd; border-radius:6px; padding:12px; margin-bottom:16px;">
             <div style="font-weight:bold; margin-bottom:8px;">Add User</div>
-            <div style="display:grid; grid-template-columns:1.1fr 1fr 1fr 1fr 1fr auto; gap:8px; align-items:end;">
+            <div style="display:grid; grid-template-columns:1.1fr 0.8fr 0.8fr 1fr 1fr 1fr auto; gap:8px; align-items:end;">
                 <div>
                     <label for="newUserEmail" style="display:block; margin-bottom:4px;">Email</label>
                     <input id="newUserEmail" type="email" placeholder="name@yourdomain.com" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:4px;" />
+                </div>
+                <div>
+                    <label for="newUserFirstName" style="display:block; margin-bottom:4px;">First Name</label>
+                    <input id="newUserFirstName" type="text" placeholder="First" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:4px;" />
+                </div>
+                <div>
+                    <label for="newUserLastName" style="display:block; margin-bottom:4px;">Last Name</label>
+                    <input id="newUserLastName" type="text" placeholder="Last" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:4px;" />
                 </div>
                 <div>
                     <label for="newUserPassword" style="display:block; margin-bottom:4px;">Password</label>
@@ -70,9 +81,11 @@ def get_users_screen_html():
 
         <div style="background:#fff; border:1px solid #ddd; border-radius:6px; overflow:hidden;">
             <div style="display:flex; background:#3c4142; color:#fff; padding:10px; font-weight:bold;">
-                <div style="flex:1.6;">Email</div>
-                <div style="flex:1.1;">Shop</div>
-                <div style="flex:1.2;">Company</div>
+                <div style="flex:1.3;">Email</div>
+                <div style="flex:0.9;">First Name</div>
+                <div style="flex:0.9;">Last Name</div>
+                <div style="flex:1;">Shop</div>
+                <div style="flex:1.1;">Company</div>
                 <div style="flex:0.9; text-align:center;">Access Level</div>
                 <div style="flex:0.8; text-align:center;">Status</div>
                 <div style="flex:1.1; text-align:center;">Last Login</div>
@@ -108,6 +121,10 @@ def get_users_screen_html():
 
     function usersCanManage() {
         return window.__usersCanManage === true;
+    }
+
+    function logoutCurrentUser() {
+        window.location.href = '/auth/logout';
     }
 
     function usersIsArchitect() {
@@ -236,9 +253,11 @@ def get_users_screen_html():
                     : '<span style="color:#666;">-</span>';
                 return `
                     <div style="display:flex; padding:10px; border-top:1px solid #eee; align-items:center; gap:10px;">
-                        <div style="flex:1.6;">${usersEscapeHtml(user.email)}</div>
-                        <div style="flex:1.1;">${usersEscapeHtml(user.domain || '-')}</div>
-                        <div style="flex:1.2;">${usersEscapeHtml(user.company_name || '-')}</div>
+                        <div style="flex:1.3;">${usersEscapeHtml(user.email)}</div>
+                        <div style="flex:0.9;">${usersEscapeHtml(user.first_name || '-')}</div>
+                        <div style="flex:0.9;">${usersEscapeHtml(user.last_name || '-')}</div>
+                        <div style="flex:1;">${usersEscapeHtml(user.domain || '-')}</div>
+                        <div style="flex:1.1;">${usersEscapeHtml(user.company_name || '-')}</div>
                         <div style="flex:0.9; text-align:center; text-transform:capitalize;">${usersEscapeHtml(user.access_level || 'support')}</div>
                         <div style="flex:0.8; text-align:center; font-weight:bold; color:${isActive ? '#2e7d32' : '#9e9e9e'};">${isActive ? 'Active' : 'Inactive'}</div>
                         <div style="flex:1.1; text-align:center;">${usersEscapeHtml(formatUsersDate(user.last_login))}</div>
@@ -256,13 +275,17 @@ def get_users_screen_html():
 
     async function createUser() {
         const emailEl = document.getElementById('newUserEmail');
+        const firstNameEl = document.getElementById('newUserFirstName');
+        const lastNameEl = document.getElementById('newUserLastName');
         const passwordEl = document.getElementById('newUserPassword');
         const companyEl = document.getElementById('newUserCompany');
         const shopDomainEl = document.getElementById('newUserShopDomain');
         const accessLevelEl = document.getElementById('newUserAccessLevel');
-        if (!emailEl || !passwordEl || !companyEl || !accessLevelEl) return;
+        if (!emailEl || !firstNameEl || !lastNameEl || !passwordEl || !companyEl || !accessLevelEl) return;
 
         const email = String(emailEl.value || '').trim().toLowerCase();
+        const first_name = String(firstNameEl.value || '').trim();
+        const last_name = String(lastNameEl.value || '').trim();
         const password = String(passwordEl.value || '');
         const company_name = String(companyEl.value || '').trim();
         const access_level = String(accessLevelEl.value || 'support').trim().toLowerCase();
@@ -274,13 +297,17 @@ def get_users_screen_html():
             setUsersStatus('Email and password are required.', '#b22222');
             return;
         }
+        if (!first_name || !last_name) {
+            setUsersStatus('First and last name are required.', '#b22222');
+            return;
+        }
 
         try {
             const response = await fetch('/api/users', {
                 method: 'POST',
                 credentials: 'include',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ email, password, company_name, access_level, shop_domain }),
+                body: JSON.stringify({ email, first_name, last_name, password, company_name, access_level, shop_domain }),
             });
             const payload = await response.json();
             if (!response.ok) {
@@ -288,6 +315,8 @@ def get_users_screen_html():
             }
 
             emailEl.value = '';
+            firstNameEl.value = '';
+            lastNameEl.value = '';
             passwordEl.value = '';
             if (shopDomainEl && usersIsArchitect()) {
                 shopDomainEl.value = shop_domain || currentUsersShopDomain();

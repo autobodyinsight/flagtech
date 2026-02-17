@@ -105,7 +105,7 @@ async def list_users(request: Request):
         if shop_domain:
             cur.execute(
                 """
-                SELECT id, email, domain, company_name, access_level, active, created_at, last_login
+                SELECT id, email, first_name, last_name, domain, company_name, access_level, active, created_at, last_login
                 FROM users
                 WHERE domain = %s
                 ORDER BY domain ASC, email ASC
@@ -115,7 +115,7 @@ async def list_users(request: Request):
         else:
             cur.execute(
                 """
-                SELECT id, email, domain, company_name, access_level, active, created_at, last_login
+                SELECT id, email, first_name, last_name, domain, company_name, access_level, active, created_at, last_login
                 FROM users
                 ORDER BY domain ASC, email ASC
                 """
@@ -123,7 +123,7 @@ async def list_users(request: Request):
     elif session_access_level == "manager":
         cur.execute(
             """
-            SELECT id, email, domain, company_name, access_level, active, created_at, last_login
+            SELECT id, email, first_name, last_name, domain, company_name, access_level, active, created_at, last_login
             FROM users
             WHERE domain = %s
             ORDER BY email ASC
@@ -133,7 +133,7 @@ async def list_users(request: Request):
     else:
         cur.execute(
             """
-            SELECT id, email, domain, company_name, access_level, active, created_at, last_login
+            SELECT id, email, first_name, last_name, domain, company_name, access_level, active, created_at, last_login
             FROM users
             WHERE domain = %s AND lower(email) = lower(%s)
             ORDER BY email ASC
@@ -167,6 +167,8 @@ async def create_user(request: Request):
         raise HTTPException(status_code=403, detail="Manager access required")
 
     company_name = str(payload.get("company_name") or target_domain).strip() or target_domain
+    first_name = str(payload.get("first_name") or "").strip()
+    last_name = str(payload.get("last_name") or "").strip()
     access_level = str(payload.get("access_level") or "support").strip().lower()
 
     if "@" not in email:
@@ -192,11 +194,19 @@ async def create_user(request: Request):
 
     cur.execute(
         """
-        INSERT INTO users (email, domain, company_name, password_hash, access_level, active)
-        VALUES (%s, %s, %s, %s, %s, TRUE)
-        RETURNING id, email, domain, company_name, access_level, active, created_at, last_login
+        INSERT INTO users (email, domain, company_name, first_name, last_name, password_hash, access_level, active)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, TRUE)
+        RETURNING id, email, first_name, last_name, domain, company_name, access_level, active, created_at, last_login
         """,
-        (email, target_domain, company_name, hash_password(password), access_level),
+        (
+            email,
+            target_domain,
+            company_name,
+            first_name or None,
+            last_name or None,
+            hash_password(password),
+            access_level,
+        ),
     )
     created = cur.fetchone()
     cur.close()
@@ -234,7 +244,7 @@ async def set_user_active(user_id: int, request: Request):
             UPDATE users
             SET active = %s
             WHERE id = %s AND NOT (lower(email) = %s AND access_level = 'architect')
-            RETURNING id, email, domain, company_name, access_level, active, created_at, last_login
+            RETURNING id, email, first_name, last_name, domain, company_name, access_level, active, created_at, last_login
             """,
             (active, user_id, ARCHITECT_EMAIL),
         )
@@ -244,7 +254,7 @@ async def set_user_active(user_id: int, request: Request):
             UPDATE users
             SET active = %s
             WHERE id = %s AND domain = %s AND access_level <> 'architect'
-            RETURNING id, email, domain, company_name, access_level, active, created_at, last_login
+            RETURNING id, email, first_name, last_name, domain, company_name, access_level, active, created_at, last_login
             """,
             (active, user_id, domain),
         )
@@ -289,7 +299,7 @@ async def reset_user_password(user_id: int, request: Request):
             UPDATE users
             SET password_hash = %s
             WHERE id = %s
-            RETURNING id, email, domain, company_name, access_level, active, created_at, last_login
+            RETURNING id, email, first_name, last_name, domain, company_name, access_level, active, created_at, last_login
             """,
             (hash_password(new_password), user_id),
         )
@@ -299,7 +309,7 @@ async def reset_user_password(user_id: int, request: Request):
             UPDATE users
             SET password_hash = %s
             WHERE id = %s AND domain = %s AND access_level <> 'architect'
-            RETURNING id, email, domain, company_name, access_level, active, created_at, last_login
+            RETURNING id, email, first_name, last_name, domain, company_name, access_level, active, created_at, last_login
             """,
             (hash_password(new_password), user_id, domain),
         )
