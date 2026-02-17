@@ -147,7 +147,7 @@ def get_payments_screen_html():
                     ? `
                         <div style="display:flex; justify-content:flex-end; align-items:center; gap:12px; margin-bottom:10px;">
                             <div id="payments-save-msg-${rowId}" style="font-size:12px; color:#666;"></div>
-                            <button id="payments-save-btn-${rowId}" type="button" onclick="saveGrandTotalPaymentsForRo(event, '${roEscaped}')" style="padding:8px 14px; background:#4caf50; color:#fff; border:none; border-radius:4px; cursor:pointer; font-weight:bold;">
+                            <button id="payments-save-btn-${rowId}" type="button" onclick="saveGrandTotalPaymentsForRo(event, '${roEscaped}')" style="padding:8px 14px; background:#b22222; color:#fff; border:none; border-radius:4px; cursor:pointer; font-weight:bold;">
                                 SAVE
                             </button>
                         </div>
@@ -166,23 +166,14 @@ def get_payments_screen_html():
                     `
                     : '';
 
-                const buildSectionRows = (entries, totalAmount, paidTotal, includeInput, inputHtml) => {
+                const buildSectionRows = (entries, totalAmount, paidTotal) => {
                     let runningBalance = Math.max(0, Number(totalAmount || 0) - Number(paidTotal || 0));
                     const rows = [];
 
-                    if (includeInput) {
-                        rows.push(`
-                            <tr>
-                                <td style="padding:8px; border-bottom:1px solid #ececec;">${inputHtml}</td>
-                                <td style="padding:8px; border-bottom:1px solid #ececec;"></td>
-                                <td style="padding:8px; border-bottom:1px solid #ececec;"></td>
-                            </tr>
-                        `);
-                    }
-
-                    (Array.isArray(entries) ? entries : []).forEach((entry, index) => {
+                    const normalizedEntries = Array.isArray(entries) ? entries : [];
+                    normalizedEntries.forEach((entry, index) => {
                         const amount = Number(entry.amount || 0);
-                        const dateDisplay = paymentsFormatBusinessDate(entry.business_date);
+                        const dateDisplay = paymentsFormatBusinessDate(entry.business_date || entry.paid_at || entry.date);
                         const rowBalance = runningBalance;
                         const balanceColor = index === 0
                             ? (rowBalance === 0 ? '#2e7d32' : '#c62828')
@@ -199,11 +190,23 @@ def get_payments_screen_html():
                         runningBalance = Math.max(0, rowBalance + amount);
                     });
 
+                    if (rows.length === 0 && Number(paidTotal || 0) > 0) {
+                        const newestBalance = Math.max(0, Number(totalAmount || 0) - Number(paidTotal || 0));
+                        const newestColor = newestBalance === 0 ? '#2e7d32' : '#c62828';
+                        rows.push(`
+                            <tr>
+                                <td style="padding:8px; border-bottom:1px solid #ececec; color:#333;">${paymentsFormatBusinessDate(paymentsGetLocalBusinessDateISO())}</td>
+                                <td style="padding:8px; border-bottom:1px solid #ececec; text-align:right; color:#333;">${paymentsFormatMoney(paidTotal)}</td>
+                                <td style="padding:8px; border-bottom:1px solid #ececec; text-align:right; color:${newestColor}; font-weight:bold;">${paymentsFormatMoney(newestBalance)}</td>
+                            </tr>
+                        `);
+                    }
+
                     return rows.join('');
                 };
 
-                const insuranceRowsHtml = buildSectionRows(insurancePaymentEntries, insuranceTotal, insurancePaid, editable, insuranceInputHtml);
-                const customerRowsHtml = buildSectionRows(customerPaymentEntries, customerTotal, customerPaid, editable, customerInputHtml);
+                const insuranceRowsHtml = buildSectionRows(insurancePaymentEntries, insuranceTotal, insurancePaid);
+                const customerRowsHtml = buildSectionRows(customerPaymentEntries, customerTotal, customerPaid);
 
                 const insuranceTableHtml = editable
                     ? `
@@ -215,7 +218,7 @@ def get_payments_screen_html():
                             </colgroup>
                             <thead>
                                 <tr style="background:#f7f7f7; text-align:left;">
-                                    <th style="padding:8px; border-bottom:1px solid #ddd; font-weight:bold; color:#666;"></th>
+                                    <th style="padding:8px; border-bottom:1px solid #ddd; font-weight:bold; color:#666;">${insuranceInputHtml}</th>
                                     <th style="padding:8px; border-bottom:1px solid #ddd; font-weight:bold; color:#666; text-align:right;">PAYMENTS</th>
                                     <th style="padding:8px; border-bottom:1px solid #ddd; font-weight:bold; color:#666; text-align:right;">BALANCE</th>
                                 </tr>
@@ -234,7 +237,7 @@ def get_payments_screen_html():
                             </colgroup>
                             <thead>
                                 <tr style="background:#f7f7f7; text-align:left;">
-                                    <th style="padding:8px; border-bottom:1px solid #ddd; font-weight:bold; color:#666;"></th>
+                                    <th style="padding:8px; border-bottom:1px solid #ddd; font-weight:bold; color:#666;">${customerInputHtml}</th>
                                     <th style="padding:8px; border-bottom:1px solid #ddd; font-weight:bold; color:#666; text-align:right;">PAYMENTS</th>
                                     <th style="padding:8px; border-bottom:1px solid #ddd; font-weight:bold; color:#666; text-align:right;">BALANCE</th>
                                 </tr>
