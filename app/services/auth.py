@@ -10,6 +10,7 @@ from app.services.db import get_conn
 SESSION_COOKIE_NAME = "flagtech_session"
 PASSWORD_SCHEME = "pbkdf2_sha256"
 PASSWORD_ITERATIONS = 390000
+ACCESS_LEVELS = ("support", "reception", "parts", "estimator", "manager", "architect")
 
 
 def _utc_now() -> datetime:
@@ -27,12 +28,14 @@ def ensure_auth_tables() -> None:
             domain VARCHAR(255) NOT NULL,
             company_name VARCHAR(255) NOT NULL,
             password_hash VARCHAR(255) NOT NULL,
+            access_level VARCHAR(32) DEFAULT 'support',
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             last_login TIMESTAMP,
             active BOOLEAN DEFAULT TRUE
         )
         """
     )
+    cur.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS access_level VARCHAR(32) DEFAULT 'support'")
     cur.execute("CREATE INDEX IF NOT EXISTS idx_users_email ON users(email)")
     cur.execute("CREATE INDEX IF NOT EXISTS idx_users_domain ON users(domain)")
     cur.execute(
@@ -43,11 +46,13 @@ def ensure_auth_tables() -> None:
             email VARCHAR(255),
             domain VARCHAR(255),
             company_name VARCHAR(255),
+            access_level VARCHAR(32) DEFAULT 'support',
             expires_at TIMESTAMP,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
         """
     )
+    cur.execute("ALTER TABLE sessions ADD COLUMN IF NOT EXISTS access_level VARCHAR(32) DEFAULT 'support'")
     cur.execute("CREATE INDEX IF NOT EXISTS idx_sessions_expires_at ON sessions(expires_at)")
     cur.close()
 
@@ -96,7 +101,7 @@ def get_user_by_email(email: str):
     cur = conn.cursor()
     cur.execute(
         """
-        SELECT id, email, domain, company_name, password_hash, active
+        SELECT id, email, domain, company_name, password_hash, active, access_level
         FROM users
         WHERE lower(email) = lower(%s)
         LIMIT 1
@@ -119,8 +124,8 @@ def create_session_for_user(user: dict, ttl_days: int = 7) -> str:
     cur.execute("DELETE FROM sessions WHERE expires_at < NOW()")
     cur.execute(
         """
-        INSERT INTO sessions (token, user_id, email, domain, company_name, expires_at)
-        VALUES (%s, %s, %s, %s, %s, %s)
+        INSERT INTO sessions (token, user_id, email, domain, company_name, access_level, expires_at)
+        VALUES (%s, %s, %s, %s, %s, %s, %s)
         """,
         (
             token,
@@ -128,6 +133,7 @@ def create_session_for_user(user: dict, ttl_days: int = 7) -> str:
             user["email"],
             user["domain"],
             user["company_name"],
+            user.get("access_level") or "support",
             expires_at,
         ),
     )
@@ -144,7 +150,7 @@ def get_session_by_token(token: str):
     cur = conn.cursor()
     cur.execute(
         """
-        SELECT token, user_id, email, domain, company_name, expires_at
+        SELECT token, user_id, email, domain, company_name, access_level, expires_at
         FROM sessions
         WHERE token = %s AND expires_at > NOW()
         LIMIT 1
@@ -166,7 +172,13 @@ def delete_session_by_token(token: str) -> None:
     cur.close()
 
 
-def upsert_user(email: str, password: str, company_name: str | None = None, active: bool = True) -> None:
+def upsert_user(
+    email: str,
+    password: str,
+    company_name: str | None = None,
+    active: bool = True,
+    access_level: str = "support",
+) -> None:
     ensure_auth_tables()
     normalized_email = (email or "").strip().lower()
     if "@" not in normalized_email:
@@ -175,20 +187,24 @@ def upsert_user(email: str, password: str, company_name: str | None = None, acti
     domain = normalized_email.split("@", 1)[1]
     user_company = company_name or domain
     password_hash = hash_password(password)
+    normalized_access_level = (access_level or "support").strip().lower()
+    if normalized_access_level not in ACCESS_LEVELS:
+        normalized_access_level = "support"
 
     conn = get_conn()
     cur = conn.cursor()
     cur.execute(
         """
-        INSERT INTO users (email, domain, company_name, password_hash, active)
-        VALUES (%s, %s, %s, %s, %s)
+        INSERT INTO users (email, domain, company_name, password_hash, active, access_level)
+        VALUES (%s, %s, %s, %s, %s, %s)
         ON CONFLICT (email)
         DO UPDATE SET
             domain = EXCLUDED.domain,
             company_name = EXCLUDED.company_name,
             password_hash = EXCLUDED.password_hash,
-            active = EXCLUDED.active
+            active = EXCLUDED.active,
+            access_level = EXCLUDED.access_level
         """,
-        (normalized_email, domain, user_company, password_hash, active),
+        (normalized_email, domain, user_company, password_hash, active, normalized_access_level),
     )
     cur.close()

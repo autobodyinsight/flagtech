@@ -16,7 +16,14 @@ def _clean(value: Optional[str]) -> Optional[str]:
 
 
 def get_user_domain(request: Request) -> Optional[str]:
-    """Resolve the user's domain from headers, query params, cookies, or origin."""
+    """Resolve the user's domain with authenticated session taking priority."""
+    state_user = getattr(request.state, "user", None)
+    if isinstance(state_user, dict):
+        value = _clean(state_user.get("domain"))
+        if value:
+            return value
+
+    # Backward-compatible fallback paths (used only when no authenticated user context exists).
     header_keys = ("x-user-domain", "x-domain", "x-tenant", "x-organization")
     for key in header_keys:
         value = _clean(request.headers.get(key))
