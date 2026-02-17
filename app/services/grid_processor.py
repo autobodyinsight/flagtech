@@ -204,7 +204,7 @@ def detect_anchors_and_vehicle_info(
                     full_line = _row_text_in_bounds(rows[j])
                     if not full_line:
                         continue
-                    name_match = re.match(r"^([A-Za-z][A-Za-z\-]*,\s*[A-Za-z][A-Za-z\-]*)", full_line)
+                    name_match = re.match(r"^([A-Za-z][A-Za-z\-\s']*,\s*[A-Za-z][A-Za-z\-\s']*)", full_line)
                     if name_match:
                         name = name_match.group(1)
                         break

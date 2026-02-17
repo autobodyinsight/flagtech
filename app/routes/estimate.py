@@ -629,7 +629,11 @@ def _parse_owner_info(owner_info: str) -> tuple[str, str]:
     if not lines:
         return "", ""
     name = lines[0]
+    if re.fullmatch(r"\(?\d{3}\)?[\s\-]*\d{3}[\-\s]*\d{4}(?:\s*(?:cell|work|home|mobile))?", name, re.IGNORECASE):
+        name = ""
     phone = lines[1] if len(lines) > 1 else ""
+    if not phone and len(lines) > 0 and re.search(r"\(?\d{3}\)?[\s\-]*\d{3}[\-\s]*\d{4}", lines[0]):
+        phone = lines[0]
     return name, phone
 
 
