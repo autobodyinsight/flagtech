@@ -684,8 +684,9 @@ def process_pdf_grid(pages: List[Dict]) -> Dict[str, Any]:
         return ""
 
     def _sanitize_name_only(value: str) -> str:
-        without_digits = re.sub(r"\d+", "", value or "")
-        return re.sub(r"\s+", " ", without_digits).strip()
+        base = str(value or "").split(",", 1)[0]
+        alpha_only = re.sub(r"[^A-Za-z\s]", "", base)
+        return re.sub(r"\s+", " ", alpha_only).strip()
 
     written_by = ""
     estimator = ""
