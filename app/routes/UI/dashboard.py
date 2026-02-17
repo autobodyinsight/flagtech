@@ -1443,7 +1443,10 @@ def get_dashboard_screen_html():
                         <tr id="tech-assignment-row-${rowId}" style="display:none; background:${rowBg};">
                             <td colspan="10" style="padding:16px; border-bottom:1px solid #eee;">
                                 <div style="background:#fafafa; border:1px solid #ddd; border-radius:6px; padding:16px;">
-                                    <div style="font-weight:bold; color:#333; margin-bottom:10px;">Tech List</div>
+                                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+                                        <div style="font-weight:bold; color:#333;">Tech List</div>
+                                        <div style="font-weight:bold; color:#333;">ESTIMATOR</div>
+                                    </div>
                                     <div id="tech-assignment-list-${rowId}" style="margin-top:12px;">
                                         <div style="color:#777;">Loading...</div>
                                     </div>
