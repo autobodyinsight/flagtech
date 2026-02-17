@@ -17,6 +17,8 @@ def get_save_estimate_modal_html(
   insurance_company="",
   vin="",
   claim_number="",
+  estimator="",
+  written_by="",
 ):
     """Return the HTML for the save estimate modal."""
     return f"""
@@ -45,10 +47,14 @@ def get_save_estimate_modal_html(
             <div id="vehicleVIN" style="font-size: 14px; margin-top: 3px;">-</div>
           </div>
         </div>
-        <div style="margin-top: 12px; display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+        <div style="margin-top: 12px; display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 15px;">
           <div>
             <label style="font-weight: bold; font-size: 12px; color: #666;">OWNER</label>
             <div id="ownerInfo" style="font-size: 14px; margin-top: 3px;">-</div>
+          </div>
+          <div>
+            <label style="font-weight: bold; font-size: 12px; color: #666;">ESTIMATOR</label>
+            <div id="estimatorDisplay" style="font-size: 14px; margin-top: 3px;">-</div>
           </div>
           <div>
             <label style="font-weight: bold; font-size: 12px; color: #666;">INSURANCE COMPANY</label>
@@ -199,6 +205,8 @@ def get_save_estimate_modal_script(
   insurance_company="",
   vin="",
   claim_number="",
+  estimator="",
+  written_by="",
 ):
     """Return the JavaScript for the save estimate modal functionality."""
     return f"""
@@ -213,6 +221,8 @@ var saveOwnerInfo = {json.dumps(owner_info or '').replace("<", "\\u003c")};
 var saveInsuranceCompany = {json.dumps(insurance_company or '').replace("<", "\\u003c")};
 var saveVIN = {json.dumps(vin or '').replace("<", "\\u003c")};
 var saveClaimNumber = {json.dumps(claim_number or '').replace("<", "\\u003c")};
+var saveEstimator = {json.dumps(estimator or '').replace("<", "\\u003c")};
+var saveWrittenBy = {json.dumps(written_by or '').replace("<", "\\u003c")};
 var saveEstimateTotalsData = {{}};
 var preloadedEstimateTotals = {json.dumps({
     "parts_total": parts_total,
@@ -451,6 +461,7 @@ function openSaveEstimateModal(estimateTotals) {{
     }}
   }}
   document.getElementById('ownerInfo').innerHTML = ownerHtml;
+  document.getElementById('estimatorDisplay').textContent = saveEstimator || saveWrittenBy || '-';
   document.getElementById('insuranceCompany').textContent = saveInsuranceCompany || '-';
   
   // Populate labor repairs

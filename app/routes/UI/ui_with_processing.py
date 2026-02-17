@@ -513,6 +513,8 @@ async def grid_ui(request: Request, file: UploadFile = File(...), ajax: str = No
     vehicle_info_line = result["vehicle_info_line"]
     owner_info = result.get("owner_info", "")
     insurance_company = result.get("insurance_company", "")
+    written_by = result.get("written_by", "")
+    estimator = result.get("estimator", "")
     vin = result.get("vin", "")
     claim_number = result.get("claim_number", "")
     anchor_page = result["anchor_page"]
@@ -598,6 +600,8 @@ async def grid_ui(request: Request, file: UploadFile = File(...), ajax: str = No
             insurance_company,
             vin,
             claim_number,
+            estimator,
+            written_by,
         )
         
         # Generate modal styles
@@ -622,6 +626,8 @@ async def grid_ui(request: Request, file: UploadFile = File(...), ajax: str = No
             insurance_company,
             vin,
             claim_number,
+            estimator,
+            written_by,
         )
         
         content = f"""
