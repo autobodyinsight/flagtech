@@ -17,6 +17,30 @@ def _utc_now() -> datetime:
     return datetime.now(timezone.utc)
 
 
+def normalize_email(value: str | None) -> str:
+    return (value or "").strip().lower()
+
+
+def normalize_domain(value: str | None) -> str:
+    return (value or "").strip().lower()
+
+
+def normalize_shop_name(value: str | None) -> str:
+    return " ".join((value or "").strip().lower().split())
+
+
+def build_shop_scope_key(domain: str | None, company_name: str | None, email: str | None) -> str:
+    normalized_domain = normalize_domain(domain)
+    if normalized_domain:
+        return normalized_domain
+
+    normalized_shop_name = normalize_shop_name(company_name) or "shop"
+    normalized_email = normalize_email(email)
+    if normalized_email:
+        return f"shop:{normalized_shop_name}|user:{normalized_email}"
+    return f"shop:{normalized_shop_name}"
+
+
 def ensure_auth_tables() -> None:
     conn = get_conn()
     cur = conn.cursor()
@@ -123,6 +147,12 @@ def create_session_for_user(user: dict, ttl_days: int = 7) -> str:
     now = _utc_now()
     expires_at = now + timedelta(days=ttl_days)
 
+    scope_key = build_shop_scope_key(
+        user.get("domain"),
+        user.get("company_name"),
+        user.get("email"),
+    )
+
     conn = get_conn()
     cur = conn.cursor()
     cur.execute("DELETE FROM sessions WHERE expires_at < NOW()")
@@ -135,7 +165,7 @@ def create_session_for_user(user: dict, ttl_days: int = 7) -> str:
             token,
             user["id"],
             user["email"],
-            user["domain"],
+            scope_key,
             user["company_name"],
             user.get("access_level") or "support",
             expires_at,
@@ -184,14 +214,16 @@ def upsert_user(
     access_level: str = "support",
     first_name: str | None = None,
     last_name: str | None = None,
+    shop_domain: str | None = None,
 ) -> None:
     ensure_auth_tables()
-    normalized_email = (email or "").strip().lower()
+    normalized_email = normalize_email(email)
     if "@" not in normalized_email:
         raise ValueError(f"Invalid email: {email}")
 
-    domain = normalized_email.split("@", 1)[1]
-    user_company = company_name or domain
+    email_domain = normalized_email.split("@", 1)[1]
+    user_company = company_name or email_domain
+    scope_key = build_shop_scope_key(shop_domain or email_domain, user_company, normalized_email)
     normalized_first_name = (first_name or "").strip() or None
     normalized_last_name = (last_name or "").strip() or None
     password_hash = hash_password(password)
@@ -217,7 +249,7 @@ def upsert_user(
         """,
         (
             normalized_email,
-            domain,
+            scope_key,
             user_company,
             normalized_first_name,
             normalized_last_name,

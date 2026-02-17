@@ -2,7 +2,7 @@ from fastapi import APIRouter, HTTPException, Request
 from psycopg2 import sql
 from psycopg2.extras import Json
 
-from app.services.auth import ACCESS_LEVELS, ensure_auth_tables, hash_password
+from app.services.auth import ACCESS_LEVELS, build_shop_scope_key, ensure_auth_tables, hash_password, normalize_domain
 from app.services.db import get_conn
 from app.services.middleware import get_user_domain
 
@@ -162,11 +162,17 @@ async def create_user(request: Request):
     payload = await request.json()
     email = str(payload.get("email") or "").strip().lower()
     password = str(payload.get("password") or "")
-    target_domain = str(payload.get("shop_domain") or domain).strip().lower() or domain
-    if not is_architect and target_domain != domain:
+    company_name = str(payload.get("company_name") or "").strip()
+    requested_shop_domain = normalize_domain(payload.get("shop_domain"))
+    if not is_architect and requested_shop_domain and requested_shop_domain != domain:
         raise HTTPException(status_code=403, detail="Manager access required")
 
-    company_name = str(payload.get("company_name") or target_domain).strip() or target_domain
+    target_domain = (
+        requested_shop_domain
+        if requested_shop_domain
+        else (domain if not is_architect else build_shop_scope_key(None, company_name, email))
+    )
+    company_name = company_name or target_domain
     first_name = str(payload.get("first_name") or "").strip()
     last_name = str(payload.get("last_name") or "").strip()
     access_level = str(payload.get("access_level") or "support").strip().lower()
@@ -181,7 +187,7 @@ async def create_user(request: Request):
         raise HTTPException(status_code=400, detail="Architect access level is reserved")
 
     email_domain = email.split("@", 1)[1].lower()
-    if email_domain != target_domain.lower():
+    if requested_shop_domain and email_domain != requested_shop_domain:
         raise HTTPException(status_code=400, detail="User email must match your shop domain")
 
     ensure_auth_tables()
