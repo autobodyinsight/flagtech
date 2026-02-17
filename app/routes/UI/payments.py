@@ -147,7 +147,7 @@ def get_payments_screen_html():
                     ? `
                         <div style="display:flex; justify-content:flex-end; align-items:center; gap:12px; margin-bottom:10px;">
                             <div id="payments-save-msg-${rowId}" style="font-size:12px; color:#666;"></div>
-                            <button id="payments-save-btn-${rowId}" type="button" onclick="saveGrandTotalPaymentsForRo(event, '${roEscaped}')" style="padding:8px 14px; background:#b22222; color:#fff; border:none; border-radius:4px; cursor:pointer; font-weight:bold;">
+                            <button id="payments-save-btn-${rowId}" type="button" onclick="saveGrandTotalPaymentsForRo(event, '${roEscaped}')" onmouseover="this.style.background='#8f1a1a'" onmouseout="this.style.background='#b22222'" style="padding:8px 14px; background:#b22222; color:#fff; border:none; border-radius:4px; cursor:pointer; font-weight:bold; transition:background-color 0.15s ease;">
                                 SAVE
                             </button>
                         </div>
