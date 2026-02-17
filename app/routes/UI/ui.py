@@ -48,7 +48,7 @@ async def home_screen(request: Request):
             margin: 0;
         }}
         .tab-bar {{
-            background-color: #505050;
+            background-color: #d32f2f;
             display: flex;
             gap: 0;
             padding: 0;
@@ -56,7 +56,7 @@ async def home_screen(request: Request):
         }}
         .nav-tab {{
             padding: 18px 35px;
-            background-color: #666666;
+            background-color: #d32f2f;
             color: white;
             text-align: center;
             cursor: pointer;
@@ -68,7 +68,7 @@ async def home_screen(request: Request):
             max-width: 200px;
         }}
         .nav-tab:hover {{
-            background-color: #707070;
+            background-color: #b22222;
         }}
         .nav-tab.active {{
             background-color: #d32f2f;
@@ -93,10 +93,6 @@ async def home_screen(request: Request):
             --card-bg: #e4e4e4;
         }}
         body,
-        .tab-bar,
-        .nav-tab,
-        .nav-tab:hover,
-        .nav-tab.active,
         .content-area,
         .screen {{
             background-color: var(--app-bg) !important;

@@ -186,7 +186,7 @@ async def home_screen():
         }}
         .sidebar {{
             width: 150px;
-            background-color: #505050;
+            background-color: #d32f2f;
             display: flex;
             flex-direction: column;
             gap: 10px;
@@ -197,7 +197,7 @@ async def home_screen():
         }}
         .nav-box {{
             padding: 15px;
-            background-color: #666666;
+            background-color: #d32f2f;
             color: white;
             text-align: center;
             cursor: pointer;
@@ -207,7 +207,7 @@ async def home_screen():
             transition: all 0.3s ease;
         }}
         .nav-box:hover {{
-            background-color: #707070;
+            background-color: #b22222;
             border: 2px solid white;
         }}
         .nav-box.active {{
@@ -234,10 +234,6 @@ async def home_screen():
             --card-bg: #e4e4e4;
         }}
         body,
-        .sidebar,
-        .nav-box,
-        .nav-box:hover,
-        .nav-box.active,
         .content-area,
         .screen {{
             background-color: var(--app-bg) !important;

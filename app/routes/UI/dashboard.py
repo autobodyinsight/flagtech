@@ -7,7 +7,7 @@ def get_dashboard_screen_html():
         <div id="dashboard" class="screen active" style="padding:20px;">
             <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:30px; gap:20px;">
                 <h1 style="text-align:center; margin:0; flex:1;">DASHBOARD</h1>
-                <button onclick="flashAllData()" style="padding:10px 16px; background:#d32f2f; color:#fff; border:none; border-radius:4px; font-weight:bold; cursor:pointer;">FLASH</button>
+                <button onclick="flashAllData()" style="padding:10px 16px; background:var(--brand-red, #d32f2f); color:#fff; border:none; border-radius:4px; font-weight:bold; cursor:pointer;">FLASH</button>
             </div>
             
             <div style="--dash-chart-h: 520px;">
@@ -163,7 +163,7 @@ def get_dashboard_screen_html():
             <div style="margin-top:30px; background:#fff; padding:20px; border-radius:8px; box-shadow:0 2px 4px rgba(0,0,0,0.1);">
                 <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:20px; position:relative;">
                     <h3 style="margin:0; color:#333;">Repair Orders</h3>
-                    <button id="dashboardPrintTrigger" class="mini-popup-trigger" onclick="openPrintOptionsModal()" style="padding:8px 16px; background:#b22222; color:#fff; border:none; border-radius:4px; cursor:pointer; font-weight:bold; font-size:14px;">Print</button>
+                    <button id="dashboardPrintTrigger" class="mini-popup-trigger" onclick="openPrintOptionsModal()" style="padding:8px 16px; background:var(--brand-red, #d32f2f); color:#fff; border:none; border-radius:4px; cursor:pointer; font-weight:bold; font-size:14px;">Print</button>
                     <div id="printOptionsModal" class="mini-popup-panel" style="display:none; right:0; left:auto;">
                         <h2 style="margin:0 0 14px 0; color:#333; font-size:18px;">Print RO List</h2>
                         <p style="margin:0 0 12px 0; font-weight:bold; color:#555;">Print by:</p>

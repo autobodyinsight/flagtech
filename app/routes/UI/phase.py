@@ -5,7 +5,7 @@ def get_phase_screen_html():
     """Return the HTML content for the Phase screen."""
     return """
     <div id="phase" class="screen" style="padding:20px;">
-        <h1 style="text-align:center; margin-bottom:20px;">PHASE</h1>
+        <h1 style="text-align:center; margin-bottom:20px;">ROADMAP</h1>
 
         <div style="display:grid; grid-template-columns:repeat(9, minmax(140px, 1fr)); gap:12px; align-items:start;">
             <div class="phase-column">
