@@ -57,6 +57,10 @@ async def home_screen():
             padding: 15px;
             background-color: #3c4142;
             color: white;
+            opacity: 1;
+            background-image: none;
+            box-shadow: none;
+            filter: none;
             text-align: center;
             cursor: pointer;
             border-radius: 5px;
@@ -148,6 +152,11 @@ async def home_screen():
         }}
         .nav-box {{
             background-color: var(--tab-inactive) !important;
+            color: #fff !important;
+            opacity: 1 !important;
+            background-image: none !important;
+            box-shadow: none !important;
+            filter: none !important;
         }}
         .nav-box.active {{
             background-color: var(--brand-red) !important;
