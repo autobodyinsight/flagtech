@@ -122,10 +122,30 @@ async def home_screen(request: Request):
             background: var(--brand-red) !important;
             background-color: var(--brand-red) !important;
         }}
-        button {{
+        button:not([style*="background:none"]):not([style*="background: none"]):not(.link-button):not(.tech-link) {{
             background: var(--brand-red) !important;
             background-color: var(--brand-red) !important;
             color: #fff !important;
+        }}
+        button[style*="background:none"],
+        button[style*="background: none"],
+        .link-button,
+        .tech-link {{
+            background: transparent !important;
+            background-color: transparent !important;
+            border: none !important;
+            padding: 0 !important;
+            border-radius: 0 !important;
+            color: #007bff !important;
+            box-shadow: none !important;
+        }}
+        button[style*="background:none"]:hover,
+        button[style*="background: none"]:hover,
+        .link-button:hover,
+        .tech-link:hover {{
+            background: transparent !important;
+            background-color: transparent !important;
+            text-decoration: underline !important;
         }}
         .nav-tab {{
             background-color: var(--tab-inactive) !important;

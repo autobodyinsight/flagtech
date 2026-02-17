@@ -93,11 +93,15 @@ def get_techs_screen_html():
                 background:none;
                 border:none;
                 color:#0066cc;
-                text-decoration:underline;
+                text-decoration:none;
                 cursor:pointer;
                 padding:0;
                 font:inherit;
                 font-weight:bold;
+            }
+            .tech-link:hover {
+                text-decoration:underline;
+                background:none;
             }
             .tech-inline-edit {
                 cursor:pointer;
