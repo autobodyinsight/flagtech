@@ -10,7 +10,7 @@ def get_techs_screen_html():
 
         <div style="display:flex; justify-content:center; gap:12px; margin-bottom:30px;">
             <button onclick="openManageTechsModal()"
-                    style="padding:12px 24px; font-size:16px; cursor:pointer; background-color:#b22222; color:white; border:none; border-radius:4px; font-weight:bold;">
+                    style="padding:8px 16px; background:var(--brand-red, #d32f2f); color:#fff; border:none; border-radius:4px; cursor:pointer; font-weight:bold; font-size:14px;">
                 Manage Techs
             </button>
         </div>
