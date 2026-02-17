@@ -98,6 +98,8 @@ def _ensure_saved_estimates_table(cur) -> None:
     cur.execute("ALTER TABLE saved_estimates ADD COLUMN IF NOT EXISTS claim_number VARCHAR(64)")
     cur.execute("ALTER TABLE saved_estimates ADD COLUMN IF NOT EXISTS phone_original TEXT")
     cur.execute("ALTER TABLE saved_estimates ADD COLUMN IF NOT EXISTS phone_override TEXT")
+    cur.execute("ALTER TABLE saved_estimates ADD COLUMN IF NOT EXISTS written_by TEXT")
+    cur.execute("ALTER TABLE saved_estimates ADD COLUMN IF NOT EXISTS estimator TEXT")
     cur.execute("ALTER TABLE saved_estimates ADD COLUMN IF NOT EXISTS in_date DATE DEFAULT CURRENT_DATE")
     cur.execute("ALTER TABLE saved_estimates ADD COLUMN IF NOT EXISTS ecd_date DATE")
     cur.execute("ALTER TABLE saved_estimates ADD COLUMN IF NOT EXISTS domain VARCHAR(255)")
@@ -711,9 +713,9 @@ async def save_estimate(request: Request):
             """
             INSERT INTO saved_estimates
             (ro, vehicle, year, make, model, owner_info, insurance_company, vin, claim_number,
-             labor_repairs, paint_repairs, parts_repairs,
+             written_by, estimator, labor_repairs, paint_repairs, parts_repairs,
              estimate_totals, parts_total, grand_total, deductible, customer_pay, insurance_pay, in_date, ecd_date, domain)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             """,
             (
                 ro_value,
@@ -725,6 +727,8 @@ async def save_estimate(request: Request):
                 data.get("insurance_company"),
                 data.get("vin"),
                 data.get("claim_number"),
+                data.get("written_by"),
+                data.get("estimator"),
                 json.dumps(data.get("labor_repairs") or []),
                 json.dumps(data.get("paint_repairs") or []),
                 json.dumps(data.get("parts_repairs") or []),

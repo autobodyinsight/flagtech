@@ -183,6 +183,8 @@ def _ensure_saved_estimates_table(cur) -> None:
     cur.execute("ALTER TABLE saved_estimates ADD COLUMN IF NOT EXISTS claim_number VARCHAR(64)")
     cur.execute("ALTER TABLE saved_estimates ADD COLUMN IF NOT EXISTS phone_original TEXT")
     cur.execute("ALTER TABLE saved_estimates ADD COLUMN IF NOT EXISTS phone_override TEXT")
+    cur.execute("ALTER TABLE saved_estimates ADD COLUMN IF NOT EXISTS written_by TEXT")
+    cur.execute("ALTER TABLE saved_estimates ADD COLUMN IF NOT EXISTS estimator TEXT")
     cur.execute("ALTER TABLE saved_estimates ADD COLUMN IF NOT EXISTS vin VARCHAR(32)")
     cur.execute("ALTER TABLE saved_estimates ADD COLUMN IF NOT EXISTS in_date DATE DEFAULT CURRENT_DATE")
     cur.execute("ALTER TABLE saved_estimates ADD COLUMN IF NOT EXISTS ecd_date DATE")
@@ -1498,6 +1500,8 @@ async def get_dashboard_data(request: Request):
                      year,
                      make,
                      model,
+                                     written_by,
+                                     estimator,
                    labor_repairs,
                    paint_repairs,
                    parts_repairs,
@@ -1581,6 +1585,16 @@ async def get_dashboard_data(request: Request):
             # Parse owner_info to extract customer name and phone
             owner_info = (row.get("owner_info") or "").strip()
             customer_name, customer_phone = _parse_owner_info(owner_info)
+            written_by = (row.get("written_by") or "").strip()
+            estimator = (row.get("estimator") or "").strip()
+            if not written_by:
+                written_match = re.search(r"written\s*by\s*:\s*([^\n,]+)", owner_info, re.IGNORECASE)
+                if written_match:
+                    written_by = (written_match.group(1) or "").strip()
+            if not estimator:
+                estimator_match = re.search(r"estimator\s*:\s*([^\n,]+)", owner_info, re.IGNORECASE)
+                if estimator_match:
+                    estimator = (estimator_match.group(1) or "").strip()
             phone_override = (row.get("phone_override") or "").strip()
             phone_original = (row.get("phone_original") or customer_phone).strip()
             current_phone = phone_override or customer_phone
@@ -1620,6 +1634,9 @@ async def get_dashboard_data(request: Request):
                     "customer": customer_name,
                     "phone": current_phone,
                     "phone_original": phone_original,
+                    "owner_info": owner_info,
+                    "written_by": written_by,
+                    "estimator": estimator,
                     "insurance": row.get("insurance_company") or "",
                     "claim_number": row.get("claim_number") or "",
                     "vin": row.get("vin") or "",

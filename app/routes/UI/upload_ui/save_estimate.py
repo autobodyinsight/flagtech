@@ -579,6 +579,8 @@ function executeSaveEstimate() {{
     insurance_company: saveInsuranceCompany,
     vin: saveVIN,
     claim_number: saveClaimNumber,
+    written_by: saveWrittenBy,
+    estimator: saveEstimator,
     labor_repairs: laborData,
     paint_repairs: paintData,
     parts_repairs: partsResult.items,
