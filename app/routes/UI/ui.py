@@ -44,11 +44,11 @@ async def home_screen(request: Request):
             display: flex;
             flex-direction: column;
             height: 100vh;
-            background-color: #f2f2f2;
+            background-color: #d3d3d3;
             margin: 0;
         }}
         .tab-bar {{
-            background-color: #d32f2f;
+            background-color: #3c4142;
             display: flex;
             gap: 0;
             padding: 0;
@@ -56,7 +56,7 @@ async def home_screen(request: Request):
         }}
         .nav-tab {{
             padding: 18px 35px;
-            background-color: #d32f2f;
+            background-color: #3c4142;
             color: white;
             text-align: center;
             cursor: pointer;
@@ -68,19 +68,19 @@ async def home_screen(request: Request):
             max-width: 200px;
         }}
         .nav-tab:hover {{
-            background-color: #b22222;
+            background-color: #3c4142;
         }}
         .nav-tab.active {{
-            background-color: #d32f2f;
+            background-color: #b22222;
             color: white;
-            border-bottom: 3px solid #d32f2f;
+            border-bottom: 3px solid #b22222;
             margin-bottom: -3px;
         }}
         .content-area {{
             flex: 1;
             padding: 40px;
             overflow-y: auto;
-            background-color: #f2f2f2;
+            background-color: #d3d3d3;
         }}
         .screen {{
             display: none;
@@ -89,8 +89,10 @@ async def home_screen(request: Request):
             display: block;
         }}
         :root {{
-            --app-bg: #a9a9a9;
-            --card-bg: #e4e4e4;
+            --app-bg: #d3d3d3;
+            --card-bg: #f2f0ef;
+            --brand-red: #b22222;
+            --tab-inactive: #3c4142;
         }}
         body,
         .content-area,
@@ -117,8 +119,27 @@ async def home_screen(request: Request):
         [style*="background: #707070"],
         [style*="background-color:#707070"],
         [style*="background-color: #707070"] {{
-            background: var(--app-bg) !important;
-            background-color: var(--app-bg) !important;
+            background: var(--brand-red) !important;
+            background-color: var(--brand-red) !important;
+        }}
+        button {{
+            background: var(--brand-red) !important;
+            background-color: var(--brand-red) !important;
+            color: #fff !important;
+        }}
+        .nav-tab {{
+            background-color: var(--tab-inactive) !important;
+        }}
+        .nav-tab.active {{
+            background-color: var(--brand-red) !important;
+            border-bottom-color: var(--brand-red) !important;
+        }}
+        .tab-button {{
+            background-color: var(--tab-inactive) !important;
+            color: #fff !important;
+        }}
+        .tab-button.active {{
+            background-color: var(--brand-red) !important;
         }}
         .modal-content,
         .dash-center-card,

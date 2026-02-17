@@ -40,11 +40,11 @@ async def home_screen():
             font-family: Arial, sans-serif;
             display: flex;
             height: 100vh;
-            background-color: #f2f2f2;
+            background-color: #d3d3d3;
         }}
         .sidebar {{
             width: 150px;
-            background-color: #d32f2f;
+            background-color: #3c4142;
             display: flex;
             flex-direction: column;
             gap: 10px;
@@ -55,7 +55,7 @@ async def home_screen():
         }}
         .nav-box {{
             padding: 15px;
-            background-color: #d32f2f;
+            background-color: #3c4142;
             color: white;
             text-align: center;
             cursor: pointer;
@@ -65,20 +65,20 @@ async def home_screen():
             transition: all 0.3s ease;
         }}
         .nav-box:hover {{
-            background-color: #b22222;
+            background-color: #3c4142;
             border: 2px solid white;
         }}
         .nav-box.active {{
-            background-color: #d32f2f;
+            background-color: #b22222;
             color: white;
-            border: 2px solid #d32f2f;
+            border: 2px solid #b22222;
         }}
         .content-area {{
             flex: 1;
             padding: 40px;
             overflow-y: auto;
             margin-left: 150px;
-            background-color: #f2f2f2;
+            background-color: #d3d3d3;
             min-height: 100vh;
         }}
         .screen {{
@@ -88,8 +88,10 @@ async def home_screen():
             display: block;
         }}
         :root {{
-            --app-bg: #a9a9a9;
-            --card-bg: #e4e4e4;
+            --app-bg: #d3d3d3;
+            --card-bg: #f2f0ef;
+            --brand-red: #b22222;
+            --tab-inactive: #3c4142;
         }}
         body,
         .content-area,
@@ -116,8 +118,27 @@ async def home_screen():
         [style*="background: #707070"],
         [style*="background-color:#707070"],
         [style*="background-color: #707070"] {{
-            background: var(--app-bg) !important;
-            background-color: var(--app-bg) !important;
+            background: var(--brand-red) !important;
+            background-color: var(--brand-red) !important;
+        }}
+        button {{
+            background: var(--brand-red) !important;
+            background-color: var(--brand-red) !important;
+            color: #fff !important;
+        }}
+        .nav-box {{
+            background-color: var(--tab-inactive) !important;
+        }}
+        .nav-box.active {{
+            background-color: var(--brand-red) !important;
+            border-color: var(--brand-red) !important;
+        }}
+        .tab-button {{
+            background-color: var(--tab-inactive) !important;
+            color: #fff !important;
+        }}
+        .tab-button.active {{
+            background-color: var(--brand-red) !important;
         }}
         .modal-content,
         .dash-center-card,
