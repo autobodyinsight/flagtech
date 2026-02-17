@@ -666,6 +666,30 @@ def process_pdf_grid(pages: List[Dict]) -> Dict[str, Any]:
         pages, columns, anchor_page, anchor_ymid, subtotals_page, subtotals_ymid
     )
 
+    full_text_lines: List[str] = []
+    for page in pages:
+        rows = group_rows(page.get("words", []), y_thresh=6.0)
+        for row in rows:
+            row_text = " ".join(
+                word.get("text", "") for word in sorted(row.get("words", []), key=lambda item: item.get("x0", 0))
+            ).strip()
+            if row_text:
+                full_text_lines.append(row_text)
+
+    def _extract_line_value(lines: List[str], pattern: str) -> str:
+        for line in lines:
+            match = re.search(pattern, line, re.IGNORECASE)
+            if match:
+                return (match.group(1) or "").strip()
+        return ""
+
+    written_by = ""
+    estimator = ""
+    if not written_by:
+        written_by = _extract_line_value(full_text_lines, r"\bwritten\s+by\b\s*:\s*(.*)$")
+    if not estimator:
+        estimator = _extract_line_value(full_text_lines, r"\bestimator\b\s*:\s*(.*)$")
+
     total_labor = sum(item["value"] for item in labor_items)
     total_paint = sum(item["value"] for item in paint_items)
 
@@ -812,6 +836,8 @@ def process_pdf_grid(pages: List[Dict]) -> Dict[str, Any]:
         "vehicle_info_line": vehicle_info_line,
         "owner_info": owner_info,
         "insurance_company": insurance_company,
+        "written_by": written_by,
+        "estimator": estimator,
         "vin": vin,
         "claim_number": claim_number,
         "anchor_page": anchor_page,
