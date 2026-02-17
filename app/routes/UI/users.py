@@ -40,18 +40,18 @@ def get_users_screen_html():
 
         <div id="usersAddPanel" style="background:#fff; border:1px solid #ddd; border-radius:6px; padding:12px; margin-bottom:16px;">
             <div style="font-weight:bold; margin-bottom:8px;">Add User</div>
-            <div style="display:grid; grid-template-columns:1.1fr 0.8fr 0.8fr 1fr 1fr 1fr auto; gap:8px; align-items:end;">
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; align-items:end;">
                 <div>
-                    <label for="newUserEmail" style="display:block; margin-bottom:4px;">Email</label>
-                    <input id="newUserEmail" type="email" placeholder="name@yourdomain.com" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:4px;" />
+                    <label for="newUserLastName" style="display:block; margin-bottom:4px;">Last Name</label>
+                    <input id="newUserLastName" type="text" placeholder="Last" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:4px;" />
                 </div>
                 <div>
                     <label for="newUserFirstName" style="display:block; margin-bottom:4px;">First Name</label>
                     <input id="newUserFirstName" type="text" placeholder="First" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:4px;" />
                 </div>
                 <div>
-                    <label for="newUserLastName" style="display:block; margin-bottom:4px;">Last Name</label>
-                    <input id="newUserLastName" type="text" placeholder="Last" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:4px;" />
+                    <label for="newUserEmail" style="display:block; margin-bottom:4px;">Email</label>
+                    <input id="newUserEmail" type="email" placeholder="name@yourdomain.com" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:4px;" />
                 </div>
                 <div>
                     <label for="newUserPassword" style="display:block; margin-bottom:4px;">Password</label>
@@ -75,7 +75,9 @@ def get_users_screen_html():
                         <option value="manager">manager</option>
                     </select>
                 </div>
-                <button onclick="createUser()" style="padding:10px 16px; background:#b22222; color:#fff; border:none; border-radius:4px; font-weight:bold; cursor:pointer;">Create</button>
+                <div style="grid-column:1 / -1; display:flex; justify-content:flex-end; margin-top:2px;">
+                    <button onclick="createUser()" style="padding:10px 16px; background:#b22222; color:#fff; border:none; border-radius:4px; font-weight:bold; cursor:pointer;">Create</button>
+                </div>
             </div>
         </div>
 
