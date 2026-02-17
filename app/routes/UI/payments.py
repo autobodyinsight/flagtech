@@ -53,6 +53,21 @@ def get_payments_screen_html():
                 return Number.isFinite(parsed) ? parsed : NaN;
             }
 
+            function paymentsFormatCurrencyInputValue(value) {
+                const cleaned = String(value || '')
+                    .replace(/[^0-9.]/g, '')
+                    .replace(/(\..*)\./g, '$1');
+                if (!cleaned) return '';
+                const parsed = Number(cleaned);
+                if (!Number.isFinite(parsed)) return '';
+                return '$' + parsed.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            }
+
+            function paymentsHandleCurrencyInput(event) {
+                if (!event || !event.target) return;
+                event.target.value = paymentsFormatCurrencyInputValue(event.target.value);
+            }
+
             function paymentsEscapedRoValue(value) {
                 return String(value || '').replace(/'/g, "\\'");
             }
@@ -64,6 +79,92 @@ def get_payments_screen_html():
                     .replace(/>/g, '&gt;')
                     .replace(/\"/g, '&quot;')
                     .replace(/'/g, '&#39;');
+            }
+
+            function buildPaymentsBalancePanel(options) {
+                const {
+                    rowId,
+                    roEscaped,
+                    insuranceName,
+                    customerName,
+                    insuranceTotal,
+                    customerTotal,
+                    insurancePaid,
+                    customerPaid,
+                    insuranceBalance,
+                    customerBalance,
+                    editable,
+                } = options;
+
+                const saveControlsHtml = editable
+                    ? `
+                        <div style="display:flex; align-items:center; gap:12px; margin-bottom:10px;">
+                            <button id="payments-save-btn-${rowId}" type="button" onclick="saveGrandTotalPaymentsForRo(event, '${roEscaped}')" style="padding:8px 14px; background:#4caf50; color:#fff; border:none; border-radius:4px; cursor:pointer; font-weight:bold;">
+                                SAVE
+                            </button>
+                            <div id="payments-save-msg-${rowId}" style="font-size:12px; color:#666;"></div>
+                        </div>
+                    `
+                    : '';
+
+                const insuranceInputHtml = editable
+                    ? `
+                        <input id="payments-ins-paid-${rowId}" type="text" inputmode="decimal" value="${paymentsFormatMoney(insurancePaid)}" oninput="paymentsHandleCurrencyInput(event)" style="padding:8px; border:1px solid #ccc; border-radius:4px; width:170px; text-align:right; margin-bottom:8px;" />
+                    `
+                    : '';
+
+                const customerInputHtml = editable
+                    ? `
+                        <input id="payments-cust-paid-${rowId}" type="text" inputmode="decimal" value="${paymentsFormatMoney(customerPaid)}" oninput="paymentsHandleCurrencyInput(event)" style="padding:8px; border:1px solid #ccc; border-radius:4px; width:170px; text-align:right; margin-bottom:8px;" />
+                    `
+                    : '';
+
+                return `
+                    <div style="background:#fafafa; border:1px solid #ddd; border-radius:6px; padding:12px;">
+                        ${saveControlsHtml}
+                        <div style="font-weight:bold; color:#333; margin-bottom:8px;">Running Ledger</div>
+
+                        <div style="font-weight:bold; color:#555; margin-bottom:2px;">INSURANCE</div>
+                        <div style="color:#333; margin-bottom:6px;">${insuranceName || '-'}</div>
+                        ${insuranceInputHtml}
+                        <table style="width:100%; border-collapse:collapse; margin-bottom:10px;">
+                            <thead>
+                                <tr style="background:#f7f7f7; text-align:left;">
+                                    <th style="padding:8px; border-bottom:1px solid #ddd; font-weight:bold; color:#666; text-align:right;">TOTAL</th>
+                                    <th style="padding:8px; border-bottom:1px solid #ddd; font-weight:bold; color:#666; text-align:right;">PAYMENTS</th>
+                                    <th style="padding:8px; border-bottom:1px solid #ddd; font-weight:bold; color:#666; text-align:right;">BALANCE</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td style="padding:8px; border-bottom:1px solid #ececec; text-align:right; color:#333;">${paymentsFormatMoney(insuranceTotal)}</td>
+                                    <td style="padding:8px; border-bottom:1px solid #ececec; text-align:right; color:#333;">${paymentsFormatMoney(insurancePaid)}</td>
+                                    <td style="padding:8px; border-bottom:1px solid #ececec; text-align:right; font-weight:bold; color:#333;">${paymentsFormatMoney(insuranceBalance)}</td>
+                                </tr>
+                            </tbody>
+                        </table>
+
+                        <div style="font-weight:bold; color:#555; margin-bottom:2px;">CUSTOMER</div>
+                        <div style="color:#333; margin-bottom:6px;">${customerName || '-'}</div>
+                        ${customerInputHtml}
+                        <table style="width:100%; border-collapse:collapse;">
+                            <thead>
+                                <tr style="background:#f7f7f7; text-align:left;">
+                                    <th style="padding:8px; border-bottom:1px solid #ddd; font-weight:bold; color:#666; text-align:right;">TOTAL</th>
+                                    <th style="padding:8px; border-bottom:1px solid #ddd; font-weight:bold; color:#666; text-align:right;">PAYMENTS</th>
+                                    <th style="padding:8px; border-bottom:1px solid #ddd; font-weight:bold; color:#666; text-align:right;">BALANCE</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td style="padding:8px; border-bottom:1px solid #ececec; text-align:right; color:#333;">${paymentsFormatMoney(customerTotal)}</td>
+                                    <td style="padding:8px; border-bottom:1px solid #ececec; text-align:right; color:#333;">${paymentsFormatMoney(customerPaid)}</td>
+                                    <td style="padding:8px; border-bottom:1px solid #ececec; text-align:right; font-weight:bold; color:#333;">${paymentsFormatMoney(customerBalance)}</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                `;
             }
 
             function paymentsOpenRow(rowEl) {
@@ -300,7 +401,7 @@ def get_payments_screen_html():
                 }
             }
 
-            async function savePaymentsForRo(event, roNumber) {
+            async function saveGrandTotalPaymentsForRo(event, roNumber) {
                 if (event) event.stopPropagation();
 
                 const rowId = paymentsSafeId(roNumber);
@@ -345,7 +446,7 @@ def get_payments_screen_html():
                     messageEl.textContent = 'Saved';
                     await loadPaymentsData();
                 } catch (err) {
-                    console.error('Error saving payments:', err);
+                    console.error('Error saving grand total payments:', err);
                     messageEl.style.color = '#c62828';
                     messageEl.textContent = err.message || 'Unable to save payments';
                 } finally {
@@ -414,70 +515,38 @@ def get_payments_screen_html():
                         <tr id="payments-editor-row-${rowId}" style="display:none; background:${rowBg};">
                             <td colspan="7" style="padding:0 16px 12px 16px; border-bottom:1px solid #eee;">
                                 <div class="ro-slide-panel" style="max-height:0; overflow:hidden; opacity:0; transition:max-height 0.22s ease, opacity 0.22s ease;">
-                                    <div style="background:#fafafa; border:1px solid #ddd; border-radius:6px; padding:12px;">
-                                        <div style="display:grid; grid-template-columns:auto auto auto; gap:10px 14px; align-items:center;">
-                                            <div style="font-weight:bold; color:#333;">INSURANCE: ${paymentsFormatMoney(insuranceTotal)}</div>
-                                            <label style="color:#555; font-weight:bold;">PAID:</label>
-                                            <input id="payments-ins-paid-${rowId}" type="number" min="0" step="0.01" value="${insurancePaid.toFixed(2)}" style="padding:8px; border:1px solid #ccc; border-radius:4px; width:170px; text-align:right;" />
-
-                                            <div style="font-weight:bold; color:#333;">CUSTOMER: ${paymentsFormatMoney(customerTotal)}</div>
-                                            <label style="color:#555; font-weight:bold;">PAID:</label>
-                                            <input id="payments-cust-paid-${rowId}" type="number" min="0" step="0.01" value="${customerPaid.toFixed(2)}" style="padding:8px; border:1px solid #ccc; border-radius:4px; width:170px; text-align:right;" />
-                                        </div>
-                                        <div style="display:flex; align-items:center; gap:12px; margin-top:12px;">
-                                            <button id="payments-save-btn-${rowId}" type="button" onclick="savePaymentsForRo(event, '${roEscaped}')" style="padding:8px 14px; background:#4caf50; color:#fff; border:none; border-radius:4px; cursor:pointer; font-weight:bold;">
-                                                SAVE
-                                            </button>
-                                            <div id="payments-save-msg-${rowId}" style="font-size:12px; color:#666;"></div>
-                                        </div>
-                                    </div>
+                                    ${buildPaymentsBalancePanel({
+                                        rowId,
+                                        roEscaped,
+                                        insuranceName,
+                                        customerName,
+                                        insuranceTotal,
+                                        customerTotal,
+                                        insurancePaid,
+                                        customerPaid,
+                                        insuranceBalance,
+                                        customerBalance,
+                                        editable: true,
+                                    })}
                                 </div>
                             </td>
                         </tr>
                         <tr id="payments-ledger-row-${rowId}" style="display:none; background:${rowBg};">
                             <td colspan="7" style="padding:0 16px 12px 16px; border-bottom:1px solid #eee;">
                                 <div class="ro-slide-panel" style="max-height:0; overflow:hidden; opacity:0; transition:max-height 0.22s ease, opacity 0.22s ease;">
-                                    <div style="background:#fafafa; border:1px solid #ddd; border-radius:6px; padding:12px;">
-                                        <div style="font-weight:bold; color:#333; margin-bottom:8px;">Running Ledger</div>
-
-                                        <div style="font-weight:bold; color:#555; margin-bottom:2px;">INSURANCE</div>
-                                        <div style="color:#333; margin-bottom:6px;">${insuranceName || '-'}</div>
-                                        <table style="width:100%; border-collapse:collapse; margin-bottom:10px;">
-                                            <thead>
-                                                <tr style="background:#f7f7f7; text-align:left;">
-                                                    <th style="padding:8px; border-bottom:1px solid #ddd; font-weight:bold; color:#666; text-align:right;">TOTAL</th>
-                                                    <th style="padding:8px; border-bottom:1px solid #ddd; font-weight:bold; color:#666; text-align:right;">PAYMENTS</th>
-                                                    <th style="padding:8px; border-bottom:1px solid #ddd; font-weight:bold; color:#666; text-align:right;">BALANCE</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                                <tr>
-                                                    <td style="padding:8px; border-bottom:1px solid #ececec; text-align:right; color:#333;">${paymentsFormatMoney(insuranceTotal)}</td>
-                                                    <td style="padding:8px; border-bottom:1px solid #ececec; text-align:right; color:#333;">${paymentsFormatMoney(insurancePaid)}</td>
-                                                    <td style="padding:8px; border-bottom:1px solid #ececec; text-align:right; font-weight:bold; color:#333;">${paymentsFormatMoney(insuranceBalance)}</td>
-                                                </tr>
-                                            </tbody>
-                                        </table>
-
-                                        <div style="font-weight:bold; color:#555; margin-bottom:2px;">CUSTOMER</div>
-                                        <div style="color:#333; margin-bottom:6px;">${customerName || '-'}</div>
-                                        <table style="width:100%; border-collapse:collapse;">
-                                            <thead>
-                                                <tr style="background:#f7f7f7; text-align:left;">
-                                                    <th style="padding:8px; border-bottom:1px solid #ddd; font-weight:bold; color:#666; text-align:right;">TOTAL</th>
-                                                    <th style="padding:8px; border-bottom:1px solid #ddd; font-weight:bold; color:#666; text-align:right;">PAYMENTS</th>
-                                                    <th style="padding:8px; border-bottom:1px solid #ddd; font-weight:bold; color:#666; text-align:right;">BALANCE</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                                <tr>
-                                                    <td style="padding:8px; border-bottom:1px solid #ececec; text-align:right; color:#333;">${paymentsFormatMoney(customerTotal)}</td>
-                                                    <td style="padding:8px; border-bottom:1px solid #ececec; text-align:right; color:#333;">${paymentsFormatMoney(customerPaid)}</td>
-                                                    <td style="padding:8px; border-bottom:1px solid #ececec; text-align:right; font-weight:bold; color:#333;">${paymentsFormatMoney(customerBalance)}</td>
-                                                </tr>
-                                            </tbody>
-                                        </table>
-                                    </div>
+                                    ${buildPaymentsBalancePanel({
+                                        rowId,
+                                        roEscaped,
+                                        insuranceName,
+                                        customerName,
+                                        insuranceTotal,
+                                        customerTotal,
+                                        insurancePaid,
+                                        customerPaid,
+                                        insuranceBalance,
+                                        customerBalance,
+                                        editable: false,
+                                    })}
                                 </div>
                             </td>
                         </tr>
