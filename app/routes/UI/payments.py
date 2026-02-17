@@ -622,7 +622,7 @@ def get_payments_screen_html():
 
                 let html = '';
                 rows.forEach((row, index) => {
-                    const rowBg = index % 2 === 0 ? '#fff' : '#f9f9f9';
+                    const rowBg = index % 2 === 0 ? '#f2f0ef' : 'var(--list-row-white, #ffffff)';
                     const ro = row.ro || '';
                     const rowId = paymentsSafeId(ro);
                     const insuranceTotal = Number(row.insurance_total || 0);

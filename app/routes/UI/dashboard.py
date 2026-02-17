@@ -1274,7 +1274,7 @@ def get_dashboard_screen_html():
                 
                 let html = '';
                 sortedList.forEach((ro, index) => {
-                    const rowBg = index % 2 === 0 ? '#fff' : '#f9f9f9';
+                    const rowBg = index % 2 === 0 ? '#f2f0ef' : 'var(--list-row-white, #ffffff)';
                     const rowId = safeId(ro.ro);
                     const customerDisplay = ro.customer || '-';
                     const phoneDisplay = cleanPhoneNumber(ro.phone);
@@ -1882,7 +1882,7 @@ def get_dashboard_screen_html():
                 // Build table rows
                 let rowsHtml = '';
                 sortedList.forEach((ro, index) => {
-                    const rowBg = index % 2 === 0 ? '#fff' : '#f9f9f9';
+                    const rowBg = index % 2 === 0 ? '#f2f0ef' : 'var(--list-row-white, #ffffff)';
                     const inDisplay = ro.in_date ? formatShortDate(ro.in_date) : '-';
                     const ecdDisplay = ro.ecd_date ? formatShortDate(ro.ecd_date) : '-';
                     const daysSinceIn = calculateDaysSince(ro.in_date || '');
@@ -2556,7 +2556,7 @@ def get_dashboard_screen_html():
                 const techDisplayValue = techName || '_______________________';
                 
                 const linesHtml = lines.map((line, idx) => {
-                    const rowBg = idx % 2 === 0 ? '#fff' : '#f9f9f9';
+                    const rowBg = idx % 2 === 0 ? '#f2f0ef' : 'var(--list-row-white, #ffffff)';
                     return `
                         <tr style="background:${rowBg};">
                             <td style="padding:10px; border-bottom:1px solid #eee;">${escapeHtml(line.line || '-')}</td>

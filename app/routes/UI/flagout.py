@@ -355,7 +355,8 @@ def get_flagtech_screen_html():
                     return;
                 }
 
-                const html = techs.map((tech) => {
+                const html = techs.map((tech, index) => {
+                    const rowBg = index % 2 === 0 ? '#f2f0ef' : 'var(--list-row-white, #ffffff)';
                     const techId = Number(tech.tech_id || 0);
                     const name = tech.tech_name || `Tech #${techId}`;
                     const role = (tech.role || '').trim() || '-';
@@ -410,7 +411,7 @@ def get_flagtech_screen_html():
                         : "<div style='padding:10px; color:#777;'>No ROs found.</div>";
 
                     return `
-                        <div class="flagout-tech-row">
+                        <div class="flagout-tech-row" style="background:${rowBg};">
                             <div style="flex:1.8;">
                                 ${flagoutInitializeMode ? `<input type="checkbox" ${techChecked ? 'checked' : ''} ${techPartial ? 'data-partial="1"' : ''} onclick="event.stopPropagation();" onchange="toggleTechSelection(${techId}, this.checked)" style="margin-right:8px;" />` : ''}
                                 <button type="button" class="flagout-tech-toggle" onclick="toggleFlagoutTechRos(${techId})">${name}</button>
@@ -419,7 +420,7 @@ def get_flagtech_screen_html():
                             <div style="flex:1; text-align:center;">${formatCurrency(payRate)}/hr</div>
                             <div style="flex:1; text-align:right; font-weight:bold;">${totalHours.toFixed(1)}</div>
                         </div>
-                        <div id="flagout-ros-${techId}" class="flagout-ros-wrap" style="display:${isOpen ? 'block' : 'none'};">${roTable}</div>
+                        <div id="flagout-ros-${techId}" class="flagout-ros-wrap" style="display:${isOpen ? 'block' : 'none'}; background:${rowBg};">${roTable}</div>
                     `;
                 }).join('');
 

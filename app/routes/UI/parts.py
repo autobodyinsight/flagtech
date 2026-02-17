@@ -502,7 +502,7 @@ def get_parts_script():
             }
 
             body.innerHTML = partsVendorsCache.map((vendor, idx) => {
-                const rowBg = idx % 2 === 0 ? '#fff' : '#f9f9f9';
+                const rowBg = idx % 2 === 0 ? '#f2f0ef' : 'var(--list-row-white, #ffffff)';
                 const detailRowId = `parts-vendor-detail-row-${vendor.id}`;
                 const detailWrapId = `parts-vendor-detail-wrap-${vendor.id}`;
                 return `
@@ -838,7 +838,7 @@ def get_parts_script():
                     }
 
                     tbody.innerHTML = res.ros.map((ro, idx) => {
-                        const rowBg = idx % 2 === 0 ? '#fff' : '#f9f9f9';
+                        const rowBg = idx % 2 === 0 ? '#f2f0ef' : 'var(--list-row-white, #ffffff)';
                         return `
                             <tr style="background:${rowBg};">
                                 <td style="padding:12px; border-bottom:1px solid #eee; color:#333;">${ro.ro}</td>
@@ -956,7 +956,7 @@ def get_parts_script():
             }
 
             body.innerHTML = partsArrivedItems.map((item, idx) => {
-                const rowBg = idx % 2 === 0 ? '#fff' : '#f9f9f9';
+                const rowBg = idx % 2 === 0 ? '#f2f0ef' : 'var(--list-row-white, #ffffff)';
                 const descriptionDisplay = String(item.description || '').replace(/\\s+/g, ' ').trim();
                 const arrivedDisplay = item.arrived_date
                     ? partsFormatBusinessDate(item.arrived_date)
@@ -1057,7 +1057,7 @@ def get_parts_script():
             }
 
             body.innerHTML = partsReturnedItems.map((item, idx) => {
-                const rowBg = idx % 2 === 0 ? '#fff' : '#f9f9f9';
+                const rowBg = idx % 2 === 0 ? '#f2f0ef' : 'var(--list-row-white, #ffffff)';
                 const descriptionDisplay = String(item.description || '').replace(/\\s+/g, ' ').trim();
                 const returnDateDisplay = item.return_date ? partsFormatBusinessDate(item.return_date) : '—';
                 return `
@@ -1166,7 +1166,7 @@ def get_parts_script():
                     : '';
 
                 return `
-                    <tr style="background:${idx % 2 === 0 ? '#fff' : '#f9f9f9'};">
+                    <tr style="background:${idx % 2 === 0 ? '#f2f0ef' : 'var(--list-row-white, #ffffff)'};">
                         ${checkboxCell}
                         <td style="padding:10px; border-bottom:1px solid #eee;">${partsEscapeHtml(item.line || '—')}</td>
                         <td style="padding:10px; border-bottom:1px solid #eee;">${partsEscapeHtml(item.description || '')}</td>

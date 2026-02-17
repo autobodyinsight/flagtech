@@ -394,7 +394,7 @@ def get_techs_screen_html():
                         return;
                     }
 
-                    cachedTechRows.forEach(tech => {
+                    cachedTechRows.forEach((tech, index) => {
                         const techId = Number(tech.id);
                         const fullName = `${(tech.first_name || '').trim()} ${(tech.last_name || '').trim()}`.trim();
                         const role = (tech.role || '').trim() || 'Body';
@@ -403,6 +403,8 @@ def get_techs_screen_html():
 
                         const row = document.createElement('div');
                         row.className = 'tech-row';
+                        const rowBg = index % 2 === 0 ? '#f2f0ef' : 'var(--list-row-white, #ffffff)';
+                        row.style.background = rowBg;
 
                         const statusCell = document.createElement('div');
                         statusCell.style.flex = '0.6';
@@ -459,6 +461,7 @@ def get_techs_screen_html():
                         slideDown.id = `tech-slide-${techId}`;
                         slideDown.className = 'tech-slide-down';
                         slideDown.style.display = 'none';
+                        slideDown.style.background = rowBg;
 
                         tableContainer.appendChild(row);
                         tableContainer.appendChild(slideDown);
@@ -940,13 +943,14 @@ def get_techs_screen_html():
                 return;
             }
 
-            container.innerHTML = cachedTechRows.map(tech => {
+            container.innerHTML = cachedTechRows.map((tech, idx) => {
                 const techId = Number(tech.id);
                 const fullName = `${(tech.first_name || '').trim()} ${(tech.last_name || '').trim()}`.trim();
                 const role = (tech.role || '').trim() || 'Body';
                 const payRate = Number(tech.pay_rate || 0).toFixed(2);
+                const rowBg = idx % 2 === 0 ? '#f2f0ef' : 'var(--list-row-white, #ffffff)';
                 return `
-                    <div class="manage-tech-row" data-tech-id="${techId}" data-original-name="${escapeHtml(fullName)}" data-original-role="${escapeHtml(role)}" data-original-rate="${payRate}">
+                    <div class="manage-tech-row" style="background:${rowBg};" data-tech-id="${techId}" data-original-name="${escapeHtml(fullName)}" data-original-role="${escapeHtml(role)}" data-original-rate="${payRate}">
                         <div style="flex:1.7;"><input class="manage-name" type="text" value="${escapeHtml(fullName)}" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:4px;" /></div>
                         <div style="flex:1; text-align:center;">
                             <select class="manage-role" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:4px;">
