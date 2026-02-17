@@ -366,21 +366,6 @@ def get_payments_screen_html():
                 paymentsCloseRow(detailRow);
             }
 
-            function togglePaymentsLedger(event, roNumber) {
-                if (event) event.stopPropagation();
-                const rowId = paymentsSafeId(roNumber);
-                const detailRow = document.getElementById(`payments-ledger-row-${rowId}`);
-                if (!detailRow) return;
-
-                const isHidden = detailRow.style.display === 'none' || detailRow.style.display === '';
-                if (isHidden) {
-                    paymentsOpenRow(detailRow);
-                    return;
-                }
-
-                paymentsCloseRow(detailRow);
-            }
-
             function findPaymentsRow(roNumber) {
                 const roValue = String(roNumber || '');
                 return paymentsRows.find((row) => String(row.ro || '') === roValue) || null;
@@ -460,14 +445,14 @@ def get_payments_screen_html():
                     : '<tr><td colspan="2" style="padding:8px; border-bottom:1px solid #ececec; text-align:center; color:#777;">No invoice payments saved in Parts</td></tr>';
 
                 contentEl.innerHTML = `
-                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:14px; align-items:start;">
+                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:30px; align-items:start;">
                         <div>
-                            <div style="font-weight:bold; color:#555; margin-bottom:6px;">Payments Made for Invoices</div>
+                            <div style="font-weight:bold; color:#000; margin-bottom:6px;">Payments Made for Invoices</div>
                             <table style="width:100%; border-collapse:collapse;">
                                 <thead>
                                     <tr style="background:#f7f7f7; text-align:left;">
                                         <th style="padding:8px; border-bottom:1px solid #ddd; font-weight:bold; color:#666;">Invoice #</th>
-                                        <th style="padding:8px; border-bottom:1px solid #ddd; font-weight:bold; color:#666; text-align:right;">Amount</th>
+                                        <th style="padding:8px; border-bottom:1px solid #ddd; font-weight:bold; color:#000; text-align:right;">Amount</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -481,13 +466,13 @@ def get_payments_screen_html():
                         </div>
 
                         <div>
-                            <div style="font-weight:bold; color:#555; margin-bottom:6px;">Payments Made to Techs</div>
+                            <div style="font-weight:bold; color:#000; margin-bottom:6px;">Payments Made for Techs</div>
                             <table style="width:100%; border-collapse:collapse;">
                                 <thead>
                                     <tr style="background:#f7f7f7; text-align:left;">
                                         <th style="padding:8px; border-bottom:1px solid #ddd; font-weight:bold; color:#666;">Paid At</th>
                                         <th style="padding:8px; border-bottom:1px solid #ddd; font-weight:bold; color:#666;">Tech</th>
-                                        <th style="padding:8px; border-bottom:1px solid #ddd; font-weight:bold; color:#666; text-align:right;">Amount</th>
+                                        <th style="padding:8px; border-bottom:1px solid #ddd; font-weight:bold; color:#000; text-align:right;">Amount</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -661,9 +646,7 @@ def get_payments_screen_html():
                                 </button>
                             </td>
                             <td style="padding:12px; border-bottom:1px solid #eee; text-align:right; font-weight:bold; color:#333;">
-                                <button type="button" onclick="togglePaymentsLedger(event, '${roEscaped}')" style="background:none; border:none; color:#0066cc; text-decoration:underline; cursor:pointer; padding:0; font:inherit; font-weight:bold;">
-                                    ${paymentsFormatMoney(balance)}
-                                </button>
+                                ${paymentsFormatMoney(balance)}
                             </td>
                         </tr>
                         <tr id="payments-ro-details-row-${rowId}" style="display:none; background:${rowBg};">
@@ -692,27 +675,6 @@ def get_payments_screen_html():
                                         insurancePaymentEntries,
                                         customerPaymentEntries,
                                         editable: true,
-                                    })}
-                                </div>
-                            </td>
-                        </tr>
-                        <tr id="payments-ledger-row-${rowId}" style="display:none; background:${rowBg};">
-                            <td colspan="7" style="padding:0 16px 12px 16px; border-bottom:1px solid #eee;">
-                                <div class="ro-slide-panel" style="max-height:0; overflow:hidden; opacity:0; transition:max-height 0.22s ease, opacity 0.22s ease;">
-                                    ${buildPaymentsBalancePanel({
-                                        rowId,
-                                        roEscaped,
-                                        insuranceName,
-                                        customerName,
-                                        insuranceTotal,
-                                        customerTotal,
-                                        insurancePaid,
-                                        customerPaid,
-                                        insuranceBalance,
-                                        customerBalance,
-                                        insurancePaymentEntries,
-                                        customerPaymentEntries,
-                                        editable: false,
                                     })}
                                 </div>
                             </td>
