@@ -20,7 +20,7 @@ def get_flagtech_screen_html():
                 </button>
             </div>
             <div id="flagoutTechTable" style="width:100%; border:1px solid #ddd; border-radius:4px; overflow:hidden; background:#fff;">
-                <div style="display:flex; justify-content:space-between; align-items:center; padding:12px; background-color:#f5f5f5; border-bottom:2px solid #ddd; font-weight:bold;">
+                <div class="flagout-header-bar" style="display:flex; justify-content:space-between; align-items:center; padding:12px; border-bottom:2px solid #ddd; font-weight:bold;">
                     <div style="flex:1.8; text-align:left;">Tech Name</div>
                     <div style="flex:1; text-align:center;">Role</div>
                     <div style="flex:1; text-align:center;">Pay Rate</div>
@@ -56,6 +56,10 @@ def get_flagtech_screen_html():
         </div>
 
         <style>
+            .flagout-header-bar {
+                background:#3c4142;
+                color:#fff;
+            }
             .flagout-tech-row {
                 display:flex;
                 justify-content:space-between;
@@ -93,8 +97,9 @@ def get_flagtech_screen_html():
                 border-collapse:collapse;
             }
             .flagout-ros-table thead tr {
-                background:#d9d9d9;
+                background:#3c4142;
                 border-bottom:2px solid #999;
+                color:#fff;
             }
             .flagout-ros-table th,
             .flagout-ros-table td {

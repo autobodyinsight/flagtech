@@ -5,6 +5,15 @@ def get_parts_screen_html():
     """Return the HTML content for the Parts screen."""
     return """
     <div id="parts" class="screen" style="padding:20px;">
+        <style>
+            .parts-header-row {
+                background:#3c4142;
+                text-align:left;
+            }
+            .parts-header-row th {
+                color:#fff;
+            }
+        </style>
         <div style="display:flex; align-items:center; justify-content:center; gap:28px; margin-bottom:20px;">
             <h1 style="text-align:center; margin:0;">PARTS</h1>
             <div>
@@ -17,14 +26,14 @@ def get_parts_screen_html():
             <div style="overflow-x:auto;">
                 <table id="partsRoTable" style="width:100%; border-collapse:collapse;">
                     <thead>
-                        <tr style="background:#f5f5f5; text-align:left;">
-                            <th style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold; color:#555;">RO#</th>
-                            <th style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold; color:#555;">Vehicle</th>
-                            <th style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold; color:#555;">Tech</th>
-                            <th style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold; color:#555;">Parts Qty</th>
-                            <th style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold; color:#555;">On Order</th>
-                            <th style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold; color:#555;">Arrived</th>
-                            <th style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold; color:#555;">Returned</th>
+                        <tr class="parts-header-row">
+                            <th style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold;">RO#</th>
+                            <th style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold;">Vehicle</th>
+                            <th style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold;">Tech</th>
+                            <th style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold;">Parts Qty</th>
+                            <th style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold;">On Order</th>
+                            <th style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold;">Arrived</th>
+                            <th style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold;">Returned</th>
                         </tr>
                     </thead>
                     <tbody id="partsRoBody">
@@ -112,7 +121,7 @@ def get_parts_screen_html():
                 <div style="overflow-x:auto;">
                     <table style="width:100%; border-collapse:collapse;">
                         <thead>
-                            <tr style="background:#f5f5f5; text-align:left;">
+                            <tr class="parts-header-row">
                                 <th id="partsOnOrderCheckHeader" style="padding:10px; border-bottom:2px solid #ddd; width:40px; display:none;"></th>
                                 <th style="padding:10px; border-bottom:2px solid #ddd; width:80px;">Line</th>
                                 <th style="padding:10px; border-bottom:2px solid #ddd;">Description</th>
@@ -144,7 +153,7 @@ def get_parts_screen_html():
                 <div style="overflow-x:auto;">
                     <table style="width:100%; border-collapse:collapse;">
                         <thead>
-                            <tr style="background:#f5f5f5; text-align:left;">
+                            <tr class="parts-header-row">
                                 <th style="padding:10px; border-bottom:2px solid #ddd; width:40px;"></th>
                                 <th style="padding:10px; border-bottom:2px solid #ddd; width:80px;">Line</th>
                                 <th style="padding:10px; border-bottom:2px solid #ddd;">Description</th>
@@ -171,7 +180,7 @@ def get_parts_screen_html():
                 <div style="overflow-x:auto;">
                     <table style="width:100%; border-collapse:collapse;">
                         <thead>
-                            <tr style="background:#f5f5f5; text-align:left;">
+                            <tr class="parts-header-row">
                                 <th style="padding:10px; border-bottom:2px solid #ddd; width:80px;">Line</th>
                                 <th style="padding:10px; border-bottom:2px solid #ddd;">Description</th>
                                 <th style="padding:10px; border-bottom:2px solid #ddd; width:170px;">Part #</th>

@@ -7,18 +7,28 @@ def get_payments_screen_html():
         <div id="payments" class="screen" style="padding:20px;">
             <h1 style="text-align:center; margin-bottom:20px;">PAYMENTS</h1>
 
+            <style>
+                .payments-header-row {
+                    background:#3c4142;
+                    text-align:left;
+                }
+                .payments-header-cell {
+                    color:#fff;
+                }
+            </style>
+
             <div style="background:#fff; border-radius:8px; padding:18px; box-shadow:0 2px 4px rgba(0,0,0,0.1);">
                 <div style="overflow-x:auto;">
                     <table id="paymentsRoTable" style="width:100%; border-collapse:collapse;">
                         <thead>
-                            <tr style="background:#f5f5f5; text-align:left;">
-                                <th style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold; color:#555;">RO#</th>
-                                <th style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold; color:#555;">Customer</th>
-                                <th style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold; color:#555;">Vehicle</th>
-                                <th style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold; color:#555; text-align:right;">Insurance (Total)</th>
-                                <th style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold; color:#555; text-align:right;">Customer (Total)</th>
-                                <th style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold; color:#555; text-align:right;">Grand Total</th>
-                                <th style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold; color:#555; text-align:right;">BALANCE</th>
+                            <tr class="payments-header-row">
+                                <th class="payments-header-cell" style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold;">RO#</th>
+                                <th class="payments-header-cell" style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold;">Customer</th>
+                                <th class="payments-header-cell" style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold;">Vehicle</th>
+                                <th class="payments-header-cell" style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold; text-align:right;">Insurance (Total)</th>
+                                <th class="payments-header-cell" style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold; text-align:right;">Customer (Total)</th>
+                                <th class="payments-header-cell" style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold; text-align:right;">Grand Total</th>
+                                <th class="payments-header-cell" style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold; text-align:right;">BALANCE</th>
                             </tr>
                         </thead>
                         <tbody id="paymentsRoTableBody">

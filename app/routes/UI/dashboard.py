@@ -178,17 +178,17 @@ def get_dashboard_screen_html():
                 <div style="overflow-x:auto;">
                     <table id="roListTable" style="width:100%; border-collapse:collapse;">
                         <thead>
-                            <tr style="background:#f5f5f5; text-align:left;">
-                                <th data-sort-key="ro" onclick="sortRoListByHeader('ro')" style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold; color:#555; cursor:pointer; user-select:none;">RO# <span data-sort-indicator="ro" style="font-size:12px;"></span></th>
-                                <th data-sort-key="vehicle" onclick="sortRoListByHeader('vehicle')" style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold; color:#555; cursor:pointer; user-select:none;">Vehicle <span data-sort-indicator="vehicle" style="font-size:12px;"></span></th>
-                                <th data-sort-key="customer" onclick="sortRoListByHeader('customer')" style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold; color:#555; cursor:pointer; user-select:none;">Customer <span data-sort-indicator="customer" style="font-size:12px;"></span></th>
-                                <th data-sort-key="insurance" onclick="sortRoListByHeader('insurance')" style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold; color:#555; cursor:pointer; user-select:none;">Insurance <span data-sort-indicator="insurance" style="font-size:12px;"></span></th>
-                                <th data-sort-key="phase" onclick="sortRoListByHeader('phase')" style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold; color:#555; cursor:pointer; user-select:none;">Phase <span data-sort-indicator="phase" style="font-size:12px;"></span></th>
-                                <th data-sort-key="in_date" onclick="sortRoListByHeader('in_date')" style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold; color:#555; cursor:pointer; user-select:none;">In <span data-sort-indicator="in_date" style="font-size:12px;"></span></th>
-                                <th data-sort-key="days_since_in" onclick="sortRoListByHeader('days_since_in')" style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold; color:#555; text-align:center; cursor:pointer; user-select:none;" title="Days Since In Date">⏳ <span data-sort-indicator="days_since_in" style="font-size:12px;"></span></th>
-                                <th data-sort-key="ecd_date" onclick="sortRoListByHeader('ecd_date')" style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold; color:#555; cursor:pointer; user-select:none;">ECD <span data-sort-indicator="ecd_date" style="font-size:12px;"></span></th>
-                                <th data-sort-key="hours" onclick="sortRoListByHeader('hours')" style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold; color:#555; text-align:right; cursor:pointer; user-select:none;">HRS <span data-sort-indicator="hours" style="font-size:12px;"></span></th>
-                                <th data-sort-key="total" onclick="sortRoListByHeader('total')" style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold; color:#555; text-align:right; cursor:pointer; user-select:none;">Total <span data-sort-indicator="total" style="font-size:12px;"></span></th>
+                            <tr class="dashboard-header-row">
+                                <th class="dashboard-header-cell" data-sort-key="ro" onclick="sortRoListByHeader('ro')" style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold; cursor:pointer; user-select:none;">RO# <span data-sort-indicator="ro" style="font-size:12px;"></span></th>
+                                <th class="dashboard-header-cell" data-sort-key="vehicle" onclick="sortRoListByHeader('vehicle')" style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold; cursor:pointer; user-select:none;">Vehicle <span data-sort-indicator="vehicle" style="font-size:12px;"></span></th>
+                                <th class="dashboard-header-cell" data-sort-key="customer" onclick="sortRoListByHeader('customer')" style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold; cursor:pointer; user-select:none;">Customer <span data-sort-indicator="customer" style="font-size:12px;"></span></th>
+                                <th class="dashboard-header-cell" data-sort-key="insurance" onclick="sortRoListByHeader('insurance')" style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold; cursor:pointer; user-select:none;">Insurance <span data-sort-indicator="insurance" style="font-size:12px;"></span></th>
+                                <th class="dashboard-header-cell" data-sort-key="phase" onclick="sortRoListByHeader('phase')" style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold; cursor:pointer; user-select:none;">Phase <span data-sort-indicator="phase" style="font-size:12px;"></span></th>
+                                <th class="dashboard-header-cell" data-sort-key="in_date" onclick="sortRoListByHeader('in_date')" style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold; cursor:pointer; user-select:none;">In <span data-sort-indicator="in_date" style="font-size:12px;"></span></th>
+                                <th class="dashboard-header-cell" data-sort-key="days_since_in" onclick="sortRoListByHeader('days_since_in')" style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold; text-align:center; cursor:pointer; user-select:none;" title="Days Since In Date">⏳ <span data-sort-indicator="days_since_in" style="font-size:12px;"></span></th>
+                                <th class="dashboard-header-cell" data-sort-key="ecd_date" onclick="sortRoListByHeader('ecd_date')" style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold; cursor:pointer; user-select:none;">ECD <span data-sort-indicator="ecd_date" style="font-size:12px;"></span></th>
+                                <th class="dashboard-header-cell" data-sort-key="hours" onclick="sortRoListByHeader('hours')" style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold; text-align:right; cursor:pointer; user-select:none;">HRS <span data-sort-indicator="hours" style="font-size:12px;"></span></th>
+                                <th class="dashboard-header-cell" data-sort-key="total" onclick="sortRoListByHeader('total')" style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold; text-align:right; cursor:pointer; user-select:none;">Total <span data-sort-indicator="total" style="font-size:12px;"></span></th>
                             </tr>
                         </thead>
                         <tbody id="roListBody">
@@ -242,6 +242,13 @@ def get_dashboard_screen_html():
         </div>
 
         <style>
+            .dashboard-header-row {
+                background:#3c4142;
+                text-align:left;
+            }
+            .dashboard-header-cell {
+                color:#fff;
+            }
             .mini-popup-panel {
                 position: absolute;
                 top: 100%;

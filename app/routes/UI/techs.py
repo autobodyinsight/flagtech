@@ -18,7 +18,7 @@ def get_techs_screen_html():
         <div style="margin-top:40px;">
             <h2 style="margin-bottom:20px;">Technicians</h2>
             <div id="techsTableContainer" style="width:100%; border:1px solid #ddd; border-radius:4px; overflow:visible;">
-                <div style="display:flex; justify-content:space-between; align-items:center; padding:12px; background-color:#f5f5f5; border-bottom:2px solid #ddd; font-weight:bold; position:sticky; top:0; z-index:5;">
+                <div class="techs-header-bar" style="display:flex; justify-content:space-between; align-items:center; padding:12px; border-bottom:2px solid #ddd; font-weight:bold; position:sticky; top:0; z-index:5;">
                     <div style="flex:0.6; text-align:left;">Status</div>
                     <div style="flex:1.4; text-align:left;">Tech Name</div>
                     <div style="flex:0.9; text-align:center;">Role</div>
@@ -78,6 +78,10 @@ def get_techs_screen_html():
         </div>
 
         <style>
+            .techs-header-bar {
+                background:#3c4142;
+                color:#fff;
+            }
             .tech-row {
                 display:flex;
                 justify-content:space-between;
