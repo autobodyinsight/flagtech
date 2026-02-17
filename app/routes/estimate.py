@@ -3,6 +3,7 @@ import os
 import json
 import math
 import re
+from decimal import Decimal
 from datetime import date, datetime, timedelta, timezone
 from app.services.extractor import load_pdf
 from app.services.parser import parse_estimate_pdf
@@ -238,6 +239,23 @@ def _ensure_ro_payment_entries_table(cur) -> None:
     cur.execute("CREATE INDEX IF NOT EXISTS idx_ro_payment_entries_domain_ro_type ON ro_payment_entries(domain, ro, payer_type)")
 
 
+def _ensure_closed_ro_archive_table(cur) -> None:
+    cur.execute(
+        """
+        CREATE TABLE IF NOT EXISTS closed_ro_archive (
+            id SERIAL PRIMARY KEY,
+            ro VARCHAR(255) NOT NULL,
+            domain VARCHAR(255) NOT NULL,
+            archived_payload JSONB NOT NULL,
+            closed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+        """
+    )
+    cur.execute("ALTER TABLE closed_ro_archive ADD COLUMN IF NOT EXISTS archived_payload JSONB")
+    cur.execute("ALTER TABLE closed_ro_archive ADD COLUMN IF NOT EXISTS closed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP")
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_closed_ro_archive_domain_ro ON closed_ro_archive(domain, ro)")
+
+
 def _ensure_parts_orders_table(cur) -> None:
     cur.execute(
         """
@@ -350,6 +368,20 @@ def _activity_to_datetime(value) -> datetime:
     if isinstance(value, date):
         return datetime.combine(value, datetime.min.time())
     return datetime.utcnow()
+
+
+def _to_archive_json_value(value):
+    if isinstance(value, datetime):
+        return value.isoformat()
+    if isinstance(value, date):
+        return value.isoformat()
+    if isinstance(value, Decimal):
+        return str(value)
+    if isinstance(value, dict):
+        return {str(key): _to_archive_json_value(item) for key, item in value.items()}
+    if isinstance(value, list):
+        return [_to_archive_json_value(item) for item in value]
+    return value
 
 
 def _log_ro_activity(cur, domain: str, ro: str, activity_type: str, message: str, occurred_at=None) -> None:
@@ -2041,6 +2073,112 @@ async def save_ro_payments(request: Request):
             "balance": balance,
         }
     finally:
+        cur.close()
+
+
+@router.post("/payments/close-ro")
+async def close_ro_from_payments(request: Request):
+    domain = get_user_domain(request)
+    if not domain:
+        return JSONResponse(status_code=401, content={"error": "Not authenticated"})
+
+    data = await request.json()
+    ro_value = str(data.get("ro") or "").strip()
+    if not ro_value:
+        return JSONResponse(status_code=400, content={"error": "ro is required"})
+
+    conn = get_conn()
+    cur = conn.cursor()
+    previous_autocommit = conn.autocommit
+
+    try:
+        conn.autocommit = False
+
+        _ensure_saved_estimates_table(cur)
+        _ensure_closed_ro_archive_table(cur)
+
+        cur.execute(
+            """
+            SELECT 1
+            FROM saved_estimates
+            WHERE domain = %s
+              AND ro = %s
+            LIMIT 1
+            """,
+            (domain, ro_value),
+        )
+        existing_ro = cur.fetchone()
+        if not existing_ro:
+            conn.rollback()
+            return JSONResponse(status_code=404, content={"error": "RO not found"})
+
+        cur.execute(
+            """
+            SELECT table_name
+            FROM information_schema.columns
+            WHERE table_schema = 'public'
+              AND column_name IN ('ro', 'domain')
+            GROUP BY table_name
+            HAVING COUNT(DISTINCT column_name) = 2
+            ORDER BY table_name
+            """
+        )
+        ro_table_rows = cur.fetchall() or []
+
+        excluded_tables = {"closed_ro_archive"}
+        archived_rows_by_table = {}
+        deleted_counts = {}
+
+        for row in ro_table_rows:
+            table_name = str(row.get("table_name") or "").strip()
+            if not table_name or table_name in excluded_tables:
+                continue
+
+            select_stmt = sql.SQL("SELECT * FROM {} WHERE domain = %s AND ro = %s").format(
+                sql.Identifier(table_name)
+            )
+            cur.execute(select_stmt, (domain, ro_value))
+            table_rows = cur.fetchall() or []
+
+            if not table_rows:
+                continue
+
+            archived_rows_by_table[table_name] = [
+                _to_archive_json_value(dict(table_row))
+                for table_row in table_rows
+            ]
+
+            delete_stmt = sql.SQL("DELETE FROM {} WHERE domain = %s AND ro = %s").format(
+                sql.Identifier(table_name)
+            )
+            cur.execute(delete_stmt, (domain, ro_value))
+            deleted_counts[table_name] = cur.rowcount
+
+        archived_payload = {
+            "ro": ro_value,
+            "domain": domain,
+            "tables": archived_rows_by_table,
+        }
+        cur.execute(
+            """
+            INSERT INTO closed_ro_archive (ro, domain, archived_payload, closed_at)
+            VALUES (%s, %s, %s::jsonb, CURRENT_TIMESTAMP)
+            """,
+            (ro_value, domain, json.dumps(archived_payload)),
+        )
+
+        conn.commit()
+        return {
+            "status": "success",
+            "ro": ro_value,
+            "archived_tables": sorted(list(archived_rows_by_table.keys())),
+            "deleted": deleted_counts,
+        }
+    except Exception as exc:
+        conn.rollback()
+        return JSONResponse(status_code=500, content={"error": str(exc)})
+    finally:
+        conn.autocommit = previous_autocommit
         cur.close()
 
 

@@ -5,7 +5,15 @@ def get_payments_screen_html():
     """Return the HTML content for the Payments screen."""
     return r"""
         <div id="payments" class="screen" style="padding:20px;">
-            <h1 style="text-align:center; margin-bottom:20px;">PAYMENTS</h1>
+            <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:20px; gap:12px;">
+                <h1 style="text-align:center; margin:0; flex:1;">PAYMENTS</h1>
+                <div style="display:flex; align-items:center; gap:10px;">
+                    <div id="paymentsCloseStatus" style="font-size:12px; color:#666; min-height:16px;"></div>
+                    <button id="paymentsCloseRoBtn" type="button" onclick="handlePaymentsCloseRoClick(event)" style="padding:10px 16px; background:var(--brand-red, #d32f2f); color:#fff; border:none; border-radius:4px; font-weight:bold; cursor:pointer; font-size:14px;">
+                        Close RO
+                    </button>
+                </div>
+            </div>
 
             <style>
                 .payments-header-row {
@@ -22,6 +30,7 @@ def get_payments_screen_html():
                     <table id="paymentsRoTable" style="width:100%; border-collapse:collapse;">
                         <thead>
                             <tr class="payments-header-row">
+                                <th id="paymentsCloseHeader" class="payments-header-cell payments-close-col" style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold; width:36px; display:none;"></th>
                                 <th class="payments-header-cell" style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold;">RO#</th>
                                 <th class="payments-header-cell" style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold;">Customer</th>
                                 <th class="payments-header-cell" style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold;">Vehicle</th>
@@ -33,7 +42,7 @@ def get_payments_screen_html():
                         </thead>
                         <tbody id="paymentsRoTableBody">
                             <tr>
-                                <td colspan="7" style="padding:20px; text-align:center; color:#999;">Loading...</td>
+                                <td colspan="8" style="padding:20px; text-align:center; color:#999;">Loading...</td>
                             </tr>
                         </tbody>
                     </table>
@@ -45,6 +54,8 @@ def get_payments_screen_html():
             let paymentsRows = [];
             let paymentsTechPaymentsByRo = {};
             let openPaymentsRoDetailId = null;
+            let paymentsCloseMode = false;
+            let paymentsSelectedCloseRo = '';
 
             function paymentsSafeId(value) {
                 return String(value || '').replace(/[^a-zA-Z0-9_-]/g, '_');
@@ -131,6 +142,96 @@ def get_payments_screen_html():
                     .replace(/>/g, '&gt;')
                     .replace(/\"/g, '&quot;')
                     .replace(/'/g, '&#39;');
+            }
+
+            function setPaymentsCloseStatus(message, color) {
+                const statusEl = document.getElementById('paymentsCloseStatus');
+                if (!statusEl) return;
+                statusEl.textContent = message || '';
+                statusEl.style.color = color || '#666';
+            }
+
+            function syncPaymentsCloseSelectionUI() {
+                const checkboxes = document.querySelectorAll('.payments-close-checkbox');
+                checkboxes.forEach((checkbox) => {
+                    const roValue = String(checkbox.getAttribute('data-ro') || '');
+                    checkbox.checked = !!paymentsSelectedCloseRo && roValue === paymentsSelectedCloseRo;
+                });
+            }
+
+            function applyPaymentsCloseModeToTable() {
+                const closeCells = document.querySelectorAll('.payments-close-col');
+                closeCells.forEach((cell) => {
+                    cell.style.display = paymentsCloseMode ? '' : 'none';
+                });
+
+                const button = document.getElementById('paymentsCloseRoBtn');
+                if (button) {
+                    button.textContent = 'Close RO';
+                }
+
+                syncPaymentsCloseSelectionUI();
+            }
+
+            function onPaymentsCloseRoSelect(event, roNumber) {
+                if (event) event.stopPropagation();
+                const roValue = String(roNumber || '');
+                if (!roValue) return;
+
+                paymentsSelectedCloseRo = paymentsSelectedCloseRo === roValue ? '' : roValue;
+                syncPaymentsCloseSelectionUI();
+            }
+
+            async function handlePaymentsCloseRoClick(event) {
+                if (event) event.stopPropagation();
+                const button = document.getElementById('paymentsCloseRoBtn');
+                if (!button) return;
+
+                if (!paymentsCloseMode) {
+                    paymentsCloseMode = true;
+                    paymentsSelectedCloseRo = '';
+                    applyPaymentsCloseModeToTable();
+                    setPaymentsCloseStatus('Select one RO, then click Close RO again.', '#666');
+                    return;
+                }
+
+                if (!paymentsSelectedCloseRo) {
+                    setPaymentsCloseStatus('Select one RO to close.', '#c62828');
+                    return;
+                }
+
+                const roToClose = paymentsSelectedCloseRo;
+                button.disabled = true;
+                setPaymentsCloseStatus(`Closing RO ${roToClose}...`, '#555');
+
+                try {
+                    const response = await fetch('/api/payments/close-ro', {
+                        method: 'POST',
+                        credentials: 'include',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ ro: roToClose }),
+                    });
+                    const payload = await response.json();
+                    if (!response.ok) {
+                        throw new Error(payload.error || 'Unable to close RO');
+                    }
+
+                    paymentsCloseMode = false;
+                    paymentsSelectedCloseRo = '';
+                    await loadPaymentsData();
+
+                    if (typeof loadDashboardData === 'function') {
+                        loadDashboardData();
+                    }
+
+                    setPaymentsCloseStatus(`RO ${roToClose} closed.`, '#2e7d32');
+                } catch (err) {
+                    console.error('Error closing RO:', err);
+                    setPaymentsCloseStatus(err.message || 'Unable to close RO', '#c62828');
+                } finally {
+                    button.disabled = false;
+                    applyPaymentsCloseModeToTable();
+                }
             }
 
             function buildPaymentsBalancePanel(options) {
@@ -616,7 +717,8 @@ def get_payments_screen_html():
                 openPaymentsRoDetailId = null;
 
                 if (!Array.isArray(rows) || rows.length === 0) {
-                    tbody.innerHTML = '<tr><td colspan="7" style="padding:20px; text-align:center; color:#999;">No open repair orders found</td></tr>';
+                    tbody.innerHTML = '<tr><td colspan="8" style="padding:20px; text-align:center; color:#999;">No open repair orders found</td></tr>';
+                    applyPaymentsCloseModeToTable();
                     return;
                 }
 
@@ -641,6 +743,16 @@ def get_payments_screen_html():
 
                     html += `
                         <tr style="background:${rowBg};">
+                            <td class="payments-close-col" style="padding:12px 8px; border-bottom:1px solid #eee; text-align:center; width:36px; display:${paymentsCloseMode ? '' : 'none'};">
+                                <input
+                                    type="checkbox"
+                                    class="payments-close-checkbox"
+                                    data-ro="${paymentsEscapeHtml(ro)}"
+                                    onchange="onPaymentsCloseRoSelect(event, '${roEscaped}')"
+                                    onclick="event.stopPropagation();"
+                                    style="width:16px; height:16px; cursor:pointer;"
+                                />
+                            </td>
                             <td style="padding:12px; border-bottom:1px solid #eee; color:#333;">
                                 <button type="button" onclick="togglePaymentsRoDetails(event, '${roEscaped}')" style="background:none; border:none; color:#0066cc; text-decoration:underline; cursor:pointer; padding:0; font:inherit; font-weight:bold;">
                                     ${ro || '-'}
@@ -660,7 +772,7 @@ def get_payments_screen_html():
                             </td>
                         </tr>
                         <tr id="payments-ro-details-row-${rowId}" style="display:none; background:${rowBg};">
-                            <td colspan="7" style="padding:0 16px 12px 16px; border-bottom:1px solid #eee;">
+                            <td colspan="8" style="padding:0 16px 12px 16px; border-bottom:1px solid #eee;">
                                 <div class="ro-slide-panel" style="max-height:0; overflow:hidden; opacity:0; transition:max-height 0.22s ease, opacity 0.22s ease;">
                                     <div style="background:#fafafa; border:1px solid #ddd; border-radius:6px; padding:12px;">
                                         <div id="payments-ro-details-content-${rowId}" style="color:#777;">Loading payment details...</div>
@@ -669,7 +781,7 @@ def get_payments_screen_html():
                             </td>
                         </tr>
                         <tr id="payments-editor-row-${rowId}" style="display:none; background:${rowBg};">
-                            <td colspan="7" style="padding:0 16px 12px 16px; border-bottom:1px solid #eee;">
+                            <td colspan="8" style="padding:0 16px 12px 16px; border-bottom:1px solid #eee;">
                                 <div class="ro-slide-panel" style="max-height:0; overflow:hidden; opacity:0; transition:max-height 0.22s ease, opacity 0.22s ease;">
                                     ${buildPaymentsBalancePanel({
                                         rowId,
@@ -693,6 +805,7 @@ def get_payments_screen_html():
                 });
 
                 tbody.innerHTML = html;
+                applyPaymentsCloseModeToTable();
             }
 
             async function loadPaymentsData(options) {
@@ -703,6 +816,9 @@ def get_payments_screen_html():
                     paymentsTechPaymentsByRo = {};
                     openPaymentsRoDetailId = null;
                     renderPaymentsTable(paymentsRows);
+                    if (!paymentsCloseMode) {
+                        paymentsSelectedCloseRo = '';
+                    }
 
                     const reopenEditorRo = options && options.reopenEditorRo ? String(options.reopenEditorRo) : '';
                     if (reopenEditorRo) {
@@ -716,7 +832,7 @@ def get_payments_screen_html():
                     console.error('Error loading payments data:', err);
                     const tbody = document.getElementById('paymentsRoTableBody');
                     if (tbody) {
-                        tbody.innerHTML = '<tr><td colspan="7" style="padding:20px; text-align:center; color:#c62828;">Unable to load payments data</td></tr>';
+                        tbody.innerHTML = '<tr><td colspan="8" style="padding:20px; text-align:center; color:#c62828;">Unable to load payments data</td></tr>';
                     }
                 }
             }
