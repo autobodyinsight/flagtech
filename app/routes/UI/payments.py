@@ -196,7 +196,10 @@ def get_payments_screen_html():
                 }
 
                 if (!paymentsSelectedCloseRo) {
-                    setPaymentsCloseStatus('Select one RO to close.', '#c62828');
+                    paymentsCloseMode = false;
+                    paymentsSelectedCloseRo = '';
+                    applyPaymentsCloseModeToTable();
+                    setPaymentsCloseStatus('', '#666');
                     return;
                 }
 
