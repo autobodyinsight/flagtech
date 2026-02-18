@@ -186,9 +186,9 @@ async def create_user(request: Request):
     if access_level == "architect":
         raise HTTPException(status_code=400, detail="Architect access level is reserved")
 
-    email_domain = email.split("@", 1)[1].lower()
-    if requested_shop_domain and email_domain != requested_shop_domain:
-        raise HTTPException(status_code=400, detail="User email must match your shop domain")
+    # Email domain does not restrict shop association
+    # If shop has a domain, user is linked to that shop regardless of email domain
+    # If shop does not have a domain, user is tied to the shop by its name
 
     ensure_auth_tables()
     conn = get_conn()
