@@ -1,3 +1,33 @@
+from fastapi import APIRouter, Depends
+from fastapi.responses import JSONResponse
+from app.services.auth import get_current_user
+from app.services.db import get_closed_ros_and_summary
+
+router = APIRouter()
+
+# API endpoint for JS fetch
+@router.get("/api/reports_data", response_class=JSONResponse)
+async def reports_data(user=Depends(get_current_user)):
+    closed_ros, summary = get_closed_ros_and_summary()
+    summary_data = [
+        {"category": k, "sales": v["sales"], "gp_percent": v["gp_percent"], "gp_dollar": v["gp_dollar"]}
+        for k, v in summary.items()
+    ]
+    # Convert closed_ros rows to dicts if needed
+    ros = []
+    for row in closed_ros:
+        if isinstance(row, dict):
+            ros.append(row)
+        elif hasattr(row, '_asdict'):
+            ros.append(row._asdict())
+        elif hasattr(row, '__dict__'):
+            ros.append(dict(row.__dict__))
+        else:
+            # fallback: assume tuple with known columns
+            ros.append({
+                "ro_number": row[0], "vehicle": row[1], "tech": row[2], "parts": row[3], "insurance": row[4], "customer": row[5], "in_date": row[6], "picked_up": row[7], "hours": row[8], "total": row[9], "status": row[10], "gp_percent": row[11], "gp_dollar": row[12], "type": row[13]
+            })
+    return {"summary": summary_data, "closed_ros": ros}
 """REPORTS window for summary metrics and closed RO list."""
 
 def get_reports_screen_html():
@@ -13,30 +43,14 @@ def get_reports_screen_html():
             <table style="width:100%; border-collapse:collapse;">
                 <thead>
                     <tr style="background:#f5f5f5;">
+                        <th style="padding:12px; font-size:18px; font-weight:bold; text-align:left;">CATEGORY</th>
                         <th style="padding:12px; font-size:18px; font-weight:bold; text-align:left;">TOTAL SALES</th>
                         <th style="padding:12px; font-size:18px; font-weight:bold; text-align:left;">TOTAL GP %</th>
                         <th style="padding:12px; font-size:18px; font-weight:bold; text-align:left;">TOTAL GP $</th>
                     </tr>
                 </thead>
-                <tbody>
-                    <tr style="color:#2e7d32; font-weight:bold;">
-                        <td style="padding:12px;">RO'S</td>
-                        <td style="padding:12px;">$10354</td>
-                        <td style="padding:12px;">40%</td>
-                        <td style="padding:12px;">$4141.60</td>
-                    </tr>
-                    <tr>
-                        <td style="padding:12px;">PARTS</td>
-                        <td style="padding:12px;">$5412.32</td>
-                        <td style="padding:12px;">20%</td>
-                        <td style="padding:12px;">$1080.46</td>
-                    </tr>
-                    <tr>
-                        <td style="padding:12px;">LABOR</td>
-                        <td style="padding:12px;">$1200</td>
-                        <td style="padding:12px;">20%</td>
-                        <td style="padding:12px;">$240</td>
-                    </tr>
+                <tbody id="reportsSummaryBody">
+                    <tr><td colspan="4" style="padding:20px; text-align:center; color:#999;">Loading...</td></tr>
                 </tbody>
             </table>
         </div>
@@ -79,4 +93,52 @@ def get_reports_screen_html():
             font-weight: bold;
         }
     </style>
+    <script>
+    async function loadReportsData() {
+        try {
+            const resp = await fetch('/api/reports_data');
+            const data = await resp.json();
+            // Render summary
+            const summaryBody = document.getElementById('reportsSummaryBody');
+            summaryBody.innerHTML = '';
+            for (const row of data.summary) {
+                summaryBody.innerHTML += `<tr>
+                    <td style='padding:12px;'>${row.category}</td>
+                    <td style='padding:12px;'>$${row.sales.toLocaleString()}</td>
+                    <td style='padding:12px;'>${row.gp_percent}%</td>
+                    <td style='padding:12px;'>$${row.gp_dollar.toLocaleString()}</td>
+                </tr>`;
+            }
+            // Render closed RO list
+            const roBody = document.getElementById('reportsRoListBody');
+            roBody.innerHTML = '';
+            if (data.closed_ros.length === 0) {
+                roBody.innerHTML = `<tr><td colspan='8' style='padding:20px; text-align:center; color:#999;'>No closed repair orders found.</td></tr>`;
+            } else {
+                for (const ro of data.closed_ros) {
+                    roBody.innerHTML += `<tr>
+                        <td style='padding:12px;'>${ro.ro_number || ''}</td>
+                        <td style='padding:12px;'>${ro.vehicle || ''}</td>
+                        <td style='padding:12px;'>${ro.customer || ''}</td>
+                        <td style='padding:12px;'>${ro.insurance || ''}</td>
+                        <td style='padding:12px;'>${ro.in_date || ''}</td>
+                        <td style='padding:12px;'>${ro.picked_up || ''}</td>
+                        <td style='padding:12px; text-align:right;'>${ro.hours || ''}</td>
+                        <td style='padding:12px; text-align:right;'>$${ro.total ? ro.total.toLocaleString() : ''}</td>
+                    </tr>`;
+                }
+            }
+        } catch (e) {
+            document.getElementById('reportsSummaryBody').innerHTML = `<tr><td colspan='4' style='padding:20px; text-align:center; color:#c00;'>Error loading data</td></tr>`;
+            document.getElementById('reportsRoListBody').innerHTML = `<tr><td colspan='8' style='padding:20px; text-align:center; color:#c00;'>Error loading data</td></tr>`;
+        }
+    }
+    // Load data when REPORTS screen is shown
+    document.addEventListener('DOMContentLoaded', function() {
+        const reportsTab = document.querySelector('.nav-tab[onclick*="reports"]');
+        if (reportsTab) {
+            reportsTab.addEventListener('click', loadReportsData);
+        }
+    });
+    </script>
     '''

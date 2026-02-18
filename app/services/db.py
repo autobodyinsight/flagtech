@@ -1,3 +1,42 @@
+# Utility to fetch closed ROs and summary metrics
+def get_closed_ros_and_summary():
+	conn = get_conn()
+	cur = conn.cursor()
+	# Example query: adjust table/column names as needed
+	cur.execute('''
+		SELECT ro_number, vehicle, tech, parts, insurance, customer, in_date, picked_up, hours, total, status, gp_percent, gp_dollar, type
+		FROM repair_orders
+		WHERE status = 'closed'
+	''')
+	rows = cur.fetchall()
+	# Calculate summary metrics
+	summary = {
+		'RO\'S': {'sales': 0, 'gp_percent': 0, 'gp_dollar': 0, 'count': 0},
+		'PARTS': {'sales': 0, 'gp_percent': 0, 'gp_dollar': 0, 'count': 0},
+		'LABOR': {'sales': 0, 'gp_percent': 0, 'gp_dollar': 0, 'count': 0},
+	}
+	for row in rows:
+		# Example aggregation logic, adjust as needed
+		summary["RO'S"]['sales'] += row.get('total', 0) or 0
+		summary["RO'S"]['gp_percent'] += row.get('gp_percent', 0) or 0
+		summary["RO'S"]['gp_dollar'] += row.get('gp_dollar', 0) or 0
+		summary["RO'S"]['count'] += 1
+		if row.get('type') == 'parts':
+			summary['PARTS']['sales'] += row.get('parts', 0) or 0
+			summary['PARTS']['gp_percent'] += row.get('gp_percent', 0) or 0
+			summary['PARTS']['gp_dollar'] += row.get('gp_dollar', 0) or 0
+			summary['PARTS']['count'] += 1
+		if row.get('type') == 'labor':
+			summary['LABOR']['sales'] += row.get('labor', 0) or 0
+			summary['LABOR']['gp_percent'] += row.get('gp_percent', 0) or 0
+			summary['LABOR']['gp_dollar'] += row.get('gp_dollar', 0) or 0
+			summary['LABOR']['count'] += 1
+	# Average GP %
+	for k in summary:
+		if summary[k]['count']:
+			summary[k]['gp_percent'] = round(summary[k]['gp_percent'] / summary[k]['count'], 2)
+	cur.close()
+	return rows, summary
 import os
 from urllib.parse import urlsplit, urlunsplit, parse_qsl, urlencode
 
