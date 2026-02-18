@@ -242,12 +242,12 @@ def get_dashboard_screen_html():
         </div>
 
         <style>
-            .dashboard-header-row {
-                background:#3c4142;
-                text-align:left;
-            }
-            .dashboard-header-cell {
-                color:#fff;
+            .dashboard-header-row th, .dashboard-header-cell {
+                font-family: inherit;
+                font-size: 16px;
+                font-weight: bold;
+                background: #23272a;
+                color: #fff;
             }
             .mini-popup-panel {
                 position: absolute;

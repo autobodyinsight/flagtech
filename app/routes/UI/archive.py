@@ -36,7 +36,8 @@ def get_archive_screen_html():
                 font-family: inherit;
                 font-size: 16px;
                 font-weight: bold;
-                background: #f5f5f5;
+                background: #23272a;
+                color: #fff;
             }
         </style>
         <script>
