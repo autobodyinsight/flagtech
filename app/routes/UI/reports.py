@@ -1,13 +1,11 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter
 from fastapi.responses import JSONResponse
-from app.services.auth import get_current_user
 from app.services.db import get_closed_ros_and_summary
 
 router = APIRouter()
 
-# API endpoint for JS fetch
 @router.get("/api/reports_data", response_class=JSONResponse)
-async def reports_data(user=Depends(get_current_user)):
+async def reports_data():
     closed_ros, summary = get_closed_ros_and_summary()
     summary_data = [
         {"category": k, "sales": v["sales"], "gp_percent": v["gp_percent"], "gp_dollar": v["gp_dollar"]}
