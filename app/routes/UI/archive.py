@@ -41,39 +41,35 @@ def get_archive_screen_html():
             }
         </style>
         <script>
-            // Clickable column behaviors
-            document.addEventListener('DOMContentLoaded', function() {
-                const table = document.getElementById('archiveRoListTable');
-                if (!table) return;
-                table.addEventListener('click', function(e) {
-                    const cell = e.target.closest('td,th');
-                    if (!cell) return;
-                    const row = cell.parentElement;
-                    if (row.rowIndex === 0) return; // skip header
-                    const colIndex = cell.cellIndex;
-                    // Implement slide-down/modal behaviors here
-                    // RO#: colIndex 0
-                    // TECH: colIndex 2
-                    // PARTS: colIndex 3
-                    // INSURANCE: colIndex 4
-                    // CUSTOMER: colIndex 5
-                    // PICKED UP: colIndex 7
-                    // Example:
-                    if (colIndex === 0) {
-                        alert('Show notes for RO# ' + row.cells[0].innerText);
-                    } else if (colIndex === 2) {
-                        alert('Show tech details for ' + row.cells[2].innerText);
-                    } else if (colIndex === 3) {
-                        alert('Show parts invoices for RO# ' + row.cells[0].innerText);
-                    } else if (colIndex === 4) {
-                        alert('Show insurance log for RO# ' + row.cells[0].innerText);
-                    } else if (colIndex === 5) {
-                        alert('Show customer log for RO# ' + row.cells[0].innerText);
-                    } else if (colIndex === 7) {
-                        alert('Re-Open RO modal for RO# ' + row.cells[0].innerText);
-                    }
-                });
-            });
+        // Load closed ROs from backend (same as REPORTS)
+        async function loadArchiveClosedRos() {
+            try {
+                const resp = await fetch('/api/reports_data');
+                const data = await resp.json();
+                const ros = data.closed_ros || [];
+                const body = document.getElementById('archiveRoListBody');
+                body.innerHTML = '';
+                if (!ros.length) {
+                    body.innerHTML = `<tr><td colspan='8' style='padding:20px; text-align:center; color:#999;'>No closed repair orders found.</td></tr>`;
+                    return;
+                }
+                for (const ro of ros) {
+                    body.innerHTML += `<tr>
+                        <td style='padding:12px;'>${ro.ro_number || ''}</td>
+                        <td style='padding:12px;'>${ro.vehicle || ''}</td>
+                        <td style='padding:12px;'>${ro.tech || ''}</td>
+                        <td style='padding:12px;'>${ro.parts || ''}</td>
+                        <td style='padding:12px;'>${ro.insurance || ''}</td>
+                        <td style='padding:12px;'>${ro.customer || ''}</td>
+                        <td style='padding:12px;'>${ro.in_date || ''}</td>
+                        <td style='padding:12px;'>${ro.picked_up || ''}</td>
+                    </tr>`;
+                }
+            } catch (e) {
+                document.getElementById('archiveRoListBody').innerHTML = `<tr><td colspan='8' style='padding:20px; text-align:center; color:#c00;'>Error loading data</td></tr>`;
+            }
+        }
+        document.addEventListener('DOMContentLoaded', loadArchiveClosedRos);
         </script>
     </div>
     '''
