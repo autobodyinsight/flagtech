@@ -71,3 +71,14 @@ def get_conn():
 		conn = psycopg2.connect(dsn_with_ssl, cursor_factory=psycopg2.extras.RealDictCursor)
 		conn.autocommit = True
 	return conn
+
+def close_repair_order(ro_number):
+    """Set status='closed' for the given RO number in repair_orders table."""
+    conn = get_conn()
+    cur = conn.cursor()
+    cur.execute("""
+        UPDATE repair_orders
+        SET status = 'closed'
+        WHERE ro_number = %s
+    """, (ro_number,))
+    cur.close()

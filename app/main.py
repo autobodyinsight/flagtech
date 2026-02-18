@@ -11,6 +11,7 @@ from app.routes.UI.ui import router as ui_router
 from app.routes.UI.ui_with_processing import router as processing_router
 from app.routes.UI.upload_ui.routes import router as ui_routes_router
 from app.routes.auth import router as auth_router
+from app.routes.payments import router as payments_router
 from app.services.auth import SESSION_COOKIE_NAME, get_session_by_token
 
 
@@ -81,6 +82,7 @@ async def auth_middleware(request: Request, call_next):
 # API endpoints
 app.include_router(estimate_router, prefix="/api")
 app.include_router(users_router, prefix="/api")
+app.include_router(payments_router, prefix="/api")
 
 # Authentication endpoints
 app.include_router(auth_router)
