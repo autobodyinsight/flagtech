@@ -10,6 +10,7 @@ from .techs import get_techs_screen_html
 from .users import get_users_screen_html
 from .phase import get_phase_screen_html
 from .payments import get_payments_screen_html
+from .archive import get_archive_screen_html
 
 try:
     from .upload_ui.upload import get_upload_screen_html, get_upload_script, get_estimate_summary_html
@@ -232,6 +233,7 @@ async def home_screen(request: Request):
         <div class="nav-tab" onclick="switchScreen('phase')">ROADMAP</div>
         <div class="nav-tab" onclick="switchScreen('flagtech')">FLAGOUT</div>
         <div class="nav-tab" onclick="switchScreen('parts')">PARTS</div>
+        <div class="nav-tab" onclick="switchScreen('archive')">ARCHIVE</div>
     </div>
     
     <div class="content-area">
@@ -244,6 +246,7 @@ async def home_screen(request: Request):
         {get_phase_screen_html()}
         {get_parts_screen_html()}
         {get_flagtech_screen_html()}
+        {get_archive_screen_html()}
     </div>
     
     <script>
