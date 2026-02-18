@@ -7,67 +7,72 @@ def get_archive_screen_html():
         <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:30px; gap:20px;">
             <h1 style="text-align:center; margin:0; flex:1;">ARCHIVE</h1>
         </div>
-        <div style="display:flex; height:80vh;">
-            <!-- Left Control Pane -->
-            <div style="width:220px; background:#23272a; color:#fff; border-radius:8px 0 0 8px; display:flex; flex-direction:column; align-items:stretch; padding:0;">
-                <div id="archive-tab-ros" class="archive-tab active" onclick="switchArchiveTab('ros')">RO'S</div>
-                <div id="archive-tab-techs" class="archive-tab" onclick="switchArchiveTab('techs')">TECHS</div>
-                <div id="archive-tab-invoices" class="archive-tab" onclick="switchArchiveTab('invoices')">INVOICES</div>
-                <div id="archive-tab-payments" class="archive-tab" onclick="switchArchiveTab('payments')">PAYMENTS</div>
-            </div>
-            <!-- Main Content Area -->
-            <div id="archive-content" style="flex:1; background:#f2f0ef; border-radius:0 8px 8px 0; padding:32px; overflow-y:auto;">
-                <div id="archive-ros-list" class="archive-content-section active">
-                    <!-- Closed ROs list will be loaded here -->
-                    <div style="font-size:18px; color:#333;">Closed Repair Orders will appear here.</div>
-                </div>
-                <div id="archive-techs-list" class="archive-content-section" style="display:none;">
-                    <!-- Deactivated techs list -->
-                    <div style="font-size:18px; color:#333;">Deactivated Technicians will appear here.</div>
-                </div>
-                <div id="archive-invoices-list" class="archive-content-section" style="display:none;">
-                    <!-- Invoices for closed ROs -->
-                    <div style="font-size:18px; color:#333;">Invoices for Closed ROs will appear here.</div>
-                </div>
-                <div id="archive-payments-list" class="archive-content-section" style="display:none;">
-                    <!-- Payments for closed ROs -->
-                    <div style="font-size:18px; color:#333;">Payments for Closed ROs will appear here.</div>
-                </div>
+        <div style="background:#fff; padding:20px; border-radius:8px; box-shadow:0 2px 4px rgba(0,0,0,0.1);">
+            <h3 style="margin:0 0 18px 0; color:#333;">Closed Repair Orders</h3>
+            <div style="overflow-x:auto;">
+                <table id="archiveRoListTable" style="width:100%; border-collapse:collapse;">
+                    <thead>
+                        <tr class="dashboard-header-row">
+                            <th class="dashboard-header-cell" style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold; cursor:pointer; user-select:none;">RO#</th>
+                            <th class="dashboard-header-cell" style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold; cursor:pointer; user-select:none;">VEHICLE</th>
+                            <th class="dashboard-header-cell" style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold; cursor:pointer; user-select:none;">TECH</th>
+                            <th class="dashboard-header-cell" style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold; cursor:pointer; user-select:none;">PARTS</th>
+                            <th class="dashboard-header-cell" style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold; cursor:pointer; user-select:none;">INSURANCE</th>
+                            <th class="dashboard-header-cell" style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold; cursor:pointer; user-select:none;">CUSTOMER</th>
+                            <th class="dashboard-header-cell" style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold; cursor:pointer; user-select:none;">IN</th>
+                            <th class="dashboard-header-cell" style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold; cursor:pointer; user-select:none;">PICKED UP</th>
+                        </tr>
+                    </thead>
+                    <tbody id="archiveRoListBody">
+                        <tr>
+                            <td colspan="8" style="padding:20px; text-align:center; color:#999;">Loading...</td>
+                        </tr>
+                    </tbody>
+                </table>
             </div>
         </div>
         <style>
-            .archive-tab {
-                padding: 22px 0;
-                text-align: center;
-                font-weight: bold;
+            .dashboard-header-row th, .dashboard-header-cell {
+                font-family: inherit;
                 font-size: 16px;
-                border-bottom: 1px solid #444;
-                cursor: pointer;
-                background: #23272a;
-                color: #fff;
-                transition: background 0.2s, color 0.2s;
-            }
-            .archive-tab.active {
-                background: #444950;
-                color: #ffb300;
-            }
-            .archive-content-section {
-                display: none;
-            }
-            .archive-content-section.active {
-                display: block;
+                font-weight: bold;
+                background: #f5f5f5;
             }
         </style>
         <script>
-            function switchArchiveTab(tab) {
-                const tabs = ['ros', 'techs', 'invoices', 'payments'];
-                tabs.forEach(t => {
-                    document.getElementById('archive-tab-' + t).classList.remove('active');
-                    document.getElementById('archive-' + t + '-list').style.display = 'none';
+            // Clickable column behaviors
+            document.addEventListener('DOMContentLoaded', function() {
+                const table = document.getElementById('archiveRoListTable');
+                if (!table) return;
+                table.addEventListener('click', function(e) {
+                    const cell = e.target.closest('td,th');
+                    if (!cell) return;
+                    const row = cell.parentElement;
+                    if (row.rowIndex === 0) return; // skip header
+                    const colIndex = cell.cellIndex;
+                    // Implement slide-down/modal behaviors here
+                    // RO#: colIndex 0
+                    // TECH: colIndex 2
+                    // PARTS: colIndex 3
+                    // INSURANCE: colIndex 4
+                    // CUSTOMER: colIndex 5
+                    // PICKED UP: colIndex 7
+                    // Example:
+                    if (colIndex === 0) {
+                        alert('Show notes for RO# ' + row.cells[0].innerText);
+                    } else if (colIndex === 2) {
+                        alert('Show tech details for ' + row.cells[2].innerText);
+                    } else if (colIndex === 3) {
+                        alert('Show parts invoices for RO# ' + row.cells[0].innerText);
+                    } else if (colIndex === 4) {
+                        alert('Show insurance log for RO# ' + row.cells[0].innerText);
+                    } else if (colIndex === 5) {
+                        alert('Show customer log for RO# ' + row.cells[0].innerText);
+                    } else if (colIndex === 7) {
+                        alert('Re-Open RO modal for RO# ' + row.cells[0].innerText);
+                    }
                 });
-                document.getElementById('archive-tab-' + tab).classList.add('active');
-                document.getElementById('archive-' + tab + '-list').style.display = 'block';
-            }
+            });
         </script>
     </div>
     '''
