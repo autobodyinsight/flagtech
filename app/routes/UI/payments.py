@@ -74,19 +74,14 @@ def get_payments_screen_html():
                 return Number.isFinite(parsed) ? parsed : NaN;
             }
 
-            function paymentsFormatCurrencyInputValue(value) {
-                const cleaned = String(value || '')
-                    .replace(/[^0-9.]/g, '')
-                    .replace(/(\..*)\./g, '$1');
-                if (!cleaned) return '';
-                const parsed = Number(cleaned);
-                if (!Number.isFinite(parsed)) return '';
-                return '$' + parsed.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-            }
 
-            function paymentsHandleCurrencyInput(event) {
+            // Only format as currency on blur
+            function paymentsFormatCurrencyOnBlur(event) {
                 if (!event || !event.target) return;
-                event.target.value = paymentsFormatCurrencyInputValue(event.target.value);
+                const val = event.target.value;
+                if (val === '' || isNaN(Number(val))) return;
+                const num = Number(val);
+                event.target.value = paymentsFormatMoney(num);
             }
 
             function paymentsGetLocalBusinessDateISO() {
@@ -270,13 +265,13 @@ def get_payments_screen_html():
 
                 const insuranceInputHtml = editable
                     ? `
-                        <input id="payments-ins-paid-${rowId}" type="text" inputmode="decimal" pattern="^\\d{0,6}(\\.\\d{0,2})?$" maxlength="9" value="${paymentsFormatMoney(0)}" oninput="paymentsHandleCurrencyInput(event)" placeholder="$0.00" style="padding:8px; border:1px solid #ccc; border-radius:4px; width:170px; text-align:right;" />
+                        <input id="payments-ins-paid-${rowId}" type="text" inputmode="decimal" value="" placeholder="$0.00" style="padding:8px; border:1px solid #ccc; border-radius:4px; width:170px; text-align:right;" onblur="paymentsFormatCurrencyOnBlur(event)" />
                     `
                     : '';
 
                 const customerInputHtml = editable
                     ? `
-                        <input id="payments-cust-paid-${rowId}" type="text" inputmode="decimal" pattern="^\\d{0,6}(\\.\\d{0,2})?$" maxlength="9" value="${paymentsFormatMoney(0)}" oninput="paymentsHandleCurrencyInput(event)" placeholder="$0.00" style="padding:8px; border:1px solid #ccc; border-radius:4px; width:170px; text-align:right;" />
+                        <input id="payments-cust-paid-${rowId}" type="text" inputmode="decimal" value="" placeholder="$0.00" style="padding:8px; border:1px solid #ccc; border-radius:4px; width:170px; text-align:right;" onblur="paymentsFormatCurrencyOnBlur(event)" />
                     `
                     : '';
 
