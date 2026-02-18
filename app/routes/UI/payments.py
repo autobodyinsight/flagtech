@@ -270,13 +270,13 @@ def get_payments_screen_html():
 
                 const insuranceInputHtml = editable
                     ? `
-                        <input id="payments-ins-paid-${rowId}" type="text" inputmode="decimal" value="${paymentsFormatMoney(insuranceBalance)}" oninput="paymentsHandleCurrencyInput(event)" style="padding:8px; border:1px solid #ccc; border-radius:4px; width:170px; text-align:right;" />
+                        <input id="payments-ins-paid-${rowId}" type="text" inputmode="decimal" pattern="^\\d{0,6}(\\.\\d{0,2})?$" maxlength="9" value="${paymentsFormatMoney(0)}" oninput="paymentsHandleCurrencyInput(event)" placeholder="$0.00" style="padding:8px; border:1px solid #ccc; border-radius:4px; width:170px; text-align:right;" />
                     `
                     : '';
 
                 const customerInputHtml = editable
                     ? `
-                        <input id="payments-cust-paid-${rowId}" type="text" inputmode="decimal" value="${paymentsFormatMoney(customerBalance)}" oninput="paymentsHandleCurrencyInput(event)" style="padding:8px; border:1px solid #ccc; border-radius:4px; width:170px; text-align:right;" />
+                        <input id="payments-cust-paid-${rowId}" type="text" inputmode="decimal" pattern="^\\d{0,6}(\\.\\d{0,2})?$" maxlength="9" value="${paymentsFormatMoney(0)}" oninput="paymentsHandleCurrencyInput(event)" placeholder="$0.00" style="padding:8px; border:1px solid #ccc; border-radius:4px; width:170px; text-align:right;" />
                     `
                     : '';
 
