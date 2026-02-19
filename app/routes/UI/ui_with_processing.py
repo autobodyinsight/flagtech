@@ -332,16 +332,6 @@ async def home_screen():
         {get_roadmap_screen_html()}
         {get_flagtech_screen_html()}
     </div>
-
-    <script>
-        // Hide all screens except the active one on load
-        document.addEventListener('DOMContentLoaded', function() {
-            const screens = document.querySelectorAll('.screen');
-            screens.forEach(screen => screen.classList.remove('active'));
-            const defaultScreen = document.getElementById('upload');
-            if (defaultScreen) defaultScreen.classList.add('active');
-        });
-    </script>
     
     <script>
         function normalizeFormAccessibility(root = document) {{
