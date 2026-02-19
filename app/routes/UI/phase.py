@@ -4,18 +4,18 @@
 def get_phase_screen_html():
     """Return the HTML content for the Phase screen."""
     return """
-    """Roadmap screen content for the FlagTech UI."""
+    <div id="phase" class="screen" style="padding:20px;">
         <h1 style="text-align:center; margin-bottom:20px;">ROADMAP</h1>
-    def get_roadmap_screen_html():
-        """Return the HTML content for the Roadmap screen."""
+
+        <div style="display:grid; grid-template-columns:repeat(9, minmax(140px, 1fr)); gap:12px; align-items:start;">
             <div class="phase-column">
-        <div id="roadmap" class="screen" style="padding:20px;">
+                <div class="phase-header">Teardown <span class="phase-count" id="phase-count-teardown">0</span></div>
                 <div id="phase-teardown" class="phase-cards"></div>
             </div>
             <div class="phase-column">
-                <div class="roadmap-column">
-                    <div class="roadmap-header">Teardown <span class="roadmap-count" id="roadmap-count-teardown">0</span></div>
-                    <div id="roadmap-teardown" class="roadmap-cards"></div>
+                <div class="phase-header">Auth <span class="phase-count" id="phase-count-auth">0</span></div>
+                <div id="phase-auth" class="phase-cards"></div>
+            </div>
             <div class="phase-column">
                 <div class="phase-header">Parts <span class="phase-count" id="phase-count-parts">0</span></div>
                 <div id="phase-parts" class="phase-cards"></div>
@@ -191,60 +191,39 @@ def get_phase_screen_html():
                     '#8A2BE2', // purple
                     '#708090'  // slate
                 ];
-                    // Helper to get estimator name (same as dashboard)
-                    function getRoEstimatorName(item) {
-                        let preferred = String(item?.written_by || '').trim() || String(item?.estimator || '').trim();
-                        if (!preferred) {
-                            const ownerInfo = String(item?.owner_info || '').trim();
-                            if (ownerInfo) {
-                                const writtenByMatch = ownerInfo.match(/written\s*by\s*:\s*([^\n,]+)/i);
-                                if (writtenByMatch && writtenByMatch[1]) {
-                                    preferred = String(writtenByMatch[1]).trim();
-                                }
-                                if (!preferred) {
-                                    const estimatorMatch = ownerInfo.match(/estimator\s*:\s*([^\n,]+)/i);
-                                    if (estimatorMatch && estimatorMatch[1]) {
-                                        preferred = String(estimatorMatch[1]).trim();
-                                    }
-                                }
-                            }
-                        }
-                        return preferred || '—';
+                items.forEach((item, idx) => {
+                    const colId = phaseColumnFor(item.phase);
+                    const col = document.getElementById(colId);
+                    if (!col) return;
+
+                    const phaseKey = colId.replace('phase-', '');
+                    if (tally[phaseKey] !== undefined) {
+                        tally[phaseKey] += 1;
                     }
-                    items.forEach((item, idx) => {
-                        const colId = phaseColumnFor(item.phase);
-                        const col = document.getElementById(colId);
-                        if (!col) return;
 
-                        const phaseKey = colId.replace('phase-', '');
-                        if (tally[phaseKey] !== undefined) {
-                            tally[phaseKey] += 1;
-                        }
-
-                        const card = document.createElement('div');
-                        card.className = 'phase-card';
-                        card.setAttribute('draggable', 'true');
-                        card.dataset.ro = item.ro || '';
-                        card.dataset.phase = item.phase || 'teardown';
-                        // Assign color from pie chart palette
-                        const roBarColor = roBarColors[idx % roBarColors.length];
-                        const estimatorName = getRoEstimatorName(item);
-                        card.innerHTML = `
-                            <div class="ro-bar" style="background:${roBarColor}">RO# ${item.ro || '—'}</div>
-                            <div class="vehicle">${item.vehicle || '—'}</div>
-                            <div class="meta">
-                                <div>TECH: ${item.labor_tech || 'Unassigned'}</div>
-                                <div>Estimator: ${estimatorName}</div>
-                            </div>
-                        `;
-                        card.addEventListener('dragstart', (event) => {
-                            event.dataTransfer.setData('text/plain', JSON.stringify({
-                                ro: card.dataset.ro,
-                                from: card.dataset.phase
-                            }));
-                        });
-                        col.appendChild(card);
+                    const card = document.createElement('div');
+                    card.className = 'phase-card';
+                    card.setAttribute('draggable', 'true');
+                    card.dataset.ro = item.ro || '';
+                    card.dataset.phase = item.phase || 'teardown';
+                    // Assign color from pie chart palette
+                    const roBarColor = roBarColors[idx % roBarColors.length];
+                    card.innerHTML = `
+                        <div class="ro-bar" style="background:${roBarColor}">RO# ${item.ro || '—'}</div>
+                        <div class="vehicle">${item.vehicle || '—'}</div>
+                        <div class="meta">
+                            <div>TECH: ${item.labor_tech || 'Unassigned'}</div>
+                            <div>ESTIMATOR: ${item.estimator || '—'}</div>
+                        </div>
+                    `;
+                    card.addEventListener('dragstart', (event) => {
+                        event.dataTransfer.setData('text/plain', JSON.stringify({
+                            ro: card.dataset.ro,
+                            from: card.dataset.phase
+                        }));
                     });
+                    col.appendChild(card);
+                });
 
                 Object.keys(tally).forEach(key => {
                     const countEl = document.getElementById(`phase-count-${key}`);

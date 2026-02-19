@@ -38,32 +38,12 @@ def get_payments_screen_html():
                                 <th class="payments-header-cell" style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold; text-align:right;">Customer (Total)</th>
                                 <th class="payments-header-cell" style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold; text-align:right;">Grand Total</th>
                                 <th class="payments-header-cell" style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold; text-align:right;">BALANCE</th>
-                                <th class="payments-header-cell" style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold;">Picked Up</th>
                             </tr>
                         </thead>
                         <tbody id="paymentsRoTableBody">
                             <tr>
-                                <td colspan="9" style="padding:20px; text-align:center; color:#999;">Loading...</td>
+                                <td colspan="8" style="padding:20px; text-align:center; color:#999;">Loading...</td>
                             </tr>
-                                    // Save Picked Up date for an RO
-                                    async function savePickedUpDate(roNumber, pickedUpDate) {
-                                        try {
-                                            const response = await fetch('/api/payments/set-picked-up', {
-                                                method: 'POST',
-                                                credentials: 'include',
-                                                headers: { 'Content-Type': 'application/json' },
-                                                body: JSON.stringify({ ro: roNumber, picked_up: pickedUpDate })
-                                            });
-                                            const payload = await response.json();
-                                            if (!response.ok) throw new Error(payload.error || 'Unable to save Picked Up date');
-                                        } catch (err) {
-                                            alert('Error saving Picked Up date: ' + (err.message || err));
-                                        }
-                                    }
-                                    // Patch: Add Picked Up date input to each row in Payments table
-                                    // This should be integrated into the row rendering logic where paymentsRows are used to build the table body.
-                                    // For each row, add:
-                                    // <td><input type="date" value="${row.picked_up ? row.picked_up.slice(0,10) : ''}" onchange="savePickedUpDate('${row.ro}', this.value)" /></td>
                         </tbody>
                     </table>
                 </div>

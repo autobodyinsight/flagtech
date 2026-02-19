@@ -82,14 +82,3 @@ def close_repair_order(ro_number):
         WHERE ro_number = %s
     """, (ro_number,))
     cur.close()
-
-def set_picked_up_date(ro_number, picked_up):
-    """Set picked_up date for the given RO number in repair_orders table."""
-    conn = get_conn()
-    cur = conn.cursor()
-    cur.execute("""
-        UPDATE repair_orders
-        SET picked_up = %s
-        WHERE ro_number = %s
-    """, (picked_up, ro_number))
-    cur.close()
