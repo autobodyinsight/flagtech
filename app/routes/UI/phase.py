@@ -73,28 +73,44 @@ def get_phase_screen_html():
                 color: #333;
             }
             .phase-card {
-                border: 1px solid #e0e0e0;
-                border-radius: 8px;
-                padding: 10px;
-                margin-bottom: 10px;
-                background: #fafafa;
-                font-size: 12px;
+                border: 1.5px solid #e0e0e0;
+                border-radius: 12px;
+                padding: 0;
+                margin-bottom: 14px;
+                background: #fff;
+                font-size: 13px;
+                box-shadow: 0 2px 8px rgba(0,0,0,0.07);
+                overflow: hidden;
+                transition: box-shadow 0.18s;
             }
-            .phase-card .ro {
+            .phase-card:hover {
+                box-shadow: 0 4px 16px rgba(0,0,0,0.13);
+            }
+            .phase-card .ro-bar {
                 font-weight: bold;
-                color: #333;
-                margin-bottom: 4px;
+                color: #fff;
+                padding: 8px 0 8px 0;
+                text-align: center;
+                font-size: 15px;
+                letter-spacing: 1px;
+                background: var(--ro-bar-color, #00BFFF);
+                border-bottom: 1.5px solid #e0e0e0;
+                transition: background 0.2s;
             }
             .phase-card .vehicle {
-                color: #555;
-                margin-bottom: 6px;
+                color: #222;
+                font-weight: 500;
+                padding: 10px 12px 0 12px;
+                font-size: 14px;
+                margin-bottom: 2px;
             }
             .phase-card .meta {
                 display: flex;
                 flex-direction: column;
-                gap: 4px;
-                font-size: 11px;
-                color: #666;
+                gap: 2px;
+                font-size: 12px;
+                color: #444;
+                padding: 0 12px 10px 12px;
             }
             .phase-cards {
                 min-height: 140px;
@@ -165,7 +181,17 @@ def get_phase_screen_html():
                     complete: 0
                 };
 
-                items.forEach(item => {
+                // Pie chart colors from dashboard
+                const roBarColors = [
+                    '#00BFFF', // blue
+                    '#FF8C00', // orange
+                    '#32CD32', // green
+                    '#FFD700', // yellow
+                    '#40E0D0', // turquoise
+                    '#8A2BE2', // purple
+                    '#708090'  // slate
+                ];
+                items.forEach((item, idx) => {
                     const colId = phaseColumnFor(item.phase);
                     const col = document.getElementById(colId);
                     if (!col) return;
@@ -180,12 +206,14 @@ def get_phase_screen_html():
                     card.setAttribute('draggable', 'true');
                     card.dataset.ro = item.ro || '';
                     card.dataset.phase = item.phase || 'teardown';
+                    // Assign color from pie chart palette
+                    const roBarColor = roBarColors[idx % roBarColors.length];
                     card.innerHTML = `
-                        <div class="ro">RO# ${item.ro || '—'}</div>
+                        <div class="ro-bar" style="background:${roBarColor}">RO# ${item.ro || '—'}</div>
                         <div class="vehicle">${item.vehicle || '—'}</div>
                         <div class="meta">
-                            <div><strong>Labor:</strong> ${item.labor_tech || 'Unassigned'} — ${item.labor_hours?.toFixed ? item.labor_hours.toFixed(1) : (item.labor_hours || 0)} hrs</div>
-                            <div><strong>Paint:</strong> ${item.paint_tech || 'Unassigned'} — ${item.paint_hours?.toFixed ? item.paint_hours.toFixed(1) : (item.paint_hours || 0)} hrs</div>
+                            <div>TECH: ${item.labor_tech || 'Unassigned'}</div>
+                            <div>ESTIMATOR: ${item.estimator || '—'}</div>
                         </div>
                     `;
                     card.addEventListener('dragstart', (event) => {
