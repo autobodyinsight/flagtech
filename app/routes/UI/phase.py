@@ -1,25 +1,23 @@
-def get_phase_screen_html():
-"""Roadmap screen content for the FlagTech UI."""
+"""Phase screen content for the FlagTech UI."""
 
-def get_roadmap_screen_html():
-    """Return the HTML content for the Roadmap screen."""
+
+def get_phase_screen_html():
+    """Return the HTML content for the Phase screen."""
     return """
-    <div id='roadmap' class='screen' style='padding:20px;'>
-        <h1 style='text-align:center; margin-bottom:20px;'>ROADMAP</h1>
-        <!-- Add roadmap columns and cards here -->
-        <div class='roadmap-columns'>
-            <div class='roadmap-column'>
-                <div class='roadmap-header'>Teardown <span class='roadmap-count' id='roadmap-count-teardown'>0</span></div>
-                <div id='roadmap-teardown' class='roadmap-cards'></div>
+    """Roadmap screen content for the FlagTech UI."""
+        <h1 style="text-align:center; margin-bottom:20px;">ROADMAP</h1>
+    def get_roadmap_screen_html():
+        """Return the HTML content for the Roadmap screen."""
+            <div class="phase-column">
+        <div id="roadmap" class="screen" style="padding:20px;">
+                <div id="phase-teardown" class="phase-cards"></div>
             </div>
-            <div class='roadmap-column'>
-                <div class='roadmap-header'>Parts <span class='roadmap-count' id='roadmap-count-parts'>0</span></div>
-                <div id='roadmap-parts' class='roadmap-cards'></div>
-            </div>
-            <!-- Add more columns as needed -->
-        </div>
-    </div>
-    """
+            <div class="phase-column">
+                <div class="roadmap-column">
+                    <div class="roadmap-header">Teardown <span class="roadmap-count" id="roadmap-count-teardown">0</span></div>
+                    <div id="roadmap-teardown" class="roadmap-cards"></div>
+            <div class="phase-column">
+                <div class="phase-header">Parts <span class="phase-count" id="phase-count-parts">0</span></div>
                 <div id="phase-parts" class="phase-cards"></div>
             </div>
             <div class="phase-column">
