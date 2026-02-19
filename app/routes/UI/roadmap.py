@@ -3,57 +3,60 @@ def get_roadmap_screen_html():
     return """
     <div id='roadmap' class='screen' style='padding:20px;'>
         <h1 style='text-align:center; margin-bottom:20px;'>ROADMAP</h1>
-        <!-- Add roadmap columns and cards here -->
+
         <div class='roadmap-columns'>
+
             <div class='roadmap-column'>
                 <div class='roadmap-header'>Teardown <span class='roadmap-count' id='roadmap-count-teardown'>0</span></div>
                 <div id='roadmap-teardown' class='roadmap-cards'></div>
             </div>
+
             <div class='roadmap-column'>
                 <div class='roadmap-header'>Parts <span class='roadmap-count' id='roadmap-count-parts'>0</span></div>
                 <div id='roadmap-parts' class='roadmap-cards'></div>
             </div>
-            <!-- Add more columns as needed -->
-        </div>
-    </div>
-    
-                <div id="phase-parts" class="phase-cards"></div>
+
+            <div class='roadmap-column'>
+                <div class='roadmap-header'>Body <span class='roadmap-count' id='roadmap-count-body'>0</span></div>
+                <div id='roadmap-body' class='roadmap-cards'></div>
             </div>
-            <div class="phase-column">
-                <div class="phase-header">Body <span class="phase-count" id="phase-count-body">0</span></div>
-                <div id="phase-body" class="phase-cards"></div>
+
+            <div class='roadmap-column'>
+                <div class='roadmap-header'>Refinish <span class='roadmap-count' id='roadmap-count-refinish'>0</span></div>
+                <div id='roadmap-refinish' class='roadmap-cards'></div>
             </div>
-            <div class="phase-column">
-                <div class="phase-header">Refinish <span class="phase-count" id="phase-count-refinish">0</span></div>
-                <div id="phase-refinish" class="phase-cards"></div>
+
+            <div class='roadmap-column'>
+                <div class='roadmap-header'>Reassy <span class='roadmap-count' id='roadmap-count-reassy'>0</span></div>
+                <div id='roadmap-reassy' class='roadmap-cards'></div>
             </div>
-            <div class="phase-column">
-                <div class="phase-header">Reassy <span class="phase-count" id="phase-count-reassy">0</span></div>
-                <div id="phase-reassy" class="phase-cards"></div>
+
+            <div class='roadmap-column'>
+                <div class='roadmap-header'>Sublet <span class='roadmap-count' id='roadmap-count-sublet'>0</span></div>
+                <div id='roadmap-sublet' class='roadmap-cards'></div>
             </div>
-            <div class="phase-column">
-                <div class="phase-header">Sublet <span class="phase-count" id="phase-count-sublet">0</span></div>
-                <div id="phase-sublet" class="phase-cards"></div>
+
+            <div class='roadmap-column'>
+                <div class='roadmap-header'>Wash/QC <span class='roadmap-count' id='roadmap-count-washqc'>0</span></div>
+                <div id='roadmap-washqc' class='roadmap-cards'></div>
             </div>
-            <div class="phase-column">
-                <div class="phase-header">Wash/QC <span class="phase-count" id="phase-count-washqc">0</span></div>
-                <div id="phase-washqc" class="phase-cards"></div>
+
+            <div class='roadmap-column'>
+                <div class='roadmap-header'>Complete <span class='roadmap-count' id='roadmap-count-complete'>0</span></div>
+                <div id='roadmap-complete' class='roadmap-cards'></div>
             </div>
-            <div class="phase-column">
-                <div class="phase-header">Complete/Finish <span class="phase-count" id="phase-count-complete">0</span></div>
-                <div id="phase-complete" class="phase-cards"></div>
-            </div>
+
         </div>
 
         <style>
-            .phase-column {
+            .roadmap-column {
                 background: #fff;
                 border: 1px solid #ddd;
                 border-radius: 8px;
                 padding: 10px;
                 min-height: 200px;
             }
-            .phase-header {
+            .roadmap-header {
                 font-weight: bold;
                 padding: 10px 8px;
                 border-bottom: 2px solid #eee;
@@ -62,7 +65,7 @@ def get_roadmap_screen_html():
                 background: #f7f7f7;
                 border-radius: 6px;
             }
-            .phase-count {
+            .roadmap-count {
                 display: inline-block;
                 margin-left: 6px;
                 padding: 2px 6px;
@@ -71,7 +74,7 @@ def get_roadmap_screen_html():
                 background: #e0e0e0;
                 color: #333;
             }
-            .phase-card {
+            .roadmap-card {
                 border: 1.5px solid #e0e0e0;
                 border-radius: 12px;
                 padding: 0;
@@ -82,13 +85,13 @@ def get_roadmap_screen_html():
                 overflow: hidden;
                 transition: box-shadow 0.18s;
             }
-            .phase-card:hover {
+            .roadmap-card:hover {
                 box-shadow: 0 4px 16px rgba(0,0,0,0.13);
             }
-            .phase-card .ro-bar {
+            .roadmap-card .ro-bar {
                 font-weight: bold;
                 color: #fff;
-                padding: 8px 0 8px 0;
+                padding: 8px 0;
                 text-align: center;
                 font-size: 15px;
                 letter-spacing: 1px;
@@ -96,14 +99,14 @@ def get_roadmap_screen_html():
                 border-bottom: 1.5px solid #e0e0e0;
                 transition: background 0.2s;
             }
-            .phase-card .vehicle {
+            .roadmap-card .vehicle {
                 color: #222;
                 font-weight: 500;
                 padding: 10px 12px 0 12px;
                 font-size: 14px;
                 margin-bottom: 2px;
             }
-            .phase-card .meta {
+            .roadmap-card .meta {
                 display: flex;
                 flex-direction: column;
                 gap: 2px;
@@ -111,11 +114,11 @@ def get_roadmap_screen_html():
                 color: #444;
                 padding: 0 12px 10px 12px;
             }
-            .phase-cards {
+            .roadmap-cards {
                 min-height: 140px;
                 padding-bottom: 10px;
             }
-            .phase-cards.drag-over {
+            .roadmap-cards.drag-over {
                 outline: 2px dashed #4caf50;
                 outline-offset: 4px;
                 background: #f3fff3;
@@ -123,10 +126,11 @@ def get_roadmap_screen_html():
         </style>
 
         <script>
-            function clearPhaseColumns() {
+            function clearroadmapColumns() {
                 const columns = [
-                    'phase-teardown', 'phase-auth', 'phase-parts', 'phase-body', 'phase-refinish',
-                    'phase-reassy', 'phase-sublet', 'phase-washqc', 'phase-complete'
+                    'roadmap-teardown', 'roadmap-auth', 'roadmap-parts', 'roadmap-body',
+                    'roadmap-refinish', 'roadmap-reassy', 'roadmap-sublet',
+                    'roadmap-washqc', 'roadmap-complete'
                 ];
                 columns.forEach(id => {
                     const el = document.getElementById(id);
@@ -134,9 +138,9 @@ def get_roadmap_screen_html():
                 });
 
                 const counts = [
-                    'phase-count-teardown', 'phase-count-auth', 'phase-count-parts', 'phase-count-body',
-                    'phase-count-refinish', 'phase-count-reassy', 'phase-count-sublet',
-                    'phase-count-washqc', 'phase-count-complete'
+                    'roadmap-count-teardown', 'roadmap-count-auth', 'roadmap-count-parts',
+                    'roadmap-count-body', 'roadmap-count-refinish', 'roadmap-count-reassy',
+                    'roadmap-count-sublet', 'roadmap-count-washqc', 'roadmap-count-complete'
                 ];
                 counts.forEach(id => {
                     const el = document.getElementById(id);
@@ -144,24 +148,24 @@ def get_roadmap_screen_html():
                 });
             }
 
-            function phaseColumnFor(phase) {
-                const key = (phase || '').toLowerCase();
-                if (key === 'auth') return 'phase-auth';
-                if (key === 'parts') return 'phase-parts';
-                if (key === 'body') return 'phase-body';
-                if (key === 'refinish') return 'phase-refinish';
-                if (key === 'reassy') return 'phase-reassy';
-                if (key === 'sublet') return 'phase-sublet';
-                if (key === 'wash/qc' || key === 'washqc') return 'phase-washqc';
-                if (key === 'complete/finish' || key === 'complete') return 'phase-complete';
-                return 'phase-teardown';
+            function roadmapColumnFor(roadmap) {
+                const key = (roadmap || '').toLowerCase();
+                if (key === 'auth') return 'roadmap-auth';
+                if (key === 'parts') return 'roadmap-parts';
+                if (key === 'body') return 'roadmap-body';
+                if (key === 'refinish') return 'roadmap-refinish';
+                if (key === 'reassy') return 'roadmap-reassy';
+                if (key === 'sublet') return 'roadmap-sublet';
+                if (key === 'wash/qc' || key === 'washqc') return 'roadmap-washqc';
+                if (key === 'complete/finish' || key === 'complete') return 'roadmap-complete';
+                return 'roadmap-teardown';
             }
 
-            function renderPhaseCards(items) {
-                clearPhaseColumns();
+            function renderroadmapCards(items) {
+                clearroadmapColumns();
 
                 if (!items || items.length === 0) {
-                    const teardown = document.getElementById('phase-teardown');
+                    const teardown = document.getElementById('roadmap-teardown');
                     if (teardown) {
                         teardown.innerHTML = '<div style="color:#999; text-align:center; padding:10px;">No repair orders found</div>';
                     }
@@ -169,94 +173,86 @@ def get_roadmap_screen_html():
                 }
 
                 const tally = {
-                    teardown: 0,
-                    auth: 0,
-                    parts: 0,
-                    body: 0,
-                    refinish: 0,
-                    reassy: 0,
-                    sublet: 0,
-                    washqc: 0,
-                    complete: 0
+                    teardown: 0, auth: 0, parts: 0, body: 0,
+                    refinish: 0, reassy: 0, sublet: 0,
+                    washqc: 0, complete: 0
                 };
 
-                // Pie chart colors from dashboard
                 const roBarColors = [
-                    '#00BFFF', // blue
-                    '#FF8C00', // orange
-                    '#32CD32', // green
-                    '#FFD700', // yellow
-                    '#40E0D0', // turquoise
-                    '#8A2BE2', // purple
-                    '#708090'  // slate
+                    '#00BFFF', '#FF8C00', '#32CD32',
+                    '#FFD700', '#40E0D0', '#8A2BE2', '#708090'
                 ];
-                    // Helper to get estimator name (same as dashboard)
-                    function getRoEstimatorName(item) {
-                        let preferred = String(item?.written_by || '').trim() || String(item?.estimator || '').trim();
-                        if (!preferred) {
-                            const ownerInfo = String(item?.owner_info || '').trim();
-                            if (ownerInfo) {
-                                const writtenByMatch = ownerInfo.match(/written\s*by\s*:\s*([^\n,]+)/i);
-                                if (writtenByMatch && writtenByMatch[1]) {
-                                    preferred = String(writtenByMatch[1]).trim();
-                                }
-                                if (!preferred) {
-                                    const estimatorMatch = ownerInfo.match(/estimator\s*:\s*([^\n,]+)/i);
-                                    if (estimatorMatch && estimatorMatch[1]) {
-                                        preferred = String(estimatorMatch[1]).trim();
-                                    }
+
+                function getRoEstimatorName(item) {
+                    let preferred = String(item?.written_by || '').trim() || String(item?.estimator || '').trim();
+                    if (!preferred) {
+                        const ownerInfo = String(item?.owner_info || '').trim();
+                        if (ownerInfo) {
+                            const writtenByMatch = ownerInfo.match(/written\s*by\s*:\s*([^\n,]+)/i);
+                            if (writtenByMatch && writtenByMatch[1]) {
+                                preferred = String(writtenByMatch[1]).trim();
+                            }
+                            if (!preferred) {
+                                const estimatorMatch = ownerInfo.match(/estimator\s*:\s*([^\n,]+)/i);
+                                if (estimatorMatch && estimatorMatch[1]) {
+                                    preferred = String(estimatorMatch[1]).trim();
                                 }
                             }
                         }
-                        return preferred || '—';
                     }
-                    items.forEach((item, idx) => {
-                        const colId = phaseColumnFor(item.phase);
-                        const col = document.getElementById(colId);
-                        if (!col) return;
+                    return preferred || '—';
+                }
 
-                        const phaseKey = colId.replace('phase-', '');
-                        if (tally[phaseKey] !== undefined) {
-                            tally[phaseKey] += 1;
-                        }
+                items.forEach((item, idx) => {
+                    const colId = roadmapColumnFor(item.roadmap);
+                    const col = document.getElementById(colId);
+                    if (!col) return;
 
-                        const card = document.createElement('div');
-                        card.className = 'phase-card';
-                        card.setAttribute('draggable', 'true');
-                        card.dataset.ro = item.ro || '';
-                        card.dataset.phase = item.phase || 'teardown';
-                        // Assign color from pie chart palette
-                        const roBarColor = roBarColors[idx % roBarColors.length];
-                        const estimatorName = getRoEstimatorName(item);
-                        card.innerHTML = `
-                            <div class="ro-bar" style="background:${roBarColor}">RO# ${item.ro || '—'}</div>
-                            <div class="vehicle">${item.vehicle || '—'}</div>
-                            <div class="meta">
-                                <div>TECH: ${item.labor_tech || 'Unassigned'}</div>
-                                <div>Estimator: ${estimatorName}</div>
-                            </div>
-                        `;
-                        card.addEventListener('dragstart', (event) => {
-                            event.dataTransfer.setData('text/plain', JSON.stringify({
-                                ro: card.dataset.ro,
-                                from: card.dataset.phase
-                            }));
-                        });
-                        col.appendChild(card);
+                    const roadmapKey = colId.replace('roadmap-', '');
+                    if (tally[roadmapKey] !== undefined) {
+                        tally[roadmapKey] += 1;
+                    }
+
+                    const card = document.createElement('div');
+                    card.className = 'roadmap-card';
+                    card.setAttribute('draggable', 'true');
+                    card.dataset.ro = item.ro || '';
+                    card.dataset.roadmap = item.roadmap || 'teardown';
+
+                    const roBarColor = roBarColors[idx % roBarColors.length];
+                    const estimatorName = getRoEstimatorName(item);
+
+                    card.innerHTML = `
+                        <div class="ro-bar" style="background:${roBarColor}">RO# ${item.ro || '—'}</div>
+                        <div class="vehicle">${item.vehicle || '—'}</div>
+                        <div class="meta">
+                            <div>TECH: ${item.labor_tech || 'Unassigned'}</div>
+                            <div>Estimator: ${estimatorName}</div>
+                        </div>
+                    `;
+
+                    card.addEventListener('dragstart', (event) => {
+                        event.dataTransfer.setData('text/plain', JSON.stringify({
+                            ro: card.dataset.ro,
+                            from: card.dataset.roadmap
+                        }));
                     });
 
+                    col.appendChild(card);
+                });
+
                 Object.keys(tally).forEach(key => {
-                    const countEl = document.getElementById(`phase-count-${key}`);
+                    const countEl = document.getElementById(`roadmap-count-${key}`);
                     if (countEl) {
                         countEl.textContent = String(tally[key]);
                     }
                 });
 
-                wirePhaseDropZones();
+                wireroadmapDropZones();
             }
 
-            function wirePhaseDropZones() {
-                const zones = document.querySelectorAll('.phase-cards');
+            function wireroadmapDropZones() {
+                const zones = document.querySelectorAll('.roadmap-cards');
                 zones.forEach(zone => {
                     zone.addEventListener('dragover', (event) => {
                         event.preventDefault();
@@ -278,54 +274,54 @@ def get_roadmap_screen_html():
                         }
                         const ro = data.ro;
                         if (!ro) return;
-                        const targetPhase = zone.id.replace('phase-', '');
-                        updatePhase(ro, targetPhase);
+                        const targetroadmap = zone.id.replace('roadmap-', '');
+                        updateroadmap(ro, targetroadmap);
                     });
                 });
             }
 
-            function updatePhase(ro, phaseKey) {
-                fetch('/api/phase/update', {
+            function updateroadmap(ro, roadmapKey) {
+                fetch('/api/roadmap/update', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     credentials: 'include',
-                    body: JSON.stringify({ ro, phase: phaseKey })
+                    body: JSON.stringify({ ro, roadmap: roadmapKey })
                 })
                 .then(r => r.json())
                 .then(res => {
                     if (res.error) {
                         throw new Error(res.error);
                     }
-                    loadPhaseData();
+                    loadroadmapData();
                     if (typeof loadDashboardData === 'function') {
                         loadDashboardData();
                     }
                 })
                 .catch(err => {
-                    console.error('Error updating phase:', err);
-                    loadPhaseData();
+                    console.error('Error updating roadmap:', err);
+                    loadroadmapData();
                 });
             }
 
-            function loadPhaseData() {
-                clearPhaseColumns();
-                const teardown = document.getElementById('phase-teardown');
+            function loadroadmapData() {
+                clearroadmapColumns();
+                const teardown = document.getElementById('roadmap-teardown');
                 if (teardown) {
                     teardown.innerHTML = '<div style="color:#999; text-align:center; padding:10px;">Loading...</div>';
                 }
 
-                fetch('/api/phase/board', { credentials: 'include' })
+                fetch('/api/roadmap/board', { credentials: 'include' })
                     .then(r => r.json())
                     .then(res => {
                         if (res.error) {
                             throw new Error(res.error);
                         }
-                        renderPhaseCards(res.items || []);
+                        renderroadmapCards(res.items || []);
                     })
                     .catch(err => {
-                        console.error('Error loading phase data:', err);
+                        console.error('Error loading roadmap data:', err);
                         if (teardown) {
-                            teardown.innerHTML = '<div style="color:#999; text-align:center; padding:10px;">Unable to load phase board</div>';
+                            teardown.innerHTML = '<div style="color:#999; text-align:center; padding:10px;">Unable to load roadmap board</div>';
                         }
                     });
             }
