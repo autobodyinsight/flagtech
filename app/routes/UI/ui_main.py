@@ -5,7 +5,7 @@ from fastapi.responses import HTMLResponse
 from .flagout import get_flagtech_screen_html
 from .parts import get_parts_screen_html, get_parts_script
 from .techs import get_techs_screen_html
-from .roadmap import get_roadmap_screen_html
+from .phase import get_phase_screen_html
 from .payments import get_payments_screen_html
 from .dashboard import get_dashboard_screen_html
 try:
@@ -173,8 +173,8 @@ async def home_screen():
         .dash-center-card,
         .dash-mini-card,
         .mini-popup-panel,
-        .roadmap-card,
-        .roadmap-cards,
+        .phase-card,
+        .phase-cards,
         #estimateSummary,
         #flagoutTechTable,
         #techsTableContainer,
@@ -227,7 +227,7 @@ async def home_screen():
         <div class="nav-box" onclick="switchScreen('payments')">PAYMENTS</div>
         <div class="nav-box" onclick="switchScreen('parts')">PARTS</div>
         <div class="nav-box" onclick="switchScreen('tech')">TECHS</div>
-        <div class="nav-box" onclick="switchScreen('roadmap')">ROADMAP</div>
+        <div class="nav-box" onclick="switchScreen('phase')">ROADMAP</div>
         <div class="nav-box" onclick="switchScreen('flagtech')">FLAGOUT</div>
     </div>
     
@@ -237,7 +237,7 @@ async def home_screen():
         {get_dashboard_screen_html()}
         {get_payments_screen_html()}
         {get_techs_screen_html()}
-        {get_roadmap_screen_html()}
+        {get_phase_screen_html()}
         {get_parts_screen_html()}
         {get_flagtech_screen_html()}
     </div>
@@ -313,8 +313,8 @@ async def home_screen():
                     loadTechsList();
                 }}
 
-                if (screenName === 'roadmap' && typeof loadRoadmapData === 'function') {{
-                    loadRoadmapData();
+                if (screenName === 'phase' && typeof loadPhaseData === 'function') {{
+                    loadPhaseData();
                 }}
 
                 if (screenName === 'flagtech' && typeof loadFlagoutTechs === 'function') {{
