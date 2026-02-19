@@ -183,7 +183,7 @@ def get_dashboard_screen_html():
                                 <th class="dashboard-header-cell" data-sort-key="vehicle" onclick="sortRoListByHeader('vehicle')" style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold; cursor:pointer; user-select:none;">Vehicle <span data-sort-indicator="vehicle" style="font-size:12px;"></span></th>
                                 <th class="dashboard-header-cell" data-sort-key="customer" onclick="sortRoListByHeader('customer')" style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold; cursor:pointer; user-select:none;">Customer <span data-sort-indicator="customer" style="font-size:12px;"></span></th>
                                 <th class="dashboard-header-cell" data-sort-key="insurance" onclick="sortRoListByHeader('insurance')" style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold; cursor:pointer; user-select:none;">Insurance <span data-sort-indicator="insurance" style="font-size:12px;"></span></th>
-                                <th class="dashboard-header-cell" data-sort-key="phase" onclick="sortRoListByHeader('phase')" style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold; cursor:pointer; user-select:none;">Phase <span data-sort-indicator="phase" style="font-size:12px;"></span></th>
+                                <th class="dashboard-header-cell" data-sort-key="roadmap" onclick="sortRoListByHeader('roadmap')" style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold; cursor:pointer; user-select:none;">Roadmap <span data-sort-indicator="roadmap" style="font-size:12px;"></span></th>
                                 <th class="dashboard-header-cell" data-sort-key="in_date" onclick="sortRoListByHeader('in_date')" style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold; cursor:pointer; user-select:none;">In <span data-sort-indicator="in_date" style="font-size:12px;"></span></th>
                                 <th class="dashboard-header-cell" data-sort-key="days_since_in" onclick="sortRoListByHeader('days_since_in')" style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold; text-align:center; cursor:pointer; user-select:none;" title="Days Since In Date">⏳ <span data-sort-indicator="days_since_in" style="font-size:12px;"></span></th>
                                 <th class="dashboard-header-cell" data-sort-key="ecd_date" onclick="sortRoListByHeader('ecd_date')" style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold; cursor:pointer; user-select:none;">ECD <span data-sort-indicator="ecd_date" style="font-size:12px;"></span></th>
@@ -829,7 +829,7 @@ def get_dashboard_screen_html():
                 return digits;
             }
 
-            function formatPhaseDisplay(phase) {
+            function formatRoadmapDisplay(phase) {
                 const key = String(phase || 'teardown').trim().toLowerCase();
                 const labelMap = {
                     teardown: 'Teardown',
@@ -1281,8 +1281,8 @@ def get_dashboard_screen_html():
                     const phoneDisplay = cleanPhoneNumber(ro.phone);
                     const insuranceDisplay = (ro.insurance || '-').split(/\s+/).slice(0, 2).join(' ');
                     const claimDisplay = ro.claim_number || '-';
-                    const phaseDisplay = formatPhaseDisplay(ro.phase);
-                    const phaseSelectOptions = getPhaseDropdownOptions(ro.phase);
+                    const roadmapDisplay = formatRoadmapDisplay(ro.phase);
+                    const roadmapSelectOptions = getPhaseDropdownOptions(ro.phase);
                     const vinDisplay = ro.vin || '-';
                     const phoneOriginal = cleanPhoneNumber(ro.phone_original) || phoneDisplay || '-';
                     const inIso = ro.in_date || '';
@@ -1369,7 +1369,7 @@ def get_dashboard_screen_html():
                             </td>
                             <td style="padding:12px; border-bottom:1px solid #eee; color:#333;">
                                 <select onchange="changeRoPhase(event, '${ro.ro}', this.value)" style="padding:4px 6px; border:1px solid #ccc; border-radius:4px; background:#fff; color:#333; font-size:13px; max-width:160px;">
-                                    ${phaseSelectOptions}
+                                    ${roadmapSelectOptions}
                                 </select>
                             </td>
                             <td style="padding:12px; border-bottom:1px solid #eee; color:#333;">
