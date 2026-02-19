@@ -41,23 +41,47 @@ def get_archive_screen_html():
             }
         </style>
         <script>
-        // Load closed ROs from backend (same as REPORTS)
+        // Helper: get estimator name (same as dashboard)
+        function getRoEstimatorName(ro) {
+            let preferred = String(ro?.written_by || '').trim() || String(ro?.estimator || '').trim();
+            if (!preferred) {
+                const ownerInfo = String(ro?.owner_info || '').trim();
+                if (ownerInfo) {
+                    const writtenByMatch = ownerInfo.match(/written\s*by\s*:\s*([^\n,]+)/i);
+                    if (writtenByMatch && writtenByMatch[1]) {
+                        preferred = String(writtenByMatch[1]).trim();
+                    }
+                    if (!preferred) {
+                        const estimatorMatch = ownerInfo.match(/estimator\s*:\s*([^\n,]+)/i);
+                        if (estimatorMatch && estimatorMatch[1]) {
+                            preferred = String(estimatorMatch[1]).trim();
+                        }
+                    }
+                }
+            }
+            return preferred || '—';
+        }
+
+        // Load closed ROs from dashboard data (auto-archive logic)
         async function loadArchiveClosedRos() {
             try {
-                const resp = await fetch('/api/reports_data');
+                const resp = await fetch('/api/dashboard-data', { credentials: 'include' });
                 const data = await resp.json();
-                const ros = data.closed_ros || [];
+                const allRos = Array.isArray(data.roList) ? data.roList : [];
+                // Closed = status is 'closed' (regardless of picked_up date)
+                const closedRos = allRos.filter(ro => String(ro.status).toLowerCase() === 'closed');
                 const body = document.getElementById('archiveRoListBody');
                 body.innerHTML = '';
-                if (!ros.length) {
+                if (!closedRos.length) {
                     body.innerHTML = `<tr><td colspan='8' style='padding:20px; text-align:center; color:#999;'>No closed repair orders found.</td></tr>`;
                     return;
                 }
-                for (const ro of ros) {
+                for (const ro of closedRos) {
+                    const estimator = getRoEstimatorName(ro);
                     body.innerHTML += `<tr>
-                        <td style='padding:12px;'>${ro.ro_number || ''}</td>
+                        <td style='padding:12px;'>${ro.ro || ''}</td>
                         <td style='padding:12px;'>${ro.vehicle || ''}</td>
-                        <td style='padding:12px;'>${ro.tech || ''}</td>
+                        <td style='padding:12px;'>${estimator}</td>
                         <td style='padding:12px;'>${ro.parts || ''}</td>
                         <td style='padding:12px;'>${ro.insurance || ''}</td>
                         <td style='padding:12px;'>${ro.customer || ''}</td>
