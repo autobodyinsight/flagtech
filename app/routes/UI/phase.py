@@ -1,3 +1,6 @@
+def get_phase_screen_html():
+"""Roadmap screen content for the FlagTech UI."""
+
 def get_roadmap_screen_html():
     """Return the HTML content for the Roadmap screen."""
     return """
@@ -15,8 +18,6 @@ def get_roadmap_screen_html():
             </div>
             <!-- Add more columns as needed -->
         </div>
-    </div>
-    """
     </div>
     """
                 <div id="phase-parts" class="phase-cards"></div>
