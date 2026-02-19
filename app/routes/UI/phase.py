@@ -16,9 +16,7 @@ def get_roadmap_screen_html():
             <!-- Add more columns as needed -->
         </div>
     </div>
-    """
-    </div>
-    """
+    
                 <div id="phase-parts" class="phase-cards"></div>
             </div>
             <div class="phase-column">
