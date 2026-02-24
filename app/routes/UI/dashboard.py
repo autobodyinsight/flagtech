@@ -317,12 +317,41 @@ def get_dashboard_screen_html():
                 alert('RO not found.');
                 return;
             }
+            // SVG line icons (white, flat, no fill)
+            const icons = {
+                notepad: `<svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="5" y="6" width="18" height="16" rx="2" stroke="white" stroke-width="2"/><line x1="9" y1="10" x2="19" y2="10" stroke="white" stroke-width="2"/><line x1="9" y1="14" x2="19" y2="14" stroke="white" stroke-width="2"/><line x1="9" y1="18" x2="15" y2="18" stroke="white" stroke-width="2"/></svg>`,
+                tech: `<svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="14" cy="9" r="4" stroke="white" stroke-width="2"/><rect x="7" y="17" width="14" height="6" rx="3" stroke="white" stroke-width="2"/><path d="M21 21l2.5 2.5" stroke="white" stroke-width="2" stroke-linecap="round"/><path d="M7 21l-2.5 2.5" stroke="white" stroke-width="2" stroke-linecap="round"/></svg>`,
+                cart: `<svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="10" cy="23" r="2" stroke="white" stroke-width="2"/><circle cx="20" cy="23" r="2" stroke="white" stroke-width="2"/><rect x="5" y="7" width="18" height="10" rx="2" stroke="white" stroke-width="2"/><path d="M7 7V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v2" stroke="white" stroke-width="2"/></svg>`,
+                credit: `<svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="4" y="7" width="20" height="14" rx="3" stroke="white" stroke-width="2"/><rect x="7" y="17" width="6" height="3" rx="1.5" stroke="white" stroke-width="2"/><line x1="4" y1="12" x2="24" y2="12" stroke="white" stroke-width="2"/></svg>`
+            };
+
+            // Sidebar HTML
+            const sidebarHtml = `
+                <div id="roSidebar" style="position:fixed; left:0; top:0; height:100vh; width:64px; background:#23272a; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:38px; z-index:100; box-shadow:2px 0 8px rgba(0,0,0,0.08);">
+                    <div style="display:flex; flex-direction:column; align-items:center; gap:38px; width:100%;">
+                        <div>${icons.notepad}</div>
+                        <div>${icons.tech}</div>
+                        <div>${icons.cart}</div>
+                        <div>${icons.credit}</div>
+                    </div>
+                </div>
+            `;
+
+            // Top-right Print/Close buttons
+            const buttonsHtml = `
+                <div style="position:absolute; top:18px; right:24px; display:flex; gap:12px; z-index:10;">
+                    <button onclick="window.print()" style="padding:7px 18px; background:#d32f2f; color:#fff; border:none; border-radius:4px; font-weight:bold; font-size:15px; cursor:pointer;">Print</button>
+                    <button onclick="window.close()" style="padding:7px 18px; background:#505050; color:#fff; border:none; border-radius:4px; font-weight:bold; font-size:15px; cursor:pointer;">Close</button>
+                </div>
+            `;
+
             // Banner fields
             const bannerHtml = `
-                <div style="background:#23272a; color:#fff; padding:18px 24px; font-size:20px; font-weight:bold; border-bottom:3px solid #d32f2f;">
+                <div style="background:#23272a; color:#fff; padding:18px 24px; font-size:20px; font-weight:bold; border-bottom:3px solid #d32f2f; position:relative; min-height:56px;">
                     RO Window
+                    ${buttonsHtml}
                 </div>
-                <div style="padding:20px 24px; background:#f9f9f9; border-bottom:1px solid #eee;">
+                <div style="padding:20px 24px 20px 88px; background:#f9f9f9; border-bottom:1px solid #eee; min-height:64px;">
                     <div style="display:flex; flex-wrap:wrap; gap:18px 36px; align-items:center; font-size:17px;">
                         <div><span style='color:#d32f2f; font-weight:bold;'>RO#:</span> <span style='color:#23272a;'>${ro.ro}</span></div>
                         <div><span style='color:#d32f2f; font-weight:bold;'>Customer:</span> <span style='color:#23272a;'>${ro.customer || '-'}</span></div>
@@ -334,8 +363,9 @@ def get_dashboard_screen_html():
                         <div><span style='color:#d32f2f; font-weight:bold;'>ECD Date:</span> <span style='color:#23272a;'>${ro.ecd_date || '-'}</span></div>
                     </div>
                 </div>
-                <div id="roWindowContent" style="padding:32px; min-height:180px; background:#fff; color:#23272a; font-size:18px;">(Content area)</div>
+                <div id="roWindowContent" style="padding:32px 32px 32px 88px; min-height:180px; background:#fff; color:#23272a; font-size:18px;">(Content area)</div>
             `;
+
             // Open new window
             const win = window.open('', `RO_Window_${ro.ro}`, 'width=900,height=600,scrollbars=yes,resizable=yes');
             if (!win) {
@@ -343,10 +373,19 @@ def get_dashboard_screen_html():
                 return;
             }
             win.document.title = `RO Window - ${ro.ro}`;
-            win.document.body.innerHTML = bannerHtml;
-            // Optional: Add some basic styles
+            win.document.body.innerHTML = `<div style='display:flex; flex-direction:row; height:100vh; width:100vw; background:#f2f2f2;'>${sidebarHtml}<div style='flex:1; display:flex; flex-direction:column; min-width:0;'>${bannerHtml}</div></div>`;
+            // Add styles for sidebar and icons
             const style = win.document.createElement('style');
-            style.textContent = `body { margin:0; font-family:Segoe UI,Arial,sans-serif; background:#f2f2f2; }`;
+            style.textContent = `
+                body { margin:0; font-family:Segoe UI,Arial,sans-serif; background:#f2f2f2; }
+                #roSidebar svg { display:block; margin:0 auto; }
+                #roSidebar div { cursor:pointer; }
+                #roSidebar { box-shadow:2px 0 8px rgba(0,0,0,0.08); }
+                @media (max-width: 700px) {
+                  #roSidebar { width:44px; }
+                  #roSidebar svg { width:22px; height:22px; }
+                }
+            `;
             win.document.head.appendChild(style);
         }
             // Global variables for dashboard
