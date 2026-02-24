@@ -678,81 +678,81 @@ def get_dashboard_screen_html():
                         }).join('');
                         refreshRoSlideDownHeight(roNumber, 'activity');
                     })
-                    sortedList.forEach((ro, index) => {
-                        const rowBg = index % 2 === 0 ? '#f2f0ef' : 'var(--list-row-white, #ffffff)';
-                        const rowId = safeId(ro.ro);
-                        const estimatorDisplay = getRoEstimatorDisplay(ro);
-                        const customerDisplay = ro.customer || '-';
-                        const phoneDisplay = cleanPhoneNumber(ro.phone);
-                        const insuranceDisplay = (ro.insurance || '-').split(/\s+/).slice(0, 2).join(' ');
-                        const claimDisplay = ro.claim_number || '-';
-                        const phaseDisplay = formatPhaseDisplay(ro.phase);
-                        const phaseSelectOptions = getPhaseDropdownOptions(ro.phase);
-                        const vinDisplay = ro.vin || '-';
-                        const phoneOriginal = cleanPhoneNumber(ro.phone_original) || phoneDisplay || '-';
-                        const inIso = ro.in_date || '';
-                        const ecdIso = ro.ecd_date || computeEcdIso(inIso, Number(ro.hours || 0));
-                        const inDisplay = formatShortDate(inIso);
-                        const ecdDisplay = formatShortDate(ecdIso);
-                        const daysSinceIn = calculateDaysSince(inIso);
-                        const daysDisplay = daysSinceIn !== null ? daysSinceIn : '-';
-                        const showSubletWarning = hasSubletWarning(ro);
-                        const subletItems = showSubletWarning ? getPendingSubletItems(ro) : [];
+                    .catch(err => {
+                        console.error('Error loading RO activity:', err);
+                        if (listEl) {
+                            listEl.innerHTML = '<div style="color:red;">Error loading activity.</div>';
+                            refreshRoSlideDownHeight(roNumber, 'activity');
+                        }
+                    });
+            }
 
-                        html += `
-                            <tr style="background:${rowBg};" onclick="toggleRoActivityLogFromRow(event, '${ro.ro}')">
-                                <td style="padding:12px; border-bottom:1px solid #eee; position:relative;">
-                                    <div style="display:inline-flex; align-items:center; gap:6px;">
-                                        <button type="button" class="mini-popup-trigger" onclick="openRoPrintModal(event, '${ro.ro}'); event.stopPropagation();" style="background:none; border:none; color:#333; cursor:pointer; padding:0; font-size:16px; line-height:1;" title="Print Reports">🖨️</button>
-                                        <button type="button" onclick="toggleRoNotesFromLink(event, '${ro.ro}')" style="background:none; border:none; color:#0066cc; text-decoration:underline; cursor:pointer; padding:0; font:inherit;">
-                                            ${ro.ro}
-                                        </button>
-                                        ${showSubletWarning ? `
-                                            <span class="sublet-warning-icon mini-popup-trigger" onclick="toggleSubletPanel(event, '${ro.ro}'); event.stopPropagation();" style="cursor:pointer; color:#ff9800; font-size:18px; line-height:1;" title="Pending Sublets">⚠️</span>
-                                            <div id="sublet-panel-${rowId}" class="sublet-panel mini-popup-panel" style="display:none;">
-                                                <div style="font-weight:bold; color:#e65100; margin-bottom:8px; font-size:14px;">Pending Sublet Items:</div>
-                                                <ul style="margin:0; padding-left:20px; font-size:13px;">
-                                                    ${subletItems.map(item => `
-                                                        <li style="margin-bottom:6px; color:#333;">
-                                                            ${item.line ? `<strong>Line ${item.line}:</strong> ` : ''}${item.description}
-                                                            <span style="color:#666; font-size:11px;"> (${item.type})</span>
-                                                        </li>
-                                                    `).join('')}
-                                                </ul>
-                                            </div>
-                                        ` : ''}
-                                        <div id="ro-print-panel-${rowId}" class="mini-popup-panel" style="display:none;">
-                                            <h2 id="roPrintTitle-${rowId}" style="margin:0 0 12px 0; color:#333; font-size:16px;">Print Reports - RO# ${ro.ro}</h2>
-                                            <p style="margin:0 0 10px 0; font-weight:bold; color:#555;">Select reports to print:</p>
-                                            <div style="display:flex; flex-direction:column; gap:8px; margin-bottom:12px;">
-                                                <label style="display:flex; align-items:center; gap:8px; padding:8px; background:#f9f9f9; border-radius:4px; cursor:pointer;">
-                                                    <input type="checkbox" id="printFileCover-${rowId}" style="width:16px; height:16px; cursor:pointer;" />
-                                                    <span style="font-size:14px;">File Cover Page</span>
-                                                </label>
-                                                <label style="display:flex; align-items:center; gap:8px; padding:8px; background:#f9f9f9; border-radius:4px; cursor:pointer;">
-                                                    <input type="checkbox" id="printVehicleTag-${rowId}" style="width:16px; height:16px; cursor:pointer;" />
-                                                    <span style="font-size:14px;">Vehicle Tag</span>
-                                                </label>
-                                                <label style="display:flex; align-items:center; gap:8px; padding:8px; background:#f9f9f9; border-radius:4px; cursor:pointer;">
-                                                    <input type="checkbox" id="printTechBody-${rowId}" style="width:16px; height:16px; cursor:pointer;" />
-                                                    <span style="font-size:14px;">Tech Body</span>
-                                                </label>
-                                                <label style="display:flex; align-items:center; gap:8px; padding:8px; background:#f9f9f9; border-radius:4px; cursor:pointer;">
-                                                    <input type="checkbox" id="printTechPaint-${rowId}" style="width:16px; height:16px; cursor:pointer;" />
-                                                    <span style="font-size:14px;">Tech Paint</span>
-                                                </label>
-                                                <label style="display:flex; align-items:center; gap:8px; padding:8px; background:#f9f9f9; border-radius:4px; cursor:pointer;">
-                                                    <input type="checkbox" id="printTechMech-${rowId}" style="width:16px; height:16px; cursor:pointer;" />
-                                                    <span style="font-size:14px;">Tech Mech</span>
-                                                </label>
-                                            </div>
-                                            <div style="display:flex; justify-content:flex-end; gap:8px;">
-                                                <button onclick="closeRoPrintModal()" style="padding:8px 14px; background:#999; color:#fff; border:none; border-radius:4px; cursor:pointer;">Cancel</button>
-                                                <button onclick="generateSelectedPrints()" style="padding:8px 14px; background:#d32f2f; color:#fff; border:none; border-radius:4px; cursor:pointer; font-weight:bold;">Print</button>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </td>
+            function loadRoNotes(roNumber) {
+                const listEl = document.getElementById(`notes-list-${safeId(roNumber)}`);
+                if (!listEl) return;
+                listEl.innerHTML = '<div style="color:#777;">Loading...</div>';
+
+                fetch(`/api/ro-notes?ro=${encodeURIComponent(roNumber)}`, { credentials: 'include' })
+                    .then(r => r.json())
+                    .then(res => {
+                        if (!listEl) return;
+                        if (!res.notes || res.notes.length === 0) {
+                            listEl.innerHTML = '<div style="color:#999;">No notes yet.</div>';
+                            refreshRoSlideDownHeight(roNumber, 'notes');
+                            return;
+                        }
+                        listEl.innerHTML = res.notes.map(note => {
+                            const when = note.created_at ? new Date(note.created_at).toLocaleString() : '';
+                            return `
+                                <div style="padding:6px 0; border-bottom:1px solid #eee;">
+                                    <div style="font-size:12px; color:#777;">${when}</div>
+                                    <div style="white-space:pre-wrap;">${note.note || ''}</div>
+                                </div>
+                            `;
+                        }).join('');
+                        refreshRoSlideDownHeight(roNumber, 'notes');
+                    })
+                    .catch(err => {
+                        console.error('Error loading notes:', err);
+                        if (listEl) {
+                            listEl.innerHTML = '<div style="color:red;">Error loading notes.</div>';
+                            refreshRoSlideDownHeight(roNumber, 'notes');
+                        }
+                    });
+            }
+
+            function saveRoNote(roNumber) {
+                const input = document.getElementById(`notes-input-${safeId(roNumber)}`);
+                if (!input) return;
+                const text = (input.value || '').trim();
+                if (!text) return;
+
+                fetch('/api/ro-notes', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'include',
+                    body: JSON.stringify({ ro: roNumber, note: text })
+                })
+                .then(r => r.json())
+                .then(res => {
+                    if (res.error) {
+                        throw new Error(res.error);
+                    }
+                    input.value = '';
+                    loadRoNotes(roNumber);
+                })
+                .catch(err => {
+                    console.error('Error saving note:', err);
+                    alert('Error saving note.');
+                });
+            }
+
+            function toggleRoNotesFromLink(event, roNumber) {
+                if (event) event.stopPropagation();
+                toggleRoNotes(roNumber);
+            }
+
+            function toggleOldPhone(event, rowId) {
                 if (event) event.stopPropagation();
                 const oldEl = document.getElementById(`phone-old-${rowId}`);
                 if (!oldEl) return;
@@ -1241,37 +1241,7 @@ def get_dashboard_screen_html():
                 }
             });
 
-            // Open RO Window in new tab
-            function openRoWindowFromDashboard(event, roNumber) {
-                if (event) event.stopPropagation();
-                // Find the RO data from dashboardData.roList
-                const ro = (dashboardData && dashboardData.roList) ? dashboardData.roList.find(r => String(r.ro) === String(roNumber)) : null;
-                if (!ro) {
-                    alert('RO data not found.');
-                    return;
-                }
-                // Load the RO window HTML generator
-                if (!window.getRoWindowHtml) {
-                    const script = document.createElement('script');
-                    script.src = '/static/ro_window.js';
-                    script.onload = () => {
-                        openRoWindowFromDashboard(event, roNumber);
-                    };
-                    document.body.appendChild(script);
-                    return;
-                }
-                const win = window.open('', 'RO Window', 'width=1100,height=700');
-                if (!win) {
-                    alert('Popup blocked. Please allow popups for this site.');
-                    return;
-                }
-                win.document.write(window.getRoWindowHtml(ro));
-                win.document.close();
-                win.focus();
-            }
-
             // Update RO list table
-            function updateRoListTable(roList) {
             function updateRoListTable(roList) {
                 const tbody = document.getElementById('roListBody');
                 const sourceList = Array.isArray(roList) ? roList : [];
