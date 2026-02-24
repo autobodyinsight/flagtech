@@ -304,6 +304,51 @@ def get_dashboard_screen_html():
         
         <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
         <script>
+        // Opens a new window with RO details banner
+        function openRoWindowFromDashboard(event, roNumber) {
+            if (event) event.stopPropagation();
+            // Find the RO data from dashboardData.roList
+            if (!dashboardData || !dashboardData.roList) {
+                alert('RO data not loaded.');
+                return;
+            }
+            const ro = dashboardData.roList.find(r => String(r.ro) === String(roNumber));
+            if (!ro) {
+                alert('RO not found.');
+                return;
+            }
+            // Banner fields
+            const bannerHtml = `
+                <div style="background:#23272a; color:#fff; padding:18px 24px; font-size:20px; font-weight:bold; border-bottom:3px solid #d32f2f;">
+                    RO Window
+                </div>
+                <div style="padding:20px 24px; background:#f9f9f9; border-bottom:1px solid #eee;">
+                    <div style="display:flex; flex-wrap:wrap; gap:18px 36px; align-items:center; font-size:17px;">
+                        <div><span style='color:#d32f2f; font-weight:bold;'>RO#:</span> <span style='color:#23272a;'>${ro.ro}</span></div>
+                        <div><span style='color:#d32f2f; font-weight:bold;'>Customer:</span> <span style='color:#23272a;'>${ro.customer || '-'}</span></div>
+                        <div><span style='color:#d32f2f; font-weight:bold;'>Phone:</span> <span style='color:#23272a;'>${ro.phone || '-'}</span></div>
+                        <div><span style='color:#d32f2f; font-weight:bold;'>Insurance:</span> <span style='color:#23272a;'>${ro.insurance || '-'}</span></div>
+                        <div><span style='color:#d32f2f; font-weight:bold;'>Claim#:</span> <span style='color:#23272a;'>${ro.claim_number || '-'}</span></div>
+                        <div><span style='color:#d32f2f; font-weight:bold;'>Vehicle:</span> <span style='color:#23272a;'>${ro.vehicle || '-'}</span></div>
+                        <div><span style='color:#d32f2f; font-weight:bold;'>IN Date:</span> <span style='color:#23272a;'>${ro.in_date || '-'}</span></div>
+                        <div><span style='color:#d32f2f; font-weight:bold;'>ECD Date:</span> <span style='color:#23272a;'>${ro.ecd_date || '-'}</span></div>
+                    </div>
+                </div>
+                <div id="roWindowContent" style="padding:32px; min-height:180px; background:#fff; color:#23272a; font-size:18px;">(Content area)</div>
+            `;
+            // Open new window
+            const win = window.open('', `RO_Window_${ro.ro}`, 'width=900,height=600,scrollbars=yes,resizable=yes');
+            if (!win) {
+                alert('Popup blocked. Please allow popups for this site.');
+                return;
+            }
+            win.document.title = `RO Window - ${ro.ro}`;
+            win.document.body.innerHTML = bannerHtml;
+            // Optional: Add some basic styles
+            const style = win.document.createElement('style');
+            style.textContent = `body { margin:0; font-family:Segoe UI,Arial,sans-serif; background:#f2f2f2; }`;
+            win.document.head.appendChild(style);
+        }
             // Global variables for dashboard
             let dashboardData = null;
             let hoursPerTechChartInstance = null;
