@@ -1,3 +1,70 @@
+            // Open RO Window in new tab
+            function openRoWindowFromDashboard(event, roNumber) {
+                if (event) event.stopPropagation();
+                // Find the RO data from dashboardData.roList
+                const ro = (dashboardData && dashboardData.roList) ? dashboardData.roList.find(r => String(r.ro) === String(roNumber)) : null;
+                if (!ro) {
+                    alert('RO data not found.');
+                    return;
+                }
+                const win = window.open('', 'RO Window', 'width=1100,height=700');
+                if (!win) {
+                    alert('Popup blocked. Please allow popups for this site.');
+                    return;
+                }
+                win.document.write(`
+                    <!DOCTYPE html>
+                    <html lang="en">
+                    <head>
+                        <meta charset="UTF-8">
+                        <title>RO Window</title>
+                        <style>
+                            body { margin:0; font-family: Arial, sans-serif; background:#f7f7f7; }
+                            .ro-banner {
+                                position:fixed;
+                                top:0; left:0; right:0;
+                                background:#1E90FF;
+                                color:#fff;
+                                padding:18px 32px;
+                                z-index:1000;
+                                box-shadow:0 2px 8px rgba(0,0,0,0.08);
+                                display:flex;
+                                flex-wrap:wrap;
+                                gap:32px 48px;
+                                align-items:center;
+                                font-size:18px;
+                            }
+                            .ro-banner-label { font-weight:bold; margin-right:6px; }
+                            .ro-banner-row { display:flex; gap:24px; flex-wrap:wrap; }
+                            .ro-content {
+                                margin-top:90px;
+                                padding:32px;
+                                min-height:400px;
+                            }
+                        </style>
+                    </head>
+                    <body>
+                        <div class="ro-banner">
+                            <div class="ro-banner-row">
+                                <span class="ro-banner-label">RO#:</span> <span>${ro.ro}</span>
+                                <span class="ro-banner-label">Customer:</span> <span>${ro.customer || '-'}</span>
+                                <span class="ro-banner-label">Phone:</span> <span>${ro.phone || '-'}</span>
+                                <span class="ro-banner-label">Insurance:</span> <span>${ro.insurance || '-'}</span>
+                                <span class="ro-banner-label">Claim#:</span> <span>${ro.claim_number || '-'}</span>
+                                <span class="ro-banner-label">Vehicle:</span> <span>${ro.vehicle || '-'}</span>
+                                <span class="ro-banner-label">IN Date:</span> <span>${ro.in_date || '-'}</span>
+                                <span class="ro-banner-label">ECD Date:</span> <span>${ro.ecd_date || '-'}</span>
+                            </div>
+                        </div>
+                        <div class="ro-content">
+                            <!-- Empty content area for future tabs/sections -->
+                        </div>
+                    </body>
+                    </html>
+                `);
+                win.document.close();
+                win.focus();
+            }
 """Dashboard screen content for the FlagTech UI."""
 
 
@@ -1303,7 +1370,7 @@ def get_dashboard_screen_html():
                             <td style="padding:12px; border-bottom:1px solid #eee; position:relative;">
                                 <div style="display:inline-flex; align-items:center; gap:6px;">
                                     <button type="button" class="mini-popup-trigger" onclick="openRoPrintModal(event, '${ro.ro}')" style="background:none; border:none; color:#333; cursor:pointer; padding:0; font-size:16px; line-height:1;" title="Print Reports">🖨️</button>
-                                    <button type="button" onclick="toggleRoNotesFromLink(event, '${ro.ro}')" style="background:none; border:none; color:#0066cc; text-decoration:underline; cursor:pointer; padding:0; font:inherit;">
+                                    <button type="button" onclick="openRoWindowFromDashboard(event, '${ro.ro}')" style="background:none; border:none; color:#0066cc; text-decoration:underline; cursor:pointer; padding:0; font:inherit;">
                                         ${ro.ro}
                                     </button>
                                     ${showSubletWarning ? `
