@@ -476,6 +476,43 @@ def get_dashboard_screen_html():
                 return popupFormatDateTime(value);
             }
 
+            function extractPartNumberAndDescription(rawDescription) {
+                const source = String(rawDescription || '').trim();
+                if (!source) return { description: '', partNumber: '' };
+
+                const tokens = source.split(/\s+/);
+                const kept = [];
+                let extractedPartNumber = '';
+
+                function cleanToken(token) {
+                    return String(token || '').trim().replace(/^[\[\](){},;:]+|[\[\](){},;:]+$/g, '');
+                }
+
+                function looksLikePartNumber(token) {
+                    const cleaned = cleanToken(token);
+                    if (!cleaned) return false;
+                    if (!/^[A-Za-z0-9-]{5,}$/.test(cleaned)) return false;
+                    const hasLetter = /[A-Za-z]/.test(cleaned);
+                    const hasDigit = /\d/.test(cleaned);
+                    return hasLetter && hasDigit;
+                }
+
+                tokens.forEach((token) => {
+                    if (looksLikePartNumber(token)) {
+                        if (!extractedPartNumber) {
+                            extractedPartNumber = cleanToken(token).toUpperCase();
+                        }
+                        return;
+                    }
+                    kept.push(token);
+                });
+
+                return {
+                    description: kept.join(' ').replace(/\s+/g, ' ').trim(),
+                    partNumber: extractedPartNumber,
+                };
+            }
+
             function normalizeTypeLabelLocal(typeValue) {
                 const value = String(typeValue || '').toLowerCase();
                 if (value === 'labor') return 'body';
@@ -934,10 +971,10 @@ def get_dashboard_screen_html():
                     listEl.innerHTML = `
                         <table style="width:100%; border-collapse:collapse;">
                             <thead>
-                                <tr style="background:#d9d9d9; border-bottom:2px solid #999;">
-                                    <th style="padding:8px 12px; text-align:left; font-weight:700; color:#333;">TECH</th>
-                                    <th style="padding:8px 12px; text-align:left; font-weight:700; color:#333;">TYPE</th>
-                                    <th style="padding:8px 12px; text-align:right; font-weight:700; color:#333;">HRS</th>
+                                <tr style="background:#3c4142; border-bottom:2px solid #999;">
+                                    <th style="padding:8px 12px; text-align:left; font-weight:700; color:#fff;">TECH</th>
+                                    <th style="padding:8px 12px; text-align:left; font-weight:700; color:#fff;">TYPE</th>
+                                    <th style="padding:8px 12px; text-align:right; font-weight:700; color:#fff;">HRS</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -947,7 +984,7 @@ def get_dashboard_screen_html():
                                     const textColor = techLabel.toUpperCase() === 'PENDING' ? '#d32f2f' : '#333';
                                     const hrs = Number(item.hours || 0).toFixed(1);
                                     return `
-                                        <tr style="background:#fff; border-bottom:1px solid #ddd;">
+                                        <tr style="background:${index % 2 === 0 ? '#f2f0ef' : '#ffffff'}; border-bottom:1px solid #ddd;">
                                             <td style="padding:8px 12px; color:${textColor}; font-weight:700;"><button type="button" data-tech-index="${index}" class="roPopupTechAssignBtn" style="background:none; border:none; color:${textColor}; text-decoration:underline; cursor:pointer; padding:0; font:inherit; font-weight:700;">${techLabel}</button></td>
                                             <td style="padding:8px 12px; color:#333;">${typeLabel}</td>
                                             <td style="padding:8px 12px; text-align:right; color:#333; font-weight:700;">${hrs}</td>
@@ -1009,6 +1046,15 @@ def get_dashboard_screen_html():
                     const arrivedSet = new Set(arrived.map((item) => Number(item.line_id)));
                     const returnedSet = new Set(returned.map((item) => Number(item.line_id)));
                     const onOrderSet = new Set(onOrder.map((item) => Number(item.line_id)));
+                    const partNumberByLine = new Map();
+
+                    [...onOrder, ...arrived, ...returned, ...received].forEach((entry) => {
+                        const lineId = Number(entry.line_id);
+                        const partNumber = String(entry.part_number || '').trim();
+                        if (!Number.isNaN(lineId) && lineId > 0 && partNumber && !partNumberByLine.has(lineId)) {
+                            partNumberByLine.set(lineId, partNumber);
+                        }
+                    });
 
                     statusEl.innerHTML = `
                         <div style="display:flex; flex-wrap:wrap; gap:8px;">
@@ -1029,25 +1075,31 @@ def get_dashboard_screen_html():
                                         <tr style="background:#3c4142; color:#fff; text-align:left;">
                                             <th style="padding:8px;">Line</th>
                                             <th style="padding:8px;">Description</th>
-                                            <th style="padding:8px; text-align:right;">Qty</th>
-                                            <th style="padding:8px; text-align:right;">Price</th>
-                                            <th style="padding:8px;">Status</th>
+                                            <th style="padding:8px; text-align:right;">QTY</th>
+                                            <th style="padding:8px; text-align:center;">On Order</th>
+                                            <th style="padding:8px; text-align:center;">Arrived</th>
+                                            <th style="padding:8px; text-align:center;">Returned</th>
+                                            <th style="padding:8px;">Part #</th>
                                         </tr>
                                     </thead>
                                     <tbody>
                                         ${lines.map((line, idx) => {
                                             const idNum = Number(line.id);
-                                            let status = 'Pending';
-                                            if (returnedSet.has(idNum)) status = 'Returned';
-                                            else if (arrivedSet.has(idNum)) status = 'Arrived';
-                                            else if (onOrderSet.has(idNum) || line.is_ordered) status = 'On Order';
+                                            const extracted = extractPartNumberAndDescription(line.description || '');
+                                            const cleanDescription = extracted.description || String(line.description || '').trim();
+                                            const linePartNumber = String(partNumberByLine.get(idNum) || extracted.partNumber || '').trim();
+                                            const isOnOrder = onOrderSet.has(idNum) || !!line.is_ordered;
+                                            const isArrived = arrivedSet.has(idNum);
+                                            const isReturned = returnedSet.has(idNum);
                                             return `
-                                                <tr style="background:${idx % 2 === 0 ? '#f2f0ef' : '#fff'}; border-bottom:1px solid #eee;">
+                                                <tr style="background:${idx % 2 === 0 ? '#f2f0ef' : '#ffffff'}; border-bottom:1px solid #eee;">
                                                     <td style="padding:8px;">${escapePopupHtml(line.line || '-')}</td>
-                                                    <td style="padding:8px;">${escapePopupHtml(line.description || '')}</td>
+                                                    <td style="padding:8px;">${escapePopupHtml(cleanDescription)}</td>
                                                     <td style="padding:8px; text-align:right;">${escapePopupHtml(line.qty || 0)}</td>
-                                                    <td style="padding:8px; text-align:right;">${popupFormatMoney(line.price || 0)}</td>
-                                                    <td style="padding:8px; font-weight:600;">${escapePopupHtml(status)}</td>
+                                                    <td style="padding:8px; text-align:center; font-weight:600; color:${isOnOrder ? '#2e7d32' : '#777'};">${isOnOrder ? 'Yes' : '—'}</td>
+                                                    <td style="padding:8px; text-align:center; font-weight:600; color:${isArrived ? '#2e7d32' : '#777'};">${isArrived ? 'Yes' : '—'}</td>
+                                                    <td style="padding:8px; text-align:center; font-weight:600; color:${isReturned ? '#2e7d32' : '#777'};">${isReturned ? 'Yes' : '—'}</td>
+                                                    <td style="padding:8px;">${escapePopupHtml(linePartNumber || '-')}</td>
                                                 </tr>
                                             `;
                                         }).join('')}
