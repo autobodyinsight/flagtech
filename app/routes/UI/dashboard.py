@@ -338,7 +338,7 @@ def get_dashboard_screen_html():
 
             // Sidebar HTML
             const sidebarHtml = `
-                <div id="roSidebar" style="position:fixed; left:0; top:0; height:100vh; width:64px; background:#23272a; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:38px; z-index:100; box-shadow:2px 0 8px rgba(0,0,0,0.08);">
+                <div id="roSidebar" style="position:fixed; left:0; top:var(--ro-header-height, 170px); height:calc(100vh - var(--ro-header-height, 170px)); width:64px; background:#23272a; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:38px; z-index:100; box-shadow:2px 0 8px rgba(0,0,0,0.08);">
                     <div style="display:flex; flex-direction:column; align-items:center; gap:38px; width:100%;">
                         <div>${icons.notepad}</div>
                         <div>${icons.tech}</div>
@@ -358,7 +358,7 @@ def get_dashboard_screen_html():
 
             // Banner fields
             const bannerHtml = `
-                <div style="background:#23272a; color:#fff; padding:16px 24px 18px 24px; border-bottom:3px solid #d32f2f; position:relative; min-height:132px;">
+                <div id="roHeaderBar" style="background:#23272a; color:#fff; padding:16px 24px 18px 24px; border-bottom:3px solid #d32f2f; position:relative; min-height:132px; z-index:120;">
                     <div style="font-size:20px; font-weight:bold; margin-bottom:10px;">RO Window</div>
                     ${buttonsHtml}
                     <div id="roSummaryHeaderGrid" style="display:grid; grid-template-columns:repeat(3, minmax(0, 1fr)); gap:20px 28px; margin-right:230px; align-items:start;">
@@ -427,6 +427,12 @@ def get_dashboard_screen_html():
                 }
             `;
             win.document.head.appendChild(style);
+
+            const headerEl = win.document.getElementById('roHeaderBar');
+            if (headerEl) {
+                const headerHeight = Math.ceil(headerEl.getBoundingClientRect().height);
+                win.document.documentElement.style.setProperty('--ro-header-height', `${headerHeight}px`);
+            }
 
             const script = win.document.createElement('script');
             script.textContent = `
