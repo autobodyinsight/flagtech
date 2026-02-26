@@ -352,7 +352,7 @@ def get_dashboard_screen_html():
             const buttonsHtml = `
                 <div style="position:absolute; top:18px; right:24px; display:flex; gap:12px; z-index:10;">
                     <button onclick="window.print()" style="padding:7px 18px; background:#d32f2f; color:#fff; border:none; border-radius:4px; font-weight:bold; font-size:15px; cursor:pointer;">Print</button>
-                    <button onclick="window.close()" style="padding:7px 18px; background:#505050; color:#fff; border:none; border-radius:4px; font-weight:bold; font-size:15px; cursor:pointer;">Close</button>
+                    <button id="roCloseButton" type="button" style="padding:7px 18px; background:#505050; color:#fff; border:none; border-radius:4px; font-weight:bold; font-size:15px; cursor:pointer;">Close RO</button>
                 </div>
             `;
 
@@ -551,6 +551,124 @@ def get_dashboard_screen_html():
                             showSidebarView(view);
                         }
                     });
+                });
+            }
+
+            function closeRoConfirmPopover() {
+                const panel = roWindowDoc.getElementById('roCloseConfirmPopover');
+                if (panel) {
+                    panel.remove();
+                }
+            }
+
+            async function flushHeaderDateInputs() {
+                const dateFields = [
+                    roWindowDoc.getElementById('roHeaderInDate'),
+                    roWindowDoc.getElementById('roHeaderEcdDate'),
+                ].filter(Boolean);
+
+                for (const input of dateFields) {
+                    const roNumber = input.dataset.ro || '';
+                    const field = input.dataset.field || '';
+                    const currentValue = input.value || '';
+                    const lastValue = input.dataset.lastValue || '';
+                    if (!roNumber || !field || !currentValue || currentValue === lastValue) {
+                        continue;
+                    }
+                    await patchRoDate(roNumber, field, currentValue);
+                    input.dataset.lastValue = currentValue;
+                }
+            }
+
+            function openRoConfirmPopover() {
+                closeRoConfirmPopover();
+
+                const closeButton = roWindowDoc.getElementById('roCloseButton');
+                if (!closeButton) return;
+
+                const panel = roWindowDoc.createElement('div');
+                panel.id = 'roCloseConfirmPopover';
+                panel.style.position = 'fixed';
+                panel.style.width = '300px';
+                panel.style.background = '#fff';
+                panel.style.border = '1px solid #ccc';
+                panel.style.borderRadius = '8px';
+                panel.style.boxShadow = '0 8px 22px rgba(0,0,0,0.2)';
+                panel.style.padding = '12px';
+                panel.style.zIndex = '9000';
+
+                const rect = closeButton.getBoundingClientRect();
+                const left = Math.max(10, Math.min(window.innerWidth - 320, rect.right + 10));
+                const top = Math.max(10, rect.top - 2);
+                panel.style.left = `${left}px`;
+                panel.style.top = `${top}px`;
+
+                panel.innerHTML = `
+                    <div style="font-size:14px; color:#222; margin-bottom:10px;">You're about to close the RO. Confirm?</div>
+                    <div style="display:flex; justify-content:flex-end; gap:8px;">
+                        <button id="roCloseConfirmCancel" type="button" style="padding:7px 12px; background:#999; color:#fff; border:none; border-radius:5px; cursor:pointer;">Cancel</button>
+                        <button id="roCloseConfirmYes" type="button" style="padding:7px 12px; background:#d32f2f; color:#fff; border:none; border-radius:5px; cursor:pointer; font-weight:700;">Yes</button>
+                    </div>
+                `;
+
+                roWindowDoc.body.appendChild(panel);
+
+                const cancelBtn = roWindowDoc.getElementById('roCloseConfirmCancel');
+                const yesBtn = roWindowDoc.getElementById('roCloseConfirmYes');
+
+                if (cancelBtn) {
+                    cancelBtn.addEventListener('click', () => {
+                        closeRoConfirmPopover();
+                    });
+                }
+
+                if (yesBtn) {
+                    yesBtn.addEventListener('click', async () => {
+                        yesBtn.disabled = true;
+                        try {
+                            await flushHeaderDateInputs();
+                            await popupFetchJson('/api/payments/close-ro', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ ro: ro.ro }),
+                            });
+
+                            closeRoConfirmPopover();
+
+                            if (window.opener && !window.opener.closed) {
+                                if (typeof window.opener.loadDashboardData === 'function') {
+                                    window.opener.loadDashboardData();
+                                }
+                                if (typeof window.opener.loadArchiveClosedRos === 'function') {
+                                    window.opener.loadArchiveClosedRos();
+                                }
+                            }
+
+                            window.close();
+                        } catch (error) {
+                            console.error('Error closing RO:', error);
+                            alert(error.message || 'Unable to close RO.');
+                        } finally {
+                            yesBtn.disabled = false;
+                        }
+                    });
+                }
+            }
+
+            function bindCloseRoButton() {
+                const closeButton = roWindowDoc.getElementById('roCloseButton');
+                if (!closeButton) return;
+                closeButton.addEventListener('click', (event) => {
+                    event.stopPropagation();
+                    openRoConfirmPopover();
+                });
+
+                roWindowDoc.addEventListener('click', (event) => {
+                    const panel = roWindowDoc.getElementById('roCloseConfirmPopover');
+                    if (!panel) return;
+                    const target = event.target;
+                    if (panel.contains(target) || target === closeButton) return;
+                    closeRoConfirmPopover();
                 });
             }
 
@@ -1132,6 +1250,7 @@ def get_dashboard_screen_html():
             bindDateAutosave('roHeaderInDate');
             bindDateAutosave('roHeaderEcdDate');
             bindSidebarButtons();
+            bindCloseRoButton();
             showSidebarView('notes');
         }
             // Global variables for dashboard
