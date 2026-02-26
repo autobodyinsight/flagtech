@@ -340,10 +340,10 @@ def get_dashboard_screen_html():
             const sidebarHtml = `
                 <div id="roSidebar" style="position:fixed; left:0; top:var(--ro-header-height, 170px); height:calc(100vh - var(--ro-header-height, 170px)); width:64px; background:#23272a; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:38px; z-index:100; box-shadow:2px 0 8px rgba(0,0,0,0.08);">
                     <div style="display:flex; flex-direction:column; align-items:center; gap:38px; width:100%;">
-                        <div>${icons.notepad}</div>
-                        <div>${icons.tech}</div>
-                        <div>${icons.cart}</div>
-                        <div>${icons.credit}</div>
+                        <button id="roSidebarBtn-notes" class="ro-sidebar-btn" data-view="notes" title="Notes" style="background:none; border:none; padding:0; cursor:pointer;">${icons.notepad}</button>
+                        <button id="roSidebarBtn-tech" class="ro-sidebar-btn" data-view="tech" title="Tech" style="background:none; border:none; padding:0; cursor:pointer;">${icons.tech}</button>
+                        <button id="roSidebarBtn-parts" class="ro-sidebar-btn" data-view="parts" title="Parts" style="background:none; border:none; padding:0; cursor:pointer;">${icons.cart}</button>
+                        <button id="roSidebarBtn-payments" class="ro-sidebar-btn" data-view="payments" title="Payments" style="background:none; border:none; padding:0; cursor:pointer;">${icons.credit}</button>
                     </div>
                 </div>
             `;
@@ -400,7 +400,9 @@ def get_dashboard_screen_html():
             style.textContent = `
                 body { margin:0; font-family:Segoe UI,Arial,sans-serif; background:#f2f2f2; }
                 #roSidebar svg { display:block; margin:0 auto; }
-                #roSidebar div { cursor:pointer; }
+                #roSidebar .ro-sidebar-btn { opacity:0.72; transition:opacity 0.15s ease, transform 0.15s ease; }
+                #roSidebar .ro-sidebar-btn:hover { opacity:1; transform:translateY(-1px); }
+                #roSidebar .ro-sidebar-btn.active { opacity:1; }
                 #roSidebar { box-shadow:2px 0 8px rgba(0,0,0,0.08); }
                 .ro-header-item { font-size:15px; line-height:1.25; min-width:0; }
                 .ro-header-label { color:#d32f2f; font-weight:700; margin-right:6px; white-space:nowrap; }
@@ -421,6 +423,7 @@ def get_dashboard_screen_html():
                     border-color:#d32f2f;
                     box-shadow:0 0 0 2px rgba(211,47,47,0.25);
                 }
+                                .ro-window-card { background:#fafafa; border:1px solid #ddd; border-radius:8px; padding:14px; }
                 @media (max-width: 700px) {
                   #roSidebar { width:44px; }
                   #roSidebar svg { width:22px; height:22px; }
@@ -434,55 +437,702 @@ def get_dashboard_screen_html():
                 win.document.documentElement.style.setProperty('--ro-header-height', `${headerHeight}px`);
             }
 
-            const script = win.document.createElement('script');
-            script.textContent = `
-                (function() {
-                    async function patchRoDate(roNumber, field, isoValue) {
-                        const response = await fetch('/api/ro-dates', {
-                            method: 'PATCH',
-                            headers: { 'Content-Type': 'application/json' },
-                            credentials: 'include',
-                            body: JSON.stringify({ ro: roNumber, field, value: isoValue })
-                        });
-                        const result = await response.json();
-                        if (!response.ok || result.error) {
-                            throw new Error(result.error || 'Failed to update date');
+            const roWindowDoc = win.document;
+            const roWindowContentEl = roWindowDoc.getElementById('roWindowContent');
+            const popupState = {
+                activeView: '',
+                techLineItems: [],
+                techAssignContext: null,
+                techAssignLines: []
+            };
+
+            function escapePopupHtml(value) {
+                return String(value === null || value === undefined ? '' : value)
+                    .replace(/&/g, '&amp;')
+                    .replace(/</g, '&lt;')
+                    .replace(/>/g, '&gt;')
+                    .replace(/"/g, '&quot;')
+                    .replace(/'/g, '&#39;');
+            }
+
+            function popupFormatMoney(value) {
+                const amount = Number(value || 0);
+                return '$' + amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            }
+
+            function popupFormatDateTime(value) {
+                if (!value) return '-';
+                const parsed = new Date(value);
+                if (Number.isNaN(parsed.getTime())) return String(value);
+                return parsed.toLocaleString();
+            }
+
+            function popupFormatDate(value) {
+                if (!value) return '-';
+                if (/^\d{4}-\d{2}-\d{2}$/.test(String(value))) {
+                    const parts = String(value).split('-');
+                    return `${parts[1]}/${parts[2]}/${parts[0]}`;
+                }
+                return popupFormatDateTime(value);
+            }
+
+            function normalizeTypeLabelLocal(typeValue) {
+                const value = String(typeValue || '').toLowerCase();
+                if (value === 'labor') return 'body';
+                if (value === 'body' || value === 'paint' || value === 'mech' || value === 'frame') return value;
+                return value || '?';
+            }
+
+            async function popupFetchJson(url, options = {}) {
+                const response = await fetch(url, {
+                    credentials: 'include',
+                    ...options,
+                });
+                const payload = await response.json();
+                if (!response.ok || payload.error) {
+                    throw new Error(payload.error || 'Request failed');
+                }
+                return payload;
+            }
+
+            async function patchRoDate(roNumber, field, isoValue) {
+                await popupFetchJson('/api/ro-dates', {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ ro: roNumber, field, value: isoValue }),
+                });
+            }
+
+            function bindDateAutosave(inputId) {
+                const input = roWindowDoc.getElementById(inputId);
+                if (!input) return;
+                input.dataset.lastValue = input.value || '';
+                input.addEventListener('change', async function() {
+                    const roNumber = this.dataset.ro || '';
+                    const field = this.dataset.field || '';
+                    const nextValue = this.value || '';
+                    const prevValue = this.dataset.lastValue || '';
+                    if (!roNumber || !field || !nextValue || nextValue === prevValue) return;
+
+                    this.disabled = true;
+                    try {
+                        await patchRoDate(roNumber, field, nextValue);
+                        this.dataset.lastValue = nextValue;
+                    } catch (error) {
+                        console.error('Error updating RO date:', error);
+                        this.value = prevValue;
+                        alert('Unable to save date.');
+                    } finally {
+                        this.disabled = false;
+                    }
+                });
+            }
+
+            function setActiveSidebar(view) {
+                roWindowDoc.querySelectorAll('#roSidebar .ro-sidebar-btn').forEach((button) => {
+                    if (button.getAttribute('data-view') === view) {
+                        button.classList.add('active');
+                    } else {
+                        button.classList.remove('active');
+                    }
+                });
+            }
+
+            function renderLoading(message) {
+                if (!roWindowContentEl) return;
+                roWindowContentEl.innerHTML = `<div class="ro-window-card" style="color:#777;">${escapePopupHtml(message || 'Loading...')}</div>`;
+            }
+
+            function bindSidebarButtons() {
+                roWindowDoc.querySelectorAll('#roSidebar .ro-sidebar-btn').forEach((button) => {
+                    button.addEventListener('click', () => {
+                        const view = button.getAttribute('data-view') || '';
+                        if (view) {
+                            showSidebarView(view);
                         }
+                    });
+                });
+            }
+
+            async function renderNotesView() {
+                if (!roWindowContentEl) return;
+                roWindowContentEl.innerHTML = `
+                    <div class="ro-window-card">
+                        <div style="font-weight:700; font-size:18px; margin-bottom:10px; color:#333;">Notes Log</div>
+                        <div style="display:flex; gap:10px; margin-bottom:12px; align-items:flex-start;">
+                            <textarea id="roPopupNoteInput" rows="3" style="flex:1; padding:10px; border:1px solid #ccc; border-radius:6px; resize:vertical;" placeholder="Add note..."></textarea>
+                            <button id="roPopupNoteSave" type="button" style="padding:10px 14px; background:#505050; color:#fff; border:none; border-radius:6px; cursor:pointer;">Save</button>
+                        </div>
+                        <div id="roPopupNotesList" style="max-height:420px; overflow-y:auto;"></div>
+                    </div>
+                `;
+
+                const listEl = roWindowDoc.getElementById('roPopupNotesList');
+                const inputEl = roWindowDoc.getElementById('roPopupNoteInput');
+                const saveBtn = roWindowDoc.getElementById('roPopupNoteSave');
+
+                async function loadNotes() {
+                    if (!listEl) return;
+                    listEl.innerHTML = '<div style="color:#777;">Loading...</div>';
+                    try {
+                        const res = await popupFetchJson(`/api/ro-notes?ro=${encodeURIComponent(ro.ro)}`);
+                        const notes = Array.isArray(res.notes) ? res.notes : [];
+                        if (!notes.length) {
+                            listEl.innerHTML = '<div style="color:#999;">No notes yet.</div>';
+                            return;
+                        }
+                        listEl.innerHTML = notes.map((note) => {
+                            const when = popupFormatDateTime(note.created_at);
+                            const who = escapePopupHtml(note.created_by || 'Unknown');
+                            const text = escapePopupHtml(note.note || '');
+                            return `
+                                <div style="padding:10px 0; border-bottom:1px solid #eee;">
+                                    <div style="font-size:12px; color:#666; margin-bottom:4px;">${escapePopupHtml(when)} • ${who}</div>
+                                    <div style="white-space:pre-wrap; color:#222;">${text}</div>
+                                </div>
+                            `;
+                        }).join('');
+                    } catch (error) {
+                        console.error('Error loading notes:', error);
+                        listEl.innerHTML = '<div style="color:#c62828;">Error loading notes.</div>';
+                    }
+                }
+
+                if (saveBtn && inputEl) {
+                    saveBtn.addEventListener('click', async () => {
+                        const noteText = String(inputEl.value || '').trim();
+                        if (!noteText) return;
+                        saveBtn.disabled = true;
+                        try {
+                            await popupFetchJson('/api/ro-notes', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ ro: ro.ro, note: noteText }),
+                            });
+                            inputEl.value = '';
+                            await loadNotes();
+                        } catch (error) {
+                            console.error('Error saving note:', error);
+                            alert('Error saving note.');
+                        } finally {
+                            saveBtn.disabled = false;
+                        }
+                    });
+                }
+
+                await loadNotes();
+            }
+
+            function renderTechAssignLinesModal(lines) {
+                const container = roWindowDoc.getElementById('roPopupTechModalLines');
+                if (!container) return;
+                if (!lines || !lines.length) {
+                    container.innerHTML = '<div style="padding:10px; color:#777;">No repair lines found.</div>';
+                    return;
+                }
+                const sorted = [...lines].sort((a, b) => {
+                    const av = parseInt(String(a.line_number || a.line_key || '').match(/\d+/)?.[0] || '0', 10);
+                    const bv = parseInt(String(b.line_number || b.line_key || '').match(/\d+/)?.[0] || '0', 10);
+                    return av - bv;
+                });
+                container.innerHTML = sorted.map((line) => {
+                    const lineNumber = escapePopupHtml(line.line_number || line.line_key || '-');
+                    const description = escapePopupHtml(String(line.description || '').trim());
+                    const lineType = normalizeTypeLabelLocal(line.repair_type);
+                    const hours = Number(line.hours || 0).toFixed(1);
+                    return `
+                        <div style="display:flex; align-items:center; gap:10px; padding:8px 10px; border-bottom:1px solid #eee;">
+                            <input type="checkbox" class="roPopupTechLineCheckbox" checked data-line-key="${escapePopupHtml(line.line_key)}" data-repair-type="${escapePopupHtml(lineType)}" data-hours="${escapePopupHtml(hours)}" style="width:16px; height:16px;" />
+                            <div style="flex:1; color:#333;">Line ${lineNumber} ${description}</div>
+                            <div style="min-width:70px; text-align:right; font-weight:bold;">${hours} hrs</div>
+                        </div>
+                    `;
+                }).join('');
+            }
+
+            async function openTechAssignModalPopup(item) {
+                const modal = roWindowDoc.getElementById('roPopupTechModal');
+                const title = roWindowDoc.getElementById('roPopupTechModalTitle');
+                const techSelect = roWindowDoc.getElementById('roPopupTechSelect');
+                const typeSelect = roWindowDoc.getElementById('roPopupTechType');
+                if (!modal || !title || !techSelect || !typeSelect) return;
+
+                const mode = String(item?.mode || '').toLowerCase();
+                const sourceType = normalizeTypeLabelLocal(item?.repair_type || item?.type || 'body');
+                const sourceTech = String(item?.tech_name || item?.tech || '');
+
+                popupState.techAssignContext = {
+                    ro: ro.ro,
+                    source: {
+                        mode,
+                        repair_type: sourceType,
+                        tech_name: sourceTech,
+                    },
+                };
+
+                title.textContent = `Assign Repair Lines - RO# ${ro.ro}`;
+                modal.style.display = 'flex';
+                renderTechAssignLinesModal([]);
+
+                try {
+                    const query = new URLSearchParams({
+                        ro: ro.ro,
+                        mode,
+                        repair_type: sourceType,
+                        tech_name: sourceTech,
+                    });
+                    const res = await popupFetchJson(`/api/ro-assignment-lines?${query.toString()}`);
+                    popupState.techAssignLines = Array.isArray(res.lines) ? res.lines : [];
+
+                    const options = ['<option value="">Select tech...</option>'];
+                    (res.techs || []).forEach((tech) => {
+                        const label = escapePopupHtml(tech.name || `Tech #${tech.id}`);
+                        options.push(`<option value="${escapePopupHtml(tech.id)}" data-name="${label}">${label}</option>`);
+                    });
+                    techSelect.innerHTML = options.join('');
+                    if (mode === 'tech' && sourceTech) {
+                        const matched = Array.from(techSelect.options).find((opt) => (opt.dataset?.name || '') === sourceTech);
+                        if (matched) techSelect.value = matched.value;
+                    }
+                    typeSelect.value = mode === 'pending' ? 'body' : sourceType;
+
+                    renderTechAssignLinesModal(popupState.techAssignLines);
+                } catch (error) {
+                    console.error('Error loading assignment lines:', error);
+                    renderTechAssignLinesModal([]);
+                }
+            }
+
+            async function saveTechAssignModalPopup() {
+                const context = popupState.techAssignContext;
+                if (!context?.ro || !context?.source) return;
+
+                const techSelect = roWindowDoc.getElementById('roPopupTechSelect');
+                const typeSelect = roWindowDoc.getElementById('roPopupTechType');
+                if (!techSelect || !typeSelect || !techSelect.value) {
+                    alert('Please select a tech.');
+                    return;
+                }
+
+                const selectedLines = Array.from(roWindowDoc.querySelectorAll('.roPopupTechLineCheckbox:checked')).map((checkbox) => ({
+                    repair_type: checkbox.getAttribute('data-repair-type'),
+                    line_key: checkbox.getAttribute('data-line-key'),
+                }));
+
+                if (!selectedLines.length) {
+                    alert('Select at least one repair line.');
+                    return;
+                }
+
+                const techId = parseInt(techSelect.value, 10);
+                const techName = techSelect.options[techSelect.selectedIndex]?.dataset?.name || '';
+
+                await popupFetchJson('/api/ro-assignment-save', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        ro: context.ro,
+                        source: context.source,
+                        target: {
+                            tech_id: Number.isFinite(techId) ? techId : null,
+                            tech_name: techName,
+                            repair_type: typeSelect.value,
+                        },
+                        selected_lines: selectedLines,
+                    }),
+                });
+
+                const modal = roWindowDoc.getElementById('roPopupTechModal');
+                if (modal) modal.style.display = 'none';
+                await renderTechView();
+                loadDashboardData();
+            }
+
+            function bindTechModalActions() {
+                const closeBtn = roWindowDoc.getElementById('roPopupTechModalClose');
+                const saveBtn = roWindowDoc.getElementById('roPopupTechModalSave');
+                const modal = roWindowDoc.getElementById('roPopupTechModal');
+                if (closeBtn && modal) closeBtn.onclick = () => { modal.style.display = 'none'; };
+                if (saveBtn) {
+                    saveBtn.onclick = async () => {
+                        try {
+                            await saveTechAssignModalPopup();
+                        } catch (error) {
+                            console.error('Error saving assignment:', error);
+                            alert('Error saving assignments.');
+                        }
+                    };
+                }
+            }
+
+            async function renderTechView() {
+                if (!roWindowContentEl) return;
+                roWindowContentEl.innerHTML = `
+                    <div class="ro-window-card">
+                        <div style="font-weight:700; font-size:18px; margin-bottom:10px; color:#333;">Tech Hours Assignment</div>
+                        <div id="roPopupTechList"><div style="color:#777;">Loading...</div></div>
+                    </div>
+                    <div id="roPopupTechModal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.45); z-index:6000; align-items:center; justify-content:center;">
+                        <div style="background:#fff; width:min(860px, 92vw); max-height:90vh; overflow:auto; border-radius:8px; padding:14px 16px;">
+                            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+                                <div id="roPopupTechModalTitle" style="font-weight:700; color:#333;"></div>
+                                <button id="roPopupTechModalClose" type="button" style="background:none; border:none; font-size:20px; cursor:pointer;">×</button>
+                            </div>
+                            <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:10px;">
+                                <div>
+                                    <label style="font-weight:600; color:#555;">Tech</label>
+                                    <select id="roPopupTechSelect" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:6px;"></select>
+                                </div>
+                                <div>
+                                    <label style="font-weight:600; color:#555;">Type</label>
+                                    <select id="roPopupTechType" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:6px;">
+                                        <option value="body">body</option>
+                                        <option value="paint">paint</option>
+                                        <option value="mech">mech</option>
+                                        <option value="frame">frame</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div id="roPopupTechModalLines" style="border:1px solid #e2e2e2; border-radius:6px; max-height:52vh; overflow:auto;"></div>
+                            <div style="display:flex; justify-content:flex-end; gap:8px; margin-top:12px;">
+                                <button id="roPopupTechModalSave" type="button" style="padding:9px 14px; background:#d32f2f; color:#fff; border:none; border-radius:6px; cursor:pointer; font-weight:700;">Save</button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+
+                bindTechModalActions();
+                const listEl = roWindowDoc.getElementById('roPopupTechList');
+                try {
+                    const data = await popupFetchJson(`/api/ro-tech-lines?ro=${encodeURIComponent(ro.ro)}`);
+                    const displayList = Array.isArray(data.tech_lines) ? data.tech_lines : [];
+                    popupState.techLineItems = displayList;
+
+                    if (!displayList.length) {
+                        listEl.innerHTML = '<div style="color:#999; padding:8px;">No repair data found.</div>';
+                        return;
                     }
 
-                    function bindDateAutosave(inputId) {
-                        const input = document.getElementById(inputId);
-                        if (!input) return;
-                        input.dataset.lastValue = input.value || '';
-                        input.addEventListener('change', async function() {
-                            const roNumber = this.dataset.ro || '';
-                            const field = this.dataset.field || '';
-                            const nextValue = this.value || '';
-                            const prevValue = this.dataset.lastValue || '';
+                    listEl.innerHTML = `
+                        <table style="width:100%; border-collapse:collapse;">
+                            <thead>
+                                <tr style="background:#d9d9d9; border-bottom:2px solid #999;">
+                                    <th style="padding:8px 12px; text-align:left; font-weight:700; color:#333;">TECH</th>
+                                    <th style="padding:8px 12px; text-align:left; font-weight:700; color:#333;">TYPE</th>
+                                    <th style="padding:8px 12px; text-align:right; font-weight:700; color:#333;">HRS</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${displayList.map((item, index) => {
+                                    const techLabel = escapePopupHtml(item.tech || 'unassigned');
+                                    const typeLabel = escapePopupHtml(normalizeTypeLabelLocal(item.type || '?'));
+                                    const textColor = techLabel.toUpperCase() === 'PENDING' ? '#d32f2f' : '#333';
+                                    const hrs = Number(item.hours || 0).toFixed(1);
+                                    return `
+                                        <tr style="background:#fff; border-bottom:1px solid #ddd;">
+                                            <td style="padding:8px 12px; color:${textColor}; font-weight:700;"><button type="button" data-tech-index="${index}" class="roPopupTechAssignBtn" style="background:none; border:none; color:${textColor}; text-decoration:underline; cursor:pointer; padding:0; font:inherit; font-weight:700;">${techLabel}</button></td>
+                                            <td style="padding:8px 12px; color:#333;">${typeLabel}</td>
+                                            <td style="padding:8px 12px; text-align:right; color:#333; font-weight:700;">${hrs}</td>
+                                        </tr>
+                                    `;
+                                }).join('')}
+                            </tbody>
+                        </table>
+                    `;
 
-                            if (!roNumber || !field || !nextValue || nextValue === prevValue) {
-                                return;
-                            }
+                    roWindowDoc.querySelectorAll('.roPopupTechAssignBtn').forEach((button) => {
+                        button.addEventListener('click', async () => {
+                            const idx = parseInt(button.getAttribute('data-tech-index') || '-1', 10);
+                            const item = popupState.techLineItems[idx];
+                            if (!item) return;
+                            await openTechAssignModalPopup(item);
+                        });
+                    });
+                } catch (error) {
+                    console.error('Error loading repair data:', error);
+                    listEl.innerHTML = '<div style="color:#c62828;">Error loading data.</div>';
+                }
+            }
 
-                            this.disabled = true;
-                            try {
-                                await patchRoDate(roNumber, field, nextValue);
-                                this.dataset.lastValue = nextValue;
-                            } catch (error) {
-                                console.error('Error updating RO date:', error);
-                                this.value = prevValue;
-                                alert('Unable to save date.');
-                            } finally {
-                                this.disabled = false;
-                            }
+            async function renderPartsView() {
+                if (!roWindowContentEl) return;
+                roWindowContentEl.innerHTML = `
+                    <div class="ro-window-card">
+                        <div style="font-weight:700; font-size:18px; margin-bottom:10px; color:#333;">Parts</div>
+                        <div id="roPopupPartsStatus" style="margin-bottom:12px;"></div>
+                        <div style="font-weight:700; color:#333; margin-bottom:6px;">Parts List</div>
+                        <div id="roPopupPartsLines" style="margin-bottom:14px;"></div>
+                        <div style="font-weight:700; color:#333; margin-bottom:6px;">Invoices</div>
+                        <div id="roPopupPartsInvoices"></div>
+                    </div>
+                `;
+
+                const statusEl = roWindowDoc.getElementById('roPopupPartsStatus');
+                const linesEl = roWindowDoc.getElementById('roPopupPartsLines');
+                const invoicesEl = roWindowDoc.getElementById('roPopupPartsInvoices');
+
+                try {
+                    const [rosRes, linesRes, onOrderRes, arrivedRes, returnedRes, receivedRes] = await Promise.all([
+                        popupFetchJson('/api/parts/ros'),
+                        popupFetchJson(`/api/parts/ro-lines?ro=${encodeURIComponent(ro.ro)}`),
+                        popupFetchJson(`/api/parts/on-order-lines?ro=${encodeURIComponent(ro.ro)}`),
+                        popupFetchJson(`/api/parts/arrived-lines?ro=${encodeURIComponent(ro.ro)}`),
+                        popupFetchJson(`/api/parts/returned-lines?ro=${encodeURIComponent(ro.ro)}`),
+                        popupFetchJson(`/api/parts/received?ro=${encodeURIComponent(ro.ro)}`),
+                    ]);
+
+                    const roRow = (Array.isArray(rosRes.ros) ? rosRes.ros : []).find((item) => String(item.ro || '') === String(ro.ro)) || {};
+                    const lines = Array.isArray(linesRes.lines) ? linesRes.lines : [];
+                    const onOrder = Array.isArray(onOrderRes.items) ? onOrderRes.items : [];
+                    const arrived = Array.isArray(arrivedRes.items) ? arrivedRes.items : [];
+                    const returned = Array.isArray(returnedRes.items) ? returnedRes.items : [];
+                    const received = Array.isArray(receivedRes.items) ? receivedRes.items : [];
+
+                    const arrivedSet = new Set(arrived.map((item) => Number(item.line_id)));
+                    const returnedSet = new Set(returned.map((item) => Number(item.line_id)));
+                    const onOrderSet = new Set(onOrder.map((item) => Number(item.line_id)));
+
+                    statusEl.innerHTML = `
+                        <div style="display:flex; flex-wrap:wrap; gap:8px;">
+                            <span style="padding:6px 10px; background:#f1f1f1; border-radius:999px; font-size:13px;">On Order: <strong>${Number(roRow.on_order || 0)}</strong></span>
+                            <span style="padding:6px 10px; background:#f1f1f1; border-radius:999px; font-size:13px;">Arrived: <strong>${Number(roRow.arrived || 0)}</strong></span>
+                            <span style="padding:6px 10px; background:#f1f1f1; border-radius:999px; font-size:13px;">Returned: <strong>${Number(roRow.returned || 0)}</strong></span>
+                            ${(Number(roRow.on_order_warning_count || 0) > 0) ? `<span style="padding:6px 10px; background:#fff3e0; border-radius:999px; font-size:13px; color:#e65100;">⚠ Overdue: <strong>${Number(roRow.on_order_warning_count || 0)}</strong></span>` : ''}
+                        </div>
+                    `;
+
+                    if (!lines.length) {
+                        linesEl.innerHTML = '<div style="color:#777;">No parts lines found.</div>';
+                    } else {
+                        linesEl.innerHTML = `
+                            <div style="overflow:auto; border:1px solid #e2e2e2; border-radius:6px;">
+                                <table style="width:100%; border-collapse:collapse;">
+                                    <thead>
+                                        <tr style="background:#3c4142; color:#fff; text-align:left;">
+                                            <th style="padding:8px;">Line</th>
+                                            <th style="padding:8px;">Description</th>
+                                            <th style="padding:8px; text-align:right;">Qty</th>
+                                            <th style="padding:8px; text-align:right;">Price</th>
+                                            <th style="padding:8px;">Status</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        ${lines.map((line, idx) => {
+                                            const idNum = Number(line.id);
+                                            let status = 'Pending';
+                                            if (returnedSet.has(idNum)) status = 'Returned';
+                                            else if (arrivedSet.has(idNum)) status = 'Arrived';
+                                            else if (onOrderSet.has(idNum) || line.is_ordered) status = 'On Order';
+                                            return `
+                                                <tr style="background:${idx % 2 === 0 ? '#f2f0ef' : '#fff'}; border-bottom:1px solid #eee;">
+                                                    <td style="padding:8px;">${escapePopupHtml(line.line || '-')}</td>
+                                                    <td style="padding:8px;">${escapePopupHtml(line.description || '')}</td>
+                                                    <td style="padding:8px; text-align:right;">${escapePopupHtml(line.qty || 0)}</td>
+                                                    <td style="padding:8px; text-align:right;">${popupFormatMoney(line.price || 0)}</td>
+                                                    <td style="padding:8px; font-weight:600;">${escapePopupHtml(status)}</td>
+                                                </tr>
+                                            `;
+                                        }).join('')}
+                                    </tbody>
+                                </table>
+                            </div>
+                        `;
+                    }
+
+                    const receivedByInvoice = {};
+                    received.forEach((entry) => {
+                        const invoice = String(entry.invoice_number || '').trim();
+                        if (!invoice) return;
+                        if (!receivedByInvoice[invoice]) receivedByInvoice[invoice] = [];
+                        receivedByInvoice[invoice].push(entry);
+                    });
+                    const invoiceNumbers = Object.keys(receivedByInvoice);
+
+                    if (!invoiceNumbers.length) {
+                        invoicesEl.innerHTML = '<div style="color:#777;">No invoice records.</div>';
+                    } else {
+                        invoicesEl.innerHTML = `
+                            <div style="overflow:auto; border:1px solid #e2e2e2; border-radius:6px;">
+                                <table style="width:100%; border-collapse:collapse;">
+                                    <thead>
+                                        <tr style="background:#3c4142; color:#fff; text-align:left;">
+                                            <th style="padding:8px;">Invoice #</th>
+                                            <th style="padding:8px; text-align:right;">Total</th>
+                                            <th style="padding:8px;">Status</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        ${invoiceNumbers.map((invoice, idx) => {
+                                            const group = receivedByInvoice[invoice] || [];
+                                            const total = group.reduce((sum, item) => sum + Number(item.invoice_total || item.cost || 0), 0);
+                                            const key = escapePopupHtml(invoice);
+                                            return `
+                                                <tr data-invoice-key="${key}" class="roPopupInvoiceRow" style="background:${idx % 2 === 0 ? '#f2f0ef' : '#fff'}; border-bottom:1px solid #eee; cursor:pointer;">
+                                                    <td style="padding:8px; color:#0066cc; text-decoration:underline;">${key}</td>
+                                                    <td style="padding:8px; text-align:right;">${popupFormatMoney(total)}</td>
+                                                    <td style="padding:8px;">Open details</td>
+                                                </tr>
+                                                <tr id="roPopupInvoiceDetail-${key}" style="display:none; background:#fff;">
+                                                    <td colspan="3" style="padding:8px 10px; border-bottom:1px solid #eee;"></td>
+                                                </tr>
+                                            `;
+                                        }).join('')}
+                                    </tbody>
+                                </table>
+                            </div>
+                        `;
+
+                        roWindowDoc.querySelectorAll('.roPopupInvoiceRow').forEach((rowEl) => {
+                            rowEl.addEventListener('click', () => {
+                                const key = rowEl.getAttribute('data-invoice-key') || '';
+                                const detailRow = roWindowDoc.getElementById(`roPopupInvoiceDetail-${key}`);
+                                if (!detailRow) return;
+                                const isOpen = detailRow.style.display === 'table-row';
+                                roWindowDoc.querySelectorAll('[id^="roPopupInvoiceDetail-"]').forEach((el) => {
+                                    el.style.display = 'none';
+                                });
+                                if (isOpen) return;
+
+                                const detailCell = detailRow.querySelector('td');
+                                const group = receivedByInvoice[key] || [];
+                                const groupRows = group.map((item) => {
+                                    const lineId = Number(item.line_id || 0);
+                                    const lineInfo = lines.find((line) => Number(line.id || 0) === lineId) || {};
+                                    return `
+                                        <tr>
+                                            <td style="padding:6px 8px; border-bottom:1px solid #f0f0f0; width:80px;">${escapePopupHtml(lineInfo.line || lineId || '-')}</td>
+                                            <td style="padding:6px 8px; border-bottom:1px solid #f0f0f0;">${escapePopupHtml(lineInfo.description || '')}</td>
+                                            <td style="padding:6px 8px; border-bottom:1px solid #f0f0f0; text-align:right; width:120px;">${popupFormatMoney(item.cost || 0)}</td>
+                                        </tr>
+                                    `;
+                                }).join('');
+                                if (detailCell) {
+                                    detailCell.innerHTML = `
+                                        <div style="font-weight:700; margin-bottom:6px; color:#333;">Invoice Details</div>
+                                        <table style="width:100%; border-collapse:collapse;">
+                                            <thead>
+                                                <tr style="background:#f7f7f7; text-align:left;">
+                                                    <th style="padding:6px 8px; width:80px;">Line</th>
+                                                    <th style="padding:6px 8px;">Description</th>
+                                                    <th style="padding:6px 8px; width:120px; text-align:right;">Cost</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>${groupRows}</tbody>
+                                        </table>
+                                    `;
+                                }
+                                detailRow.style.display = 'table-row';
+                            });
                         });
                     }
+                } catch (error) {
+                    console.error('Error loading parts view:', error);
+                    statusEl.innerHTML = '<div style="color:#c62828;">Error loading parts data.</div>';
+                    linesEl.innerHTML = '';
+                    invoicesEl.innerHTML = '';
+                }
+            }
 
-                    bindDateAutosave('roHeaderInDate');
-                    bindDateAutosave('roHeaderEcdDate');
-                })();
-            `;
-            win.document.body.appendChild(script);
+            async function renderPaymentsView() {
+                if (!roWindowContentEl) return;
+                roWindowContentEl.innerHTML = `
+                    <div class="ro-window-card">
+                        <div style="font-weight:700; font-size:18px; margin-bottom:10px; color:#333;">Payments Log</div>
+                        <div id="roPopupPaymentsLog"><div style="color:#777;">Loading...</div></div>
+                    </div>
+                `;
+
+                const logEl = roWindowDoc.getElementById('roPopupPaymentsLog');
+                try {
+                    const data = await popupFetchJson('/api/payments/open-ros');
+                    const rows = Array.isArray(data.rows) ? data.rows : [];
+                    const row = rows.find((item) => String(item.ro || '') === String(ro.ro));
+                    if (!row) {
+                        logEl.innerHTML = '<div style="color:#777;">No payments found for this RO.</div>';
+                        return;
+                    }
+
+                    const insuranceEntries = Array.isArray(row.insurance_payment_entries) ? row.insurance_payment_entries : [];
+                    const customerEntries = Array.isArray(row.customer_payment_entries) ? row.customer_payment_entries : [];
+
+                    const allEntries = [
+                        ...insuranceEntries.map((entry) => ({ ...entry, source: 'Insurance' })),
+                        ...customerEntries.map((entry) => ({ ...entry, source: 'Customer' })),
+                    ].sort((a, b) => {
+                        const aDate = new Date(a.business_date || a.paid_at || a.date || '').getTime() || 0;
+                        const bDate = new Date(b.business_date || b.paid_at || b.date || '').getTime() || 0;
+                        return aDate - bDate;
+                    });
+
+                    if (!allEntries.length) {
+                        logEl.innerHTML = '<div style="color:#777;">No payment entries yet.</div>';
+                        return;
+                    }
+
+                    logEl.innerHTML = `
+                        <div style="margin-bottom:8px; color:#333;">
+                            <strong>Insurance Paid:</strong> ${popupFormatMoney(row.insurance_paid || 0)} &nbsp;|&nbsp;
+                            <strong>Customer Paid:</strong> ${popupFormatMoney(row.customer_paid || 0)}
+                        </div>
+                        <div style="overflow:auto; border:1px solid #e2e2e2; border-radius:6px;">
+                            <table style="width:100%; border-collapse:collapse;">
+                                <thead>
+                                    <tr style="background:#3c4142; color:#fff; text-align:left;">
+                                        <th style="padding:8px;">Date</th>
+                                        <th style="padding:8px; text-align:right;">Amount</th>
+                                        <th style="padding:8px;">Source</th>
+                                        <th style="padding:8px;">Ref/Note</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    ${allEntries.map((entry, idx) => {
+                                        const ref = entry.reference || entry.note || '-';
+                                        return `
+                                            <tr style="background:${idx % 2 === 0 ? '#f2f0ef' : '#fff'}; border-bottom:1px solid #eee;">
+                                                <td style="padding:8px;">${escapePopupHtml(popupFormatDate(entry.business_date || entry.paid_at || entry.date))}</td>
+                                                <td style="padding:8px; text-align:right;">${popupFormatMoney(entry.amount || 0)}</td>
+                                                <td style="padding:8px;">${escapePopupHtml(entry.source || '-')}</td>
+                                                <td style="padding:8px;">${escapePopupHtml(ref)}</td>
+                                            </tr>
+                                        `;
+                                    }).join('')}
+                                </tbody>
+                            </table>
+                        </div>
+                    `;
+                } catch (error) {
+                    console.error('Error loading payments log:', error);
+                    logEl.innerHTML = '<div style="color:#c62828;">Error loading payments log.</div>';
+                }
+            }
+
+            async function showSidebarView(view) {
+                popupState.activeView = view;
+                setActiveSidebar(view);
+                renderLoading('Loading...');
+                if (view === 'notes') {
+                    await renderNotesView();
+                    return;
+                }
+                if (view === 'tech') {
+                    await renderTechView();
+                    return;
+                }
+                if (view === 'parts') {
+                    await renderPartsView();
+                    return;
+                }
+                if (view === 'payments') {
+                    await renderPaymentsView();
+                    return;
+                }
+                roWindowContentEl.innerHTML = '<div class="ro-window-card" style="color:#777;">Select a sidebar item.</div>';
+            }
+
+            bindDateAutosave('roHeaderInDate');
+            bindDateAutosave('roHeaderEcdDate');
+            bindSidebarButtons();
+            showSidebarView('notes');
         }
             // Global variables for dashboard
             let dashboardData = null;

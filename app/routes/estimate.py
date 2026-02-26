@@ -342,6 +342,7 @@ def _ensure_ro_notes_table(cur) -> None:
         )
         """
     )
+    cur.execute("ALTER TABLE ro_notes ADD COLUMN IF NOT EXISTS created_by VARCHAR(255)")
     cur.execute("CREATE INDEX IF NOT EXISTS idx_ro_notes_ro_domain ON ro_notes(ro, domain)")
 
 
@@ -3848,7 +3849,7 @@ async def list_ro_notes(request: Request, ro: str):
         _ensure_ro_notes_table(cur)
         cur.execute(
             """
-            SELECT note, created_at
+            SELECT note, created_at, created_by
             FROM ro_notes
             WHERE ro = %s AND domain = %s
             ORDER BY created_at DESC
@@ -3857,7 +3858,11 @@ async def list_ro_notes(request: Request, ro: str):
         )
         rows = cur.fetchall()
         notes = [
-            {"note": row.get("note"), "created_at": row.get("created_at")}
+            {
+                "note": row.get("note"),
+                "created_at": row.get("created_at"),
+                "created_by": row.get("created_by"),
+            }
             for row in rows
         ]
         return {"notes": notes}
@@ -3997,6 +4002,8 @@ async def list_ro_activity(request: Request, ro: str):
 @router.post("/ro-notes")
 async def add_ro_note(request: Request):
     domain = get_user_domain(request) or "default"
+    session_user = getattr(request.state, "user", {}) or {}
+    created_by = str(session_user.get("email") or "").strip() or "Unknown"
     data = await request.json()
     ro = (data.get("ro") or "").strip()
     note = (data.get("note") or "").strip()
@@ -4009,10 +4016,10 @@ async def add_ro_note(request: Request):
         _ensure_ro_notes_table(cur)
         cur.execute(
             """
-            INSERT INTO ro_notes (ro, note, domain)
-            VALUES (%s, %s, %s)
+            INSERT INTO ro_notes (ro, note, domain, created_by)
+            VALUES (%s, %s, %s, %s)
             """,
-            (ro, note, domain),
+            (ro, note, domain, created_by),
         )
         conn.commit()
         return {"status": "ok"}
