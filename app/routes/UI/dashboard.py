@@ -317,6 +317,17 @@ def get_dashboard_screen_html():
                 alert('RO not found.');
                 return;
             }
+
+            const normalizeIsoDateForInput = (value) => {
+                if (!value) return '';
+                const text = String(value);
+                if (text.includes('T')) return text.split('T')[0];
+                const dateMatch = text.match(/^(\d{4}-\d{2}-\d{2})/);
+                return dateMatch ? dateMatch[1] : '';
+            };
+
+            const inDateValue = normalizeIsoDateForInput(ro.in_date);
+            const ecdDateValue = normalizeIsoDateForInput(ro.ecd_date);
             // SVG line icons (white, flat, no fill)
             const icons = {
                 notepad: `<svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="5" y="6" width="18" height="16" rx="2" stroke="white" stroke-width="2"/><line x1="9" y1="10" x2="19" y2="10" stroke="white" stroke-width="2"/><line x1="9" y1="14" x2="19" y2="14" stroke="white" stroke-width="2"/><line x1="9" y1="18" x2="15" y2="18" stroke="white" stroke-width="2"/></svg>`,
@@ -347,20 +358,30 @@ def get_dashboard_screen_html():
 
             // Banner fields
             const bannerHtml = `
-                <div style="background:#23272a; color:#fff; padding:18px 24px; font-size:20px; font-weight:bold; border-bottom:3px solid #d32f2f; position:relative; min-height:56px;">
-                    RO Window
+                <div style="background:#23272a; color:#fff; padding:16px 24px 18px 24px; border-bottom:3px solid #d32f2f; position:relative; min-height:132px;">
+                    <div style="font-size:20px; font-weight:bold; margin-bottom:10px;">RO Window</div>
                     ${buttonsHtml}
-                </div>
-                <div style="padding:20px 24px 20px 88px; background:#f9f9f9; border-bottom:1px solid #eee; min-height:64px;">
-                    <div style="display:flex; flex-wrap:wrap; gap:18px 36px; align-items:center; font-size:17px;">
-                        <div><span style='color:#d32f2f; font-weight:bold;'>RO#:</span> <span style='color:#23272a;'>${ro.ro}</span></div>
-                        <div><span style='color:#d32f2f; font-weight:bold;'>Customer:</span> <span style='color:#23272a;'>${ro.customer || '-'}</span></div>
-                        <div><span style='color:#d32f2f; font-weight:bold;'>Phone:</span> <span style='color:#23272a;'>${ro.phone || '-'}</span></div>
-                        <div><span style='color:#d32f2f; font-weight:bold;'>Insurance:</span> <span style='color:#23272a;'>${ro.insurance || '-'}</span></div>
-                        <div><span style='color:#d32f2f; font-weight:bold;'>Claim#:</span> <span style='color:#23272a;'>${ro.claim_number || '-'}</span></div>
-                        <div><span style='color:#d32f2f; font-weight:bold;'>Vehicle:</span> <span style='color:#23272a;'>${ro.vehicle || '-'}</span></div>
-                        <div><span style='color:#d32f2f; font-weight:bold;'>IN Date:</span> <span style='color:#23272a;'>${ro.in_date || '-'}</span></div>
-                        <div><span style='color:#d32f2f; font-weight:bold;'>ECD Date:</span> <span style='color:#23272a;'>${ro.ecd_date || '-'}</span></div>
+                    <div id="roSummaryHeaderGrid" style="display:grid; grid-template-columns:repeat(3, minmax(0, 1fr)); gap:20px 28px; margin-right:230px; align-items:start;">
+                        <div class="ro-header-col" style="display:flex; flex-direction:column; gap:8px; text-align:left; min-width:0;">
+                            <div class="ro-header-item"><span class="ro-header-label">RO#:</span> <span class="ro-header-value">${ro.ro || '-'}</span></div>
+                            <div class="ro-header-item"><span class="ro-header-label">Customer:</span> <span class="ro-header-value">${ro.customer || '-'}</span></div>
+                            <div class="ro-header-item"><span class="ro-header-label">Phone:</span> <span class="ro-header-value">${ro.phone || '-'}</span></div>
+                        </div>
+                        <div class="ro-header-col" style="display:flex; flex-direction:column; gap:8px; text-align:left; min-width:0;">
+                            <div class="ro-header-item"><span class="ro-header-label">Insurance:</span> <span class="ro-header-value">${ro.insurance || '-'}</span></div>
+                            <div class="ro-header-item"><span class="ro-header-label">Claim#:</span> <span class="ro-header-value">${ro.claim_number || '-'}</span></div>
+                        </div>
+                        <div class="ro-header-col" style="display:flex; flex-direction:column; gap:8px; text-align:left; min-width:0;">
+                            <div class="ro-header-item"><span class="ro-header-label">Vehicle:</span> <span class="ro-header-value">${ro.vehicle || '-'}</span></div>
+                            <div class="ro-header-item ro-header-date-row">
+                                <span class="ro-header-label">IN Date:</span>
+                                <input type="date" id="roHeaderInDate" class="ro-header-date-input" value="${inDateValue}" data-field="in_date" data-ro="${ro.ro || ''}" />
+                            </div>
+                            <div class="ro-header-item ro-header-date-row">
+                                <span class="ro-header-label">ECD Date:</span>
+                                <input type="date" id="roHeaderEcdDate" class="ro-header-date-input" value="${ecdDateValue}" data-field="ecd_date" data-ro="${ro.ro || ''}" />
+                            </div>
+                        </div>
                     </div>
                 </div>
                 <div id="roWindowContent" style="padding:32px 32px 32px 88px; min-height:180px; background:#fff; color:#23272a; font-size:18px;">(Content area)</div>
@@ -381,12 +402,81 @@ def get_dashboard_screen_html():
                 #roSidebar svg { display:block; margin:0 auto; }
                 #roSidebar div { cursor:pointer; }
                 #roSidebar { box-shadow:2px 0 8px rgba(0,0,0,0.08); }
+                .ro-header-item { font-size:15px; line-height:1.25; min-width:0; }
+                .ro-header-label { color:#d32f2f; font-weight:700; margin-right:6px; white-space:nowrap; }
+                .ro-header-value { color:#fff; font-weight:600; word-break:break-word; }
+                .ro-header-date-row { display:flex; align-items:center; gap:8px; }
+                .ro-header-date-input {
+                    height:28px;
+                    min-width:140px;
+                    border:1px solid #5b636b;
+                    border-radius:4px;
+                    background:#2d3135;
+                    color:#fff;
+                    padding:2px 8px;
+                    font-size:14px;
+                }
+                .ro-header-date-input:focus {
+                    outline:none;
+                    border-color:#d32f2f;
+                    box-shadow:0 0 0 2px rgba(211,47,47,0.25);
+                }
                 @media (max-width: 700px) {
                   #roSidebar { width:44px; }
                   #roSidebar svg { width:22px; height:22px; }
                 }
             `;
             win.document.head.appendChild(style);
+
+            const script = win.document.createElement('script');
+            script.textContent = `
+                (function() {
+                    async function patchRoDate(roNumber, field, isoValue) {
+                        const response = await fetch('/api/ro-dates', {
+                            method: 'PATCH',
+                            headers: { 'Content-Type': 'application/json' },
+                            credentials: 'include',
+                            body: JSON.stringify({ ro: roNumber, field, value: isoValue })
+                        });
+                        const result = await response.json();
+                        if (!response.ok || result.error) {
+                            throw new Error(result.error || 'Failed to update date');
+                        }
+                    }
+
+                    function bindDateAutosave(inputId) {
+                        const input = document.getElementById(inputId);
+                        if (!input) return;
+                        input.dataset.lastValue = input.value || '';
+                        input.addEventListener('change', async function() {
+                            const roNumber = this.dataset.ro || '';
+                            const field = this.dataset.field || '';
+                            const nextValue = this.value || '';
+                            const prevValue = this.dataset.lastValue || '';
+
+                            if (!roNumber || !field || !nextValue || nextValue === prevValue) {
+                                return;
+                            }
+
+                            this.disabled = true;
+                            try {
+                                await patchRoDate(roNumber, field, nextValue);
+                                this.dataset.lastValue = nextValue;
+                            } catch (error) {
+                                console.error('Error updating RO date:', error);
+                                this.value = prevValue;
+                                alert('Unable to save date.');
+                            } finally {
+                                this.disabled = false;
+                            }
+                        });
+                    }
+
+                    bindDateAutosave('roHeaderInDate');
+                    bindDateAutosave('roHeaderEcdDate');
+                })();
+            `;
+            win.document.body.appendChild(script);
         }
             // Global variables for dashboard
             let dashboardData = null;
