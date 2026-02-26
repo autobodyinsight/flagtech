@@ -345,22 +345,25 @@ def get_dashboard_screen_html():
                 </div>
             `;
 
-            // Header bar with all summary fields (already refactored)
+            // Banner fields
             const bannerHtml = `
-                <div style="background:#23272a; color:#fff; padding:0 0 0 88px; font-size:18px; font-weight:bold; border-bottom:3px solid #d32f2f; position:relative; min-height:72px; display:flex; align-items:center;">
-                    <div style="display:flex; flex-direction:row; flex-wrap:wrap; gap:32px 48px; align-items:center; width:100%; padding:18px 0;">
-                        <div><span style='color:#fff; font-weight:bold;'>RO#:</span> <span style='color:#d32f2f;'>${ro.ro}</span></div>
-                        <div><span style='color:#fff; font-weight:bold;'>Customer:</span> <span style='color:#d32f2f;'>${ro.customer || '-'}</span></div>
-                        <div><span style='color:#fff; font-weight:bold;'>Phone:</span> <span style='color:#d32f2f;'>${ro.phone || '-'}</span></div>
-                        <div><span style='color:#fff; font-weight:bold;'>Insurance:</span> <span style='color:#d32f2f;'>${ro.insurance || '-'}</span></div>
-                        <div><span style='color:#fff; font-weight:bold;'>Claim#:</span> <span style='color:#d32f2f;'>${ro.claim_number || '-'}</span></div>
-                        <div><span style='color:#fff; font-weight:bold;'>Vehicle:</span> <span style='color:#d32f2f;'>${ro.vehicle || '-'}</span></div>
-                        <div><span style='color:#fff; font-weight:bold;'>IN Date:</span> <input id="inDateInput" type="date" value="${ro.in_date || ''}" style="background:#444; color:#fff; border:none; border-radius:4px; padding:2px 8px; font-size:16px; width:130px;" /> </div>
-                        <div><span style='color:#fff; font-weight:bold;'>ECD Date:</span> <input id="ecdDateInput" type="date" value="${ro.ecd_date || ''}" style="background:#444; color:#fff; border:none; border-radius:4px; padding:2px 8px; font-size:16px; width:130px;" /> </div>
-                    </div>
+                <div style="background:#23272a; color:#fff; padding:18px 24px; font-size:20px; font-weight:bold; border-bottom:3px solid #d32f2f; position:relative; min-height:56px;">
+                    RO Window
                     ${buttonsHtml}
                 </div>
-                <div id="roWindowContent" style="padding:32px 32px 32px 88px; min-height:180px; background:#fff; color:#23272a; font-size:18px;"></div>
+                <div style="padding:20px 24px 20px 88px; background:#f9f9f9; border-bottom:1px solid #eee; min-height:64px;">
+                    <div style="display:flex; flex-wrap:wrap; gap:18px 36px; align-items:center; font-size:17px;">
+                        <div><span style='color:#d32f2f; font-weight:bold;'>RO#:</span> <span style='color:#23272a;'>${ro.ro}</span></div>
+                        <div><span style='color:#d32f2f; font-weight:bold;'>Customer:</span> <span style='color:#23272a;'>${ro.customer || '-'}</span></div>
+                        <div><span style='color:#d32f2f; font-weight:bold;'>Phone:</span> <span style='color:#23272a;'>${ro.phone || '-'}</span></div>
+                        <div><span style='color:#d32f2f; font-weight:bold;'>Insurance:</span> <span style='color:#23272a;'>${ro.insurance || '-'}</span></div>
+                        <div><span style='color:#d32f2f; font-weight:bold;'>Claim#:</span> <span style='color:#23272a;'>${ro.claim_number || '-'}</span></div>
+                        <div><span style='color:#d32f2f; font-weight:bold;'>Vehicle:</span> <span style='color:#23272a;'>${ro.vehicle || '-'}</span></div>
+                        <div><span style='color:#d32f2f; font-weight:bold;'>IN Date:</span> <span style='color:#23272a;'>${ro.in_date || '-'}</span></div>
+                        <div><span style='color:#d32f2f; font-weight:bold;'>ECD Date:</span> <span style='color:#23272a;'>${ro.ecd_date || '-'}</span></div>
+                    </div>
+                </div>
+                <div id="roWindowContent" style="padding:32px 32px 32px 88px; min-height:180px; background:#fff; color:#23272a; font-size:18px;">(Content area)</div>
             `;
 
             // Open new window
@@ -382,68 +385,8 @@ def get_dashboard_screen_html():
                   #roSidebar { width:44px; }
                   #roSidebar svg { width:22px; height:22px; }
                 }
-                .date-autosave-spinner { display:inline-block; width:18px; height:18px; vertical-align:middle; margin-left:6px; }
-                .date-autosave-spinner:after { content:' '; display:block; width:18px; height:18px; border-radius:50%; border:2px solid #fff; border-color:#fff #d32f2f #fff #fff; animation: spin 0.8s linear infinite; }
-                @keyframes spin { 100% { transform: rotate(360deg); } }
             `;
             win.document.head.appendChild(style);
-
-            // Autosave logic for IN Date and ECD Date
-            const inDateInput = win.document.getElementById('inDateInput');
-            const ecdDateInput = win.document.getElementById('ecdDateInput');
-            let autosaveTimeout = null;
-            let lastSavedInDate = inDateInput ? inDateInput.value : '';
-            let lastSavedEcdDate = ecdDateInput ? ecdDateInput.value : '';
-
-            function showSpinner(input) {
-                let spinner = input.parentElement.querySelector('.date-autosave-spinner');
-                if (!spinner) {
-                    spinner = win.document.createElement('span');
-                    spinner.className = 'date-autosave-spinner';
-                    input.parentElement.appendChild(spinner);
-                }
-            }
-            function hideSpinner(input) {
-                const spinner = input.parentElement.querySelector('.date-autosave-spinner');
-                if (spinner) spinner.remove();
-            }
-
-            async function autosaveDate(field, value) {
-                if (!ro.ro) return;
-                try {
-                    const input = field === 'in_date' ? inDateInput : ecdDateInput;
-                    showSpinner(input);
-                    const response = await win.fetch('/api/ro-dates', {
-                        method: 'PATCH',
-                        headers: { 'Content-Type': 'application/json' },
-                        credentials: 'include',
-                        body: JSON.stringify({ ro: ro.ro, field, value })
-                    });
-                    const result = await response.json();
-                    if (!response.ok || result.error) throw new Error(result.error || 'Failed to update date');
-                    if (field === 'in_date') lastSavedInDate = value;
-                    if (field === 'ecd_date') lastSavedEcdDate = value;
-                } catch (err) {
-                    win.alert('Error saving date: ' + (err.message || err));
-                } finally {
-                    const input = field === 'in_date' ? inDateInput : ecdDateInput;
-                    hideSpinner(input);
-                }
-            }
-
-            function handleDateChange(e) {
-                const input = e.target;
-                const field = input === inDateInput ? 'in_date' : 'ecd_date';
-                const value = input.value;
-                if ((field === 'in_date' && value === lastSavedInDate) || (field === 'ecd_date' && value === lastSavedEcdDate)) return;
-                if (autosaveTimeout) clearTimeout(autosaveTimeout);
-                autosaveTimeout = setTimeout(() => {
-                    autosaveDate(field, value);
-                }, 600);
-            }
-
-            if (inDateInput) inDateInput.addEventListener('change', handleDateChange);
-            if (ecdDateInput) ecdDateInput.addEventListener('change', handleDateChange);
         }
             // Global variables for dashboard
             let dashboardData = null;
