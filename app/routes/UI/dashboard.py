@@ -1056,6 +1056,23 @@ def get_dashboard_screen_html():
                     const returnedSet = new Set(returned.map((item) => Number(item.line_id)));
                     const onOrderSet = new Set(onOrder.map((item) => Number(item.line_id)));
                     const partNumberByLine = new Map();
+                    const vendorByLine = new Map();
+                    const etaByLine = new Map();
+
+                    function registerVendorEta(entry) {
+                        const lineId = Number(entry.line_id);
+                        if (Number.isNaN(lineId) || lineId <= 0) return;
+
+                        const vendor = String(entry.vendor || '').trim();
+                        const eta = String(entry.eta || entry.arrival_date || '').trim();
+
+                        if (vendor && !vendorByLine.has(lineId)) {
+                            vendorByLine.set(lineId, vendor);
+                        }
+                        if (eta && !etaByLine.has(lineId)) {
+                            etaByLine.set(lineId, eta);
+                        }
+                    }
 
                     [...onOrder, ...arrived, ...returned, ...received].forEach((entry) => {
                         const lineId = Number(entry.line_id);
@@ -1063,6 +1080,7 @@ def get_dashboard_screen_html():
                         if (!Number.isNaN(lineId) && lineId > 0 && partNumber && !partNumberByLine.has(lineId)) {
                             partNumberByLine.set(lineId, partNumber);
                         }
+                        registerVendorEta(entry);
                     });
 
                     statusEl.innerHTML = `
@@ -1086,6 +1104,8 @@ def get_dashboard_screen_html():
                                             <th style="padding:8px;">Description</th>
                                             <th style="padding:8px;">Part #</th>
                                             <th style="padding:8px; text-align:right;">QTY</th>
+                                            <th style="padding:8px;">Vendor</th>
+                                            <th style="padding:8px;">ETA</th>
                                             <th style="padding:8px; text-align:center;">On Order</th>
                                             <th style="padding:8px; text-align:center;">Arrived</th>
                                             <th style="padding:8px; text-align:center;">Returned</th>
@@ -1100,6 +1120,9 @@ def get_dashboard_screen_html():
                                             );
                                             const cleanDescription = extracted.description || '—';
                                             const linePartNumber = String(extracted.partNumber || '').trim();
+                                            const lineVendor = String(vendorByLine.get(idNum) || '').trim();
+                                            const lineEtaRaw = String(etaByLine.get(idNum) || '').trim();
+                                            const lineEta = lineEtaRaw ? popupFormatDate(lineEtaRaw) : '—';
                                             const isOnOrder = onOrderSet.has(idNum) || !!line.is_ordered;
                                             const isArrived = arrivedSet.has(idNum);
                                             const isReturned = returnedSet.has(idNum);
@@ -1109,6 +1132,8 @@ def get_dashboard_screen_html():
                                                     <td style="padding:8px;">${escapePopupHtml(cleanDescription)}</td>
                                                     <td style="padding:8px;">${escapePopupHtml(linePartNumber || '-')}</td>
                                                     <td style="padding:8px; text-align:right;">${escapePopupHtml(line.qty || 0)}</td>
+                                                    <td style="padding:8px;">${escapePopupHtml(lineVendor || '-')}</td>
+                                                    <td style="padding:8px;">${escapePopupHtml(lineEta)}</td>
                                                     <td style="padding:8px; text-align:center; font-weight:600; color:${isOnOrder ? '#2e7d32' : '#777'};">${isOnOrder ? 'Yes' : '—'}</td>
                                                     <td style="padding:8px; text-align:center; font-weight:600; color:${isArrived ? '#2e7d32' : '#777'};">${isArrived ? 'Yes' : '—'}</td>
                                                     <td style="padding:8px; text-align:center; font-weight:600; color:${isReturned ? '#2e7d32' : '#777'};">${isReturned ? 'Yes' : '—'}</td>
