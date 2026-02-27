@@ -579,6 +579,50 @@ function executeSaveEstimate() {{
     }};
   }});
 
+  const allLinesSeedMap = new Map();
+  (saveLaborItems || []).forEach((item) => {{
+    const rawLine = item && item.line !== undefined && item.line !== null ? String(item.line).trim() : '';
+    const match = rawLine.match(/\d+/);
+    if (!match) return;
+    const lineNumber = Number(match[0]);
+    if (!Number.isFinite(lineNumber)) return;
+    if (!allLinesSeedMap.has(lineNumber)) {{
+      const description = String(item.description || '').trim();
+      allLinesSeedMap.set(lineNumber, {{
+        lineNumber,
+        description,
+      }});
+    }}
+  }});
+  (savePaintItems || []).forEach((item) => {{
+    const rawLine = item && item.line !== undefined && item.line !== null ? String(item.line).trim() : '';
+    const match = rawLine.match(/\d+/);
+    if (!match) return;
+    const lineNumber = Number(match[0]);
+    if (!Number.isFinite(lineNumber)) return;
+    if (!allLinesSeedMap.has(lineNumber)) {{
+      const description = String(item.description || '').trim();
+      allLinesSeedMap.set(lineNumber, {{
+        lineNumber,
+        description,
+      }});
+    }}
+  }});
+  (savePartsItems || []).forEach((item) => {{
+    const rawLine = item && item.line !== undefined && item.line !== null ? String(item.line).trim() : '';
+    const match = rawLine.match(/\d+/);
+    if (!match) return;
+    const lineNumber = Number(match[0]);
+    if (!Number.isFinite(lineNumber)) return;
+    if (!allLinesSeedMap.has(lineNumber)) {{
+      const description = String(item.description || item.row_text || '').replace(/^\s*\d+\s+/, '').trim();
+      allLinesSeedMap.set(lineNumber, {{
+        lineNumber,
+        description,
+      }});
+    }}
+  }});
+
   const estimateSnapshot = {{
     version: 1,
     source: 'upload-save-modal',
@@ -597,6 +641,7 @@ function executeSaveEstimate() {{
       insurance_company: saveInsuranceCompany || '',
       estimator: saveEstimator || saveWrittenBy || '',
     }},
+    all_lines: Array.from(allLinesSeedMap.values()).sort((a, b) => a.lineNumber - b.lineNumber),
     sections: [
       {{
         key: 'labor',
