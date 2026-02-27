@@ -93,6 +93,116 @@ def _resolve_note_created_by(cur, value: str) -> str:
     return created_by
 
 
+def _extract_line_number(value) -> int | None:
+    if value is None:
+        return None
+    if isinstance(value, (int, float)):
+        try:
+            return int(value)
+        except Exception:
+            return None
+    text = str(value).strip()
+    if not text:
+        return None
+    match = re.search(r"\d+", text)
+    if not match:
+        return None
+    try:
+        return int(match.group(0))
+    except Exception:
+        return None
+
+
+def _coerce_number(value, default: float = 0.0) -> float:
+    try:
+        parsed = float(str(value).replace(",", "").strip())
+        if math.isfinite(parsed):
+            return parsed
+    except Exception:
+        pass
+    return default
+
+
+def _build_unified_estimate_lines(snapshot: dict | None) -> list[dict]:
+    if not isinstance(snapshot, dict):
+        return []
+
+    sections = snapshot.get("sections")
+    if not isinstance(sections, list):
+        return []
+
+    by_line: dict[int, dict] = {}
+    order: list[int] = []
+
+    def _get_or_create(line_number: int) -> dict:
+        if line_number not in by_line:
+            by_line[line_number] = {
+                "lineNumber": line_number,
+                "description": "",
+                "labor": 0.0,
+                "paint": 0.0,
+                "qty": None,
+                "partNumber": "",
+                "extendedPrice": None,
+            }
+            order.append(line_number)
+        return by_line[line_number]
+
+    for section in sections:
+        if not isinstance(section, dict):
+            continue
+        key = str(section.get("key") or "").strip().lower()
+        items = section.get("items")
+        if not isinstance(items, list):
+            continue
+
+        for item in items:
+            if not isinstance(item, dict):
+                continue
+
+            line_number = _extract_line_number(item.get("line") or item.get("lineNumber"))
+            if line_number is None:
+                continue
+
+            record = _get_or_create(line_number)
+            item_description = str(item.get("description") or "").strip()
+            if item_description and not record.get("description"):
+                record["description"] = item_description
+
+            if key == "labor":
+                record["labor"] = _coerce_number(item.get("value"), 0.0)
+                continue
+
+            if key == "paint":
+                record["paint"] = _coerce_number(item.get("value"), 0.0)
+                continue
+
+            if key == "parts":
+                qty_value = item.get("qty")
+                if qty_value is not None and str(qty_value).strip() != "":
+                    record["qty"] = _coerce_number(qty_value, 0.0)
+
+                part_number = (
+                    item.get("partNumber")
+                    or item.get("part_number")
+                    or item.get("part_no")
+                    or item.get("part#")
+                    or item.get("pn")
+                    or ""
+                )
+                part_number = str(part_number or "").strip()
+                if part_number:
+                    record["partNumber"] = part_number
+
+                price_value = item.get("extendedPrice")
+                if price_value is None:
+                    price_value = item.get("price")
+                if price_value is not None and str(price_value).strip() != "":
+                    record["extendedPrice"] = _coerce_number(price_value, 0.0)
+
+    return [by_line[line_number] for line_number in sorted(order)]
+
+
 def _parse_part_description_and_number(item: dict) -> tuple[str, str]:
     description = str(item.get("description") or "").strip()
     explicit_part_number = (
@@ -5500,6 +5610,7 @@ async def get_ro_estimate_snapshot(request: Request, ro: str):
 
         saved_snapshot = _parse_json_field(row.get("estimate_snapshot"))
         if isinstance(saved_snapshot, dict) and saved_snapshot:
+            saved_snapshot["unified_lines"] = _build_unified_estimate_lines(saved_snapshot)
             return {"estimate": saved_snapshot}
 
         labor_repairs = _parse_json_field(row.get("labor_repairs"))
@@ -5553,6 +5664,7 @@ async def get_ro_estimate_snapshot(request: Request, ro: str):
             ],
             "totals": totals,
         }
+        fallback_snapshot["unified_lines"] = _build_unified_estimate_lines(fallback_snapshot)
         return {"estimate": fallback_snapshot}
     finally:
         cur.close()

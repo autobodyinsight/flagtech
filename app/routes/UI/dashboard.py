@@ -806,39 +806,128 @@ def get_dashboard_screen_html():
                     const estimate = res.estimate || {};
                     const header = estimate.header || {};
                     const vehicle = header.vehicle || {};
-                    const sections = Array.isArray(estimate.sections) ? estimate.sections : [];
                     const totals = Array.isArray(estimate.totals) ? estimate.totals : [];
+                    const sections = Array.isArray(estimate.sections) ? estimate.sections : [];
+
+                    function toNumber(value, fallback = 0) {
+                        const parsed = Number(value);
+                        return Number.isFinite(parsed) ? parsed : fallback;
+                    }
+
+                    function extractLineNumber(value) {
+                        if (value === null || value === undefined) return null;
+                        const text = String(value);
+                        const match = text.match(/\d+/);
+                        if (!match) return null;
+                        const parsed = Number(match[0]);
+                        return Number.isFinite(parsed) ? parsed : null;
+                    }
+
+                    function normalizeDisplayNumber(value) {
+                        const numeric = toNumber(value, 0);
+                        return Number.isInteger(numeric)
+                            ? String(numeric)
+                            : numeric.toFixed(2).replace(/\.00$/, '').replace(/(\.\d*[1-9])0+$/, '$1');
+                    }
+
+                    function buildUnifiedLinesFromSections(sectionList) {
+                        const byLine = new Map();
+
+                        function getLineRecord(lineNumber) {
+                            if (!byLine.has(lineNumber)) {
+                                byLine.set(lineNumber, {
+                                    lineNumber,
+                                    description: '',
+                                    labor: 0,
+                                    paint: 0,
+                                    qty: null,
+                                    partNumber: '',
+                                    extendedPrice: null,
+                                });
+                            }
+                            return byLine.get(lineNumber);
+                        }
+
+                        sectionList.forEach((section) => {
+                            const sectionKey = String(section?.key || '').toLowerCase();
+                            const items = Array.isArray(section?.items) ? section.items : [];
+                            items.forEach((item) => {
+                                const lineNumber = extractLineNumber(item?.line ?? item?.lineNumber);
+                                if (lineNumber === null) return;
+
+                                const record = getLineRecord(lineNumber);
+                                const desc = String(item?.description || '').trim();
+                                if (desc && !record.description) {
+                                    record.description = desc;
+                                }
+
+                                if (sectionKey === 'labor') {
+                                    record.labor = toNumber(item?.value, 0);
+                                    return;
+                                }
+                                if (sectionKey === 'paint') {
+                                    record.paint = toNumber(item?.value, 0);
+                                    return;
+                                }
+                                if (sectionKey === 'parts') {
+                                    const qtyRaw = item?.qty;
+                                    if (qtyRaw !== null && qtyRaw !== undefined && String(qtyRaw).trim() !== '') {
+                                        record.qty = toNumber(qtyRaw, 0);
+                                    }
+                                    const partNumber = String(
+                                        item?.partNumber || item?.part_number || item?.part_no || item?.['part#'] || item?.pn || ''
+                                    ).trim();
+                                    if (partNumber) {
+                                        record.partNumber = partNumber;
+                                    }
+                                    const extPriceRaw = item?.extendedPrice ?? item?.price;
+                                    if (extPriceRaw !== null && extPriceRaw !== undefined && String(extPriceRaw).trim() !== '') {
+                                        record.extendedPrice = toNumber(extPriceRaw, 0);
+                                    }
+                                }
+                            });
+                        });
+
+                        return Array.from(byLine.values()).sort((a, b) => a.lineNumber - b.lineNumber);
+                    }
+
+                    const unifiedLines = Array.isArray(estimate.unified_lines)
+                        ? [...estimate.unified_lines].sort((a, b) => toNumber(a?.lineNumber, 0) - toNumber(b?.lineNumber, 0))
+                        : buildUnifiedLinesFromSections(sections);
 
                     const ownerInfo = String(header.owner_info || '').trim();
                     const ownerHtml = ownerInfo
                         ? ownerInfo.split(/\r?\n/).map((line) => `<div>${escapePopupHtml(line)}</div>`).join('')
                         : '<div>-</div>';
 
-                    const sectionsHtml = sections.map((section) => {
-                        const items = Array.isArray(section.items) ? section.items : [];
-                        const itemsHtml = items.length
-                            ? items.map((item) => {
-                                const lineText = item.line ? `Line ${escapePopupHtml(item.line)} - ` : '';
-                                const desc = escapePopupHtml(item.description || '');
-                                const displayValue = item.display
-                                    ? escapePopupHtml(item.display)
-                                    : (item.value !== undefined && item.value !== null ? escapePopupHtml(String(item.value)) : '');
-                                return `
-                                    <div style="display:flex; justify-content:space-between; gap:12px; padding:8px 0; border-bottom:1px solid #eee;">
-                                        <div>${lineText}${desc}</div>
-                                        <div style="font-weight:600; white-space:nowrap;">${displayValue}</div>
-                                    </div>
-                                `;
-                            }).join('')
-                            : '<div style="color:#777; padding:8px 0;">No items.</div>';
+                    const unifiedHtml = unifiedLines.length
+                        ? unifiedLines.map((line) => {
+                            const lineNumber = toNumber(line?.lineNumber, 0);
+                            const description = String(line?.description || '').trim() || '-';
+                            const labor = toNumber(line?.labor, 0);
+                            const paint = toNumber(line?.paint, 0);
+                            const qty = line?.qty;
+                            const partNumber = String(line?.partNumber || '').trim();
+                            const extendedPrice = line?.extendedPrice;
+                            const hasPartsDetails =
+                                (qty !== null && qty !== undefined && String(qty).trim() !== '') ||
+                                !!partNumber ||
+                                (extendedPrice !== null && extendedPrice !== undefined && String(extendedPrice).trim() !== '');
 
-                        return `
-                            <div style="background:#fff; border:1px solid #ddd; border-radius:8px; padding:12px; margin-bottom:12px;">
-                                <div style="font-weight:700; margin-bottom:8px; color:#333;">${escapePopupHtml(section.title || 'Section')}</div>
-                                ${itemsHtml}
-                            </div>
-                        `;
-                    }).join('');
+                            return `
+                                <div style="background:#fff; border:1px solid #ddd; border-radius:8px; padding:12px; margin-bottom:10px;">
+                                    <div style="font-weight:700; margin-bottom:6px; color:#333;">Line ${escapePopupHtml(lineNumber)} - ${escapePopupHtml(description)}</div>
+                                    <div style="margin-bottom:4px;"><strong>Labor:</strong> ${escapePopupHtml(normalizeDisplayNumber(labor))}</div>
+                                    <div style="margin-bottom:${hasPartsDetails ? '6px' : '0'};"><strong>Paint:</strong> ${escapePopupHtml(normalizeDisplayNumber(paint))}</div>
+                                    ${hasPartsDetails ? `
+                                        <div><strong>Qty:</strong> ${escapePopupHtml(qty === null || qty === undefined || String(qty).trim() === '' ? '-' : normalizeDisplayNumber(qty))}</div>
+                                        <div><strong>Part #:</strong> ${escapePopupHtml(partNumber || '-')}</div>
+                                        <div><strong>Price:</strong> ${escapePopupHtml(extendedPrice === null || extendedPrice === undefined || String(extendedPrice).trim() === '' ? '-' : normalizeDisplayNumber(extendedPrice))}</div>
+                                    ` : ''}
+                                </div>
+                            `;
+                        }).join('')
+                        : '<div style="color:#777;">No estimate lines available.</div>';
 
                     const totalsHtml = totals.length
                         ? totals.map((total) => {
@@ -872,7 +961,10 @@ def get_dashboard_screen_html():
                             <div style="font-weight:700; margin-bottom:8px;">Owner Info</div>
                             ${ownerHtml}
                         </div>
-                        ${sectionsHtml}
+                        <div style="margin-bottom:12px;">
+                            <div style="font-weight:700; margin-bottom:8px; color:#333;">Unified Estimate Lines</div>
+                            ${unifiedHtml}
+                        </div>
                         <div style="background:#fff; border:1px solid #ddd; border-radius:8px; padding:12px;">
                             <div style="font-weight:700; margin-bottom:8px; color:#333;">Totals</div>
                             ${totalsHtml}
