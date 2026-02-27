@@ -1058,6 +1058,8 @@ def get_dashboard_screen_html():
                     const partNumberByLine = new Map();
                     const vendorByLine = new Map();
                     const etaByLine = new Map();
+                    const listByLine = new Map();
+                    const costByLine = new Map();
 
                     function registerVendorEta(entry) {
                         const lineId = Number(entry.line_id);
@@ -1074,6 +1076,21 @@ def get_dashboard_screen_html():
                         }
                     }
 
+                    function registerListAndCost(entry) {
+                        const lineId = Number(entry.line_id);
+                        if (Number.isNaN(lineId) || lineId <= 0) return;
+
+                        const listValue = Number(entry.list);
+                        if (Number.isFinite(listValue) && !listByLine.has(lineId)) {
+                            listByLine.set(lineId, listValue);
+                        }
+
+                        const costValue = Number(entry.cost);
+                        if (Number.isFinite(costValue) && !costByLine.has(lineId)) {
+                            costByLine.set(lineId, costValue);
+                        }
+                    }
+
                     [...onOrder, ...arrived, ...returned, ...received].forEach((entry) => {
                         const lineId = Number(entry.line_id);
                         const partNumber = String(entry.part_number || '').trim();
@@ -1081,6 +1098,7 @@ def get_dashboard_screen_html():
                             partNumberByLine.set(lineId, partNumber);
                         }
                         registerVendorEta(entry);
+                        registerListAndCost(entry);
                     });
 
                     statusEl.innerHTML = `
@@ -1103,6 +1121,8 @@ def get_dashboard_screen_html():
                                             <th style="padding:8px;">Line</th>
                                             <th style="padding:8px;">Description</th>
                                             <th style="padding:8px;">Part #</th>
+                                            <th style="padding:8px; text-align:right;">List</th>
+                                            <th style="padding:8px; text-align:right;">Cost</th>
                                             <th style="padding:8px; text-align:right;">QTY</th>
                                             <th style="padding:8px;">Vendor</th>
                                             <th style="padding:8px;">ETA</th>
@@ -1120,6 +1140,12 @@ def get_dashboard_screen_html():
                                             );
                                             const cleanDescription = extracted.description || '—';
                                             const linePartNumber = String(extracted.partNumber || '').trim();
+                                            const lineList = Number.isFinite(Number(listByLine.get(idNum)))
+                                                ? Number(listByLine.get(idNum))
+                                                : Number(line.price || 0);
+                                            const lineCost = Number.isFinite(Number(costByLine.get(idNum)))
+                                                ? Number(costByLine.get(idNum))
+                                                : null;
                                             const lineVendor = String(vendorByLine.get(idNum) || '').trim();
                                             const lineEtaRaw = String(etaByLine.get(idNum) || '').trim();
                                             const lineEta = lineEtaRaw ? popupFormatDate(lineEtaRaw) : '—';
@@ -1131,6 +1157,8 @@ def get_dashboard_screen_html():
                                                     <td style="padding:8px;">${escapePopupHtml(line.line || '-')}</td>
                                                     <td style="padding:8px;">${escapePopupHtml(cleanDescription)}</td>
                                                     <td style="padding:8px;">${escapePopupHtml(linePartNumber || '-')}</td>
+                                                    <td style="padding:8px; text-align:right;">${popupFormatMoney(lineList)}</td>
+                                                    <td style="padding:8px; text-align:right;">${lineCost === null ? '—' : popupFormatMoney(lineCost)}</td>
                                                     <td style="padding:8px; text-align:right;">${escapePopupHtml(line.qty || 0)}</td>
                                                     <td style="padding:8px;">${escapePopupHtml(lineVendor || '-')}</td>
                                                     <td style="padding:8px;">${escapePopupHtml(lineEta)}</td>
