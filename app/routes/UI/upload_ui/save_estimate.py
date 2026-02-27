@@ -547,174 +547,160 @@ function closeSaveEstimateModal() {{
 function executeSaveEstimate() {{
   const saveBtn = document.getElementById('executeSaveBtn');
   const statusDiv = document.getElementById('saveEstimateStatus');
-  try {{
-    const laborData = Array.isArray(saveLaborItems) ? saveLaborItems.slice() : [];
-    const paintData = Array.isArray(savePaintItems) ? savePaintItems.slice() : [];
-    const partsResult = extractPartsReplacements();
 
-    if (laborData.length === 0 && paintData.length === 0 && partsResult.items.length === 0) {{
-      statusDiv.textContent = 'No repair lines found to save';
-      statusDiv.style.color = 'red';
-      return;
-    }}
+  // Build payload
+  const laborData = saveLaborItems.slice();
+  const paintData = savePaintItems.slice();
+  const partsResult = extractPartsReplacements();
 
-    saveBtn.disabled = true;
-    statusDiv.textContent = 'Saving...';
-    statusDiv.style.color = 'blue';
-    const totalsData = Object.assign({{}}, saveEstimateTotalsData);
-    if (totalsData.parts_total === null || totalsData.parts_total === undefined) {{
-      totalsData.parts_total = partsResult.total;
-    }}
-    const nowLocal = new Date();
-    const localUploadDate = `${{nowLocal.getFullYear()}}-${{String(nowLocal.getMonth() + 1).padStart(2, '0')}}-${{String(nowLocal.getDate()).padStart(2, '0')}}`;
-    const resolvedTotals = resolveEstimateTotals(totalsData);
+  if (laborData.length === 0 && paintData.length === 0 && partsResult.items.length === 0) {{
+    statusDiv.textContent = 'No repair lines found to save';
+    statusDiv.style.color = 'red';
+    return;
+  }}
 
-    const totalsList = resolvedTotals.totalDefs.map((def) => {{
-      const value = totalsData[def.key];
-      return {{
-        key: def.key,
-        label: def.label,
-        value: value,
-        display: formatEstimateValue(value),
-      }};
-    }});
+  saveBtn.disabled = true;
+  statusDiv.textContent = 'Saving...';
+  statusDiv.style.color = 'blue';
+  const totalsData = Object.assign({{}}, saveEstimateTotalsData);
+  if (totalsData.parts_total === null || totalsData.parts_total === undefined) {{
+    totalsData.parts_total = partsResult.total;
+  }}
+  const nowLocal = new Date();
+  const localUploadDate = `${{nowLocal.getFullYear()}}-${{String(nowLocal.getMonth() + 1).padStart(2, '0')}}-${{String(nowLocal.getDate()).padStart(2, '0')}}`;
 
-    const estimateSnapshot = {{
-      version: 1,
-      source: 'upload-save-modal',
-      generated_at: new Date().toISOString(),
-      header: {{
-        ro: saveRoNumber || '',
-        claim_number: saveClaimNumber || '',
-        vehicle: {{
-          year: vehicleYear || '',
-          make: vehicleMake || '',
-          model: vehicleModel || '',
-          vin: saveVIN || '',
-          raw: saveVehicleInfoLine || '',
-        }},
-        owner_info: saveOwnerInfo || '',
-        insurance_company: saveInsuranceCompany || '',
-        estimator: saveEstimator || saveWrittenBy || '',
-      }},
-      sections: [
-        {{
-          key: 'labor',
-          title: 'Labor Repairs',
-          items: laborData.map((item) => ({{
-            line: item.line || '',
-            description: item.description || '',
-            value: Number(item.value || 0),
-            display: `${{Number(item.value || 0).toFixed(1)}} hrs`,
-          }})),
-        }},
-        {{
-          key: 'paint',
-          title: 'Refinish Repairs',
-          items: paintData.map((item) => ({{
-            line: item.line || '',
-            description: item.description || '',
-            value: Number(item.value || 0),
-            display: `${{Number(item.value || 0).toFixed(1)}} hrs`,
-          }})),
-        }},
-        {{
-          key: 'parts',
-          title: 'Parts Replacements',
-          items: partsResult.items.map((item) => ({{
-            line: item.line || '',
-            description: item.description || '',
-            part_type: item.part_type || '',
-            qty: item.qty || null,
-            part_number: item.part_number || item.partNumber || '',
-            price: Number(item.price || 0),
-            extendedPrice: Number(item.price || 0),
-            display: `$${{formatPartPrice(Number(item.price || 0))}}`,
-          }})),
-        }},
-      ],
-      totals: totalsList,
+  const totalsList = resolvedTotals.totalDefs.map((def) => {{
+    const value = totalsData[def.key];
+    return {{
+      key: def.key,
+      label: def.label,
+      value: value,
+      display: formatEstimateValue(value),
     }};
-    
-    const payload = {{
-      ro: saveRoNumber,
-      vehicle: saveVehicleInfoLine,
-      year: vehicleYear,
-      make: vehicleMake,
-      model: vehicleModel,
-      owner_info: saveOwnerInfo,
-      insurance_company: saveInsuranceCompany,
-      vin: saveVIN,
-      claim_number: saveClaimNumber,
-      written_by: saveWrittenBy,
-      estimator: saveEstimator,
-      labor_repairs: laborData,
-      paint_repairs: paintData,
-      parts_repairs: partsResult.items,
-      estimate_snapshot: estimateSnapshot,
-      estimate_totals: totalsData,
-      local_upload_date: localUploadDate,
-      timestamp: new Date().toISOString()
-    }};
-    
-    fetch('/ui/save-estimate', {{
-      method: 'POST',
-      headers: {{
-        'Content-Type': 'application/json',
-        ...getAuthHeaders()
+  }});
+
+  const estimateSnapshot = {{
+    version: 1,
+    source: 'upload-save-modal',
+    generated_at: new Date().toISOString(),
+    header: {{
+      ro: saveRoNumber || '',
+      claim_number: saveClaimNumber || '',
+      vehicle: {{
+        year: vehicleYear || '',
+        make: vehicleMake || '',
+        model: vehicleModel || '',
+        vin: saveVIN || '',
+        raw: saveVehicleInfoLine || '',
       }},
-      body: JSON.stringify(payload),
-      credentials: 'include'
-    }})
-    .then(async (response) => {{
-      const raw = await response.text();
-      let parsed = {{}};
-      try {{
-        parsed = raw ? JSON.parse(raw) : {{}};
-      }} catch (_) {{
-        parsed = {{ message: raw || 'Unexpected response from server' }};
+      owner_info: saveOwnerInfo || '',
+      insurance_company: saveInsuranceCompany || '',
+      estimator: saveEstimator || saveWrittenBy || '',
+    }},
+    sections: [
+      {{
+        key: 'labor',
+        title: 'Labor Repairs',
+        items: laborData.map((item) => ({{
+          line: item.line || '',
+          description: item.description || '',
+          value: Number(item.value || 0),
+          display: `${{Number(item.value || 0).toFixed(1)}} hrs`,
+        }})),
+      }},
+      {{
+        key: 'paint',
+        title: 'Refinish Repairs',
+        items: paintData.map((item) => ({{
+          line: item.line || '',
+          description: item.description || '',
+          value: Number(item.value || 0),
+          display: `${{Number(item.value || 0).toFixed(1)}} hrs`,
+        }})),
+      }},
+      {{
+        key: 'parts',
+        title: 'Parts Replacements',
+        items: partsResult.items.map((item) => ({{
+          line: item.line || '',
+          description: item.description || '',
+          part_type: item.part_type || '',
+          qty: item.qty || null,
+          part_number: item.part_number || item.partNumber || '',
+          price: Number(item.price || 0),
+          extendedPrice: Number(item.price || 0),
+          display: `$${{formatPartPrice(Number(item.price || 0))}}`,
+        }})),
+      }},
+    ],
+    totals: totalsList,
+  }};
+  
+  const payload = {{
+    ro: saveRoNumber,
+    vehicle: saveVehicleInfoLine,
+    year: vehicleYear,
+    make: vehicleMake,
+    model: vehicleModel,
+    owner_info: saveOwnerInfo,
+    insurance_company: saveInsuranceCompany,
+    vin: saveVIN,
+    claim_number: saveClaimNumber,
+    written_by: saveWrittenBy,
+    estimator: saveEstimator,
+    labor_repairs: laborData,
+    paint_repairs: paintData,
+    parts_repairs: partsResult.items,
+    estimate_snapshot: estimateSnapshot,
+    estimate_totals: totalsData,
+    local_upload_date: localUploadDate,
+    timestamp: new Date().toISOString()
+  }};
+  
+  fetch('/ui/save-estimate', {{
+    method: 'POST',
+    headers: {{
+      'Content-Type': 'application/json',
+      ...getAuthHeaders()
+    }},
+    body: JSON.stringify(payload),
+    credentials: 'include'
+  }})
+  .then(response => response.json())
+  .then(result => {{
+    if (result.status === 'success') {{
+      statusDiv.textContent = 'Saved successfully!';
+      statusDiv.style.color = 'green';
+      closeSaveEstimateModal();
+      const uploadStatus = document.getElementById('uploadStatus');
+      if (uploadStatus) {{
+        uploadStatus.innerHTML = '';
       }}
-      return {{ ok: response.ok, data: parsed }};
-    }})
-    .then(({ ok, data }) => {{
-      if (ok && data.status === 'success') {{
-        statusDiv.textContent = 'Saved successfully!';
-        statusDiv.style.color = 'green';
-        closeSaveEstimateModal();
-        const uploadStatus = document.getElementById('uploadStatus');
-        if (uploadStatus) {{
-          uploadStatus.innerHTML = '';
-        }}
-        const estimateSummary = document.getElementById('estimateSummary');
-        if (estimateSummary) {{
-          estimateSummary.style.display = 'none';
-        }}
-        const fileInput = document.getElementById('fileInput');
-        if (fileInput) {{
-          fileInput.value = '';
-        }}
-        const importButtonWrap = document.getElementById('importButtonWrap');
-        if (importButtonWrap) {{
-          importButtonWrap.style.display = 'flex';
-        }}
-        statusDiv.textContent = '';
-        saveBtn.disabled = false;
-      }} else {{
-        statusDiv.textContent = 'Error: ' + (data.message || data.error || 'Failed to save');
-        statusDiv.style.color = 'red';
-        saveBtn.disabled = false;
+      const estimateSummary = document.getElementById('estimateSummary');
+      if (estimateSummary) {{
+        estimateSummary.style.display = 'none';
       }}
-    }})
-    .catch(error => {{
-      statusDiv.textContent = 'Error: ' + (error && error.message ? error.message : 'Failed to save');
+      const fileInput = document.getElementById('fileInput');
+      if (fileInput) {{
+        fileInput.value = '';
+      }}
+      const importButtonWrap = document.getElementById('importButtonWrap');
+      if (importButtonWrap) {{
+        importButtonWrap.style.display = 'flex';
+      }}
+      statusDiv.textContent = '';
+      saveBtn.disabled = false;
+    }} else {{
+      statusDiv.textContent = 'Error: ' + (result.message || 'Failed to save');
       statusDiv.style.color = 'red';
       saveBtn.disabled = false;
-    }});
-  }} catch (error) {{
-    statusDiv.textContent = 'Error: ' + (error && error.message ? error.message : 'Failed to save');
+    }}
+  }})
+  .catch(error => {{
+    statusDiv.textContent = 'Error: ' + error.message;
     statusDiv.style.color = 'red';
     saveBtn.disabled = false;
-  }}
+  }});
 }}
 
 window.openSaveEstimateModal = openSaveEstimateModal;
