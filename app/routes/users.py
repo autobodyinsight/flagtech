@@ -2,12 +2,11 @@ from fastapi import APIRouter, HTTPException, Request
 from psycopg2 import sql
 from psycopg2.extras import Json
 
-from app.services.auth import ACCESS_LEVELS, build_shop_scope_key, ensure_auth_tables, hash_password, normalize_domain
+from app.services.auth import ARCHITECT_EMAIL, ACCESS_LEVELS, build_shop_scope_key, ensure_auth_tables, hash_password, normalize_domain
 from app.services.db import get_conn
 from app.services.middleware import get_user_domain
 
 router = APIRouter()
-ARCHITECT_EMAIL = "jorge@autobodyinsight.com"
 
 
 def _ensure_architect_audit_table(cur) -> None:
@@ -244,12 +243,18 @@ async def set_user_active(user_id: int, request: Request):
     ensure_auth_tables()
     conn = get_conn()
     cur = conn.cursor()
+    cur.execute("SELECT lower(email) AS email FROM users WHERE id = %s", (user_id,))
+    protected_target = cur.fetchone()
+    if protected_target and protected_target.get("email") == ARCHITECT_EMAIL:
+        cur.close()
+        raise HTTPException(status_code=403, detail="Architect user is protected")
+
     if is_architect:
         cur.execute(
             """
             UPDATE users
             SET active = %s
-            WHERE id = %s AND NOT (lower(email) = %s AND access_level = 'architect')
+            WHERE id = %s AND lower(email) <> %s
             RETURNING id, email, first_name, last_name, domain, company_name, access_level, active, created_at, last_login
             """,
             (active, user_id, ARCHITECT_EMAIL),
@@ -299,6 +304,12 @@ async def reset_user_password(user_id: int, request: Request):
     ensure_auth_tables()
     conn = get_conn()
     cur = conn.cursor()
+    cur.execute("SELECT lower(email) AS email FROM users WHERE id = %s", (user_id,))
+    protected_target = cur.fetchone()
+    if protected_target and protected_target.get("email") == ARCHITECT_EMAIL:
+        cur.close()
+        raise HTTPException(status_code=403, detail="Architect user is protected")
+
     if is_architect:
         cur.execute(
             """
@@ -352,7 +363,7 @@ async def delete_user(user_id: int, request: Request):
     cur.execute(
         """
         DELETE FROM users
-        WHERE id = %s AND NOT (lower(email) = %s AND access_level = 'architect')
+        WHERE id = %s AND lower(email) <> %s
         RETURNING id, email, domain
         """,
         (user_id, ARCHITECT_EMAIL),
