@@ -43,6 +43,56 @@ def _normalize_line_ids(values) -> set[int]:
 _TRAILING_PART_NUMBER_RE = re.compile(r"\b([A-Z0-9-]{6,})\s*$", re.IGNORECASE)
 
 
+def _alpha_only_description(value: str) -> str:
+    tokens = re.split(r"\s+", str(value or "").strip())
+    kept = []
+    for token in tokens:
+        cleaned = (token or "").strip().strip(",;:|()[]{}")
+        if not cleaned:
+            continue
+        if any(ch.isdigit() for ch in cleaned):
+            continue
+        letters_only = re.sub(r"[^A-Za-z]", "", cleaned)
+        if letters_only:
+            kept.append(letters_only)
+    return " ".join(kept)
+
+
+def _serialize_datetime_for_client(value):
+    if isinstance(value, datetime):
+        if value.tzinfo is None:
+            value = value.replace(tzinfo=timezone.utc)
+        return value.isoformat()
+    return value
+
+
+def _resolve_note_created_by(cur, value: str) -> str:
+    created_by = str(value or "").strip()
+    if not created_by:
+        return "Unknown"
+
+    if "@" in created_by:
+        try:
+            cur.execute(
+                """
+                SELECT first_name, last_name
+                FROM users
+                WHERE lower(email) = lower(%s)
+                LIMIT 1
+                """,
+                (created_by,),
+            )
+            user_row = cur.fetchone() or {}
+            first_name = str(user_row.get("first_name") or "").strip()
+            last_name = str(user_row.get("last_name") or "").strip()
+            full_name = " ".join(part for part in (first_name, last_name) if part)
+            if full_name:
+                return full_name
+        except Exception:
+            pass
+    return created_by
+
+
 def _parse_part_description_and_number(item: dict) -> tuple[str, str]:
     description = str(item.get("description") or "").strip()
     explicit_part_number = (
@@ -78,19 +128,17 @@ def _parse_part_description_and_number(item: dict) -> tuple[str, str]:
         return has_alpha and has_digit
 
     tokens = description.split()
-    while tokens:
-        last_token = tokens[-1]
-        if _is_noise_token(last_token):
-            tokens.pop()
+    kept_tokens = []
+    for token in tokens:
+        if _is_noise_token(token):
             continue
-        if _is_part_number_token(last_token):
+        if _is_part_number_token(token):
             if not part_number:
-                part_number = _clean_token(last_token)
-            tokens.pop()
+                part_number = _clean_token(token)
             continue
-        break
+        kept_tokens.append(token)
 
-    description = " ".join(tokens).strip()
+    description = " ".join(kept_tokens).strip()
 
     if not part_number:
         trailing_match = _TRAILING_PART_NUMBER_RE.search(description)
@@ -103,6 +151,7 @@ def _parse_part_description_and_number(item: dict) -> tuple[str, str]:
                 description = description[:trailing_match.start()].strip()
 
     description = re.sub(r"\s{2,}", " ", description).strip(" -|,;:")
+    description = _alpha_only_description(description)
     return description, part_number
 
 
@@ -3857,14 +3906,15 @@ async def list_ro_notes(request: Request, ro: str):
             (ro, domain),
         )
         rows = cur.fetchall()
-        notes = [
-            {
-                "note": row.get("note"),
-                "created_at": row.get("created_at"),
-                "created_by": row.get("created_by"),
-            }
-            for row in rows
-        ]
+        notes = []
+        for row in rows:
+            notes.append(
+                {
+                    "note": row.get("note"),
+                    "created_at": _serialize_datetime_for_client(row.get("created_at")),
+                    "created_by": _resolve_note_created_by(cur, row.get("created_by")),
+                }
+            )
         return {"notes": notes}
     finally:
         cur.close()
@@ -4003,7 +4053,10 @@ async def list_ro_activity(request: Request, ro: str):
 async def add_ro_note(request: Request):
     domain = get_user_domain(request) or "default"
     session_user = getattr(request.state, "user", {}) or {}
-    created_by = str(session_user.get("email") or "").strip() or "Unknown"
+    first_name = str(session_user.get("first_name") or "").strip()
+    last_name = str(session_user.get("last_name") or "").strip()
+    full_name = " ".join(part for part in (first_name, last_name) if part)
+    created_by = full_name or str(session_user.get("email") or "").strip() or "Unknown"
     data = await request.json()
     ro = (data.get("ro") or "").strip()
     note = (data.get("note") or "").strip()
@@ -4302,11 +4355,21 @@ async def list_parts_lines(request: Request, ro: str):
         for idx, item in enumerate(parts_repairs, start=1):
             if not isinstance(item, dict):
                 continue
+            parsed_description, parsed_part_number = _parse_part_description_and_number(item)
+            explicit_part_number = (
+                item.get("part_number")
+                or item.get("part_no")
+                or item.get("part#")
+                or item.get("pn")
+                or ""
+            )
+            part_number = str(parsed_part_number or explicit_part_number or "").strip()
             lines.append(
                 {
                     "id": idx,
                     "line": item.get("line"),
-                    "description": item.get("description"),
+                    "description": parsed_description,
+                    "part_number": part_number,
                     "part_type": item.get("part_type"),
                     "price": float(item.get("price") or 0),
                     "qty": float(item.get("qty") or 0),

@@ -476,13 +476,14 @@ def get_dashboard_screen_html():
                 return popupFormatDateTime(value);
             }
 
-            function extractPartNumberAndDescription(rawDescription) {
+            function extractPartNumberAndDescription(rawDescription, explicitPartNumber) {
                 const source = String(rawDescription || '').trim();
-                if (!source) return { description: '', partNumber: '' };
+                const explicit = String(explicitPartNumber || '').trim();
+                if (!source) return { description: '', partNumber: explicit };
 
                 const tokens = source.split(/\s+/);
                 const kept = [];
-                let extractedPartNumber = '';
+                let extractedPartNumber = explicit;
 
                 function cleanToken(token) {
                     return String(token || '').trim().replace(/^[\[\](){},;:]+|[\[\](){},;:]+$/g, '');
@@ -504,11 +505,19 @@ def get_dashboard_screen_html():
                         }
                         return;
                     }
-                    kept.push(token);
+                    kept.push(cleanToken(token));
                 });
 
+                const alphaOnlyDescription = kept
+                    .filter((token) => token && !/\d/.test(token))
+                    .map((token) => token.replace(/[^A-Za-z]/g, ''))
+                    .filter((token) => token)
+                    .join(' ')
+                    .replace(/\s+/g, ' ')
+                    .trim();
+
                 return {
-                    description: kept.join(' ').replace(/\s+/g, ' ').trim(),
+                    description: alphaOnlyDescription,
                     partNumber: extractedPartNumber,
                 };
             }
@@ -1075,19 +1084,22 @@ def get_dashboard_screen_html():
                                         <tr style="background:#3c4142; color:#fff; text-align:left;">
                                             <th style="padding:8px;">Line</th>
                                             <th style="padding:8px;">Description</th>
+                                            <th style="padding:8px;">Part #</th>
                                             <th style="padding:8px; text-align:right;">QTY</th>
                                             <th style="padding:8px; text-align:center;">On Order</th>
                                             <th style="padding:8px; text-align:center;">Arrived</th>
                                             <th style="padding:8px; text-align:center;">Returned</th>
-                                            <th style="padding:8px;">Part #</th>
                                         </tr>
                                     </thead>
                                     <tbody>
                                         ${lines.map((line, idx) => {
                                             const idNum = Number(line.id);
-                                            const extracted = extractPartNumberAndDescription(line.description || '');
-                                            const cleanDescription = extracted.description || String(line.description || '').trim();
-                                            const linePartNumber = String(partNumberByLine.get(idNum) || extracted.partNumber || '').trim();
+                                            const extracted = extractPartNumberAndDescription(
+                                                line.description || '',
+                                                line.part_number || partNumberByLine.get(idNum) || ''
+                                            );
+                                            const cleanDescription = extracted.description || '—';
+                                            const linePartNumber = String(extracted.partNumber || '').trim();
                                             const isOnOrder = onOrderSet.has(idNum) || !!line.is_ordered;
                                             const isArrived = arrivedSet.has(idNum);
                                             const isReturned = returnedSet.has(idNum);
@@ -1095,11 +1107,11 @@ def get_dashboard_screen_html():
                                                 <tr style="background:${idx % 2 === 0 ? '#f2f0ef' : '#ffffff'}; border-bottom:1px solid #eee;">
                                                     <td style="padding:8px;">${escapePopupHtml(line.line || '-')}</td>
                                                     <td style="padding:8px;">${escapePopupHtml(cleanDescription)}</td>
+                                                    <td style="padding:8px;">${escapePopupHtml(linePartNumber || '-')}</td>
                                                     <td style="padding:8px; text-align:right;">${escapePopupHtml(line.qty || 0)}</td>
                                                     <td style="padding:8px; text-align:center; font-weight:600; color:${isOnOrder ? '#2e7d32' : '#777'};">${isOnOrder ? 'Yes' : '—'}</td>
                                                     <td style="padding:8px; text-align:center; font-weight:600; color:${isArrived ? '#2e7d32' : '#777'};">${isArrived ? 'Yes' : '—'}</td>
                                                     <td style="padding:8px; text-align:center; font-weight:600; color:${isReturned ? '#2e7d32' : '#777'};">${isReturned ? 'Yes' : '—'}</td>
-                                                    <td style="padding:8px;">${escapePopupHtml(linePartNumber || '-')}</td>
                                                 </tr>
                                             `;
                                         }).join('')}
@@ -1704,10 +1716,12 @@ def get_dashboard_screen_html():
                         }
                         listEl.innerHTML = res.notes.map(note => {
                             const when = note.created_at ? new Date(note.created_at).toLocaleString() : '';
+                            const who = escapeHtml(note.created_by || 'Unknown');
+                            const text = escapeHtml(note.note || '');
                             return `
                                 <div style="padding:6px 0; border-bottom:1px solid #eee;">
-                                    <div style="font-size:12px; color:#777;">${when}</div>
-                                    <div style="white-space:pre-wrap;">${note.note || ''}</div>
+                                    <div style="font-size:12px; color:#777;">${escapeHtml(when)} • ${who}</div>
+                                    <div style="white-space:pre-wrap;">${text}</div>
                                 </div>
                             `;
                         }).join('');
