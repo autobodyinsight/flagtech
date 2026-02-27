@@ -129,7 +129,7 @@ def _build_unified_estimate_lines(snapshot: dict | None) -> list[dict]:
 
     sections = snapshot.get("sections")
     if not isinstance(sections, list):
-        return []
+        sections = []
 
     by_line: dict[int, dict] = {}
     order: list[int] = []
@@ -147,6 +147,19 @@ def _build_unified_estimate_lines(snapshot: dict | None) -> list[dict]:
             }
             order.append(line_number)
         return by_line[line_number]
+
+    seed_lines = snapshot.get("all_lines")
+    if isinstance(seed_lines, list):
+        for seed in seed_lines:
+            if not isinstance(seed, dict):
+                continue
+            line_number = _extract_line_number(seed.get("line") or seed.get("lineNumber"))
+            if line_number is None:
+                continue
+            record = _get_or_create(line_number)
+            seed_description = str(seed.get("description") or "").strip()
+            if seed_description and not record.get("description"):
+                record["description"] = seed_description
 
     for section in sections:
         if not isinstance(section, dict):
@@ -201,6 +214,61 @@ def _build_unified_estimate_lines(snapshot: dict | None) -> list[dict]:
                     record["extendedPrice"] = _coerce_number(price_value, 0.0)
 
     return [by_line[line_number] for line_number in sorted(order)]
+
+
+def _merge_unified_lines(primary_lines: list[dict] | None, fallback_lines: list[dict] | None) -> list[dict]:
+    merged: dict[int, dict] = {}
+
+    def _add_lines(lines: list[dict] | None, prefer_existing: bool) -> None:
+        if not isinstance(lines, list):
+            return
+        for item in lines:
+            if not isinstance(item, dict):
+                continue
+            line_number = _extract_line_number(item.get("lineNumber") or item.get("line"))
+            if line_number is None:
+                continue
+            existing = merged.get(line_number)
+            if existing is None:
+                merged[line_number] = {
+                    "lineNumber": line_number,
+                    "description": str(item.get("description") or "").strip(),
+                    "labor": _coerce_number(item.get("labor"), 0.0),
+                    "paint": _coerce_number(item.get("paint"), 0.0),
+                    "qty": item.get("qty"),
+                    "partNumber": str(item.get("partNumber") or item.get("part_number") or "").strip(),
+                    "extendedPrice": item.get("extendedPrice") if item.get("extendedPrice") is not None else item.get("price"),
+                }
+                continue
+
+            candidate_description = str(item.get("description") or "").strip()
+            if candidate_description and (not existing.get("description") or not prefer_existing):
+                existing["description"] = candidate_description
+
+            candidate_labor = item.get("labor")
+            if candidate_labor is not None and (existing.get("labor") in (None, 0, 0.0) or not prefer_existing):
+                existing["labor"] = _coerce_number(candidate_labor, 0.0)
+
+            candidate_paint = item.get("paint")
+            if candidate_paint is not None and (existing.get("paint") in (None, 0, 0.0) or not prefer_existing):
+                existing["paint"] = _coerce_number(candidate_paint, 0.0)
+
+            candidate_qty = item.get("qty")
+            if candidate_qty is not None and (existing.get("qty") is None or not prefer_existing):
+                existing["qty"] = candidate_qty
+
+            candidate_part = str(item.get("partNumber") or item.get("part_number") or "").strip()
+            if candidate_part and (not existing.get("partNumber") or not prefer_existing):
+                existing["partNumber"] = candidate_part
+
+            candidate_price = item.get("extendedPrice") if item.get("extendedPrice") is not None else item.get("price")
+            if candidate_price is not None and (existing.get("extendedPrice") is None or not prefer_existing):
+                existing["extendedPrice"] = candidate_price
+
+    _add_lines(fallback_lines, prefer_existing=False)
+    _add_lines(primary_lines, prefer_existing=True)
+
+    return [merged[line_number] for line_number in sorted(merged.keys())]
 
 
 def _parse_part_description_and_number(item: dict) -> tuple[str, str]:
@@ -5608,15 +5676,9 @@ async def get_ro_estimate_snapshot(request: Request, ro: str):
         if not row:
             return JSONResponse(status_code=404, content={"error": "Estimate not found"})
 
-        saved_snapshot = _parse_json_field(row.get("estimate_snapshot"))
-        if isinstance(saved_snapshot, dict) and saved_snapshot:
-            saved_snapshot["unified_lines"] = _build_unified_estimate_lines(saved_snapshot)
-            return {"estimate": saved_snapshot}
-
         labor_repairs = _parse_json_field(row.get("labor_repairs"))
         paint_repairs = _parse_json_field(row.get("paint_repairs"))
         parts_repairs = _parse_json_field(row.get("parts_repairs"))
-        totals = _parse_json_field(row.get("estimate_totals"))
 
         if not isinstance(labor_repairs, list):
             labor_repairs = []
@@ -5624,6 +5686,23 @@ async def get_ro_estimate_snapshot(request: Request, ro: str):
             paint_repairs = []
         if not isinstance(parts_repairs, list):
             parts_repairs = []
+
+        saved_snapshot = _parse_json_field(row.get("estimate_snapshot"))
+        if isinstance(saved_snapshot, dict) and saved_snapshot:
+            saved_unified_lines = _build_unified_estimate_lines(saved_snapshot)
+            legacy_unified_lines = _build_unified_estimate_lines(
+                {
+                    "sections": [
+                        {"key": "labor", "items": labor_repairs},
+                        {"key": "paint", "items": paint_repairs},
+                        {"key": "parts", "items": parts_repairs},
+                    ]
+                }
+            )
+            saved_snapshot["unified_lines"] = _merge_unified_lines(saved_unified_lines, legacy_unified_lines)
+            return {"estimate": saved_snapshot}
+
+        totals = _parse_json_field(row.get("estimate_totals"))
         if not isinstance(totals, dict):
             totals = {}
 
