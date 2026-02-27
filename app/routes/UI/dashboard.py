@@ -895,11 +895,6 @@ def get_dashboard_screen_html():
                         ? [...estimate.unified_lines].sort((a, b) => toNumber(a?.lineNumber, 0) - toNumber(b?.lineNumber, 0))
                         : buildUnifiedLinesFromSections(sections);
 
-                    const ownerInfo = String(header.owner_info || '').trim();
-                    const ownerHtml = ownerInfo
-                        ? ownerInfo.split(/\r?\n/).map((line) => `<div>${escapePopupHtml(line)}</div>`).join('')
-                        : '<div>-</div>';
-
                     const unifiedHtml = unifiedLines.length
                         ? `
                             <div style="overflow:auto; border:1px solid #ddd; border-radius:8px; background:#fff;">
@@ -954,45 +949,9 @@ def get_dashboard_screen_html():
                         `
                         : '<div style="color:#777;">No estimate lines available.</div>';
 
-                    const totalsHtml = totals.length
-                        ? totals.map((total) => {
-                            const label = escapePopupHtml(total.label || total.key || 'Total');
-                            const display = total.display
-                                ? escapePopupHtml(total.display)
-                                : escapePopupHtml(String(total.value ?? ''));
-                            return `
-                                <div style="display:flex; justify-content:space-between; padding:6px 0; border-bottom:1px solid #eee;">
-                                    <div style="font-weight:600;">${label}</div>
-                                    <div>${display}</div>
-                                </div>
-                            `;
-                        }).join('')
-                        : '<div style="color:#777;">No totals available.</div>';
-
                     contentEl.innerHTML = `
-                        <div style="display:grid; grid-template-columns:1fr 1fr; gap:18px; margin-bottom:14px;">
-                            <div style="background:#fff; border:1px solid #ddd; border-radius:8px; padding:12px;">
-                                <div style="margin-bottom:6px;"><strong>RO:</strong> ${escapePopupHtml(header.ro || ro.ro || '-')}</div>
-                                <div style="margin-bottom:6px;"><strong>Claim:</strong> ${escapePopupHtml(header.claim_number || '-')}</div>
-                                <div><strong>Insurance:</strong> ${escapePopupHtml(header.insurance_company || '-')}</div>
-                            </div>
-                            <div style="background:#fff; border:1px solid #ddd; border-radius:8px; padding:12px;">
-                                <div style="margin-bottom:6px;"><strong>Vehicle:</strong> ${escapePopupHtml([vehicle.year, vehicle.make, vehicle.model].filter(Boolean).join(' ') || vehicle.raw || '-')}</div>
-                                <div style="margin-bottom:6px;"><strong>VIN:</strong> ${escapePopupHtml(vehicle.vin || '-')}</div>
-                                <div><strong>Estimator:</strong> ${escapePopupHtml(header.estimator || '-')}</div>
-                            </div>
-                        </div>
-                        <div style="background:#fff; border:1px solid #ddd; border-radius:8px; padding:12px; margin-bottom:12px;">
-                            <div style="font-weight:700; margin-bottom:8px;">Owner Info</div>
-                            ${ownerHtml}
-                        </div>
                         <div style="margin-bottom:12px;">
-                            <div style="font-weight:700; margin-bottom:8px; color:#333;">Unified Estimate Lines</div>
                             ${unifiedHtml}
-                        </div>
-                        <div style="background:#fff; border:1px solid #ddd; border-radius:8px; padding:12px;">
-                            <div style="font-weight:700; margin-bottom:8px; color:#333;">Totals</div>
-                            ${totalsHtml}
                         </div>
                     `;
                 } catch (error) {
