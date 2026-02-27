@@ -72,6 +72,7 @@ def _ensure_saved_estimates_table(cur) -> None:
             labor_repairs JSONB,
             paint_repairs JSONB,
             parts_repairs JSONB,
+            estimate_snapshot JSONB,
             estimate_totals JSONB,
             parts_total NUMERIC,
             grand_total NUMERIC,
@@ -86,6 +87,7 @@ def _ensure_saved_estimates_table(cur) -> None:
         """
     )
     cur.execute("ALTER TABLE saved_estimates ADD COLUMN IF NOT EXISTS parts_repairs JSONB")
+    cur.execute("ALTER TABLE saved_estimates ADD COLUMN IF NOT EXISTS estimate_snapshot JSONB")
     cur.execute("ALTER TABLE saved_estimates ADD COLUMN IF NOT EXISTS estimate_totals JSONB")
     cur.execute("ALTER TABLE saved_estimates ADD COLUMN IF NOT EXISTS parts_total NUMERIC")
     cur.execute("ALTER TABLE saved_estimates ADD COLUMN IF NOT EXISTS grand_total NUMERIC")
@@ -714,8 +716,8 @@ async def save_estimate(request: Request):
             INSERT INTO saved_estimates
             (ro, vehicle, year, make, model, owner_info, insurance_company, vin, claim_number,
              written_by, estimator, labor_repairs, paint_repairs, parts_repairs,
-             estimate_totals, parts_total, grand_total, deductible, customer_pay, insurance_pay, in_date, ecd_date, domain)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+             estimate_snapshot, estimate_totals, parts_total, grand_total, deductible, customer_pay, insurance_pay, in_date, ecd_date, domain)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             """,
             (
                 ro_value,
@@ -732,6 +734,7 @@ async def save_estimate(request: Request):
                 json.dumps(data.get("labor_repairs") or []),
                 json.dumps(data.get("paint_repairs") or []),
                 json.dumps(data.get("parts_repairs") or []),
+                json.dumps(data.get("estimate_snapshot") or {}),
                 json.dumps(estimate_totals or {}),
                 _parse_money(estimate_totals.get("parts_total")),
                 _parse_money(estimate_totals.get("grand_total")),

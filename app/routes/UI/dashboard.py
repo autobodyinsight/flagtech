@@ -331,6 +331,7 @@ def get_dashboard_screen_html():
             // SVG line icons (white, flat, no fill)
             const icons = {
                 notepad: `<svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="5" y="6" width="18" height="16" rx="2" stroke="white" stroke-width="2"/><line x1="9" y1="10" x2="19" y2="10" stroke="white" stroke-width="2"/><line x1="9" y1="14" x2="19" y2="14" stroke="white" stroke-width="2"/><line x1="9" y1="18" x2="15" y2="18" stroke="white" stroke-width="2"/></svg>`,
+                estimate: `<svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="6" y="4" width="16" height="20" rx="2" stroke="white" stroke-width="2"/><line x1="9" y1="9" x2="19" y2="9" stroke="white" stroke-width="2"/><line x1="9" y1="13" x2="19" y2="13" stroke="white" stroke-width="2"/><line x1="9" y1="17" x2="16" y2="17" stroke="white" stroke-width="2"/></svg>`,
                 tech: `<svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="14" cy="9" r="4" stroke="white" stroke-width="2"/><rect x="7" y="17" width="14" height="6" rx="3" stroke="white" stroke-width="2"/><path d="M21 21l2.5 2.5" stroke="white" stroke-width="2" stroke-linecap="round"/><path d="M7 21l-2.5 2.5" stroke="white" stroke-width="2" stroke-linecap="round"/></svg>`,
                 cart: `<svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="10" cy="23" r="2" stroke="white" stroke-width="2"/><circle cx="20" cy="23" r="2" stroke="white" stroke-width="2"/><rect x="5" y="7" width="18" height="10" rx="2" stroke="white" stroke-width="2"/><path d="M7 7V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v2" stroke="white" stroke-width="2"/></svg>`,
                 credit: `<svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="4" y="7" width="20" height="14" rx="3" stroke="white" stroke-width="2"/><rect x="7" y="17" width="6" height="3" rx="1.5" stroke="white" stroke-width="2"/><line x1="4" y1="12" x2="24" y2="12" stroke="white" stroke-width="2"/></svg>`
@@ -341,6 +342,7 @@ def get_dashboard_screen_html():
                 <div id="roSidebar" style="position:fixed; left:0; top:var(--ro-header-height, 170px); height:calc(100vh - var(--ro-header-height, 170px)); width:64px; background:#23272a; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:38px; z-index:100; box-shadow:2px 0 8px rgba(0,0,0,0.08);">
                     <div style="display:flex; flex-direction:column; align-items:center; gap:38px; width:100%;">
                         <button id="roSidebarBtn-notes" class="ro-sidebar-btn" data-view="notes" title="Notes" style="background:none; border:none; padding:0; cursor:pointer;">${icons.notepad}</button>
+                        <button id="roSidebarBtn-estimate" class="ro-sidebar-btn" data-view="estimate" title="Estimate" style="background:none; border:none; padding:0; cursor:pointer;">${icons.estimate}</button>
                         <button id="roSidebarBtn-tech" class="ro-sidebar-btn" data-view="tech" title="Tech" style="background:none; border:none; padding:0; cursor:pointer;">${icons.tech}</button>
                         <button id="roSidebarBtn-parts" class="ro-sidebar-btn" data-view="parts" title="Parts" style="background:none; border:none; padding:0; cursor:pointer;">${icons.cart}</button>
                         <button id="roSidebarBtn-payments" class="ro-sidebar-btn" data-view="payments" title="Payments" style="background:none; border:none; padding:0; cursor:pointer;">${icons.credit}</button>
@@ -785,6 +787,101 @@ def get_dashboard_screen_html():
                 }
 
                 await loadNotes();
+            }
+
+            async function renderEstimateView() {
+                if (!roWindowContentEl) return;
+                roWindowContentEl.innerHTML = `
+                    <div class="ro-window-card">
+                        <div style="font-weight:700; font-size:18px; margin-bottom:10px; color:#333;">Estimate</div>
+                        <div id="roPopupEstimateContent" style="color:#444;"><div style="color:#777;">Loading...</div></div>
+                    </div>
+                `;
+
+                const contentEl = roWindowDoc.getElementById('roPopupEstimateContent');
+                if (!contentEl) return;
+
+                try {
+                    const res = await popupFetchJson(`/api/ro-estimate?ro=${encodeURIComponent(ro.ro)}`);
+                    const estimate = res.estimate || {};
+                    const header = estimate.header || {};
+                    const vehicle = header.vehicle || {};
+                    const sections = Array.isArray(estimate.sections) ? estimate.sections : [];
+                    const totals = Array.isArray(estimate.totals) ? estimate.totals : [];
+
+                    const ownerInfo = String(header.owner_info || '').trim();
+                    const ownerHtml = ownerInfo
+                        ? ownerInfo.split(/\r?\n/).map((line) => `<div>${escapePopupHtml(line)}</div>`).join('')
+                        : '<div>-</div>';
+
+                    const sectionsHtml = sections.map((section) => {
+                        const items = Array.isArray(section.items) ? section.items : [];
+                        const itemsHtml = items.length
+                            ? items.map((item) => {
+                                const lineText = item.line ? `Line ${escapePopupHtml(item.line)} - ` : '';
+                                const desc = escapePopupHtml(item.description || '');
+                                const displayValue = item.display
+                                    ? escapePopupHtml(item.display)
+                                    : (item.value !== undefined && item.value !== null ? escapePopupHtml(String(item.value)) : '');
+                                return `
+                                    <div style="display:flex; justify-content:space-between; gap:12px; padding:8px 0; border-bottom:1px solid #eee;">
+                                        <div>${lineText}${desc}</div>
+                                        <div style="font-weight:600; white-space:nowrap;">${displayValue}</div>
+                                    </div>
+                                `;
+                            }).join('')
+                            : '<div style="color:#777; padding:8px 0;">No items.</div>';
+
+                        return `
+                            <div style="background:#fff; border:1px solid #ddd; border-radius:8px; padding:12px; margin-bottom:12px;">
+                                <div style="font-weight:700; margin-bottom:8px; color:#333;">${escapePopupHtml(section.title || 'Section')}</div>
+                                ${itemsHtml}
+                            </div>
+                        `;
+                    }).join('');
+
+                    const totalsHtml = totals.length
+                        ? totals.map((total) => {
+                            const label = escapePopupHtml(total.label || total.key || 'Total');
+                            const display = total.display
+                                ? escapePopupHtml(total.display)
+                                : escapePopupHtml(String(total.value ?? ''));
+                            return `
+                                <div style="display:flex; justify-content:space-between; padding:6px 0; border-bottom:1px solid #eee;">
+                                    <div style="font-weight:600;">${label}</div>
+                                    <div>${display}</div>
+                                </div>
+                            `;
+                        }).join('')
+                        : '<div style="color:#777;">No totals available.</div>';
+
+                    contentEl.innerHTML = `
+                        <div style="display:grid; grid-template-columns:1fr 1fr; gap:18px; margin-bottom:14px;">
+                            <div style="background:#fff; border:1px solid #ddd; border-radius:8px; padding:12px;">
+                                <div style="margin-bottom:6px;"><strong>RO:</strong> ${escapePopupHtml(header.ro || ro.ro || '-')}</div>
+                                <div style="margin-bottom:6px;"><strong>Claim:</strong> ${escapePopupHtml(header.claim_number || '-')}</div>
+                                <div><strong>Insurance:</strong> ${escapePopupHtml(header.insurance_company || '-')}</div>
+                            </div>
+                            <div style="background:#fff; border:1px solid #ddd; border-radius:8px; padding:12px;">
+                                <div style="margin-bottom:6px;"><strong>Vehicle:</strong> ${escapePopupHtml([vehicle.year, vehicle.make, vehicle.model].filter(Boolean).join(' ') || vehicle.raw || '-')}</div>
+                                <div style="margin-bottom:6px;"><strong>VIN:</strong> ${escapePopupHtml(vehicle.vin || '-')}</div>
+                                <div><strong>Estimator:</strong> ${escapePopupHtml(header.estimator || '-')}</div>
+                            </div>
+                        </div>
+                        <div style="background:#fff; border:1px solid #ddd; border-radius:8px; padding:12px; margin-bottom:12px;">
+                            <div style="font-weight:700; margin-bottom:8px;">Owner Info</div>
+                            ${ownerHtml}
+                        </div>
+                        ${sectionsHtml}
+                        <div style="background:#fff; border:1px solid #ddd; border-radius:8px; padding:12px;">
+                            <div style="font-weight:700; margin-bottom:8px; color:#333;">Totals</div>
+                            ${totalsHtml}
+                        </div>
+                    `;
+                } catch (error) {
+                    console.error('Error loading estimate snapshot:', error);
+                    contentEl.innerHTML = '<div style="color:#c62828;">Unable to load estimate snapshot.</div>';
+                }
             }
 
             function renderTechAssignLinesModal(lines) {
@@ -1347,6 +1444,10 @@ def get_dashboard_screen_html():
                 renderLoading('Loading...');
                 if (view === 'notes') {
                     await renderNotesView();
+                    return;
+                }
+                if (view === 'estimate') {
+                    await renderEstimateView();
                     return;
                 }
                 if (view === 'tech') {

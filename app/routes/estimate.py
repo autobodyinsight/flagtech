@@ -208,6 +208,7 @@ def _ensure_saved_estimates_table(cur) -> None:
             labor_repairs JSONB,
             paint_repairs JSONB,
             parts_repairs JSONB,
+            estimate_snapshot JSONB,
             estimate_totals JSONB,
             parts_total NUMERIC,
             grand_total NUMERIC,
@@ -222,6 +223,7 @@ def _ensure_saved_estimates_table(cur) -> None:
         """
     )
     cur.execute("ALTER TABLE saved_estimates ADD COLUMN IF NOT EXISTS parts_repairs JSONB")
+    cur.execute("ALTER TABLE saved_estimates ADD COLUMN IF NOT EXISTS estimate_snapshot JSONB")
     cur.execute("ALTER TABLE saved_estimates ADD COLUMN IF NOT EXISTS estimate_totals JSONB")
     cur.execute("ALTER TABLE saved_estimates ADD COLUMN IF NOT EXISTS parts_total NUMERIC")
     cur.execute("ALTER TABLE saved_estimates ADD COLUMN IF NOT EXISTS grand_total NUMERIC")
@@ -5447,6 +5449,111 @@ async def get_ro_tech_detail(request: Request, ro: str, tech_id: int, role: str)
             "repair_lines": repair_lines,
             "total_hours": total_hours
         }
+    finally:
+        cur.close()
+
+
+@router.get("/ro-estimate")
+async def get_ro_estimate_snapshot(request: Request, ro: str):
+    domain = get_user_domain(request)
+    if not domain:
+        return JSONResponse(status_code=401, content={"error": "Not authenticated"})
+
+    ro_value = (ro or "").strip()
+    if not ro_value:
+        return JSONResponse(status_code=400, content={"error": "ro is required"})
+
+    conn = get_conn()
+    cur = conn.cursor()
+    try:
+        _ensure_saved_estimates_table(cur)
+        cur.execute(
+            """
+            SELECT
+                ro,
+                vehicle,
+                year,
+                make,
+                model,
+                vin,
+                owner_info,
+                insurance_company,
+                claim_number,
+                estimator,
+                written_by,
+                labor_repairs,
+                paint_repairs,
+                parts_repairs,
+                estimate_totals,
+                estimate_snapshot,
+                saved_at
+            FROM saved_estimates
+            WHERE domain = %s AND ro = %s
+            ORDER BY saved_at DESC, id DESC
+            LIMIT 1
+            """,
+            (domain, ro_value),
+        )
+        row = cur.fetchone()
+        if not row:
+            return JSONResponse(status_code=404, content={"error": "Estimate not found"})
+
+        saved_snapshot = _parse_json_field(row.get("estimate_snapshot"))
+        if isinstance(saved_snapshot, dict) and saved_snapshot:
+            return {"estimate": saved_snapshot}
+
+        labor_repairs = _parse_json_field(row.get("labor_repairs"))
+        paint_repairs = _parse_json_field(row.get("paint_repairs"))
+        parts_repairs = _parse_json_field(row.get("parts_repairs"))
+        totals = _parse_json_field(row.get("estimate_totals"))
+
+        if not isinstance(labor_repairs, list):
+            labor_repairs = []
+        if not isinstance(paint_repairs, list):
+            paint_repairs = []
+        if not isinstance(parts_repairs, list):
+            parts_repairs = []
+        if not isinstance(totals, dict):
+            totals = {}
+
+        fallback_snapshot = {
+            "version": 1,
+            "source": "fallback",
+            "header": {
+                "ro": row.get("ro") or ro_value,
+                "claim_number": row.get("claim_number") or "",
+                "vehicle": {
+                    "year": row.get("year") or "",
+                    "make": row.get("make") or "",
+                    "model": row.get("model") or "",
+                    "vin": row.get("vin") or "",
+                    "raw": row.get("vehicle") or "",
+                },
+                "owner_info": row.get("owner_info") or "",
+                "insurance_company": row.get("insurance_company") or "",
+                "estimator": row.get("estimator") or row.get("written_by") or "",
+                "saved_at": _serialize_datetime_for_client(row.get("saved_at")),
+            },
+            "sections": [
+                {
+                    "key": "labor",
+                    "title": "Labor Repairs",
+                    "items": labor_repairs,
+                },
+                {
+                    "key": "paint",
+                    "title": "Refinish Repairs",
+                    "items": paint_repairs,
+                },
+                {
+                    "key": "parts",
+                    "title": "Parts Replacements",
+                    "items": parts_repairs,
+                },
+            ],
+            "totals": totals,
+        }
+        return {"estimate": fallback_snapshot}
     finally:
         cur.close()
 

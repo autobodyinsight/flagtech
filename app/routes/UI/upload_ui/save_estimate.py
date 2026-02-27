@@ -568,6 +568,71 @@ function executeSaveEstimate() {{
   }}
   const nowLocal = new Date();
   const localUploadDate = `${{nowLocal.getFullYear()}}-${{String(nowLocal.getMonth() + 1).padStart(2, '0')}}-${{String(nowLocal.getDate()).padStart(2, '0')}}`;
+
+  const totalsList = resolvedTotals.totalDefs.map((def) => {{
+    const value = totalsData[def.key];
+    return {{
+      key: def.key,
+      label: def.label,
+      value: value,
+      display: formatEstimateValue(value),
+    }};
+  }});
+
+  const estimateSnapshot = {{
+    version: 1,
+    source: 'upload-save-modal',
+    generated_at: new Date().toISOString(),
+    header: {{
+      ro: saveRoNumber || '',
+      claim_number: saveClaimNumber || '',
+      vehicle: {{
+        year: vehicleYear || '',
+        make: vehicleMake || '',
+        model: vehicleModel || '',
+        vin: saveVIN || '',
+        raw: saveVehicleInfoLine || '',
+      }},
+      owner_info: saveOwnerInfo || '',
+      insurance_company: saveInsuranceCompany || '',
+      estimator: saveEstimator || saveWrittenBy || '',
+    }},
+    sections: [
+      {{
+        key: 'labor',
+        title: 'Labor Repairs',
+        items: laborData.map((item) => ({{
+          line: item.line || '',
+          description: item.description || '',
+          value: Number(item.value || 0),
+          display: `${{Number(item.value || 0).toFixed(1)}} hrs`,
+        }})),
+      }},
+      {{
+        key: 'paint',
+        title: 'Refinish Repairs',
+        items: paintData.map((item) => ({{
+          line: item.line || '',
+          description: item.description || '',
+          value: Number(item.value || 0),
+          display: `${{Number(item.value || 0).toFixed(1)}} hrs`,
+        }})),
+      }},
+      {{
+        key: 'parts',
+        title: 'Parts Replacements',
+        items: partsResult.items.map((item) => ({{
+          line: item.line || '',
+          description: item.description || '',
+          part_type: item.part_type || '',
+          qty: item.qty || null,
+          price: Number(item.price || 0),
+          display: `$${{formatPartPrice(Number(item.price || 0))}}`,
+        }})),
+      }},
+    ],
+    totals: totalsList,
+  }};
   
   const payload = {{
     ro: saveRoNumber,
@@ -584,6 +649,7 @@ function executeSaveEstimate() {{
     labor_repairs: laborData,
     paint_repairs: paintData,
     parts_repairs: partsResult.items,
+    estimate_snapshot: estimateSnapshot,
     estimate_totals: totalsData,
     local_upload_date: localUploadDate,
     timestamp: new Date().toISOString()
