@@ -901,57 +901,32 @@ def get_dashboard_screen_html():
                         : '<div>-</div>';
 
                     const unifiedHtml = unifiedLines.length
-                        ? `
-                            <div style="overflow:auto; border:1px solid #ddd; border-radius:8px; background:#fff;">
-                                <table style="width:100%; border-collapse:collapse; min-width:920px;">
-                                    <thead>
-                                        <tr style="background:#3c4142; color:#fff; text-align:left;">
-                                            <th style="padding:8px 10px; white-space:nowrap;">Line #</th>
-                                            <th style="padding:8px 10px;">Description</th>
-                                            <th style="padding:8px 10px; white-space:nowrap;">Part #</th>
-                                            <th style="padding:8px 10px; text-align:right; white-space:nowrap;">Labor</th>
-                                            <th style="padding:8px 10px; text-align:right; white-space:nowrap;">Paint</th>
-                                            <th style="padding:8px 10px; text-align:right; white-space:nowrap;">Qty</th>
-                                            <th style="padding:8px 10px; text-align:right; white-space:nowrap;">Price</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        ${unifiedLines.map((line, idx) => {
-                                            const lineNumber = toNumber(line?.lineNumber, 0);
-                                            const description = String(line?.description || '').trim() || '-';
-                                            const partNumber = String(line?.partNumber || '').trim() || '-';
-                                            const labor = normalizeDisplayNumber(toNumber(line?.labor, 0));
-                                            const paint = normalizeDisplayNumber(toNumber(line?.paint, 0));
+                        ? unifiedLines.map((line) => {
+                            const lineNumber = toNumber(line?.lineNumber, 0);
+                            const description = String(line?.description || '').trim() || '-';
+                            const labor = toNumber(line?.labor, 0);
+                            const paint = toNumber(line?.paint, 0);
+                            const qty = line?.qty;
+                            const partNumber = String(line?.partNumber || '').trim();
+                            const extendedPrice = line?.extendedPrice;
+                            const hasPartsDetails =
+                                (qty !== null && qty !== undefined && String(qty).trim() !== '') ||
+                                !!partNumber ||
+                                (extendedPrice !== null && extendedPrice !== undefined && String(extendedPrice).trim() !== '');
 
-                                            const hasPartData = String(line?.partNumber || '').trim() !== ''
-                                                || (line?.extendedPrice !== null && line?.extendedPrice !== undefined && String(line?.extendedPrice).trim() !== '')
-                                                || (line?.qty !== null && line?.qty !== undefined && String(line?.qty).trim() !== '');
-
-                                            const qtyValue = hasPartData
-                                                ? normalizeDisplayNumber((line?.qty === null || line?.qty === undefined || String(line?.qty).trim() === '') ? 1 : toNumber(line?.qty, 1))
-                                                : '0';
-
-                                            const priceValue = hasPartData
-                                                ? normalizeDisplayNumber((line?.extendedPrice === null || line?.extendedPrice === undefined || String(line?.extendedPrice).trim() === '') ? 0 : toNumber(line?.extendedPrice, 0))
-                                                : '-';
-
-                                            const rowBg = idx % 2 === 0 ? '#f2f0ef' : '#ffffff';
-                                            return `
-                                                <tr style="background:${rowBg}; border-bottom:1px solid #eee;">
-                                                    <td style="padding:8px 10px; white-space:nowrap;">${escapePopupHtml(lineNumber)}</td>
-                                                    <td style="padding:8px 10px;">${escapePopupHtml(description)}</td>
-                                                    <td style="padding:8px 10px; white-space:nowrap;">${escapePopupHtml(partNumber)}</td>
-                                                    <td style="padding:8px 10px; text-align:right; white-space:nowrap;">${escapePopupHtml(labor)}</td>
-                                                    <td style="padding:8px 10px; text-align:right; white-space:nowrap;">${escapePopupHtml(paint)}</td>
-                                                    <td style="padding:8px 10px; text-align:right; white-space:nowrap;">${escapePopupHtml(qtyValue)}</td>
-                                                    <td style="padding:8px 10px; text-align:right; white-space:nowrap;">${escapePopupHtml(priceValue)}</td>
-                                                </tr>
-                                            `;
-                                        }).join('')}
-                                    </tbody>
-                                </table>
-                            </div>
-                        `
+                            return `
+                                <div style="background:#fff; border:1px solid #ddd; border-radius:8px; padding:12px; margin-bottom:10px;">
+                                    <div style="font-weight:700; margin-bottom:6px; color:#333;">Line ${escapePopupHtml(lineNumber)} - ${escapePopupHtml(description)}</div>
+                                    <div style="margin-bottom:4px;"><strong>Labor:</strong> ${escapePopupHtml(normalizeDisplayNumber(labor))}</div>
+                                    <div style="margin-bottom:${hasPartsDetails ? '6px' : '0'};"><strong>Paint:</strong> ${escapePopupHtml(normalizeDisplayNumber(paint))}</div>
+                                    ${hasPartsDetails ? `
+                                        <div><strong>Qty:</strong> ${escapePopupHtml(qty === null || qty === undefined || String(qty).trim() === '' ? '-' : normalizeDisplayNumber(qty))}</div>
+                                        <div><strong>Part #:</strong> ${escapePopupHtml(partNumber || '-')}</div>
+                                        <div><strong>Price:</strong> ${escapePopupHtml(extendedPrice === null || extendedPrice === undefined || String(extendedPrice).trim() === '' ? '-' : normalizeDisplayNumber(extendedPrice))}</div>
+                                    ` : ''}
+                                </div>
+                            `;
+                        }).join('')
                         : '<div style="color:#777;">No estimate lines available.</div>';
 
                     const totalsHtml = totals.length
