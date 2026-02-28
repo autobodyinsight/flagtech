@@ -225,9 +225,6 @@ def get_parts_screen_html():
                         <option value="OTHER">Other</option>
                     </select>
 
-                    <label>Email:</label>
-                    <input type="email" id="partsVendorEmail" style="width:100%; padding:8px; margin-bottom:10px; box-sizing:border-box;">
-
                     <label>Phone:</label>
                     <input type="text" id="partsVendorPhone" style="width:100%; padding:8px; margin-bottom:10px; box-sizing:border-box;">
 
@@ -261,11 +258,10 @@ def get_parts_screen_html():
                                 <th style="padding:10px; border-bottom:2px solid #ddd;">VENDOR</th>
                                 <th style="padding:10px; border-bottom:2px solid #ddd;">TYPE</th>
                                 <th style="padding:10px; border-bottom:2px solid #ddd;">PHONE</th>
-                                <th style="padding:10px; border-bottom:2px solid #ddd;">EMAIL</th>
                             </tr>
                         </thead>
                         <tbody id="partsVendorsTableBody">
-                            <tr><td colspan="4" style="padding:12px; text-align:center; color:#777;">Loading...</td></tr>
+                            <tr><td colspan="3" style="padding:12px; text-align:center; color:#777;">Loading...</td></tr>
                         </tbody>
                     </table>
                 </div>
@@ -327,7 +323,6 @@ def get_parts_script():
             const name = document.getElementById('partsVendorName').value.trim();
             const vendorType = document.getElementById('partsVendorType').value.trim();
             const contactPerson = document.getElementById('partsVendorContact').value.trim();
-            const email = document.getElementById('partsVendorEmail').value.trim();
             const phone = document.getElementById('partsVendorPhone').value.trim();
             const street = document.getElementById('partsVendorStreet').value.trim();
             const city = document.getElementById('partsVendorCity').value.trim();
@@ -347,7 +342,6 @@ def get_parts_script():
                     name,
                     vendor_type: vendorType,
                     contact_person: contactPerson,
-                    email,
                     phone,
                     street,
                     city,
@@ -383,7 +377,7 @@ def get_parts_script():
                     if (renderTable) {
                         const body = document.getElementById('partsVendorsTableBody');
                         if (body) {
-                            body.innerHTML = '<tr><td colspan="4" style="padding:12px; text-align:center; color:red;">Error loading vendors.</td></tr>';
+                            body.innerHTML = '<tr><td colspan="3" style="padding:12px; text-align:center; color:red;">Error loading vendors.</td></tr>';
                         }
                     }
                     throw err;
@@ -464,7 +458,6 @@ def get_parts_script():
                 'partsVendorName',
                 'partsVendorType',
                 'partsVendorContact',
-                'partsVendorEmail',
                 'partsVendorPhone',
                 'partsVendorStreet',
                 'partsVendorCity',
@@ -482,7 +475,7 @@ def get_parts_script():
             const body = document.getElementById('partsVendorsTableBody');
             if (!modal || !body) return;
 
-            body.innerHTML = '<tr><td colspan="4" style="padding:12px; text-align:center; color:#777;">Loading...</td></tr>';
+            body.innerHTML = '<tr><td colspan="3" style="padding:12px; text-align:center; color:#777;">Loading...</td></tr>';
             modal.style.display = 'block';
             partsLoadVendors(true);
         }
@@ -497,7 +490,7 @@ def get_parts_script():
             if (!body) return;
 
             if (!partsVendorsCache || partsVendorsCache.length === 0) {
-                body.innerHTML = '<tr><td colspan="4" style="padding:12px; text-align:center; color:#777;">No vendors found.</td></tr>';
+                body.innerHTML = '<tr><td colspan="3" style="padding:12px; text-align:center; color:#777;">No vendors found.</td></tr>';
                 return;
             }
 
@@ -514,10 +507,9 @@ def get_parts_script():
                         </td>
                         <td id="parts-vendor-main-type-${vendor.id}" style="padding:10px; border-bottom:1px solid #eee;">${partsEscapeHtml(vendor.vendor_type || '—')}</td>
                         <td id="parts-vendor-main-phone-${vendor.id}" style="padding:10px; border-bottom:1px solid #eee;">${partsEscapeHtml(vendor.phone || '—')}</td>
-                        <td id="parts-vendor-main-email-${vendor.id}" style="padding:10px; border-bottom:1px solid #eee;">${partsEscapeHtml(vendor.email || '—')}</td>
                     </tr>
                     <tr id="${detailRowId}" style="display:none; background:${rowBg};">
-                        <td colspan="4" style="padding:12px; border-bottom:1px solid #eee;">
+                        <td colspan="3" style="padding:12px; border-bottom:1px solid #eee;">
                             <div id="${detailWrapId}" style="background:#fafafa; border:1px solid #ddd; border-radius:6px; padding:12px;"></div>
                         </td>
                     </tr>
@@ -561,7 +553,7 @@ def get_parts_script():
                         <input class="parts-vendor-edit-field-${id}" data-field="contact_person" type="text" value="${partsEscapeHtml(vendor.contact_person || '')}" style="width:100%; padding:8px; box-sizing:border-box;" />
                     </div>
                 </div>
-                <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px; margin-bottom:8px;">
+                <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:8px;">
                     <div>
                         <label>Type</label>
                         <select class="parts-vendor-edit-field-${id}" data-field="vendor_type" style="width:100%; padding:8px; box-sizing:border-box;">
@@ -575,10 +567,6 @@ def get_parts_script():
                     <div>
                         <label>Phone</label>
                         <input class="parts-vendor-edit-field-${id}" data-field="phone" type="text" value="${partsEscapeHtml(vendor.phone || '')}" style="width:100%; padding:8px; box-sizing:border-box;" />
-                    </div>
-                    <div>
-                        <label>Email</label>
-                        <input class="parts-vendor-edit-field-${id}" data-field="email" type="email" value="${partsEscapeHtml(vendor.email || '')}" style="width:100%; padding:8px; box-sizing:border-box;" />
                     </div>
                 </div>
                 <div style="display:grid; grid-template-columns:2fr 1fr 1fr 1fr; gap:10px; margin-bottom:8px;">
@@ -671,13 +659,11 @@ def get_parts_script():
 
                 const typeEl = document.getElementById(`parts-vendor-main-type-${vendorId}`);
                 const phoneEl = document.getElementById(`parts-vendor-main-phone-${vendorId}`);
-                const emailEl = document.getElementById(`parts-vendor-main-email-${vendorId}`);
                 const nameEl = document.getElementById(`parts-vendor-main-name-${vendorId}`);
 
                 if (nameEl) nameEl.textContent = updated.name || '—';
                 if (typeEl) typeEl.textContent = updated.vendor_type || '—';
                 if (phoneEl) phoneEl.textContent = updated.phone || '—';
-                if (emailEl) emailEl.textContent = updated.email || '—';
 
                 partsSetVendorEditMode(vendorId, false);
             })

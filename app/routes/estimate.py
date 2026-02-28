@@ -254,7 +254,6 @@ def _ensure_parts_vendors_table(cur) -> None:
             name VARCHAR(255) NOT NULL,
             vendor_type VARCHAR(100),
             contact_person VARCHAR(255),
-            email VARCHAR(255),
             phone VARCHAR(50),
             street VARCHAR(255),
             city VARCHAR(100),
@@ -1414,7 +1413,6 @@ async def add_vendor(request: Request):
     name = (data.get("name") or "").strip()
     vendor_type = (data.get("vendor_type") or "").strip()
     contact_person = (data.get("contact_person") or "").strip()
-    email = (data.get("email") or "").strip()
     phone = (data.get("phone") or "").strip()
     street = (data.get("street") or "").strip()
     city = (data.get("city") or "").strip()
@@ -1430,15 +1428,14 @@ async def add_vendor(request: Request):
         _ensure_parts_vendors_table(cur)
         cur.execute(
             """
-            INSERT INTO parts_vendors (name, vendor_type, contact_person, email, phone, street, city, state, zip, domain)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-            RETURNING id, name, vendor_type, contact_person, email, phone, street, city, state, zip, active
+            INSERT INTO parts_vendors (name, vendor_type, contact_person, phone, street, city, state, zip, domain)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+            RETURNING id, name, vendor_type, contact_person, phone, street, city, state, zip, active
             """,
             (
                 name,
                 vendor_type or None,
                 contact_person or None,
-                email or None,
                 phone or None,
                 street or None,
                 city or None,
@@ -1457,7 +1454,6 @@ async def add_vendor(request: Request):
                 "name": row["name"],
                 "vendor_type": row["vendor_type"],
                 "contact_person": row["contact_person"],
-                "email": row["email"],
                 "phone": row["phone"],
                 "street": row["street"],
                 "city": row["city"],
@@ -1483,7 +1479,7 @@ async def list_vendors(request: Request):
         _ensure_parts_vendors_table(cur)
         cur.execute(
             """
-            SELECT id, name, vendor_type, contact_person, email, phone, street, city, state, zip, active
+            SELECT id, name, vendor_type, contact_person, phone, street, city, state, zip, active
             FROM parts_vendors
             WHERE active = TRUE AND domain = %s
             ORDER BY name
@@ -1498,7 +1494,6 @@ async def list_vendors(request: Request):
                 "name": row["name"],
                 "vendor_type": row["vendor_type"],
                 "contact_person": row["contact_person"],
-                "email": row["email"],
                 "phone": row["phone"],
                 "street": row["street"],
                 "city": row["city"],
@@ -1531,7 +1526,6 @@ async def update_vendor(request: Request):
     vendor_type = (data.get("vendor_type") or "").strip()
     contact_person = (data.get("contact_person") or "").strip()
     phone = (data.get("phone") or "").strip()
-    email = (data.get("email") or "").strip()
     street = (data.get("street") or "").strip()
     city = (data.get("city") or "").strip()
     state = (data.get("state") or "").strip()
@@ -1552,20 +1546,18 @@ async def update_vendor(request: Request):
                 vendor_type = %s,
                 contact_person = %s,
                 phone = %s,
-                email = %s,
                 street = %s,
                 city = %s,
                 state = %s,
                 zip = %s
             WHERE id = %s AND domain = %s AND active = TRUE
-            RETURNING id, name, vendor_type, contact_person, phone, email, street, city, state, zip, active
+            RETURNING id, name, vendor_type, contact_person, phone, street, city, state, zip, active
             """,
             (
                 name,
                 vendor_type or None,
                 contact_person or None,
                 phone or None,
-                email or None,
                 street or None,
                 city or None,
                 state or None,
@@ -1587,7 +1579,6 @@ async def update_vendor(request: Request):
                 "vendor_type": row["vendor_type"],
                 "contact_person": row["contact_person"],
                 "phone": row["phone"],
-                "email": row["email"],
                 "street": row["street"],
                 "city": row["city"],
                 "state": row["state"],

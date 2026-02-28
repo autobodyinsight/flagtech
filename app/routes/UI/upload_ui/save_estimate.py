@@ -259,15 +259,6 @@ function parseVehicleInfo(vehicleStr) {{
   return {{year, make, model}};
 }}
 
-function getAuthHeaders() {{
-  const token = localStorage.getItem('auth_token');
-  const headers = {{}};
-  if (token) {{
-    headers['Authorization'] = `Bearer ${{token}}`;
-  }}
-  return headers;
-}}
-
 function normalizeSummaryValue(raw) {{
   if (raw === null || raw === undefined) return null;
   if (typeof raw === 'number') return raw;
@@ -664,8 +655,7 @@ function executeSaveEstimate() {{
     fetch('/ui/save-estimate', {{
       method: 'POST',
       headers: {{
-        'Content-Type': 'application/json',
-        ...getAuthHeaders()
+        'Content-Type': 'application/json'
       }},
       body: JSON.stringify(payload),
       credentials: 'include'
