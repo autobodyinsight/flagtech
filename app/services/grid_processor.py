@@ -704,6 +704,11 @@ def process_pdf_grid(pages: List[Dict]) -> Dict[str, Any]:
         "deductible": None,
         "customer_pay": None,
         "insurance_pay": None,
+        "body_labor": None,
+        "paint_labor": None,
+        "frame_labor": None,
+        "mechanical_labor": None,
+        "glass_labor": None,
     }
 
     def _extract_last_numeric(text: str) -> Optional[float | str]:
@@ -740,6 +745,10 @@ def process_pdf_grid(pages: List[Dict]) -> Dict[str, Any]:
     def _apply_totals_from_row(text: str, row: Dict, next_upper: str, prev_upper: str) -> None:
         upper = text.upper()
         rightmost_value = _extract_rightmost_numeric(row)
+
+        def _matches_any(patterns: List[str]) -> bool:
+            return any(re.search(pattern, upper) for pattern in patterns)
+
         parts_row = (
             re.search(r"\bPARTS TOTAL\b", upper)
             or ("PARTS" in upper and "TOTAL" in upper)
@@ -765,6 +774,36 @@ def process_pdf_grid(pages: List[Dict]) -> Dict[str, Any]:
             or re.search(r"\bINSURANCE\s+TOTAL\b", upper)
         ):
             totals["insurance_pay"] = rightmost_value or _extract_last_numeric(text)
+
+        if totals["body_labor"] is None and _matches_any([
+            r"\bBODY\s+LABOR\b",
+            r"\bLABOR\s*,?\s*BODY\b",
+        ]):
+            totals["body_labor"] = rightmost_value or _extract_last_numeric(text)
+
+        if totals["paint_labor"] is None and _matches_any([
+            r"\bPAINT\s+LABOR\b",
+            r"\bLABOR\s*,?\s*REFINISH\b",
+        ]):
+            totals["paint_labor"] = rightmost_value or _extract_last_numeric(text)
+
+        if totals["frame_labor"] is None and _matches_any([
+            r"\bFRAME\s+LABOR\b",
+            r"\bLABOR\s*,?\s*FRAME\b",
+        ]):
+            totals["frame_labor"] = rightmost_value or _extract_last_numeric(text)
+
+        if totals["mechanical_labor"] is None and _matches_any([
+            r"\bMECHANICAL\s+LABOR\b",
+            r"\bLABOR\s*,?\s*MECHANICAL\b",
+        ]):
+            totals["mechanical_labor"] = rightmost_value or _extract_last_numeric(text)
+
+        if totals["glass_labor"] is None and _matches_any([
+            r"\bGLASS\s+LABOR\b",
+            r"\bLABOR\s*,?\s*GLASS\b",
+        ]):
+            totals["glass_labor"] = rightmost_value or _extract_last_numeric(text)
 
     if subtotals_page:
         for pi, page in enumerate(pages, start=1):
@@ -854,6 +893,11 @@ def process_pdf_grid(pages: List[Dict]) -> Dict[str, Any]:
         "deductible": totals["deductible"],
         "customer_pay": totals["customer_pay"],
         "insurance_pay": totals["insurance_pay"],
+        "body_labor": totals["body_labor"],
+        "paint_labor": totals["paint_labor"],
+        "frame_labor": totals["frame_labor"],
+        "mechanical_labor": totals["mechanical_labor"],
+        "glass_labor": totals["glass_labor"],
     }
 
 

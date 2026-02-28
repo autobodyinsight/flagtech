@@ -201,6 +201,11 @@ def get_save_estimate_modal_script(
   deductible,
   customer_pay,
   insurance_pay,
+  body_labor,
+  paint_labor,
+  frame_labor,
+  mechanical_labor,
+  glass_labor,
   owner_info="",
   insurance_company="",
   vin="",
@@ -230,6 +235,11 @@ var preloadedEstimateTotals = {json.dumps({
     "deductible": deductible,
     "customer_pay": customer_pay,
     "insurance_pay": insurance_pay,
+  "body_labor": body_labor,
+  "paint_labor": paint_labor,
+  "frame_labor": frame_labor,
+  "mechanical_labor": mechanical_labor,
+  "glass_labor": glass_labor,
 })};
 
 window.currentEstimateTotals = Object.assign({{}}, preloadedEstimateTotals);
@@ -355,6 +365,11 @@ function resolveEstimateTotals(estimateTotals) {{
     {{key: 'deductible', label: 'DEDUCTIBLE', fallbackId: 'summaryDeductible'}},
     {{key: 'customer_pay', label: 'CUSTOMER PAY', fallbackId: 'summaryCustomerPay'}},
     {{key: 'insurance_pay', label: 'INSURANCE PAY', fallbackId: 'summaryInsurancePay'}},
+    {{key: 'body_labor', label: 'BODY LABOR'}},
+    {{key: 'paint_labor', label: 'PAINT LABOR'}},
+    {{key: 'frame_labor', label: 'FRAME LABOR'}},
+    {{key: 'mechanical_labor', label: 'MECHANICAL LABOR'}},
+    {{key: 'glass_labor', label: 'GLASS LABOR'}},
   ];
 
   const resolved = {{}};
