@@ -110,7 +110,7 @@ def get_users_screen_html():
                 const id = Number(user.id);
                 const safeEmail = usersEscapeHtml(user.email);
                 return `
-                    <div style="display:flex; padding:10px; border-top:1px solid #eee; align-items:center; gap:10px;">
+                    <div style="display:flex; padding:10px; border-top:1px solid #eee; align-items:center; gap:10px;" data-user-id="${id}" data-user-email="${safeEmail}">
                         <div style="flex:1.6;">${safeEmail}</div>
                         <div style="flex:1.1; text-align:center;">
                             <select id="usersRole_${id}" style="padding:6px; border:1px solid #ccc; border-radius:4px; min-width:120px; text-transform:lowercase;">
@@ -121,7 +121,7 @@ def get_users_screen_html():
                         <div style="flex:1.1; text-align:center;">${usersEscapeHtml(formatUsersDate(user.updated_at))}</div>
                         <div style="flex:1.8; text-align:right; display:flex; justify-content:flex-end; gap:6px; flex-wrap:wrap;">
                             <button onclick="assignManagedRole(${id})" style="padding:6px 8px; border:1px solid #bbb; background:#fff; border-radius:4px; cursor:pointer;">Assign Role</button>
-                            <button onclick="resetManagedPassword(${id}, '${safeEmail}')" style="padding:6px 8px; border:1px solid #bbb; background:#fff; border-radius:4px; cursor:pointer;">Reset Password</button>
+                            <button onclick="resetManagedPassword(${id})" style="padding:6px 8px; border:1px solid #bbb; background:#fff; border-radius:4px; cursor:pointer;">Reset Password</button>
                             <button onclick="deleteManagedUser(${id}, '${safeEmail}')" style="padding:6px 8px; border:1px solid #bbb; background:#fff; border-radius:4px; cursor:pointer;">Delete</button>
                         </div>
                     </div>
@@ -195,14 +195,20 @@ def get_users_screen_html():
         }
     }
 
-    async function resetManagedPassword(userId, email) {
-        const password = window.prompt(`New password for ${email}:`, '');
-        if (!password || !String(password).trim()) {
+    async function resetManagedPassword(userId) {
+        const password = window.prompt('New password (minimum 8 characters):', '');
+        const normalized = String(password || '').trim();
+        if (!normalized) {
             setUsersStatus('Password reset cancelled.', '#666');
             return;
         }
 
-        const body = { password: String(password) };
+        if (normalized.length < 8) {
+            setUsersStatus('Password must be at least 8 characters.', '#b22222');
+            return;
+        }
+
+        const body = { password: normalized };
 
         try {
             const response = await fetch(`/api/users/${userId}/password`, {
