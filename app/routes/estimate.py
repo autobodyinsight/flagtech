@@ -2054,6 +2054,75 @@ async def list_open_ros_for_payments(request: Request):
         cur.close()
 
 
+@router.get("/records/closed-ros")
+async def list_records_closed_ros(request: Request):
+    domain = get_user_domain(request) or "default"
+
+    conn = get_conn()
+    cur = conn.cursor()
+    try:
+        _ensure_saved_estimates_table(cur)
+        _ensure_ro_phases_table(cur)
+
+        cur.execute(
+            """
+            SELECT
+                rp.ro,
+                rp.updated_at,
+                se.year,
+                se.make,
+                se.model,
+                se.vehicle,
+                se.owner_info,
+                se.insurance_company,
+                se.in_date,
+                se.grand_total
+            FROM ro_phases rp
+            LEFT JOIN LATERAL (
+                SELECT *
+                FROM saved_estimates se
+                WHERE se.ro = rp.ro
+                  AND (se.domain = rp.domain OR se.domain = %s OR se.domain IS NULL)
+                ORDER BY se.saved_at DESC, se.id DESC
+                LIMIT 1
+            ) se ON TRUE
+            WHERE rp.domain = %s
+              AND COALESCE(LOWER(TRIM(rp.phase)), '') IN ('complete', 'complete/finish')
+            ORDER BY rp.updated_at DESC NULLS LAST, rp.ro ASC
+            """,
+            (domain, domain),
+        )
+        rows = cur.fetchall() or []
+
+        records_rows = []
+        for row in rows:
+            year = (row.get("year") or "").strip()
+            make = (row.get("make") or "").strip()
+            model = (row.get("model") or "").strip()
+            vehicle_value = " ".join(part for part in (year, make, model) if part) or (row.get("vehicle") or "")
+            customer_name, _ = _parse_owner_info((row.get("owner_info") or "").strip())
+
+            in_date_value = _coerce_date(row.get("in_date"))
+            out_date_raw = row.get("updated_at")
+            out_date_value = out_date_raw.date() if isinstance(out_date_raw, datetime) else _coerce_date(out_date_raw)
+
+            records_rows.append(
+                {
+                    "ro": str(row.get("ro") or "").strip(),
+                    "vehicle": vehicle_value,
+                    "customer": customer_name,
+                    "insurance": (row.get("insurance_company") or "").strip(),
+                    "in_date": in_date_value.isoformat() if in_date_value else None,
+                    "out_date": out_date_value.isoformat() if out_date_value else None,
+                    "total": _parse_float_value(row.get("grand_total")),
+                }
+            )
+
+        return {"rows": records_rows}
+    finally:
+        cur.close()
+
+
 @router.post("/payments/save")
 async def save_ro_payments(request: Request):
     domain = get_user_domain(request)
