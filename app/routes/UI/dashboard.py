@@ -901,32 +901,75 @@ def get_dashboard_screen_html():
                         : '<div>-</div>';
 
                     const unifiedHtml = unifiedLines.length
-                        ? unifiedLines.map((line) => {
-                            const lineNumber = toNumber(line?.lineNumber, 0);
-                            const description = String(line?.description || '').trim() || '-';
-                            const labor = toNumber(line?.labor, 0);
-                            const paint = toNumber(line?.paint, 0);
-                            const qty = line?.qty;
-                            const partNumber = String(line?.partNumber || '').trim();
-                            const extendedPrice = line?.extendedPrice;
-                            const hasPartsDetails =
-                                (qty !== null && qty !== undefined && String(qty).trim() !== '') ||
-                                !!partNumber ||
-                                (extendedPrice !== null && extendedPrice !== undefined && String(extendedPrice).trim() !== '');
+                        ? `
+                            <div style="background:#fff; border:1px solid #ddd; border-radius:8px; overflow:hidden;">
+                                <div style="overflow-x:auto;">
+                                    <table style="width:100%; border-collapse:collapse; table-layout:fixed;">
+                                        <colgroup>
+                                            <col style="width:7%;" />
+                                            <col style="width:10%;" />
+                                            <col style="width:41%;" />
+                                            <col style="width:8%;" />
+                                            <col style="width:8%;" />
+                                            <col style="width:7%;" />
+                                            <col style="width:11%;" />
+                                            <col style="width:8%;" />
+                                        </colgroup>
+                                        <thead>
+                                            <tr style="background:#f5f5f5; border-bottom:1px solid #ddd;">
+                                                <th style="padding:8px; text-align:left; white-space:nowrap;">Line #</th>
+                                                <th style="padding:8px; text-align:left; white-space:nowrap;">Operation</th>
+                                                <th style="padding:8px; text-align:left; white-space:nowrap;">Description</th>
+                                                <th style="padding:8px; text-align:right; white-space:nowrap;">Labor</th>
+                                                <th style="padding:8px; text-align:right; white-space:nowrap;">Paint</th>
+                                                <th style="padding:8px; text-align:right; white-space:nowrap;">Qty</th>
+                                                <th style="padding:8px; text-align:left; white-space:nowrap;">Part #</th>
+                                                <th style="padding:8px; text-align:right; white-space:nowrap;">Price</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            ${unifiedLines.map((line) => {
+                                                const lineNumber = toNumber(line?.lineNumber, 0);
+                                                const operationCode = String(
+                                                    line?.operationCode ||
+                                                    line?.operation_code ||
+                                                    line?.operation ||
+                                                    line?.op ||
+                                                    ''
+                                                ).trim() || '-';
+                                                const description = String(line?.description || '').trim() || '-';
+                                                const labor = toNumber(line?.labor, 0);
+                                                const paint = toNumber(line?.paint, 0);
+                                                const qty = line?.qty;
+                                                const partNumber = String(line?.partNumber || '').trim();
+                                                const extendedPrice = line?.extendedPrice;
 
-                            return `
-                                <div style="background:#fff; border:1px solid #ddd; border-radius:8px; padding:12px; margin-bottom:10px;">
-                                    <div style="font-weight:700; margin-bottom:6px; color:#333;">Line ${escapePopupHtml(lineNumber)} - ${escapePopupHtml(description)}</div>
-                                    <div style="margin-bottom:4px;"><strong>Labor:</strong> ${escapePopupHtml(normalizeDisplayNumber(labor))}</div>
-                                    <div style="margin-bottom:${hasPartsDetails ? '6px' : '0'};"><strong>Paint:</strong> ${escapePopupHtml(normalizeDisplayNumber(paint))}</div>
-                                    ${hasPartsDetails ? `
-                                        <div><strong>Qty:</strong> ${escapePopupHtml(qty === null || qty === undefined || String(qty).trim() === '' ? '-' : normalizeDisplayNumber(qty))}</div>
-                                        <div><strong>Part #:</strong> ${escapePopupHtml(partNumber || '-')}</div>
-                                        <div><strong>Price:</strong> ${escapePopupHtml(extendedPrice === null || extendedPrice === undefined || String(extendedPrice).trim() === '' ? '-' : normalizeDisplayNumber(extendedPrice))}</div>
-                                    ` : ''}
+                                                const qtyDisplay = qty === null || qty === undefined || String(qty).trim() === ''
+                                                    ? '-'
+                                                    : normalizeDisplayNumber(qty);
+                                                const partNumberDisplay = partNumber || '-';
+                                                const priceDisplay = extendedPrice === null || extendedPrice === undefined || String(extendedPrice).trim() === ''
+                                                    ? '-'
+                                                    : normalizeDisplayNumber(extendedPrice);
+
+                                                return `
+                                                    <tr style="border-bottom:1px solid #eee;">
+                                                        <td style="padding:8px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${escapePopupHtml(lineNumber)}</td>
+                                                        <td style="padding:8px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${escapePopupHtml(operationCode)}</td>
+                                                        <td style="padding:8px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${escapePopupHtml(description)}</td>
+                                                        <td style="padding:8px; text-align:right; white-space:nowrap;">${escapePopupHtml(normalizeDisplayNumber(labor))}</td>
+                                                        <td style="padding:8px; text-align:right; white-space:nowrap;">${escapePopupHtml(normalizeDisplayNumber(paint))}</td>
+                                                        <td style="padding:8px; text-align:right; white-space:nowrap;">${escapePopupHtml(qtyDisplay)}</td>
+                                                        <td style="padding:8px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${escapePopupHtml(partNumberDisplay)}</td>
+                                                        <td style="padding:8px; text-align:right; white-space:nowrap;">${escapePopupHtml(priceDisplay)}</td>
+                                                    </tr>
+                                                `;
+                                            }).join('')}
+                                        </tbody>
+                                    </table>
                                 </div>
-                            `;
-                        }).join('')
+                            </div>
+                        `
                         : '<div style="color:#777;">No estimate lines available.</div>';
 
                     const totalsHtml = totals.length
