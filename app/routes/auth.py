@@ -4,18 +4,13 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from app.services.auth import (
     ARCHITECT_EMAIL,
     SESSION_COOKIE_NAME,
-    build_password_reset_link,
     create_session_for_user,
     create_user,
     delete_session_by_token,
-    generate_password_reset_token,
     get_session_by_token,
     get_user_by_email,
     normalize_email,
-    send_password_reset_email,
-    update_user,
     user_count,
-    verify_password_reset_token,
     verify_password,
 )
 
@@ -132,49 +127,10 @@ def _login_page(error: str = "", info: str = "") -> str:
 
             <button class=\"submit-btn\" type=\"submit\">Sign In</button>
         </form>
-            <div class=\"switch-link\"><a href=\"/auth/forgot-password\">Forgot password?</a></div>
-            <div class=\"switch-link\">No account yet? <a href=\"/auth/signup\">Sign Up</a></div>
+        <div class=\"switch-link\">No account yet? <a href=\"/auth/signup\">Sign Up</a></div>
     """
     return _render_shell("FlagTech Login", "Sign in to continue", body)
 
-
-def _forgot_password_page(error: str = "", info: str = "") -> str:
-    error_html = f"<div class='banner-error'>{error}</div>" if error else ""
-    info_html = f"<div class='banner-info'>{info}</div>" if info else ""
-    body = f"""
-        {info_html}
-        {error_html}
-        <form method="post" action="/auth/forgot-password" autocomplete="on">
-            <label class="field-label" for="email">Email</label>
-            <input class="field-input" id="email" name="email" type="email" required autocomplete="email" />
-
-            <button class="submit-btn" type="submit">Send Reset Link</button>
-        </form>
-        <div class="switch-link"><a href="/auth/login">Back to login</a></div>
-    """
-    return _render_shell("Forgot Password", "Request a reset link", body)
-
-
-def _reset_password_page(token: str, error: str = "", info: str = "") -> str:
-    error_html = f"<div class='banner-error'>{error}</div>" if error else ""
-    info_html = f"<div class='banner-info'>{info}</div>" if info else ""
-    body = f"""
-        {info_html}
-        {error_html}
-        <form method="post" action="/auth/reset-password" autocomplete="on">
-            <input type="hidden" name="token" value="{token}" />
-
-            <label class="field-label" for="password">New Password</label>
-            <input class="field-input" id="password" name="password" type="password" required autocomplete="new-password" />
-
-            <label class="field-label" for="confirm_password">Confirm Password</label>
-            <input class="field-input" id="confirm_password" name="confirm_password" type="password" required autocomplete="new-password" />
-
-            <button class="submit-btn" type="submit">Reset Password</button>
-        </form>
-        <div class="switch-link"><a href="/auth/login">Back to login</a></div>
-    """
-    return _render_shell("Reset Password", "Set a new password", body)
 
 @router.get("/auth/start")
 async def auth_start(request: Request):
@@ -233,76 +189,7 @@ async def login_page(request: Request):
         info_message = "Account created. Please sign in."
     elif reason == "logged_out":
         info_message = "You have been signed out."
-    elif reason == "password_reset":
-        info_message = "Password updated. Please sign in."
     return HTMLResponse(_login_page(info=info_message))
-
-
-@router.get("/auth/forgot-password", response_class=HTMLResponse)
-async def forgot_password_page(request: Request):
-    return HTMLResponse(_forgot_password_page())
-
-
-@router.post("/auth/forgot-password", response_class=HTMLResponse)
-async def forgot_password_submit(email: str = Form(...)):
-    normalized_email = normalize_email(email)
-    user = get_user_by_email(normalized_email)
-
-    generic_message = "If an account exists for this email, a reset link has been sent."
-    if not user or not user.get("active"):
-        return HTMLResponse(_forgot_password_page(info=generic_message))
-
-    try:
-        token = generate_password_reset_token(user)
-        reset_link = build_password_reset_link(token)
-        send_password_reset_email(normalized_email, reset_link)
-        return HTMLResponse(_forgot_password_page(info=generic_message))
-    except Exception:
-        return HTMLResponse(
-            _forgot_password_page(error="Unable to send reset email right now. Please try again later."),
-            status_code=500,
-        )
-
-
-@router.get("/auth/reset-password", response_class=HTMLResponse)
-async def reset_password_page(request: Request):
-    token = (request.query_params.get("token") or "").strip()
-    if not token:
-        return HTMLResponse(_forgot_password_page(error="Invalid reset link."), status_code=400)
-
-    user = verify_password_reset_token(token)
-    if not user:
-        return HTMLResponse(_forgot_password_page(error="This reset link is invalid or expired."), status_code=400)
-    return HTMLResponse(_reset_password_page(token=token))
-
-
-@router.post("/auth/reset-password", response_class=HTMLResponse)
-async def reset_password_submit(
-    token: str = Form(...),
-    password: str = Form(...),
-    confirm_password: str = Form(...),
-):
-    token = (token or "").strip()
-    if not token:
-        return HTMLResponse(_forgot_password_page(error="Invalid reset link."), status_code=400)
-
-    user = verify_password_reset_token(token)
-    if not user:
-        return HTMLResponse(_forgot_password_page(error="This reset link is invalid or expired."), status_code=400)
-
-    if password != confirm_password:
-        return HTMLResponse(_reset_password_page(token=token, error="Passwords do not match."), status_code=400)
-    if len(password) < 8:
-        return HTMLResponse(
-            _reset_password_page(token=token, error="Password must be at least 8 characters."),
-            status_code=400,
-        )
-
-    updated = update_user(user_id=int(user.get("id")), password=password)
-    if not updated:
-        return HTMLResponse(_forgot_password_page(error="Unable to reset password."), status_code=500)
-
-    return RedirectResponse(url="/auth/login?reason=password_reset", status_code=303)
 
 
 @router.post("/auth/login", response_class=HTMLResponse)
