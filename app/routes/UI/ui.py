@@ -12,7 +12,6 @@ from .phase import get_phase_screen_html
 from .payments import get_payments_screen_html
 from .archive import get_archive_screen_html
 from .reports import get_reports_screen_html
-from app.services.auth import can_manage_users
 
 try:
     from .upload_ui.upload import get_upload_screen_html, get_upload_script, get_estimate_summary_html
@@ -31,10 +30,8 @@ router = APIRouter()
 @router.get("/", response_class=HTMLResponse)
 async def home_screen(request: Request):
     """Main UI screen with sidebar navigation."""
-    session_user = getattr(request.state, "user", {}) or {}
-    show_users_management = can_manage_users(session_user)
-    users_nav_html = '<div class="nav-tab" onclick="switchScreen(\'users\')">USERS</div>' if show_users_management else ''
-    users_screen_html = get_users_screen_html() if show_users_management else ''
+    users_nav_html = '<div class="nav-tab" onclick="switchScreen(\'users\')">USERS</div>'
+    users_screen_html = get_users_screen_html()
     
     return f"""
 <!DOCTYPE html>
