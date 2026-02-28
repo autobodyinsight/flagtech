@@ -38,6 +38,17 @@ def get_records_screen_html():
                 background: #23272a;
                 color: #fff;
             }
+            .records-gp-box {
+                display: inline-block;
+                padding: 6px 10px;
+                border: 1px solid #b7b7b7;
+                border-radius: 6px;
+                background: #ffffff;
+                font-size: 12px;
+                font-weight: 700;
+                color: #222;
+                white-space: nowrap;
+            }
         </style>
         <script>
         function formatRecordsDate(value) {
@@ -61,13 +72,43 @@ def get_records_screen_html():
             return '$' + amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
         }
 
+        function formatRecordsPercent(value) {
+            const amount = Number(value || 0);
+            return amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        }
+
+        function computeGp(sales, cost) {
+            const safeSales = Number(sales || 0);
+            const safeCost = Number(cost || 0);
+            const gpDollar = safeSales - safeCost;
+            const gpPercent = safeSales > 0 ? (gpDollar / safeSales) * 100 : 0;
+            return { gpDollar, gpPercent };
+        }
+
+        function renderGpBox(label, sales, cost) {
+            const gp = computeGp(sales, cost);
+            const gpDollarAbs = Math.abs(Number(gp.gpDollar || 0)).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            const gpDollarText = gp.gpDollar < 0 ? `-${gpDollarAbs}` : gpDollarAbs;
+            return `<div class='records-gp-box' title='${label}'>[GP ${formatRecordsPercent(gp.gpPercent)}% – GP$${gpDollarText}]</div>`;
+        }
+
         async function loadRecordsData() {
             const body = document.getElementById('recordsRoListBody');
             if (!body) return;
             try {
-                const resp = await fetch('/api/records/closed-ros', { credentials: 'include' });
-                const data = await resp.json();
+                const [recordsResp, reportsResp] = await Promise.all([
+                    fetch('/api/records/closed-ros', { credentials: 'include' }),
+                    fetch('/api/reports_data', { credentials: 'include' })
+                ]);
+                const data = await recordsResp.json();
+                const reportsData = await reportsResp.json();
                 const rows = Array.isArray(data.rows) ? data.rows : [];
+                const reportsRows = Array.isArray(reportsData.closed_ros) ? reportsData.closed_ros : [];
+                const reportsByRo = {};
+                reportsRows.forEach((reportRow) => {
+                    const key = String(reportRow.ro_number || '').trim();
+                    if (key) reportsByRo[key] = reportRow;
+                });
                 body.innerHTML = '';
                 if (!rows.length) {
                     body.innerHTML = `<tr><td colspan='8' style='padding:20px; text-align:center; color:#999;'>No closed repair orders found.</td></tr>`;
@@ -76,6 +117,14 @@ def get_records_screen_html():
 
                 rows.forEach((row, index) => {
                     const rowBg = (index % 2 === 0) ? '#d3d3d3' : '#f2f0ef';
+                    const reportRow = reportsByRo[String(row.ro || '').trim()] || {};
+                    const partsSales = Number(reportRow.parts_sales || 0);
+                    const partsCost = Number(reportRow.parts_cost || 0);
+                    const laborSales = Number(reportRow.labor_sales || 0);
+                    const laborCost = Number(reportRow.labor_cost || 0);
+                    const totalSales = Number((reportRow.total_sales !== undefined ? reportRow.total_sales : row.total) || 0);
+                    const totalCost = Number((reportRow.total_cost !== undefined ? reportRow.total_cost : (partsCost + laborCost)) || 0);
+
                     body.innerHTML += `<tr>
                         <td style='padding:12px; background:${rowBg};'>${row.ro || ''}</td>
                         <td style='padding:12px; background:${rowBg};'>${row.vehicle || ''}</td>
@@ -85,6 +134,16 @@ def get_records_screen_html():
                         <td style='padding:12px; background:${rowBg};'>${formatRecordsDate(row.out_date)}</td>
                         <td style='padding:12px; background:${rowBg};'>${formatRecordsDate(row.closed_date)}</td>
                         <td style='padding:12px; text-align:right; background:${rowBg};'>${formatRecordsMoney(row.total)}</td>
+                    </tr>`;
+
+                    body.innerHTML += `<tr>
+                        <td colspan='8' style='padding:6px 12px 12px 12px; background:${rowBg}; border-top:0;'>
+                            <div style='display:grid; grid-template-columns:repeat(8, minmax(0, 1fr)); gap:8px; align-items:center;'>
+                                <div style='grid-column:6;'>${renderGpBox('PARTS GP', partsSales, partsCost)}</div>
+                                <div style='grid-column:7;'>${renderGpBox('LABOR GP', laborSales, laborCost)}</div>
+                                <div style='grid-column:8; justify-self:end;'>${renderGpBox('TOTAL GP', totalSales, totalCost)}</div>
+                            </div>
+                        </td>
                     </tr>`;
                 });
             } catch (error) {
