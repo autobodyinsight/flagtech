@@ -196,59 +196,59 @@ def get_closed_ros_and_summary():
         )
         rows = cur.fetchall() or []
 
-                cur.execute(
-                        """
-                        SELECT
-                                invoices.ro,
-                                COALESCE(SUM(invoices.invoice_paid_total), 0) AS parts_cost
-                        FROM (
-                                SELECT
-                                        ro,
-                                        invoice_number,
-                                        COALESCE(NULLIF(SUM(DISTINCT invoice_total), 0), SUM(cost), 0) AS invoice_paid_total
-                                FROM parts_received
-                                WHERE ro IS NOT NULL
-                                    AND ro <> ''
-                                    AND invoice_number IS NOT NULL
-                                    AND TRIM(invoice_number) <> ''
-                                GROUP BY ro, invoice_number
+        cur.execute(
+            """
+            SELECT
+                invoices.ro,
+                COALESCE(SUM(invoices.invoice_paid_total), 0) AS parts_cost
+            FROM (
+                SELECT
+                    ro,
+                    invoice_number,
+                    COALESCE(NULLIF(SUM(DISTINCT invoice_total), 0), SUM(cost), 0) AS invoice_paid_total
+                FROM parts_received
+                WHERE ro IS NOT NULL
+                  AND ro <> ''
+                  AND invoice_number IS NOT NULL
+                  AND TRIM(invoice_number) <> ''
+                GROUP BY ro, invoice_number
 
-                                UNION ALL
+                UNION ALL
 
-                                SELECT
-                                        ro,
-                                        '__NO_INVOICE__' AS invoice_number,
-                                        COALESCE(SUM(cost), 0) AS invoice_paid_total
-                                FROM parts_received
-                                WHERE ro IS NOT NULL
-                                    AND ro <> ''
-                                    AND (invoice_number IS NULL OR TRIM(invoice_number) = '')
-                                GROUP BY ro
-                        ) invoices
-                        GROUP BY invoices.ro
-                        """
-                )
-                parts_cost_rows = cur.fetchall() or []
-                parts_cost_by_ro = {str(row.get("ro") or "").strip(): _parse_float(row.get("parts_cost")) for row in parts_cost_rows}
+                SELECT
+                    ro,
+                    '__NO_INVOICE__' AS invoice_number,
+                    COALESCE(SUM(cost), 0) AS invoice_paid_total
+                FROM parts_received
+                WHERE ro IS NOT NULL
+                  AND ro <> ''
+                  AND (invoice_number IS NULL OR TRIM(invoice_number) = '')
+                GROUP BY ro
+            ) invoices
+            GROUP BY invoices.ro
+            """
+        )
+        parts_cost_rows = cur.fetchall() or []
+        parts_cost_by_ro = {str(row.get("ro") or "").strip(): _parse_float(row.get("parts_cost")) for row in parts_cost_rows}
 
-                cur.execute(
-                        """
-                        SELECT ro, COALESCE(SUM(pay_amount), 0) AS labor_cost
-                        FROM ro_flagout_lines
-                        WHERE ro IS NOT NULL
-                            AND ro <> ''
-                        GROUP BY ro
-                        """
-                )
-                labor_cost_rows = cur.fetchall() or []
-                labor_cost_by_ro = {str(row.get("ro") or "").strip(): _parse_float(row.get("labor_cost")) for row in labor_cost_rows}
+        cur.execute(
+            """
+            SELECT ro, COALESCE(SUM(pay_amount), 0) AS labor_cost
+            FROM ro_flagout_lines
+            WHERE ro IS NOT NULL
+              AND ro <> ''
+            GROUP BY ro
+            """
+        )
+        labor_cost_rows = cur.fetchall() or []
+        labor_cost_by_ro = {str(row.get("ro") or "").strip(): _parse_float(row.get("labor_cost")) for row in labor_cost_rows}
 
         closed_ros = []
         total_sales = 0.0
-                total_parts_sales = 0.0
-                total_labor_sales = 0.0
-                total_parts_cost = 0.0
-                total_labor_cost = 0.0
+        total_parts_sales = 0.0
+        total_labor_sales = 0.0
+        total_parts_cost = 0.0
+        total_labor_cost = 0.0
 
         for row in rows:
             year = (row.get("year") or "").strip()
