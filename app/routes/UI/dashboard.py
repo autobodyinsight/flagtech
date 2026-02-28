@@ -2055,6 +2055,102 @@ def get_dashboard_screen_html():
                     .join('');
             }
 
+            function setPhonePrimaryEditMode(rowId, editing) {
+                const displayWrap = document.getElementById(`phone-primary-display-wrap-${rowId}`);
+                const editWrap = document.getElementById(`phone-primary-edit-wrap-${rowId}`);
+                const input = document.getElementById(`phone-primary-input-${rowId}`);
+                if (!displayWrap || !editWrap) return;
+                displayWrap.style.display = editing ? 'none' : 'inline-flex';
+                editWrap.style.display = editing ? 'inline-flex' : 'none';
+                if (editing && input) {
+                    input.focus();
+                    input.select();
+                }
+            }
+
+            function startPrimaryPhoneEdit(event, rowId) {
+                if (event) {
+                    event.stopPropagation();
+                    event.preventDefault();
+                }
+                setPhonePrimaryEditMode(rowId, true);
+            }
+
+            function setAddPhoneToggleState(rowId, enabled) {
+                const button = document.getElementById(`phone-add-toggle-${rowId}`);
+                const wrapper = document.getElementById(`phone-add-input-wrap-${rowId}`);
+                if (button) {
+                    button.dataset.enabled = enabled ? '1' : '0';
+                    button.style.background = enabled ? '#b71c1c' : '#d32f2f';
+                    button.style.borderColor = enabled ? '#7f0000' : '#b71c1c';
+                }
+                if (wrapper) {
+                    wrapper.style.display = enabled ? 'block' : 'none';
+                }
+            }
+
+            function toggleAddPhoneInput(event, rowId) {
+                if (event) {
+                    event.stopPropagation();
+                    event.preventDefault();
+                }
+                const button = document.getElementById(`phone-add-toggle-${rowId}`);
+                const input = document.getElementById(`phone-add-input-${rowId}`);
+                if (!button || !input) return;
+
+                const isEnabled = button.dataset.enabled === '1';
+                if (isEnabled) {
+                    if ((input.value || '').trim()) {
+                        input.focus();
+                        return;
+                    }
+                    setAddPhoneToggleState(rowId, false);
+                    return;
+                }
+
+                setAddPhoneToggleState(rowId, true);
+                input.value = '';
+                input.focus();
+                input.select();
+            }
+
+            function setEmailDisplayState(rowId, emailValue) {
+                const normalized = String(emailValue || '').trim();
+                const displayWrap = document.getElementById(`email-display-wrap-${rowId}`);
+                const displayText = document.getElementById(`email-display-text-${rowId}`);
+                const editWrap = document.getElementById(`email-edit-wrap-${rowId}`);
+                const input = document.getElementById(`email-input-${rowId}`);
+                if (!displayWrap || !displayText || !editWrap || !input) return;
+
+                if (normalized) {
+                    displayText.textContent = normalized;
+                    displayWrap.style.display = 'inline-flex';
+                    editWrap.style.display = 'none';
+                    input.value = normalized;
+                    return;
+                }
+
+                displayText.textContent = '';
+                displayWrap.style.display = 'none';
+                editWrap.style.display = 'inline-flex';
+                input.value = '';
+            }
+
+            function startEmailEdit(event, rowId) {
+                if (event) {
+                    event.stopPropagation();
+                    event.preventDefault();
+                }
+                const displayWrap = document.getElementById(`email-display-wrap-${rowId}`);
+                const editWrap = document.getElementById(`email-edit-wrap-${rowId}`);
+                const input = document.getElementById(`email-input-${rowId}`);
+                if (!displayWrap || !editWrap || !input) return;
+                displayWrap.style.display = 'none';
+                editWrap.style.display = 'inline-flex';
+                input.focus();
+                input.select();
+            }
+
             function updateRoContactInMemory(roNumber, phoneValues, emailValue) {
                 if (!dashboardData || !Array.isArray(dashboardData.roList)) return;
                 const normalizedPhones = normalizePhoneList(phoneValues);
@@ -2081,6 +2177,7 @@ def get_dashboard_screen_html():
                 event.stopPropagation();
 
                 const input = document.getElementById(`phone-primary-input-${rowId}`);
+                const displayText = document.getElementById(`phone-primary-display-text-${rowId}`);
                 if (!input) return;
 
                 const enteredPhone = (input.value || '').trim();
@@ -2097,8 +2194,12 @@ def get_dashboard_screen_html():
                     const updatedPhones = normalizePhoneList(result.phone_numbers);
                     const primaryPhone = updatedPhones[0] || cleanPhoneNumber(result.phone || enteredPhone);
                     input.value = primaryPhone === '-' ? '' : primaryPhone;
+                    if (displayText) {
+                        displayText.textContent = primaryPhone;
+                    }
                     renderAdditionalPhones(rowId, updatedPhones.slice(1));
                     updateRoContactInMemory(roNumber, updatedPhones, result.email);
+                    setPhonePrimaryEditMode(rowId, false);
                     refreshRoSlideDownHeight(roNumber, 'customer-contact');
                 } catch (error) {
                     console.error('Error updating phone:', error);
@@ -2106,20 +2207,6 @@ def get_dashboard_screen_html():
                 } finally {
                     input.disabled = false;
                 }
-            }
-
-            function showAddPhoneInput(event, rowId) {
-                if (event) {
-                    event.stopPropagation();
-                    event.preventDefault();
-                }
-                const wrapper = document.getElementById(`phone-add-input-wrap-${rowId}`);
-                const input = document.getElementById(`phone-add-input-${rowId}`);
-                if (!wrapper || !input) return;
-                wrapper.style.display = 'block';
-                input.value = '';
-                input.focus();
-                input.select();
             }
 
             async function handleAdditionalPhoneEnter(event, rowId, roNumber) {
@@ -2145,7 +2232,6 @@ def get_dashboard_screen_html():
                     const updatedPhones = normalizePhoneList(result.phone_numbers);
                     renderAdditionalPhones(rowId, updatedPhones.slice(1));
                     updateRoContactInMemory(roNumber, updatedPhones, result.email);
-                    wrapper.style.display = 'none';
                     input.value = '';
                     refreshRoSlideDownHeight(roNumber, 'customer-contact');
                 } catch (error) {
@@ -2171,8 +2257,10 @@ def get_dashboard_screen_html():
                         action: 'set_email',
                         email: enteredEmail,
                     });
-                    input.value = result.email || '';
-                    updateRoContactInMemory(roNumber, result.phone_numbers, result.email || '');
+                    const updatedEmail = result.email || '';
+                    input.value = updatedEmail;
+                    setEmailDisplayState(rowId, updatedEmail);
+                    updateRoContactInMemory(roNumber, result.phone_numbers, updatedEmail);
                     refreshRoSlideDownHeight(roNumber, 'customer-contact');
                 } catch (error) {
                     console.error('Error updating email:', error);
@@ -2671,7 +2759,7 @@ def get_dashboard_screen_html():
                     const subletItems = showSubletWarning ? getPendingSubletItems(ro) : [];
                     
                     html += `
-                        <tr style="background:${rowBg};" onclick="toggleRoActivityLogFromRow(event, '${ro.ro}')">
+                        <tr style="background:${rowBg};">
                             <td style="padding:12px; border-bottom:1px solid #eee; position:relative;">
                                 <div style="display:inline-flex; align-items:center; gap:6px;">
                                     <button type="button" class="mini-popup-trigger" onclick="openRoPrintModal(event, '${ro.ro}')" style="background:none; border:none; color:#333; cursor:pointer; padding:0; font-size:16px; line-height:1;" title="Print Reports">🖨️</button>
@@ -2744,22 +2832,10 @@ def get_dashboard_screen_html():
                                     ${phaseSelectOptions}
                                 </select>
                             </td>
-                            <td style="padding:12px; border-bottom:1px solid #eee; color:#333;">
-                                <button id="ro-date-in_date-${rowId}" class="ro-date-btn" data-iso="${inIso}" type="button" onclick="openRoDatePicker(event, '${rowId}', '${ro.ro}', 'in_date', ${Number(ro.hours || 0)})" style="background:none; border:none; color:#0066cc; text-decoration:underline; cursor:pointer; padding:0; font:inherit;">
-                                    ${inDisplay}
-                                </button>
-                            </td>
+                            <td style="padding:12px; border-bottom:1px solid #eee; color:#333;">${inDisplay}</td>
                             <td style="padding:12px; border-bottom:1px solid #eee; color:#555; text-align:center; font-weight:bold;">${daysDisplay}</td>
-                            <td style="padding:12px; border-bottom:1px solid #eee; color:#333;">
-                                <button id="ro-date-ecd_date-${rowId}" class="ro-date-btn" data-iso="${ecdIso}" type="button" onclick="openRoDatePicker(event, '${rowId}', '${ro.ro}', 'ecd_date', ${Number(ro.hours || 0)})" style="background:none; border:none; color:#0066cc; text-decoration:underline; cursor:pointer; padding:0; font:inherit;">
-                                    ${ecdDisplay}
-                                </button>
-                            </td>
-                            <td style="padding:12px; border-bottom:1px solid #eee; text-align:right;">
-                                <button type="button" onclick="toggleTechAssignment(event, '${ro.ro}')" style="background:none; border:none; color:#0066cc; text-decoration:underline; cursor:pointer; padding:0; font:inherit; font-weight:bold;">
-                                    ${ro.hours.toFixed(1)}
-                                </button>
-                            </td>
+                            <td style="padding:12px; border-bottom:1px solid #eee; color:#333;">${ecdDisplay}</td>
+                            <td style="padding:12px; border-bottom:1px solid #eee; text-align:right; font-weight:bold; color:#333;">${ro.hours.toFixed(1)}</td>
                             <td style="padding:12px; border-bottom:1px solid #eee; color:#333; text-align:right; font-weight:bold;">$${ro.total.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
                         </tr>
                         <tr id="vehicle-vin-row-${rowId}" style="display:none; background:${rowBg};">
@@ -2789,8 +2865,15 @@ def get_dashboard_screen_html():
                                         <div style="display:flex; flex-direction:column; gap:6px;">
                                             <div style="display:flex; align-items:center; gap:8px;">
                                                 <span style="font-weight:bold; color:#555;">Phone:</span>
-                                                <input id="phone-primary-input-${rowId}" value="${primaryPhoneDisplay === '-' ? '' : primaryPhoneDisplay}" onkeydown="handlePrimaryPhoneEnter(event, '${rowId}', '${ro.ro}')" style="padding:4px 6px; width:150px;" />
-                                                <button type="button" onclick="showAddPhoneInput(event, '${rowId}')" style="background:#d32f2f; border:1px solid #b71c1c; color:#fff; border-radius:3px; padding:0 8px; font-size:13px; cursor:pointer;">+</button>
+                                                <span id="phone-primary-display-wrap-${rowId}" style="display:inline-flex;">
+                                                    <button type="button" onclick="startPrimaryPhoneEdit(event, '${rowId}')" style="background:none; border:none; color:#0066cc; text-decoration:underline; cursor:pointer; padding:0; font:inherit;">
+                                                        <span id="phone-primary-display-text-${rowId}">${primaryPhoneDisplay}</span>
+                                                    </button>
+                                                </span>
+                                                <span id="phone-primary-edit-wrap-${rowId}" style="display:none; align-items:center;">
+                                                    <input id="phone-primary-input-${rowId}" value="${primaryPhoneDisplay === '-' ? '' : primaryPhoneDisplay}" onkeydown="handlePrimaryPhoneEnter(event, '${rowId}', '${ro.ro}')" style="padding:4px 6px; width:150px;" />
+                                                </span>
+                                                <button id="phone-add-toggle-${rowId}" data-enabled="0" type="button" onclick="toggleAddPhoneInput(event, '${rowId}')" style="background:#d32f2f; border:1px solid #b71c1c; color:#fff; border-radius:3px; padding:0 8px; font-size:13px; cursor:pointer;">+</button>
                                             </div>
                                             <div id="phone-additional-${rowId}" style="display:flex; flex-direction:column; gap:3px; margin-left:56px;">
                                                 ${additionalPhoneDisplays.map(phone => `<div style="font-size:12px; color:#666;">${escapeHtml(phone)}</div>`).join('')}
@@ -2801,7 +2884,14 @@ def get_dashboard_screen_html():
                                         </div>
                                         <div style="display:flex; align-items:center; gap:8px; margin-left:auto;">
                                             <span style="font-weight:bold; color:#555;">Email:</span>
-                                            <input id="email-input-${rowId}" value="${escapeHtml(emailDisplay)}" placeholder="Enter email and press Enter" onkeydown="handleEmailEnter(event, '${rowId}', '${ro.ro}')" style="padding:4px 6px; width:220px;" />
+                                            <span id="email-display-wrap-${rowId}" style="${emailDisplay ? 'display:inline-flex;' : 'display:none;'}">
+                                                <button type="button" onclick="startEmailEdit(event, '${rowId}')" style="background:none; border:none; color:#0066cc; text-decoration:underline; cursor:pointer; padding:0; font:inherit; text-align:left;">
+                                                    <span id="email-display-text-${rowId}">${escapeHtml(emailDisplay)}</span>
+                                                </button>
+                                            </span>
+                                            <span id="email-edit-wrap-${rowId}" style="${emailDisplay ? 'display:none;' : 'display:inline-flex;'}">
+                                                <input id="email-input-${rowId}" value="${escapeHtml(emailDisplay)}" placeholder="Enter email and press Enter" onkeydown="handleEmailEnter(event, '${rowId}', '${ro.ro}')" style="padding:4px 6px; width:220px;" />
+                                            </span>
                                         </div>
                                     </div>
                                 </div>

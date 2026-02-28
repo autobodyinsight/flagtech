@@ -2467,6 +2467,13 @@ async def update_ro_phone(request: Request):
             if new_phone not in phone_numbers:
                 phone_numbers.append(new_phone)
 
+        deduped_numbers = []
+        for value in phone_numbers:
+            cleaned_value = str(value or "").strip()
+            if cleaned_value and cleaned_value not in deduped_numbers:
+                deduped_numbers.append(cleaned_value)
+        phone_numbers = deduped_numbers
+
         updated_email = old_email
         if action == "set_email":
             updated_email = new_email
