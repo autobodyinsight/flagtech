@@ -968,27 +968,53 @@ def get_techs_screen_html():
         }
 
         async function saveAllManageTechChanges() {
+            const errors = [];
+            let addedCount = 0;
             try {
-                for (const pending of manageQueuedAdds) {
+                const pendingToProcess = [...manageQueuedAdds];
+                const stillPending = [];
+
+                for (const pending of pendingToProcess) {
                     const nameParts = splitNameParts(pending.name);
                     if (!nameParts) {
-                        throw new Error(`Invalid queued name: ${pending.name}`);
+                        errors.push(`Invalid queued name: ${pending.name}`);
+                        stillPending.push(pending);
+                        continue;
                     }
-                    const addRes = await fetch('/api/techs/add', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        credentials: 'include',
-                        body: JSON.stringify({
-                            first_name: nameParts.first_name,
-                            last_name: nameParts.last_name,
-                            role: pending.role,
-                            pay_rate: pending.pay_rate
-                        })
+
+                    try {
+                        const addRes = await fetch('/api/techs/add', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            credentials: 'include',
+                            body: JSON.stringify({
+                                first_name: nameParts.first_name,
+                                last_name: nameParts.last_name,
+                                role: pending.role,
+                                pay_rate: pending.pay_rate
+                            })
+                        });
+                        const addData = await addRes.json();
+                        if (!addRes.ok || addData.error) {
+                            throw new Error(addData.error || 'Unable to add technician');
+                        }
+                        addedCount += 1;
+                    } catch (addErr) {
+                        const reason = addErr?.message || 'Unable to add technician';
+                        errors.push(`${pending.name}: ${reason}`);
+                        stillPending.push(pending);
+                    }
+                }
+
+                manageQueuedAdds = stillPending;
+                renderManageQueuedAdds();
+
+                if (addedCount > 0) {
+                    await new Promise((resolve) => {
+                        loadTechsList();
+                        setTimeout(resolve, 180);
                     });
-                    const addData = await addRes.json();
-                    if (addData.error) {
-                        throw new Error(addData.error);
-                    }
+                    renderManageTechsList();
                 }
 
                 const rows = Array.from(document.querySelectorAll('.manage-tech-row'));
@@ -1013,10 +1039,12 @@ def get_techs_screen_html():
                     const originalRate = parseFloat(row.getAttribute('data-original-rate') || '0');
 
                     if (!currentName) {
-                        throw new Error('Name cannot be blank.');
+                        errors.push('Name cannot be blank.');
+                        continue;
                     }
                     if (!Number.isFinite(currentRate) || currentRate <= 0) {
-                        throw new Error('Pay rate must be greater than zero.');
+                        errors.push(`Pay rate must be greater than zero for ${currentName}.`);
+                        continue;
                     }
 
                     const changed = currentName !== originalName || currentRole !== originalRole || Math.abs(currentRate - originalRate) > 0.0001;
@@ -1024,42 +1052,58 @@ def get_techs_screen_html():
 
                     const parts = splitNameParts(currentName);
                     if (!parts) {
-                        throw new Error(`Name must include first and last name: ${currentName}`);
+                        errors.push(`Name must include first and last name: ${currentName}`);
+                        continue;
                     }
 
-                    const updateRes = await fetch('/api/techs/update', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        credentials: 'include',
-                        body: JSON.stringify({
-                            id: techId,
-                            first_name: parts.first_name,
-                            last_name: parts.last_name,
-                            role: currentRole,
-                            pay_rate: currentRate
-                        })
-                    });
-                    const updateData = await updateRes.json();
-                    if (updateData.error) {
-                        throw new Error(updateData.error);
+                    try {
+                        const updateRes = await fetch('/api/techs/update', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            credentials: 'include',
+                            body: JSON.stringify({
+                                id: techId,
+                                first_name: parts.first_name,
+                                last_name: parts.last_name,
+                                role: currentRole,
+                                pay_rate: currentRate
+                            })
+                        });
+                        const updateData = await updateRes.json();
+                        if (!updateRes.ok || updateData.error) {
+                            throw new Error(updateData.error || 'Unable to update technician');
+                        }
+                    } catch (updateErr) {
+                        errors.push(updateErr?.message || `Unable to update ${currentName}.`);
                     }
                 }
 
                 if (archiveIds.length) {
-                    const archiveRes = await fetch('/api/techs/archive', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        credentials: 'include',
-                        body: JSON.stringify({ ids: archiveIds })
-                    });
-                    const archiveData = await archiveRes.json();
-                    if (archiveData.error) {
-                        throw new Error(archiveData.error);
+                    try {
+                        const archiveRes = await fetch('/api/techs/archive', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            credentials: 'include',
+                            body: JSON.stringify({ ids: archiveIds })
+                        });
+                        const archiveData = await archiveRes.json();
+                        if (!archiveRes.ok || archiveData.error) {
+                            throw new Error(archiveData.error || 'Unable to archive technicians');
+                        }
+                    } catch (archiveErr) {
+                        errors.push(archiveErr?.message || 'Unable to archive technicians.');
                     }
                 }
 
-                closeManageTechsModal();
                 loadTechsList();
+                renderManageTechsList();
+
+                if (!errors.length) {
+                    closeManageTechsModal();
+                    return;
+                }
+
+                alert(`Saved with ${errors.length} issue(s):\n- ${errors.join('\n- ')}`);
             } catch (err) {
                 console.error('Error saving manage tech changes:', err);
                 alert(err?.message || 'Error saving tech changes.');
