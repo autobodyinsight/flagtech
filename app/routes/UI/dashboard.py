@@ -187,7 +187,7 @@ def get_dashboard_screen_html():
                                 <th class="dashboard-header-cell" data-sort-key="in_date" onclick="sortRoListByHeader('in_date')" style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold; cursor:pointer; user-select:none;">In <span data-sort-indicator="in_date" style="font-size:12px;"></span></th>
                                 <th class="dashboard-header-cell" data-sort-key="days_since_in" onclick="sortRoListByHeader('days_since_in')" style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold; text-align:center; cursor:pointer; user-select:none;" title="Days Since In Date">⏳ <span data-sort-indicator="days_since_in" style="font-size:12px;"></span></th>
                                 <th class="dashboard-header-cell" data-sort-key="ecd_date" onclick="sortRoListByHeader('ecd_date')" style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold; cursor:pointer; user-select:none;">ECD <span data-sort-indicator="ecd_date" style="font-size:12px;"></span></th>
-                                <th class="dashboard-header-cell" data-sort-key="hours" onclick="sortRoListByHeader('hours')" style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold; text-align:right; cursor:pointer; user-select:none;">HRS <span data-sort-indicator="hours" style="font-size:12px;"></span></th>
+                                <th class="dashboard-header-cell" onclick="toggleHrsHeaderAssignments(event)" style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold; text-align:right; cursor:pointer; user-select:none;">HRS</th>
                                 <th class="dashboard-header-cell" data-sort-key="total" onclick="sortRoListByHeader('total')" style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold; text-align:right; cursor:pointer; user-select:none;">Total <span data-sort-indicator="total" style="font-size:12px;"></span></th>
                             </tr>
                         </thead>
@@ -1566,6 +1566,7 @@ def get_dashboard_screen_html():
             // Global variables for dashboard
             let dashboardData = null;
             let hoursPerTechChartInstance = null;
+            let hrsHeaderPanelOpen = false;
             let roSortState = {
                 key: null,
                 direction: 'asc'
@@ -2051,7 +2052,13 @@ def get_dashboard_screen_html():
                     return;
                 }
                 container.innerHTML = values
-                    .map((phone) => `<div style="font-size:12px; color:#666;">${escapeHtml(phone)}</div>`)
+                    .map((phone) => `
+                        <button
+                            type="button"
+                            onclick='startPrimaryPhoneEditWithValue(event, ${JSON.stringify(rowId)}, ${JSON.stringify(phone)})'
+                            style="background:none; border:none; color:#0066cc; text-decoration:underline; cursor:pointer; padding:0; font:inherit;"
+                        >${escapeHtml(phone)}</button>
+                    `)
                     .join('');
             }
 
@@ -2074,6 +2081,16 @@ def get_dashboard_screen_html():
                     event.preventDefault();
                 }
                 setPhonePrimaryEditMode(rowId, true);
+            }
+
+            function startPrimaryPhoneEditWithValue(event, rowId, phoneValue) {
+                startPrimaryPhoneEdit(event, rowId);
+                const input = document.getElementById(`phone-primary-input-${rowId}`);
+                if (!input) return;
+                const nextValue = String(phoneValue || '').trim();
+                input.value = nextValue;
+                input.focus();
+                input.select();
             }
 
             function setAddPhoneToggleState(rowId, enabled) {
@@ -2268,6 +2285,197 @@ def get_dashboard_screen_html():
                 } finally {
                     input.disabled = false;
                 }
+            }
+
+            function normalizeHrsAssignmentType(typeValue) {
+                const value = String(typeValue || '').trim().toLowerCase();
+                if (value === 'mech') return 'mechanical';
+                if (value === 'mechanical') return 'mechanical';
+                if (value === 'body' || value === 'paint' || value === 'frame' || value === 'glass') return value;
+                return '';
+            }
+
+            function refreshHrsHeaderPanelHeight() {
+                const rowEl = document.getElementById('hrs-header-row');
+                if (!rowEl || rowEl.style.display !== 'table-row') return;
+                const panel = rowEl.querySelector('.ro-slide-panel');
+                if (!panel) return;
+                panel.style.overflow = 'visible';
+                panel.style.maxHeight = `${panel.scrollHeight}px`;
+                panel.style.opacity = '1';
+                setTimeout(() => {
+                    if (rowEl.style.display === 'table-row') {
+                        panel.style.maxHeight = 'none';
+                    }
+                }, 230);
+            }
+
+            function openHrsHeaderPanel() {
+                const rowEl = document.getElementById('hrs-header-row');
+                if (!rowEl) return;
+                rowEl.style.display = 'table-row';
+                const panel = rowEl.querySelector('.ro-slide-panel');
+                if (!panel) return;
+                panel.style.overflow = 'hidden';
+                panel.style.maxHeight = '0px';
+                panel.style.opacity = '0';
+                requestAnimationFrame(() => {
+                    panel.style.maxHeight = `${panel.scrollHeight}px`;
+                    panel.style.opacity = '1';
+                });
+                setTimeout(() => {
+                    if (rowEl.style.display === 'table-row') {
+                        panel.style.maxHeight = 'none';
+                        panel.style.overflow = 'visible';
+                    }
+                }, 230);
+            }
+
+            function closeHrsHeaderPanel() {
+                const rowEl = document.getElementById('hrs-header-row');
+                if (!rowEl) return;
+                const panel = rowEl.querySelector('.ro-slide-panel');
+                if (!panel) {
+                    rowEl.style.display = 'none';
+                    return;
+                }
+                if (panel.style.maxHeight === 'none') {
+                    panel.style.maxHeight = `${panel.scrollHeight}px`;
+                    void panel.offsetHeight;
+                }
+                panel.style.maxHeight = '0px';
+                panel.style.opacity = '0';
+                setTimeout(() => {
+                    if (panel.style.maxHeight === '0px') {
+                        rowEl.style.display = 'none';
+                    }
+                }, 220);
+            }
+
+            async function loadHrsHeaderAssignments() {
+                const contentEl = document.getElementById('hrs-header-assignments-content');
+                if (!contentEl) return;
+
+                const roList = Array.isArray(dashboardData?.roList) ? dashboardData.roList : [];
+                if (roList.length === 0) {
+                    contentEl.innerHTML = '<div style="color:#999;">No repair orders found.</div>';
+                    refreshHrsHeaderPanelHeight();
+                    return;
+                }
+
+                contentEl.innerHTML = '<div style="color:#777;">Loading assignments...</div>';
+                refreshHrsHeaderPanelHeight();
+
+                const assignmentRows = await Promise.all(
+                    roList.map(async (ro) => {
+                        const roNumber = String(ro?.ro || '').trim();
+                        if (!roNumber) {
+                            return null;
+                        }
+
+                        try {
+                            const response = await fetch(`/api/ro-tech-lines?ro=${encodeURIComponent(roNumber)}`, { credentials: 'include' });
+                            const data = await response.json();
+                            const techLines = Array.isArray(data?.tech_lines) ? data.tech_lines : [];
+                            const assignments = {
+                                body: '',
+                                paint: '',
+                                frame: '',
+                                mechanical: '',
+                                glass: '',
+                            };
+
+                            techLines.forEach((line) => {
+                                const typeKey = normalizeHrsAssignmentType(line?.type || line?.repair_type || '');
+                                if (!typeKey) return;
+                                const techName = String(line?.tech || '').trim();
+                                if (!techName || techName.toLowerCase() === 'unassigned' || techName.toUpperCase() === 'PENDING') {
+                                    return;
+                                }
+                                if (!assignments[typeKey]) {
+                                    assignments[typeKey] = techName;
+                                }
+                            });
+
+                            return {
+                                ro: roNumber,
+                                assignments,
+                            };
+                        } catch (error) {
+                            return {
+                                ro: roNumber,
+                                assignments: {
+                                    body: '',
+                                    paint: '',
+                                    frame: '',
+                                    mechanical: '',
+                                    glass: '',
+                                },
+                            };
+                        }
+                    })
+                );
+
+                const rows = assignmentRows.filter(Boolean);
+                if (rows.length === 0) {
+                    contentEl.innerHTML = '<div style="color:#999;">No assignments available.</div>';
+                    refreshHrsHeaderPanelHeight();
+                    return;
+                }
+
+                let html = '<table style="width:100%; border-collapse:collapse;">';
+                html += '<thead><tr style="background:#d9d9d9; border-bottom:2px solid #999;">';
+                html += '<th style="padding:8px 10px; text-align:left; color:#333;">RO</th>';
+                html += '<th style="padding:8px 10px; text-align:left; color:#333;">Body</th>';
+                html += '<th style="padding:8px 10px; text-align:left; color:#333;">Paint</th>';
+                html += '<th style="padding:8px 10px; text-align:left; color:#333;">Frame</th>';
+                html += '<th style="padding:8px 10px; text-align:left; color:#333;">Mechanical</th>';
+                html += '<th style="padding:8px 10px; text-align:left; color:#333;">Glass</th>';
+                html += '</tr></thead><tbody>';
+
+                rows.forEach((row) => {
+                    html += '<tr style="border-bottom:1px solid #ddd; background:#fff;">';
+                    html += `<td style="padding:8px 10px; color:#333; font-weight:bold;">${escapeHtml(row.ro)}</td>`;
+                    html += `<td style="padding:8px 10px; color:#333;">${escapeHtml(row.assignments.body || '')}</td>`;
+                    html += `<td style="padding:8px 10px; color:#333;">${escapeHtml(row.assignments.paint || '')}</td>`;
+                    html += `<td style="padding:8px 10px; color:#333;">${escapeHtml(row.assignments.frame || '')}</td>`;
+                    html += `<td style="padding:8px 10px; color:#333;">${escapeHtml(row.assignments.mechanical || '')}</td>`;
+                    html += `<td style="padding:8px 10px; color:#333;">${escapeHtml(row.assignments.glass || '')}</td>`;
+                    html += '</tr>';
+                });
+
+                html += '</tbody></table>';
+                contentEl.innerHTML = html;
+                refreshHrsHeaderPanelHeight();
+            }
+
+            function restoreHrsHeaderPanelState() {
+                const rowEl = document.getElementById('hrs-header-row');
+                if (!rowEl) {
+                    hrsHeaderPanelOpen = false;
+                    return;
+                }
+                if (!hrsHeaderPanelOpen) {
+                    rowEl.style.display = 'none';
+                    return;
+                }
+                openHrsHeaderPanel();
+                loadHrsHeaderAssignments();
+            }
+
+            function toggleHrsHeaderAssignments(event) {
+                if (event) {
+                    event.stopPropagation();
+                    event.preventDefault();
+                }
+
+                hrsHeaderPanelOpen = !hrsHeaderPanelOpen;
+                if (hrsHeaderPanelOpen) {
+                    openHrsHeaderPanel();
+                    loadHrsHeaderAssignments();
+                    return;
+                }
+                closeHrsHeaderPanel();
             }
 
             // Clean phone number to display only digits
@@ -2722,11 +2930,35 @@ def get_dashboard_screen_html():
                 updateRoSortIndicators();
                 
                 if (sortedList.length === 0) {
-                    tbody.innerHTML = '<tr><td colspan="10" style="padding:20px; text-align:center; color:#999;">No repair orders found</td></tr>';
+                    tbody.innerHTML = `
+                        <tr id="hrs-header-row" style="display:none; background:#f2f0ef;">
+                            <td colspan="10" style="padding:0 16px 10px 16px; border-bottom:1px solid #eee;">
+                                <div class="ro-slide-panel" style="max-height:0; overflow:hidden; opacity:0; transition:max-height 0.22s ease, opacity 0.22s ease;">
+                                    <div style="background:#fafafa; border:1px solid #ddd; border-radius:6px; padding:10px 12px;">
+                                        <div style="font-weight:bold; margin-bottom:8px; color:#333;">HRS Assignments</div>
+                                        <div id="hrs-header-assignments-content" style="width:100%;"></div>
+                                    </div>
+                                </div>
+                            </td>
+                        </tr>
+                        <tr><td colspan="10" style="padding:20px; text-align:center; color:#999;">No repair orders found</td></tr>
+                    `;
+                    restoreHrsHeaderPanelState();
                     return;
                 }
                 
-                let html = '';
+                let html = `
+                    <tr id="hrs-header-row" style="display:none; background:#f2f0ef;">
+                        <td colspan="10" style="padding:0 16px 10px 16px; border-bottom:1px solid #eee;">
+                            <div class="ro-slide-panel" style="max-height:0; overflow:hidden; opacity:0; transition:max-height 0.22s ease, opacity 0.22s ease;">
+                                <div style="background:#fafafa; border:1px solid #ddd; border-radius:6px; padding:10px 12px;">
+                                    <div style="font-weight:bold; margin-bottom:8px; color:#333;">HRS Assignments</div>
+                                    <div id="hrs-header-assignments-content" style="width:100%;"></div>
+                                </div>
+                            </div>
+                        </td>
+                    </tr>
+                `;
                 sortedList.forEach((ro, index) => {
                     const rowBg = index % 2 === 0 ? '#f2f0ef' : 'var(--list-row-white, #ffffff)';
                     const rowId = safeId(ro.ro);
@@ -2875,8 +3107,8 @@ def get_dashboard_screen_html():
                                                 </span>
                                                 <button id="phone-add-toggle-${rowId}" data-enabled="0" type="button" onclick="toggleAddPhoneInput(event, '${rowId}')" style="background:#d32f2f; border:1px solid #b71c1c; color:#fff; border-radius:3px; padding:0 8px; font-size:13px; cursor:pointer;">+</button>
                                             </div>
-                                            <div id="phone-additional-${rowId}" style="display:flex; flex-direction:column; gap:3px; margin-left:56px;">
-                                                ${additionalPhoneDisplays.map(phone => `<div style="font-size:12px; color:#666;">${escapeHtml(phone)}</div>`).join('')}
+                                            <div id="phone-additional-${rowId}" style="display:flex; align-items:center; gap:12px; margin-left:56px; flex-wrap:wrap;">
+                                                ${additionalPhoneDisplays.map(phone => `<button type="button" onclick='startPrimaryPhoneEditWithValue(event, ${JSON.stringify(rowId)}, ${JSON.stringify(phone)})' style="background:none; border:none; color:#0066cc; text-decoration:underline; cursor:pointer; padding:0; font:inherit;">${escapeHtml(phone)}</button>`).join('')}
                                             </div>
                                             <div id="phone-add-input-wrap-${rowId}" style="display:none; margin-left:56px;">
                                                 <input id="phone-add-input-${rowId}" placeholder="Add phone and press Enter" onkeydown="handleAdditionalPhoneEnter(event, '${rowId}', '${ro.ro}')" style="padding:4px 6px; width:190px;" />
@@ -2937,6 +3169,7 @@ def get_dashboard_screen_html():
                 
                 tbody.innerHTML = html;
                 restoreOpenRoSlideDowns();
+                restoreHrsHeaderPanelState();
             }
 
             function toggleTechAssignment(event, roNumber) {
