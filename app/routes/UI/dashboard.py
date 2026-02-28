@@ -691,8 +691,6 @@ def get_dashboard_screen_html():
                                     window.opener.loadArchiveClosedRos();
                                 }
                             }
-
-                            window.close();
                         } catch (error) {
                             console.error('Error closing RO:', error);
                             alert(error.message || 'Unable to close RO.');

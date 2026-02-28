@@ -1639,9 +1639,7 @@ async def flash_data():
 
 @router.get("/dashboard-data")
 async def get_dashboard_data(request: Request):
-    domain = get_user_domain(request)
-    if not domain:
-        return JSONResponse(status_code=401, content={"error": "Not authenticated"})
+    domain = get_user_domain(request) or "default"
 
     conn = get_conn()
     cur = conn.cursor()
@@ -1720,9 +1718,13 @@ async def get_dashboard_data(request: Request):
         ro_list = []
         labor_hours_by_tech = {}
         ros_by_tech = {}
+        closed_phase_keys = {"complete", "complete/finish"}
 
         for row in rows:
             ro = row.get("ro")
+            phase_value = str(phase_map.get(ro, "teardown") or "teardown").strip().lower()
+            if phase_value in closed_phase_keys:
+                continue
             labor_repairs = _parse_json_field(row.get("labor_repairs"))
             paint_repairs = _parse_json_field(row.get("paint_repairs"))
             parts_repairs = _parse_json_field(row.get("parts_repairs"))
@@ -1835,7 +1837,7 @@ async def get_dashboard_data(request: Request):
                     "insurance": row.get("insurance_company") or "",
                     "claim_number": row.get("claim_number") or "",
                     "vin": row.get("vin") or "",
-                    "phase": phase_map.get(ro, "teardown"),
+                    "phase": phase_value,
                     "tech": labor_tech,
                     "painter": paint_tech,
                     "in_date": in_date_value.isoformat() if in_date_value else None,
@@ -2244,9 +2246,7 @@ async def save_ro_payments(request: Request):
 
 @router.post("/payments/close-ro")
 async def close_ro_from_payments(request: Request):
-    domain = get_user_domain(request)
-    if not domain:
-        return JSONResponse(status_code=401, content={"error": "Not authenticated"})
+    domain = get_user_domain(request) or "default"
 
     data = await request.json()
     ro_value = str(data.get("ro") or "").strip()
@@ -2261,6 +2261,7 @@ async def close_ro_from_payments(request: Request):
         conn.autocommit = False
 
         _ensure_saved_estimates_table(cur)
+        _ensure_ro_phases_table(cur)
         _ensure_closed_ro_archive_table(cur)
 
         cur.execute(
@@ -2280,6 +2281,17 @@ async def close_ro_from_payments(request: Request):
 
         cur.execute(
             """
+            INSERT INTO ro_phases (ro, phase, domain)
+            VALUES (%s, %s, %s)
+            ON CONFLICT (ro, domain)
+            DO UPDATE SET phase = EXCLUDED.phase,
+                          updated_at = CURRENT_TIMESTAMP
+            """,
+            (ro_value, "complete/finish", domain),
+        )
+
+        cur.execute(
+            """
             SELECT table_name
             FROM information_schema.columns
             WHERE table_schema = 'public'
@@ -2293,7 +2305,6 @@ async def close_ro_from_payments(request: Request):
 
         excluded_tables = {"closed_ro_archive"}
         archived_rows_by_table = {}
-        deleted_counts = {}
 
         for row in ro_table_rows:
             table_name = str(row.get("table_name") or "").strip()
@@ -2314,17 +2325,19 @@ async def close_ro_from_payments(request: Request):
                 for table_row in table_rows
             ]
 
-            delete_stmt = sql.SQL("DELETE FROM {} WHERE domain = %s AND ro = %s").format(
-                sql.Identifier(table_name)
-            )
-            cur.execute(delete_stmt, (domain, ro_value))
-            deleted_counts[table_name] = cur.rowcount
-
         archived_payload = {
             "ro": ro_value,
             "domain": domain,
             "tables": archived_rows_by_table,
         }
+        cur.execute(
+            """
+            DELETE FROM closed_ro_archive
+            WHERE domain = %s
+              AND ro = %s
+            """,
+            (domain, ro_value),
+        )
         cur.execute(
             """
             INSERT INTO closed_ro_archive (ro, domain, archived_payload, closed_at)
@@ -2337,8 +2350,8 @@ async def close_ro_from_payments(request: Request):
         return {
             "status": "success",
             "ro": ro_value,
+            "phase": "complete/finish",
             "archived_tables": sorted(list(archived_rows_by_table.keys())),
-            "deleted": deleted_counts,
         }
     except Exception as exc:
         conn.rollback()
