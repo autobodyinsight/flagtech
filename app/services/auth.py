@@ -11,7 +11,7 @@ SESSION_COOKIE_NAME = "flagtech_session"
 PASSWORD_SCHEME = "pbkdf2_sha256"
 PASSWORD_ITERATIONS = 390000
 ACCESS_LEVELS = ("support", "reception", "parts", "estimator", "manager", "architect")
-ARCHITECT_EMAIL = os.getenv("ARCHITECT_EMAIL")
+ARCHITECT_EMAIL = "jorge@autobodyinsight.com"
 ARCHITECT_PASSWORD = os.getenv("ARCHITECT_PASSWORD")
 ARCHITECT_COMPANY = os.getenv("ARCHITECT_COMPANY")
 ARCHITECT_DOMAIN = os.getenv("ARCHITECT_DOMAIN")
@@ -142,6 +142,14 @@ def ensure_auth_tables() -> None:
                 """,
                 (normalized_architect_email, architect_scope, architect_company, architect_password_hash),
             )
+        cur.execute(
+            """
+            UPDATE users
+            SET access_level = 'manager'
+            WHERE lower(access_level) = 'architect' AND lower(email) <> lower(%s)
+            """,
+            (normalized_architect_email,),
+        )
     cur.close()
 
 
@@ -290,6 +298,10 @@ def upsert_user(
     normalized_access_level = (access_level or "support").strip().lower()
     if normalized_access_level not in ACCESS_LEVELS:
         normalized_access_level = "support"
+    if normalized_access_level == "architect" and normalized_email != ARCHITECT_EMAIL:
+        raise PermissionError("Architect access is restricted to jorge@autobodyinsight.com")
+    if normalized_email == ARCHITECT_EMAIL and normalized_access_level != "architect":
+        raise PermissionError("jorge@autobodyinsight.com must use architect access")
 
     conn = get_conn()
     cur = conn.cursor()

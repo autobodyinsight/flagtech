@@ -73,7 +73,6 @@ def get_users_screen_html():
                         <option value="parts">parts</option>
                         <option value="estimator">estimator</option>
                         <option value="manager">manager</option>
-                        <option value="architect">architect</option>
                     </select>
                 </div>
                 <div style="grid-column:1 / -1; display:flex; justify-content:flex-end; margin-top:2px;">

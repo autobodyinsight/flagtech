@@ -77,6 +77,8 @@ def _session_context(request: Request) -> tuple[str, str, str]:
     session_user = getattr(request.state, "user", None) or {}
     session_email = str(session_user.get("email") or "").strip().lower()
     session_access_level = str(session_user.get("access_level") or "support").strip().lower()
+    if session_access_level == "architect" and session_email != ARCHITECT_EMAIL:
+        raise HTTPException(status_code=403, detail="Architect access is restricted")
     return domain, session_email, session_access_level
 
 
@@ -89,11 +91,25 @@ def _is_architect(session_email: str, session_access_level: str) -> bool:
     return session_access_level == "architect" and session_email == ARCHITECT_EMAIL
 
 
+def _enforce_architect_assignment(email: str, access_level: str) -> None:
+    if access_level != "architect":
+        if email == ARCHITECT_EMAIL:
+            raise HTTPException(status_code=403, detail="Architect email must remain architect")
+        return
+    if email != ARCHITECT_EMAIL:
+        raise HTTPException(status_code=403, detail="Architect role is restricted to jorge@autobodyinsight.com")
+
+
+def _extract_requested_access_level(payload: dict) -> str:
+    role_value = str(payload.get("role") or "").strip().lower()
+    access_level_value = str(payload.get("access_level") or "").strip().lower()
+    return role_value or access_level_value
+
+
 @router.get("/users")
 async def list_users(request: Request):
     domain, session_email, session_access_level = _session_context(request)
     is_architect = _is_architect(session_email, session_access_level)
-    can_manage_users = True
 
     ensure_auth_tables()
     conn = get_conn()
@@ -118,7 +134,7 @@ async def list_users(request: Request):
                 ORDER BY domain ASC, email ASC
                 """
             )
-    elif can_manage_users:
+    elif session_access_level == "manager":
         cur.execute(
             """
             SELECT id, email, first_name, last_name, domain, company_name, access_level, active, created_at, last_login
@@ -144,7 +160,7 @@ async def list_users(request: Request):
         "users": rows,
         "domain": domain,
         "my_access_level": session_access_level,
-        "can_manage_users": can_manage_users,
+        "can_manage_users": session_access_level == "manager" or is_architect,
         "is_architect": is_architect,
         "architect_email": ARCHITECT_EMAIL,
     }
@@ -154,12 +170,16 @@ async def list_users(request: Request):
 async def create_user(request: Request):
     domain, session_email, session_access_level = _session_context(request)
     is_architect = _is_architect(session_email, session_access_level)
+    if not is_architect and session_access_level != "manager":
+        raise HTTPException(status_code=403, detail="Manager access required")
 
     payload = await request.json()
     email = str(payload.get("email") or "").strip().lower()
     password = str(payload.get("password") or "")
     company_name = str(payload.get("company_name") or "").strip()
     requested_shop_domain = normalize_domain(payload.get("shop_domain"))
+    if not is_architect and requested_shop_domain and requested_shop_domain != domain:
+        raise HTTPException(status_code=403, detail="Manager access required")
 
     target_domain = (
         requested_shop_domain
@@ -169,7 +189,8 @@ async def create_user(request: Request):
     company_name = company_name or target_domain
     first_name = str(payload.get("first_name") or "").strip()
     last_name = str(payload.get("last_name") or "").strip()
-    access_level = str(payload.get("access_level") or "support").strip().lower()
+    requested_access_level = _extract_requested_access_level(payload)
+    access_level = requested_access_level or "support"
 
     if "@" not in email:
         raise HTTPException(status_code=400, detail="Valid email is required")
@@ -177,6 +198,7 @@ async def create_user(request: Request):
         raise HTTPException(status_code=400, detail="Password must be at least 8 characters")
     if access_level not in ACCESS_LEVELS:
         raise HTTPException(status_code=400, detail="Invalid access level")
+    _enforce_architect_assignment(email, access_level)
 
     # Email domain does not restrict shop association
     # If shop has a domain, user is linked to that shop regardless of email domain
@@ -232,12 +254,15 @@ async def set_user_active(user_id: int, request: Request):
 
     payload = await request.json()
     active = bool(payload.get("active"))
+    requested_access_level = _extract_requested_access_level(payload)
 
     ensure_auth_tables()
     conn = get_conn()
     cur = conn.cursor()
     cur.execute("SELECT lower(email) AS email FROM users WHERE id = %s", (user_id,))
     protected_target = cur.fetchone()
+    if requested_access_level == "architect" and protected_target:
+        _enforce_architect_assignment(str(protected_target.get("email") or "").strip().lower(), "architect")
     if protected_target and protected_target.get("email") == ARCHITECT_EMAIL:
         cur.close()
         raise HTTPException(status_code=403, detail="Architect user is protected")
@@ -291,6 +316,7 @@ async def reset_user_password(user_id: int, request: Request):
 
     payload = await request.json()
     new_password = str(payload.get("password") or "")
+    requested_access_level = _extract_requested_access_level(payload)
     if len(new_password) < 8:
         raise HTTPException(status_code=400, detail="Password must be at least 8 characters")
 
@@ -299,6 +325,8 @@ async def reset_user_password(user_id: int, request: Request):
     cur = conn.cursor()
     cur.execute("SELECT lower(email) AS email FROM users WHERE id = %s", (user_id,))
     protected_target = cur.fetchone()
+    if requested_access_level == "architect" and protected_target:
+        _enforce_architect_assignment(str(protected_target.get("email") or "").strip().lower(), "architect")
     if protected_target and protected_target.get("email") == ARCHITECT_EMAIL:
         cur.close()
         raise HTTPException(status_code=403, detail="Architect user is protected")
