@@ -61,17 +61,19 @@ def get_reports_screen_html():
                         <tr class="dashboard-header-row">
                             <th class="dashboard-header-cell" style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold; background:#23272a; color:#fff; cursor:pointer; user-select:none;">RO#</th>
                             <th class="dashboard-header-cell" style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold; background:#23272a; color:#fff; cursor:pointer; user-select:none;">Vehicle</th>
-                            <th class="dashboard-header-cell" style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold; background:#23272a; color:#fff; cursor:pointer; user-select:none;">Customer</th>
                             <th class="dashboard-header-cell" style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold; background:#23272a; color:#fff; cursor:pointer; user-select:none;">Insurance</th>
-                            <th class="dashboard-header-cell" style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold; background:#23272a; color:#fff; cursor:pointer; user-select:none;">In</th>
-                            <th class="dashboard-header-cell" style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold; background:#23272a; color:#fff; cursor:pointer; user-select:none;">Picked Up</th>
                             <th class="dashboard-header-cell" style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold; background:#23272a; color:#fff; text-align:right; cursor:pointer; user-select:none;">HRS</th>
-                            <th class="dashboard-header-cell" style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold; background:#23272a; color:#fff; text-align:right; cursor:pointer; user-select:none;">Total</th>
+                            <th class="dashboard-header-cell" style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold; background:#23272a; color:#fff; text-align:right; cursor:pointer; user-select:none;">PARTS-S</th>
+                            <th class="dashboard-header-cell" style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold; background:#23272a; color:#fff; text-align:right; cursor:pointer; user-select:none;">PARTS-C</th>
+                            <th class="dashboard-header-cell" style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold; background:#23272a; color:#fff; text-align:right; cursor:pointer; user-select:none;">LABOR-S</th>
+                            <th class="dashboard-header-cell" style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold; background:#23272a; color:#fff; text-align:right; cursor:pointer; user-select:none;">LABOR-C</th>
+                            <th class="dashboard-header-cell" style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold; background:#23272a; color:#fff; text-align:right; cursor:pointer; user-select:none;">TOTAL-S</th>
+                            <th class="dashboard-header-cell" style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold; background:#23272a; color:#fff; text-align:right; cursor:pointer; user-select:none;">TOTAL-C</th>
                         </tr>
                     </thead>
                     <tbody id="reportsRoListBody">
                         <tr>
-                            <td colspan="8" style="padding:20px; text-align:center; color:#999;">Loading...</td>
+                            <td colspan="10" style="padding:20px; text-align:center; color:#999;">Loading...</td>
                         </tr>
                     </tbody>
                 </table>
@@ -92,6 +94,16 @@ def get_reports_screen_html():
         }
     </style>
     <script>
+    function formatReportsPercent(value) {
+        const amount = Number(value || 0);
+        return amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+
+    function formatReportsMoney(value) {
+        const amount = Number(value || 0);
+        return '$' + amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+
     async function loadReportsData() {
         try {
             const resp = await fetch('/api/reports_data');
@@ -103,7 +115,7 @@ def get_reports_screen_html():
                 summaryBody.innerHTML += `<tr>
                     <td style='padding:12px;'>${row.category}</td>
                     <td style='padding:12px;'>$${row.sales.toLocaleString()}</td>
-                    <td style='padding:12px;'>${row.gp_percent}%</td>
+                    <td style='padding:12px;'>${formatReportsPercent(row.gp_percent)}%</td>
                     <td style='padding:12px;'>$${row.gp_dollar.toLocaleString()}</td>
                 </tr>`;
             }
@@ -111,24 +123,26 @@ def get_reports_screen_html():
             const roBody = document.getElementById('reportsRoListBody');
             roBody.innerHTML = '';
             if (data.closed_ros.length === 0) {
-                roBody.innerHTML = `<tr><td colspan='8' style='padding:20px; text-align:center; color:#999;'>No closed repair orders found.</td></tr>`;
+                roBody.innerHTML = `<tr><td colspan='10' style='padding:20px; text-align:center; color:#999;'>No closed repair orders found.</td></tr>`;
             } else {
                 for (const ro of data.closed_ros) {
                     roBody.innerHTML += `<tr>
                         <td style='padding:12px;'>${ro.ro_number || ''}</td>
                         <td style='padding:12px;'>${ro.vehicle || ''}</td>
-                        <td style='padding:12px;'>${ro.customer || ''}</td>
                         <td style='padding:12px;'>${ro.insurance || ''}</td>
-                        <td style='padding:12px;'>${ro.in_date || ''}</td>
-                        <td style='padding:12px;'>${ro.picked_up || ''}</td>
                         <td style='padding:12px; text-align:right;'>${ro.hours || ''}</td>
-                        <td style='padding:12px; text-align:right;'>$${ro.total ? ro.total.toLocaleString() : ''}</td>
+                        <td style='padding:12px; text-align:right;'>${formatReportsMoney(ro.parts_sales)}</td>
+                        <td style='padding:12px; text-align:right;'>${formatReportsMoney(ro.parts_cost)}</td>
+                        <td style='padding:12px; text-align:right;'>${formatReportsMoney(ro.labor_sales)}</td>
+                        <td style='padding:12px; text-align:right;'>${formatReportsMoney(ro.labor_cost)}</td>
+                        <td style='padding:12px; text-align:right;'>${formatReportsMoney(ro.total_sales ?? ro.total)}</td>
+                        <td style='padding:12px; text-align:right;'>${formatReportsMoney(ro.total_cost)}</td>
                     </tr>`;
                 }
             }
         } catch (e) {
             document.getElementById('reportsSummaryBody').innerHTML = `<tr><td colspan='4' style='padding:20px; text-align:center; color:#c00;'>Error loading data</td></tr>`;
-            document.getElementById('reportsRoListBody').innerHTML = `<tr><td colspan='8' style='padding:20px; text-align:center; color:#c00;'>Error loading data</td></tr>`;
+            document.getElementById('reportsRoListBody').innerHTML = `<tr><td colspan='10' style='padding:20px; text-align:center; color:#c00;'>Error loading data</td></tr>`;
         }
     }
     // Load data when REPORTS screen is shown
