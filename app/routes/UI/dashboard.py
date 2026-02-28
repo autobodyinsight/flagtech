@@ -331,7 +331,7 @@ def get_dashboard_screen_html():
             // SVG line icons (white, flat, no fill)
             const icons = {
                 notepad: `<svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="5" y="6" width="18" height="16" rx="2" stroke="white" stroke-width="2"/><line x1="9" y1="10" x2="19" y2="10" stroke="white" stroke-width="2"/><line x1="9" y1="14" x2="19" y2="14" stroke="white" stroke-width="2"/><line x1="9" y1="18" x2="15" y2="18" stroke="white" stroke-width="2"/></svg>`,
-                estimate: `<svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="6" y="4" width="16" height="20" rx="2" stroke="white" stroke-width="2"/><line x1="9" y1="9" x2="19" y2="9" stroke="white" stroke-width="2"/><line x1="9" y1="13" x2="19" y2="13" stroke="white" stroke-width="2"/><line x1="9" y1="17" x2="16" y2="17" stroke="white" stroke-width="2"/></svg>`,
+                estimate: `<svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="6" y="3" width="16" height="22" rx="2" stroke="white" stroke-width="2"/><line x1="9" y1="8" x2="19" y2="8" stroke="white" stroke-width="2"/><rect x="9" y="11" width="4" height="3" rx="0.8" stroke="white" stroke-width="1.8"/><rect x="15" y="11" width="4" height="3" rx="0.8" stroke="white" stroke-width="1.8"/><rect x="9" y="16" width="4" height="3" rx="0.8" stroke="white" stroke-width="1.8"/><rect x="15" y="16" width="4" height="3" rx="0.8" stroke="white" stroke-width="1.8"/><line x1="9" y1="22" x2="19" y2="22" stroke="white" stroke-width="2"/></svg>`,
                 tech: `<svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="14" cy="9" r="4" stroke="white" stroke-width="2"/><rect x="7" y="17" width="14" height="6" rx="3" stroke="white" stroke-width="2"/><path d="M21 21l2.5 2.5" stroke="white" stroke-width="2" stroke-linecap="round"/><path d="M7 21l-2.5 2.5" stroke="white" stroke-width="2" stroke-linecap="round"/></svg>`,
                 cart: `<svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="10" cy="23" r="2" stroke="white" stroke-width="2"/><circle cx="20" cy="23" r="2" stroke="white" stroke-width="2"/><rect x="5" y="7" width="18" height="10" rx="2" stroke="white" stroke-width="2"/><path d="M7 7V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v2" stroke="white" stroke-width="2"/></svg>`,
                 credit: `<svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="4" y="7" width="20" height="14" rx="3" stroke="white" stroke-width="2"/><rect x="7" y="17" width="6" height="3" rx="1.5" stroke="white" stroke-width="2"/><line x1="4" y1="12" x2="24" y2="12" stroke="white" stroke-width="2"/></svg>`
@@ -905,20 +905,20 @@ def get_dashboard_screen_html():
                                         <colgroup>
                                             <col style="width:8%;" />
                                             <col style="width:48%;" />
-                                            <col style="width:9%;" />
-                                            <col style="width:9%;" />
-                                            <col style="width:8%;" />
                                             <col style="width:10%;" />
+                                            <col style="width:8%;" />
+                                            <col style="width:9%;" />
+                                            <col style="width:9%;" />
                                             <col style="width:8%;" />
                                         </colgroup>
                                         <thead>
                                             <tr style="background:#f5f5f5; border-bottom:1px solid #ddd;">
                                                 <th style="padding:8px; text-align:left; white-space:nowrap;">Line #</th>
                                                 <th style="padding:8px; text-align:left; white-space:nowrap;">Description</th>
+                                                <th style="padding:8px; text-align:left; white-space:nowrap;">Part #</th>
+                                                <th style="padding:8px; text-align:right; white-space:nowrap;">Qty</th>
                                                 <th style="padding:8px; text-align:right; white-space:nowrap;">Labor</th>
                                                 <th style="padding:8px; text-align:right; white-space:nowrap;">Paint</th>
-                                                <th style="padding:8px; text-align:right; white-space:nowrap;">Qty</th>
-                                                <th style="padding:8px; text-align:left; white-space:nowrap;">Part #</th>
                                                 <th style="padding:8px; text-align:right; white-space:nowrap;">Price</th>
                                             </tr>
                                         </thead>
@@ -944,10 +944,10 @@ def get_dashboard_screen_html():
                                                     <tr style="border-bottom:1px solid #eee;">
                                                         <td style="padding:8px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${escapePopupHtml(lineNumber)}</td>
                                                         <td style="padding:8px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${escapePopupHtml(description)}</td>
+                                                        <td style="padding:8px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${escapePopupHtml(partNumberDisplay)}</td>
+                                                        <td style="padding:8px; text-align:right; white-space:nowrap;">${escapePopupHtml(qtyDisplay)}</td>
                                                         <td style="padding:8px; text-align:right; white-space:nowrap;">${escapePopupHtml(normalizeDisplayNumber(labor))}</td>
                                                         <td style="padding:8px; text-align:right; white-space:nowrap;">${escapePopupHtml(normalizeDisplayNumber(paint))}</td>
-                                                        <td style="padding:8px; text-align:right; white-space:nowrap;">${escapePopupHtml(qtyDisplay)}</td>
-                                                        <td style="padding:8px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${escapePopupHtml(partNumberDisplay)}</td>
                                                         <td style="padding:8px; text-align:right; white-space:nowrap;">${escapePopupHtml(priceDisplay)}</td>
                                                     </tr>
                                                 `;
