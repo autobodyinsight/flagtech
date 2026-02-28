@@ -45,7 +45,6 @@ import psycopg2.extras
 
 DATABASE_URL = os.getenv(
 	"DATABASE_URL",
-	"postgresql://management_app_yj3h_user:VioUE4I0r3VgaBiNt920IbTXfbRT9dfc@dpg-d5qf43juibrs73c4q5o0-a.oregon-postgres.render.com/management_app_yj3h",
 )
 
 
@@ -59,13 +58,15 @@ def _ensure_sslmode(dsn: str) -> str:
 	return rebuilt
 
 
-dsn_with_ssl = _ensure_sslmode(DATABASE_URL)
-
 conn = None
 
 
 def get_conn():
 	"""Return a live DB connection, reconnecting if needed."""
+	if not DATABASE_URL:
+		raise RuntimeError("DATABASE_URL environment variable is required")
+
+	dsn_with_ssl = _ensure_sslmode(DATABASE_URL)
 	global conn
 	if conn is None or conn.closed:
 		conn = psycopg2.connect(dsn_with_ssl, cursor_factory=psycopg2.extras.RealDictCursor)

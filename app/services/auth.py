@@ -11,10 +11,10 @@ SESSION_COOKIE_NAME = "flagtech_session"
 PASSWORD_SCHEME = "pbkdf2_sha256"
 PASSWORD_ITERATIONS = 390000
 ACCESS_LEVELS = ("support", "reception", "parts", "estimator", "manager", "architect")
-ARCHITECT_EMAIL = "jorge@autobodyinsight.com"
-ARCHITECT_PASSWORD = "!Fenderbender702"
-ARCHITECT_COMPANY = "AutoBody Insight"
-ARCHITECT_DOMAIN = "autobodyinsight.com"
+ARCHITECT_EMAIL = os.getenv("ARCHITECT_EMAIL")
+ARCHITECT_PASSWORD = os.getenv("ARCHITECT_PASSWORD")
+ARCHITECT_COMPANY = os.getenv("ARCHITECT_COMPANY")
+ARCHITECT_DOMAIN = os.getenv("ARCHITECT_DOMAIN")
 
 
 def _utc_now() -> datetime:
@@ -87,56 +87,61 @@ def ensure_auth_tables() -> None:
     cur.execute("ALTER TABLE sessions ADD COLUMN IF NOT EXISTS access_level VARCHAR(32) DEFAULT 'support'")
     cur.execute("CREATE INDEX IF NOT EXISTS idx_sessions_expires_at ON sessions(expires_at)")
 
-    normalized_architect_email = normalize_email(ARCHITECT_EMAIL)
-    cur.execute(
-        """
-        SELECT id, password_hash
-        FROM users
-        WHERE lower(email) = lower(%s)
-        LIMIT 1
-        """,
-        (normalized_architect_email,),
-    )
-    architect_row = cur.fetchone()
-    architect_password_hash = hash_password(ARCHITECT_PASSWORD)
+    if ARCHITECT_EMAIL and ARCHITECT_PASSWORD:
+        normalized_architect_email = normalize_email(ARCHITECT_EMAIL)
+        email_domain = normalized_architect_email.split("@", 1)[1] if "@" in normalized_architect_email else ""
+        architect_company = (ARCHITECT_COMPANY or email_domain or "Default Company").strip()
+        architect_scope = build_shop_scope_key(ARCHITECT_DOMAIN or email_domain, architect_company, normalized_architect_email)
 
-    if architect_row:
-        stored_hash = str(architect_row.get("password_hash") or "")
-        if verify_password(ARCHITECT_PASSWORD, stored_hash):
-            cur.execute(
-                """
-                UPDATE users
-                SET
-                    domain = %s,
-                    company_name = %s,
-                    active = TRUE,
-                    access_level = 'architect'
-                WHERE id = %s
-                """,
-                (ARCHITECT_DOMAIN, ARCHITECT_COMPANY, architect_row.get("id")),
-            )
+        cur.execute(
+            """
+            SELECT id, password_hash
+            FROM users
+            WHERE lower(email) = lower(%s)
+            LIMIT 1
+            """,
+            (normalized_architect_email,),
+        )
+        architect_row = cur.fetchone()
+        architect_password_hash = hash_password(ARCHITECT_PASSWORD)
+
+        if architect_row:
+            stored_hash = str(architect_row.get("password_hash") or "")
+            if verify_password(ARCHITECT_PASSWORD, stored_hash):
+                cur.execute(
+                    """
+                    UPDATE users
+                    SET
+                        domain = %s,
+                        company_name = %s,
+                        active = TRUE,
+                        access_level = 'architect'
+                    WHERE id = %s
+                    """,
+                    (architect_scope, architect_company, architect_row.get("id")),
+                )
+            else:
+                cur.execute(
+                    """
+                    UPDATE users
+                    SET
+                        domain = %s,
+                        company_name = %s,
+                        password_hash = %s,
+                        active = TRUE,
+                        access_level = 'architect'
+                    WHERE id = %s
+                    """,
+                    (architect_scope, architect_company, architect_password_hash, architect_row.get("id")),
+                )
         else:
             cur.execute(
                 """
-                UPDATE users
-                SET
-                    domain = %s,
-                    company_name = %s,
-                    password_hash = %s,
-                    active = TRUE,
-                    access_level = 'architect'
-                WHERE id = %s
+                INSERT INTO users (email, domain, company_name, password_hash, access_level, active)
+                VALUES (%s, %s, %s, %s, 'architect', TRUE)
                 """,
-                (ARCHITECT_DOMAIN, ARCHITECT_COMPANY, architect_password_hash, architect_row.get("id")),
+                (normalized_architect_email, architect_scope, architect_company, architect_password_hash),
             )
-    else:
-        cur.execute(
-            """
-            INSERT INTO users (email, domain, company_name, password_hash, access_level, active)
-            VALUES (%s, %s, %s, %s, 'architect', TRUE)
-            """,
-            (normalized_architect_email, ARCHITECT_DOMAIN, ARCHITECT_COMPANY, architect_password_hash),
-        )
     cur.close()
 
 
