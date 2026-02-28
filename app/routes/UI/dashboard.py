@@ -1476,7 +1476,7 @@ def get_dashboard_screen_html():
                 roWindowContentEl.innerHTML = `
                     <div class="ro-window-card">
                         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
-                            <div style="font-weight:700; font-size:18px; color:#333;">Payments</div>
+                            <div id="roPopupPaymentsTitle" style="font-weight:700; font-size:18px; color:#333;">Payments - GRAND TOTAL: -</div>
                             <button id="roPopupPaymentsSave" type="button" style="padding:9px 14px; background:#d32f2f; color:#fff; border:none; border-radius:6px; cursor:pointer; font-weight:700;">SAVE</button>
                         </div>
                         <div id="roPopupPaymentsLog"><div style="color:#777;">Loading...</div></div>
@@ -1485,6 +1485,7 @@ def get_dashboard_screen_html():
 
                 const logEl = roWindowDoc.getElementById('roPopupPaymentsLog');
                 const saveBtn = roWindowDoc.getElementById('roPopupPaymentsSave');
+                const titleEl = roWindowDoc.getElementById('roPopupPaymentsTitle');
 
                 function formatShortPaymentDate(value) {
                     const source = String(value || '').trim();
@@ -1506,6 +1507,12 @@ def get_dashboard_screen_html():
                     const numeric = Number(value || 0);
                     if (!Number.isFinite(numeric) || numeric <= 0) return '-';
                     return popupFormatMoney(numeric);
+                }
+
+                function formatGrandTotal(value) {
+                    const numeric = Number(value || 0);
+                    if (!Number.isFinite(numeric)) return '-';
+                    return popupFormatMoney(Math.max(0, numeric));
                 }
 
                 function renderPaymentLog(entries) {
@@ -1537,18 +1544,29 @@ def get_dashboard_screen_html():
                     const customerTotal = Number(row.customer_total || 0);
                     const insurancePaid = Number(row.insurance_paid || 0);
                     const customerPaid = Number(row.customer_paid || 0);
+                    const roGrandTotal = insuranceTotal + customerTotal;
 
                     const insuranceBalance = formatBalance(Math.max(0, insuranceTotal - insurancePaid));
                     const customerBalance = formatBalance(Math.max(0, customerTotal - customerPaid));
+                    const insuranceGrandTotal = formatGrandTotal(insuranceTotal);
+                    const customerGrandTotal = formatGrandTotal(customerTotal);
+                    const roGrandTotalText = formatGrandTotal(roGrandTotal);
 
                     const insuranceName = String(row.insurance_name || '').trim() || '-';
                     const customerName = String(row.customer || '').trim() || '-';
+
+                    if (titleEl) {
+                        titleEl.textContent = `Payments - GRAND TOTAL: ${roGrandTotalText}`;
+                    }
 
                     logEl.innerHTML = `
                         <div style="border:1px solid #e2e2e2; border-radius:6px; padding:12px; margin-bottom:14px; background:#fff;">
                             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; color:#333; font-weight:700;">
                                 <div>INSURANCE: ${escapePopupHtml(insuranceName)}</div>
-                                <div>BALANCE: ${escapePopupHtml(insuranceBalance)}</div>
+                                <div style="text-align:right; line-height:1.35;">
+                                    <div>GRAND TOTAL: ${escapePopupHtml(insuranceGrandTotal)}</div>
+                                    <div>BALANCE: ${escapePopupHtml(insuranceBalance)}</div>
+                                </div>
                             </div>
                             <div style="display:flex; gap:8px; align-items:center; margin-bottom:10px;">
                                 <input id="roPopupInsurancePaymentInput" type="number" step="0.01" min="0" placeholder="0.00" style="padding:8px; border:1px solid #ccc; border-radius:4px; width:180px;" />
@@ -1565,7 +1583,10 @@ def get_dashboard_screen_html():
                         <div style="border:1px solid #e2e2e2; border-radius:6px; padding:12px; background:#fff;">
                             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; color:#333; font-weight:700;">
                                 <div>CUSTOMER: ${escapePopupHtml(customerName)}</div>
-                                <div>BALANCE: ${escapePopupHtml(customerBalance)}</div>
+                                <div style="text-align:right; line-height:1.35;">
+                                    <div>GRAND TOTAL: ${escapePopupHtml(customerGrandTotal)}</div>
+                                    <div>BALANCE: ${escapePopupHtml(customerBalance)}</div>
+                                </div>
                             </div>
                             <div style="display:flex; gap:8px; align-items:center; margin-bottom:10px;">
                                 <input id="roPopupCustomerPaymentInput" type="number" step="0.01" min="0" placeholder="0.00" style="padding:8px; border:1px solid #ccc; border-radius:4px; width:180px;" />
