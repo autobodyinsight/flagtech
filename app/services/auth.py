@@ -12,6 +12,11 @@ PASSWORD_SCHEME = "pbkdf2_sha256"
 PASSWORD_ITERATIONS = 390000
 ACCESS_LEVELS = ("support", "reception", "parts", "estimator", "manager", "architect")
 ARCHITECT_EMAIL = "jorge@autobodyinsight.com"
+SINGLE_USER_EMAIL = "jorge@autobodyinsight.com"
+SINGLE_USER_DOMAIN = "autobodyinsight.com"
+SINGLE_USER_COMPANY_NAME = "autobodyinsight.com"
+SINGLE_USER_FIRST_NAME = "Jorge"
+SINGLE_USER_LAST_NAME = ""
 
 
 def _utc_now() -> datetime:
@@ -271,6 +276,72 @@ def upsert_user(
             password_hash,
             active,
             normalized_access_level,
+        ),
+    )
+    cur.close()
+
+
+def ensure_single_user_account() -> None:
+    """Reset auth data so only the configured single user exists."""
+    ensure_auth_tables()
+
+    normalized_email = normalize_email(SINGLE_USER_EMAIL)
+    scope_key = build_shop_scope_key(SINGLE_USER_DOMAIN, SINGLE_USER_COMPANY_NAME, normalized_email)
+    configured_password = os.getenv("SINGLE_USER_TEMP_PASSWORD", "").strip()
+
+    conn = get_conn()
+    cur = conn.cursor()
+    cur.execute("DELETE FROM sessions")
+
+    password_hash = None
+    if configured_password:
+        password_hash = hash_password(configured_password)
+    else:
+        cur.execute(
+            """
+            SELECT password_hash
+            FROM users
+            WHERE lower(email) = lower(%s)
+            LIMIT 1
+            """,
+            (normalized_email,),
+        )
+        existing_user = cur.fetchone() or {}
+        password_hash = existing_user.get("password_hash")
+        if not password_hash:
+            raise RuntimeError(
+                "SINGLE_USER_TEMP_PASSWORD must be set before first startup to seed the single user account."
+            )
+
+    cur.execute(
+        """
+        DELETE FROM users
+        WHERE lower(email) <> lower(%s)
+        """,
+        (normalized_email,),
+    )
+    cur.execute(
+        """
+        INSERT INTO users (email, domain, company_name, first_name, last_name, password_hash, access_level, active)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, TRUE)
+        ON CONFLICT (email)
+        DO UPDATE SET
+            domain = EXCLUDED.domain,
+            company_name = EXCLUDED.company_name,
+            first_name = EXCLUDED.first_name,
+            last_name = EXCLUDED.last_name,
+            password_hash = EXCLUDED.password_hash,
+            access_level = EXCLUDED.access_level,
+            active = TRUE
+        """,
+        (
+            normalized_email,
+            scope_key,
+            SINGLE_USER_COMPANY_NAME,
+            SINGLE_USER_FIRST_NAME,
+            SINGLE_USER_LAST_NAME,
+            password_hash,
+            "architect",
         ),
     )
     cur.close()

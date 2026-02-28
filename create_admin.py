@@ -1,7 +1,6 @@
 import os
 
 EMAIL = "MY_EMAIL_HERE"
-PASSWORD_HASH = "$2b$12$hvdQq9bPiG4L42XUPiH0aeATRvSP0bzh0sYN4L6Zza353hIJbm2Ua"
 ROLE = "architect"
 
 
@@ -9,6 +8,11 @@ def main() -> int:
     database_url = os.getenv("DATABASE_URL")
     if not database_url:
         print("DATABASE_URL is not set")
+        return 1
+
+    password_hash = os.getenv("ADMIN_PASSWORD_HASH")
+    if not password_hash:
+        print("ADMIN_PASSWORD_HASH is not set")
         return 1
 
     from app.services.db import get_conn
@@ -35,7 +39,7 @@ def main() -> int:
         INSERT INTO users (email, password_hash, role, created_at, updated_at)
         VALUES (%s, %s, %s, NOW(), NOW())
         """,
-        (EMAIL, PASSWORD_HASH, ROLE),
+        (EMAIL, password_hash, ROLE),
     )
     cur.close()
     print("User created")

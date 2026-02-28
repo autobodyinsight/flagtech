@@ -9,6 +9,11 @@ from fastapi import Request
 from app.services.auth import build_shop_scope_key
 
 
+DEFAULT_SCOPE_DOMAIN = "autobodyinsight.com"
+DEFAULT_SCOPE_COMPANY = "autobodyinsight.com"
+DEFAULT_SCOPE_EMAIL = "jorge@autobodyinsight.com"
+
+
 def _clean(value: Optional[str]) -> Optional[str]:
     if value is None:
         return None
@@ -29,4 +34,8 @@ def get_user_domain(request: Request) -> Optional[str]:
         if value:
             return value
 
-    return None
+    cookie_domain = _clean(request.cookies.get("user_domain"))
+    if cookie_domain:
+        return build_shop_scope_key(cookie_domain, DEFAULT_SCOPE_COMPANY, DEFAULT_SCOPE_EMAIL)
+
+    return build_shop_scope_key(DEFAULT_SCOPE_DOMAIN, DEFAULT_SCOPE_COMPANY, DEFAULT_SCOPE_EMAIL)
