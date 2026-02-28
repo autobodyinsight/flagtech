@@ -51,6 +51,7 @@ app.add_middleware(
 @app.middleware("http")
 async def auth_middleware(request: Request, call_next):
     path = request.url.path
+    method = request.method.upper()
 
     public_prefixes = (
         "/auth",
@@ -58,7 +59,10 @@ async def auth_middleware(request: Request, call_next):
         "/redoc",
         "/openapi.json",
     )
-    if request.method == "OPTIONS" or any(path.startswith(prefix) for prefix in public_prefixes):
+    if method == "OPTIONS" or any(path.startswith(prefix) for prefix in public_prefixes):
+        return await call_next(request)
+
+    if method == "POST" and path == "/api/users":
         return await call_next(request)
 
     protected_path = path == "/" or path.startswith("/ui") or path.startswith("/api")

@@ -6,29 +6,19 @@ from app.services.auth import (
     delete_user,
     list_users,
     normalize_email,
-    require_user_management,
     update_user,
 )
 
 router = APIRouter()
 
 
-def _require_user_management_request(request: Request) -> None:
-    try:
-        require_user_management(getattr(request.state, "user", None))
-    except PermissionError as exc:
-        raise HTTPException(status_code=403, detail=str(exc)) from exc
-
-
 @router.get("/users")
 async def api_list_users(request: Request):
-    _require_user_management_request(request)
     return {"users": list_users(), "roles": list(ALLOWED_USER_ROLES)}
 
 
 @router.post("/users")
 async def api_create_user(request: Request):
-    _require_user_management_request(request)
     payload = await request.json()
 
     email = normalize_email(payload.get("email"))
@@ -50,7 +40,6 @@ async def api_create_user(request: Request):
 
 @router.patch("/users/{user_id}")
 async def api_update_user(user_id: int, request: Request):
-    _require_user_management_request(request)
     payload = await request.json()
 
     email = payload.get("email")
@@ -77,7 +66,6 @@ async def api_update_user(user_id: int, request: Request):
 
 @router.patch("/users/{user_id}/role")
 async def api_assign_user_role(user_id: int, request: Request):
-    _require_user_management_request(request)
     payload = await request.json()
 
     role = str(payload.get("role") or "").strip().lower()
@@ -99,7 +87,6 @@ async def api_assign_user_role(user_id: int, request: Request):
 
 @router.patch("/users/{user_id}/password")
 async def api_reset_user_password(user_id: int, request: Request):
-    _require_user_management_request(request)
     payload = await request.json()
 
     password = str(payload.get("password") or "")
@@ -121,8 +108,6 @@ async def api_reset_user_password(user_id: int, request: Request):
 
 @router.delete("/users/{user_id}")
 async def api_delete_user(user_id: int, request: Request):
-    _require_user_management_request(request)
-
     deleted = delete_user(user_id)
     if not deleted:
         raise HTTPException(status_code=404, detail="User not found")
