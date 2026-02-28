@@ -6,12 +6,8 @@ from typing import Optional
 
 from fastapi import Request
 
-from app.services.auth import build_shop_scope_key
-
 
 DEFAULT_SCOPE_DOMAIN = "autobodyinsight.com"
-DEFAULT_SCOPE_COMPANY = "autobodyinsight.com"
-DEFAULT_SCOPE_EMAIL = "jorge@autobodyinsight.com"
 
 
 def _clean(value: Optional[str]) -> Optional[str]:
@@ -21,21 +17,21 @@ def _clean(value: Optional[str]) -> Optional[str]:
     return value if value else None
 
 
+def _normalize_domain(value: str | None) -> str:
+    return (value or "").strip().lower()
+
+
+def _build_scope_key(domain: str | None) -> str:
+    normalized_domain = _normalize_domain(domain)
+    if normalized_domain:
+        return normalized_domain
+    return "default"
+
+
 def get_user_domain(request: Request) -> Optional[str]:
-    """Resolve the authenticated user's strict tenant scope key."""
-    state_user = getattr(request.state, "user", None)
-    if isinstance(state_user, dict):
-        value = _clean(state_user.get("domain"))
-        if value:
-            return build_shop_scope_key(value, state_user.get("company_name"), state_user.get("email"))
-
-        fallback_scope = build_shop_scope_key(None, state_user.get("company_name"), state_user.get("email"))
-        value = _clean(fallback_scope)
-        if value:
-            return value
-
+    """Resolve the active tenant domain scope."""
     cookie_domain = _clean(request.cookies.get("user_domain"))
     if cookie_domain:
-        return build_shop_scope_key(cookie_domain, DEFAULT_SCOPE_COMPANY, DEFAULT_SCOPE_EMAIL)
+        return _build_scope_key(cookie_domain)
 
-    return build_shop_scope_key(DEFAULT_SCOPE_DOMAIN, DEFAULT_SCOPE_COMPANY, DEFAULT_SCOPE_EMAIL)
+    return _build_scope_key(DEFAULT_SCOPE_DOMAIN)

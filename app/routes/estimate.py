@@ -70,26 +70,6 @@ def _resolve_note_created_by(cur, value: str) -> str:
     created_by = str(value or "").strip()
     if not created_by:
         return "Unknown"
-
-    if "@" in created_by:
-        try:
-            cur.execute(
-                """
-                SELECT first_name, last_name
-                FROM users
-                WHERE lower(email) = lower(%s)
-                LIMIT 1
-                """,
-                (created_by,),
-            )
-            user_row = cur.fetchone() or {}
-            first_name = str(user_row.get("first_name") or "").strip()
-            last_name = str(user_row.get("last_name") or "").strip()
-            full_name = " ".join(part for part in (first_name, last_name) if part)
-            if full_name:
-                return full_name
-        except Exception:
-            pass
     return created_by
 
 
@@ -4164,11 +4144,7 @@ async def list_ro_activity(request: Request, ro: str):
 @router.post("/ro-notes")
 async def add_ro_note(request: Request):
     domain = get_user_domain(request) or "default"
-    session_user = getattr(request.state, "user", {}) or {}
-    first_name = str(session_user.get("first_name") or "").strip()
-    last_name = str(session_user.get("last_name") or "").strip()
-    full_name = " ".join(part for part in (first_name, last_name) if part)
-    created_by = full_name or str(session_user.get("email") or "").strip() or "Unknown"
+    created_by = "System"
     data = await request.json()
     ro = (data.get("ro") or "").strip()
     note = (data.get("note") or "").strip()

@@ -1,5 +1,4 @@
 from fastapi import FastAPI
-from fastapi import Request
 from fastapi.responses import RedirectResponse
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -9,7 +8,6 @@ from app.routes.UI.ui import router as ui_router
 from app.routes.UI.ui_with_processing import router as processing_router
 from app.routes.UI.upload_ui.routes import router as ui_routes_router
 from app.routes.payments import router as payments_router
-from app.services.auth import ensure_single_user_account
 
 
 app = FastAPI(title="FlagTech Estimate Parser")
@@ -44,15 +42,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-
-@app.middleware("http")
-async def auth_middleware(request: Request, call_next):
-    return await call_next(request)
-
-
-@app.on_event("startup")
-async def bootstrap_single_user() -> None:
-    ensure_single_user_account()
 
 # ---------------------------------------------------------
 # ROUTERS

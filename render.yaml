@@ -7,5 +7,3 @@ services:
     envVars:
       - key: PYTHON_VERSION
         value: 3.11
-      - key: SINGLE_USER_TEMP_PASSWORD
-        sync: false
