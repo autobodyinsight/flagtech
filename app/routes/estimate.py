@@ -2266,19 +2266,19 @@ async def close_ro_from_payments(request: Request):
 
         cur.execute(
             """
-                        SELECT COALESCE(NULLIF(TRIM(domain), ''), %s) AS resolved_domain
+            SELECT COALESCE(NULLIF(TRIM(domain), ''), %s) AS resolved_domain
             FROM saved_estimates
-                        WHERE ro = %s
-                        ORDER BY saved_at DESC NULLS LAST, id DESC
-                        LIMIT 1
+            WHERE ro = %s
+            ORDER BY saved_at DESC NULLS LAST, id DESC
+            LIMIT 1
             """,
-                        (domain, ro_value),
+            (domain, ro_value),
         )
-                existing_ro_row = cur.fetchone()
-                if not existing_ro_row:
+        existing_ro_row = cur.fetchone()
+        if not existing_ro_row:
             conn.rollback()
             return JSONResponse(status_code=404, content={"error": "RO not found"})
-                resolved_domain = str(existing_ro_row.get("resolved_domain") or domain).strip() or domain
+        resolved_domain = str(existing_ro_row.get("resolved_domain") or domain).strip() or domain
 
         cur.execute(
             """
