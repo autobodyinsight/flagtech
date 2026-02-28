@@ -187,7 +187,7 @@ def get_dashboard_screen_html():
                                 <th class="dashboard-header-cell" data-sort-key="in_date" onclick="sortRoListByHeader('in_date')" style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold; cursor:pointer; user-select:none;">In <span data-sort-indicator="in_date" style="font-size:12px;"></span></th>
                                 <th class="dashboard-header-cell" data-sort-key="days_since_in" onclick="sortRoListByHeader('days_since_in')" style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold; text-align:center; cursor:pointer; user-select:none;" title="Days Since In Date">⏳ <span data-sort-indicator="days_since_in" style="font-size:12px;"></span></th>
                                 <th class="dashboard-header-cell" data-sort-key="ecd_date" onclick="sortRoListByHeader('ecd_date')" style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold; cursor:pointer; user-select:none;">ECD <span data-sort-indicator="ecd_date" style="font-size:12px;"></span></th>
-                                <th class="dashboard-header-cell" onclick="toggleHrsHeaderAssignments(event)" style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold; text-align:right; cursor:pointer; user-select:none;">HRS</th>
+                                <th class="dashboard-header-cell" style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold; text-align:right; user-select:none;">HRS</th>
                                 <th class="dashboard-header-cell" data-sort-key="total" onclick="sortRoListByHeader('total')" style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold; text-align:right; cursor:pointer; user-select:none;">Total <span data-sort-indicator="total" style="font-size:12px;"></span></th>
                             </tr>
                         </thead>
@@ -896,9 +896,6 @@ def get_dashboard_screen_html():
                         : buildUnifiedLinesFromSections(sections);
 
                     const ownerInfo = String(header.owner_info || '').trim();
-                    const ownerHtml = ownerInfo
-                        ? ownerInfo.split(/\r?\n/).map((line) => `<div>${escapePopupHtml(line)}</div>`).join('')
-                        : '<div>-</div>';
 
                     const unifiedHtml = unifiedLines.length
                         ? `
@@ -906,19 +903,17 @@ def get_dashboard_screen_html():
                                 <div style="overflow-x:auto;">
                                     <table style="width:100%; border-collapse:collapse; table-layout:fixed;">
                                         <colgroup>
-                                            <col style="width:7%;" />
+                                            <col style="width:8%;" />
+                                            <col style="width:48%;" />
+                                            <col style="width:9%;" />
+                                            <col style="width:9%;" />
+                                            <col style="width:8%;" />
                                             <col style="width:10%;" />
-                                            <col style="width:41%;" />
-                                            <col style="width:8%;" />
-                                            <col style="width:8%;" />
-                                            <col style="width:7%;" />
-                                            <col style="width:11%;" />
                                             <col style="width:8%;" />
                                         </colgroup>
                                         <thead>
                                             <tr style="background:#f5f5f5; border-bottom:1px solid #ddd;">
                                                 <th style="padding:8px; text-align:left; white-space:nowrap;">Line #</th>
-                                                <th style="padding:8px; text-align:left; white-space:nowrap;">Operation</th>
                                                 <th style="padding:8px; text-align:left; white-space:nowrap;">Description</th>
                                                 <th style="padding:8px; text-align:right; white-space:nowrap;">Labor</th>
                                                 <th style="padding:8px; text-align:right; white-space:nowrap;">Paint</th>
@@ -930,13 +925,6 @@ def get_dashboard_screen_html():
                                         <tbody>
                                             ${unifiedLines.map((line) => {
                                                 const lineNumber = toNumber(line?.lineNumber, 0);
-                                                const operationCode = String(
-                                                    line?.operationCode ||
-                                                    line?.operation_code ||
-                                                    line?.operation ||
-                                                    line?.op ||
-                                                    ''
-                                                ).trim() || '-';
                                                 const description = String(line?.description || '').trim() || '-';
                                                 const labor = toNumber(line?.labor, 0);
                                                 const paint = toNumber(line?.paint, 0);
@@ -955,7 +943,6 @@ def get_dashboard_screen_html():
                                                 return `
                                                     <tr style="border-bottom:1px solid #eee;">
                                                         <td style="padding:8px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${escapePopupHtml(lineNumber)}</td>
-                                                        <td style="padding:8px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${escapePopupHtml(operationCode)}</td>
                                                         <td style="padding:8px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${escapePopupHtml(description)}</td>
                                                         <td style="padding:8px; text-align:right; white-space:nowrap;">${escapePopupHtml(normalizeDisplayNumber(labor))}</td>
                                                         <td style="padding:8px; text-align:right; white-space:nowrap;">${escapePopupHtml(normalizeDisplayNumber(paint))}</td>
@@ -972,46 +959,30 @@ def get_dashboard_screen_html():
                         `
                         : '<div style="color:#777;">No estimate lines available.</div>';
 
-                    const totalsHtml = totals.length
-                        ? totals.map((total) => {
-                            const label = escapePopupHtml(total.label || total.key || 'Total');
-                            const display = total.display
-                                ? escapePopupHtml(total.display)
-                                : escapePopupHtml(String(total.value ?? ''));
-                            return `
-                                <div style="display:flex; justify-content:space-between; padding:6px 0; border-bottom:1px solid #eee;">
-                                    <div style="font-weight:600;">${label}</div>
-                                    <div>${display}</div>
-                                </div>
-                            `;
-                        }).join('')
-                        : '<div style="color:#777;">No totals available.</div>';
+                    const totalEntry = totals.find((total) => {
+                        const key = String(total?.key || '').trim().toLowerCase();
+                        const label = String(total?.label || '').trim().toLowerCase();
+                        return (
+                            key === 'grand_total' ||
+                            key === 'grandtotal' ||
+                            label === 'grand total' ||
+                            key === 'total' ||
+                            label === 'total'
+                        );
+                    });
+                    let estimateTotalDisplay = '-';
+                    if (totalEntry?.display) {
+                        estimateTotalDisplay = String(totalEntry.display).trim() || '-';
+                    } else if (totalEntry && totalEntry.value !== null && totalEntry.value !== undefined && String(totalEntry.value).trim() !== '') {
+                        estimateTotalDisplay = `$${normalizeDisplayNumber(totalEntry.value)}`;
+                    }
 
                     contentEl.innerHTML = `
-                        <div style="display:grid; grid-template-columns:1fr 1fr; gap:18px; margin-bottom:14px;">
-                            <div style="background:#fff; border:1px solid #ddd; border-radius:8px; padding:12px;">
-                                <div style="margin-bottom:6px;"><strong>RO:</strong> ${escapePopupHtml(header.ro || ro.ro || '-')}</div>
-                                <div style="margin-bottom:6px;"><strong>Claim:</strong> ${escapePopupHtml(header.claim_number || '-')}</div>
-                                <div><strong>Insurance:</strong> ${escapePopupHtml(header.insurance_company || '-')}</div>
-                            </div>
-                            <div style="background:#fff; border:1px solid #ddd; border-radius:8px; padding:12px;">
-                                <div style="margin-bottom:6px;"><strong>Vehicle:</strong> ${escapePopupHtml([vehicle.year, vehicle.make, vehicle.model].filter(Boolean).join(' ') || vehicle.raw || '-')}</div>
-                                <div style="margin-bottom:6px;"><strong>VIN:</strong> ${escapePopupHtml(vehicle.vin || '-')}</div>
-                                <div><strong>Estimator:</strong> ${escapePopupHtml(header.estimator || '-')}</div>
-                            </div>
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                            <div style="font-weight:700; color:#333;">Repair Lines</div>
+                            <div style="font-weight:700; color:#333;">Estimate Total: ${escapePopupHtml(estimateTotalDisplay)}</div>
                         </div>
-                        <div style="background:#fff; border:1px solid #ddd; border-radius:8px; padding:12px; margin-bottom:12px;">
-                            <div style="font-weight:700; margin-bottom:8px;">Owner Info</div>
-                            ${ownerHtml}
-                        </div>
-                        <div style="margin-bottom:12px;">
-                            <div style="font-weight:700; margin-bottom:8px; color:#333;">Unified Estimate Lines</div>
-                            ${unifiedHtml}
-                        </div>
-                        <div style="background:#fff; border:1px solid #ddd; border-radius:8px; padding:12px;">
-                            <div style="font-weight:700; margin-bottom:8px; color:#333;">Totals</div>
-                            ${totalsHtml}
-                        </div>
+                        ${unifiedHtml}
                     `;
                 } catch (error) {
                     console.error('Error loading estimate snapshot:', error);
@@ -1609,7 +1580,6 @@ def get_dashboard_screen_html():
             // Global variables for dashboard
             let dashboardData = null;
             let hoursPerTechChartInstance = null;
-            let hrsHeaderPanelOpen = false;
             let roSortState = {
                 key: null,
                 direction: 'asc'
@@ -1830,6 +1800,8 @@ def get_dashboard_screen_html():
                     loadRoNotes(roNumber);
                 } else if (type === 'tech-assignment') {
                     loadTechAssignments(roNumber);
+                } else if (type === 'hrs-assignment') {
+                    loadRoHrsAssignments(roNumber);
                 } else if (type === 'activity') {
                     loadRoActivityLog(roNumber);
                 }
@@ -2338,187 +2310,72 @@ def get_dashboard_screen_html():
                 return '';
             }
 
-            function refreshHrsHeaderPanelHeight() {
-                const rowEl = document.getElementById('hrs-header-row');
-                if (!rowEl || rowEl.style.display !== 'table-row') return;
-                const panel = rowEl.querySelector('.ro-slide-panel');
-                if (!panel) return;
-                panel.style.overflow = 'visible';
-                panel.style.maxHeight = `${panel.scrollHeight}px`;
-                panel.style.opacity = '1';
-                setTimeout(() => {
-                    if (rowEl.style.display === 'table-row') {
-                        panel.style.maxHeight = 'none';
-                    }
-                }, 230);
-            }
-
-            function openHrsHeaderPanel() {
-                const rowEl = document.getElementById('hrs-header-row');
-                if (!rowEl) return;
-                rowEl.style.display = 'table-row';
-                const panel = rowEl.querySelector('.ro-slide-panel');
-                if (!panel) return;
-                panel.style.overflow = 'hidden';
-                panel.style.maxHeight = '0px';
-                panel.style.opacity = '0';
-                requestAnimationFrame(() => {
-                    panel.style.maxHeight = `${panel.scrollHeight}px`;
-                    panel.style.opacity = '1';
-                });
-                setTimeout(() => {
-                    if (rowEl.style.display === 'table-row') {
-                        panel.style.maxHeight = 'none';
-                        panel.style.overflow = 'visible';
-                    }
-                }, 230);
-            }
-
-            function closeHrsHeaderPanel() {
-                const rowEl = document.getElementById('hrs-header-row');
-                if (!rowEl) return;
-                const panel = rowEl.querySelector('.ro-slide-panel');
-                if (!panel) {
-                    rowEl.style.display = 'none';
-                    return;
-                }
-                if (panel.style.maxHeight === 'none') {
-                    panel.style.maxHeight = `${panel.scrollHeight}px`;
-                    void panel.offsetHeight;
-                }
-                panel.style.maxHeight = '0px';
-                panel.style.opacity = '0';
-                setTimeout(() => {
-                    if (panel.style.maxHeight === '0px') {
-                        rowEl.style.display = 'none';
-                    }
-                }, 220);
-            }
-
-            async function loadHrsHeaderAssignments() {
-                const contentEl = document.getElementById('hrs-header-assignments-content');
+            async function loadRoHrsAssignments(roNumber) {
+                const rowId = safeId(roNumber);
+                const contentEl = document.getElementById(`hrs-assignment-content-${rowId}`);
                 if (!contentEl) return;
 
-                const roList = Array.isArray(dashboardData?.roList) ? dashboardData.roList : [];
-                if (roList.length === 0) {
-                    contentEl.innerHTML = '<div style="color:#999;">No repair orders found.</div>';
-                    refreshHrsHeaderPanelHeight();
-                    return;
-                }
-
                 contentEl.innerHTML = '<div style="color:#777;">Loading assignments...</div>';
-                refreshHrsHeaderPanelHeight();
+                refreshRoSlideDownHeight(roNumber, 'hrs-assignment');
 
-                const assignmentRows = await Promise.all(
-                    roList.map(async (ro) => {
-                        const roNumber = String(ro?.ro || '').trim();
-                        if (!roNumber) {
-                            return null;
+                try {
+                    const response = await fetch(`/api/ro-tech-lines?ro=${encodeURIComponent(roNumber)}`, { credentials: 'include' });
+                    const data = await response.json();
+                    const techLines = Array.isArray(data?.tech_lines) ? data.tech_lines : [];
+                    const assignments = {
+                        body: '',
+                        paint: '',
+                        frame: '',
+                        mechanical: '',
+                        glass: '',
+                    };
+
+                    techLines.forEach((line) => {
+                        const typeKey = normalizeHrsAssignmentType(line?.type || line?.repair_type || '');
+                        if (!typeKey) return;
+                        const techName = String(line?.tech || '').trim();
+                        if (!techName || techName.toLowerCase() === 'unassigned' || techName.toUpperCase() === 'PENDING') {
+                            return;
                         }
-
-                        try {
-                            const response = await fetch(`/api/ro-tech-lines?ro=${encodeURIComponent(roNumber)}`, { credentials: 'include' });
-                            const data = await response.json();
-                            const techLines = Array.isArray(data?.tech_lines) ? data.tech_lines : [];
-                            const assignments = {
-                                body: '',
-                                paint: '',
-                                frame: '',
-                                mechanical: '',
-                                glass: '',
-                            };
-
-                            techLines.forEach((line) => {
-                                const typeKey = normalizeHrsAssignmentType(line?.type || line?.repair_type || '');
-                                if (!typeKey) return;
-                                const techName = String(line?.tech || '').trim();
-                                if (!techName || techName.toLowerCase() === 'unassigned' || techName.toUpperCase() === 'PENDING') {
-                                    return;
-                                }
-                                if (!assignments[typeKey]) {
-                                    assignments[typeKey] = techName;
-                                }
-                            });
-
-                            return {
-                                ro: roNumber,
-                                assignments,
-                            };
-                        } catch (error) {
-                            return {
-                                ro: roNumber,
-                                assignments: {
-                                    body: '',
-                                    paint: '',
-                                    frame: '',
-                                    mechanical: '',
-                                    glass: '',
-                                },
-                            };
+                        if (!assignments[typeKey]) {
+                            assignments[typeKey] = techName;
                         }
-                    })
-                );
+                    });
 
-                const rows = assignmentRows.filter(Boolean);
-                if (rows.length === 0) {
-                    contentEl.innerHTML = '<div style="color:#999;">No assignments available.</div>';
-                    refreshHrsHeaderPanelHeight();
-                    return;
-                }
-
-                let html = '<table style="width:100%; border-collapse:collapse;">';
-                html += '<thead><tr style="background:#d9d9d9; border-bottom:2px solid #999;">';
-                html += '<th style="padding:8px 10px; text-align:left; color:#333;">RO</th>';
-                html += '<th style="padding:8px 10px; text-align:left; color:#333;">Body</th>';
-                html += '<th style="padding:8px 10px; text-align:left; color:#333;">Paint</th>';
-                html += '<th style="padding:8px 10px; text-align:left; color:#333;">Frame</th>';
-                html += '<th style="padding:8px 10px; text-align:left; color:#333;">Mechanical</th>';
-                html += '<th style="padding:8px 10px; text-align:left; color:#333;">Glass</th>';
-                html += '</tr></thead><tbody>';
-
-                rows.forEach((row) => {
+                    let html = '<table style="width:100%; border-collapse:collapse;">';
+                    html += '<thead><tr style="background:#d9d9d9; border-bottom:2px solid #999;">';
+                    html += '<th style="padding:8px 10px; text-align:left; color:#333;">Body</th>';
+                    html += '<th style="padding:8px 10px; text-align:left; color:#333;">Paint</th>';
+                    html += '<th style="padding:8px 10px; text-align:left; color:#333;">Frame</th>';
+                    html += '<th style="padding:8px 10px; text-align:left; color:#333;">Mechanical</th>';
+                    html += '<th style="padding:8px 10px; text-align:left; color:#333;">Glass</th>';
+                    html += '</tr></thead><tbody>';
                     html += '<tr style="border-bottom:1px solid #ddd; background:#fff;">';
-                    html += `<td style="padding:8px 10px; color:#333; font-weight:bold;">${escapeHtml(row.ro)}</td>`;
-                    html += `<td style="padding:8px 10px; color:#333;">${escapeHtml(row.assignments.body || '')}</td>`;
-                    html += `<td style="padding:8px 10px; color:#333;">${escapeHtml(row.assignments.paint || '')}</td>`;
-                    html += `<td style="padding:8px 10px; color:#333;">${escapeHtml(row.assignments.frame || '')}</td>`;
-                    html += `<td style="padding:8px 10px; color:#333;">${escapeHtml(row.assignments.mechanical || '')}</td>`;
-                    html += `<td style="padding:8px 10px; color:#333;">${escapeHtml(row.assignments.glass || '')}</td>`;
-                    html += '</tr>';
-                });
+                    html += `<td style="padding:8px 10px; color:#333;">${escapeHtml(assignments.body || '')}</td>`;
+                    html += `<td style="padding:8px 10px; color:#333;">${escapeHtml(assignments.paint || '')}</td>`;
+                    html += `<td style="padding:8px 10px; color:#333;">${escapeHtml(assignments.frame || '')}</td>`;
+                    html += `<td style="padding:8px 10px; color:#333;">${escapeHtml(assignments.mechanical || '')}</td>`;
+                    html += `<td style="padding:8px 10px; color:#333;">${escapeHtml(assignments.glass || '')}</td>`;
+                    html += '</tr></tbody></table>';
 
-                html += '</tbody></table>';
-                contentEl.innerHTML = html;
-                refreshHrsHeaderPanelHeight();
+                    contentEl.innerHTML = html;
+                    refreshRoSlideDownHeight(roNumber, 'hrs-assignment');
+                } catch (error) {
+                    console.error('Error loading HRS assignments:', error);
+                    contentEl.innerHTML = '<div style="color:red;">Error loading assignments.</div>';
+                    refreshRoSlideDownHeight(roNumber, 'hrs-assignment');
+                }
             }
 
-            function restoreHrsHeaderPanelState() {
-                const rowEl = document.getElementById('hrs-header-row');
-                if (!rowEl) {
-                    hrsHeaderPanelOpen = false;
-                    return;
-                }
-                if (!hrsHeaderPanelOpen) {
-                    rowEl.style.display = 'none';
-                    return;
-                }
-                openHrsHeaderPanel();
-                loadHrsHeaderAssignments();
-            }
-
-            function toggleHrsHeaderAssignments(event) {
+            function toggleRoHrsAssignments(event, roNumber) {
                 if (event) {
                     event.stopPropagation();
                     event.preventDefault();
                 }
-
-                hrsHeaderPanelOpen = !hrsHeaderPanelOpen;
-                if (hrsHeaderPanelOpen) {
-                    openHrsHeaderPanel();
-                    loadHrsHeaderAssignments();
-                    return;
+                const opened = toggleRoSlideDown(roNumber, 'hrs-assignment');
+                if (opened) {
+                    loadRoHrsAssignments(roNumber);
                 }
-                closeHrsHeaderPanel();
             }
 
             // Clean phone number to display only digits
@@ -2973,35 +2830,11 @@ def get_dashboard_screen_html():
                 updateRoSortIndicators();
                 
                 if (sortedList.length === 0) {
-                    tbody.innerHTML = `
-                        <tr id="hrs-header-row" style="display:none; background:#f2f0ef;">
-                            <td colspan="10" style="padding:0 16px 10px 16px; border-bottom:1px solid #eee;">
-                                <div class="ro-slide-panel" style="max-height:0; overflow:hidden; opacity:0; transition:max-height 0.22s ease, opacity 0.22s ease;">
-                                    <div style="background:#fafafa; border:1px solid #ddd; border-radius:6px; padding:10px 12px;">
-                                        <div style="font-weight:bold; margin-bottom:8px; color:#333;">HRS Assignments</div>
-                                        <div id="hrs-header-assignments-content" style="width:100%;"></div>
-                                    </div>
-                                </div>
-                            </td>
-                        </tr>
-                        <tr><td colspan="10" style="padding:20px; text-align:center; color:#999;">No repair orders found</td></tr>
-                    `;
-                    restoreHrsHeaderPanelState();
+                    tbody.innerHTML = '<tr><td colspan="10" style="padding:20px; text-align:center; color:#999;">No repair orders found</td></tr>';
                     return;
                 }
                 
-                let html = `
-                    <tr id="hrs-header-row" style="display:none; background:#f2f0ef;">
-                        <td colspan="10" style="padding:0 16px 10px 16px; border-bottom:1px solid #eee;">
-                            <div class="ro-slide-panel" style="max-height:0; overflow:hidden; opacity:0; transition:max-height 0.22s ease, opacity 0.22s ease;">
-                                <div style="background:#fafafa; border:1px solid #ddd; border-radius:6px; padding:10px 12px;">
-                                    <div style="font-weight:bold; margin-bottom:8px; color:#333;">HRS Assignments</div>
-                                    <div id="hrs-header-assignments-content" style="width:100%;"></div>
-                                </div>
-                            </div>
-                        </td>
-                    </tr>
-                `;
+                let html = '';
                 sortedList.forEach((ro, index) => {
                     const rowBg = index % 2 === 0 ? '#f2f0ef' : 'var(--list-row-white, #ffffff)';
                     const rowId = safeId(ro.ro);
@@ -3110,8 +2943,22 @@ def get_dashboard_screen_html():
                             <td style="padding:12px; border-bottom:1px solid #eee; color:#333;">${inDisplay}</td>
                             <td style="padding:12px; border-bottom:1px solid #eee; color:#555; text-align:center; font-weight:bold;">${daysDisplay}</td>
                             <td style="padding:12px; border-bottom:1px solid #eee; color:#333;">${ecdDisplay}</td>
-                            <td style="padding:12px; border-bottom:1px solid #eee; text-align:right; font-weight:bold; color:#333;">${ro.hours.toFixed(1)}</td>
+                            <td style="padding:12px; border-bottom:1px solid #eee; text-align:right; font-weight:bold; color:#333;">
+                                <button type="button" onclick="toggleRoHrsAssignments(event, '${ro.ro}')" style="background:none; border:none; color:#0066cc; text-decoration:underline; cursor:pointer; padding:0; font:inherit; font-weight:bold;">
+                                    ${ro.hours.toFixed(1)}
+                                </button>
+                            </td>
                             <td style="padding:12px; border-bottom:1px solid #eee; color:#333; text-align:right; font-weight:bold;">$${ro.total.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                        </tr>
+                        <tr id="hrs-assignment-row-${rowId}" style="display:none; background:${rowBg};">
+                            <td colspan="10" style="padding:0 16px 10px 16px; border-bottom:1px solid #eee;">
+                                <div class="ro-slide-panel" style="max-height:0; overflow:hidden; opacity:0; transition:max-height 0.22s ease, opacity 0.22s ease;">
+                                    <div style="background:#fafafa; border:1px solid #ddd; border-radius:6px; padding:10px 12px;">
+                                        <div style="font-weight:bold; margin-bottom:8px; color:#333;">HRS Assignments</div>
+                                        <div id="hrs-assignment-content-${rowId}" style="width:100%;"></div>
+                                    </div>
+                                </div>
+                            </td>
                         </tr>
                         <tr id="vehicle-vin-row-${rowId}" style="display:none; background:${rowBg};">
                             <td colspan="10" style="padding:0 16px 10px 16px; border-bottom:1px solid #eee;">
@@ -3212,7 +3059,6 @@ def get_dashboard_screen_html():
                 
                 tbody.innerHTML = html;
                 restoreOpenRoSlideDowns();
-                restoreHrsHeaderPanelState();
             }
 
             function toggleTechAssignment(event, roNumber) {
