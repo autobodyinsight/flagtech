@@ -104,6 +104,20 @@ def get_reports_screen_html():
         return '$' + amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     }
 
+    function computeGpValues(sales, cost) {
+        const safeSales = Number(sales || 0);
+        const safeCost = Number(cost || 0);
+        const gpDollar = safeSales - safeCost;
+        const gpPercent = safeSales > 0 ? (gpDollar / safeSales) * 100 : 0;
+        return { gpDollar, gpPercent };
+    }
+
+    function formatGpBox(sales, cost) {
+        const gp = computeGpValues(sales, cost);
+        const gpDollarText = Number(gp.gpDollar || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        return `[GP ${formatReportsPercent(gp.gpPercent)}% – GP$${gpDollarText}]`;
+    }
+
     async function loadReportsData() {
         try {
             const resp = await fetch('/api/reports_data');
@@ -126,17 +140,34 @@ def get_reports_screen_html():
                 roBody.innerHTML = `<tr><td colspan='10' style='padding:20px; text-align:center; color:#999;'>No closed repair orders found.</td></tr>`;
             } else {
                 for (const ro of data.closed_ros) {
+                    const partsSales = Number(ro.parts_sales || 0);
+                    const partsCost = Number(ro.parts_cost || 0);
+                    const laborSales = Number(ro.labor_sales || 0);
+                    const laborCost = Number(ro.labor_cost || 0);
+                    const totalSales = Number((ro.total_sales ?? ro.total) || 0);
+                    const totalCost = Number(ro.total_cost || 0);
+
                     roBody.innerHTML += `<tr>
                         <td style='padding:12px;'>${ro.ro_number || ''}</td>
                         <td style='padding:12px;'>${ro.vehicle || ''}</td>
                         <td style='padding:12px;'>${ro.insurance || ''}</td>
                         <td style='padding:12px; text-align:right;'>${ro.hours || ''}</td>
-                        <td style='padding:12px; text-align:right;'>${formatReportsMoney(ro.parts_sales)}</td>
-                        <td style='padding:12px; text-align:right;'>${formatReportsMoney(ro.parts_cost)}</td>
-                        <td style='padding:12px; text-align:right;'>${formatReportsMoney(ro.labor_sales)}</td>
-                        <td style='padding:12px; text-align:right;'>${formatReportsMoney(ro.labor_cost)}</td>
-                        <td style='padding:12px; text-align:right;'>${formatReportsMoney(ro.total_sales ?? ro.total)}</td>
-                        <td style='padding:12px; text-align:right;'>${formatReportsMoney(ro.total_cost)}</td>
+                        <td style='padding:12px; text-align:right;'>${formatReportsMoney(partsSales)}</td>
+                        <td style='padding:12px; text-align:right;'>${formatReportsMoney(partsCost)}</td>
+                        <td style='padding:12px; text-align:right;'>${formatReportsMoney(laborSales)}</td>
+                        <td style='padding:12px; text-align:right;'>${formatReportsMoney(laborCost)}</td>
+                        <td style='padding:12px; text-align:right;'>${formatReportsMoney(totalSales)}</td>
+                        <td style='padding:12px; text-align:right;'>${formatReportsMoney(totalCost)}</td>
+                    </tr>`;
+
+                    roBody.innerHTML += `<tr>
+                        <td style='padding:0 12px 10px 12px;'></td>
+                        <td style='padding:0 12px 10px 12px;'></td>
+                        <td style='padding:0 12px 10px 12px;'></td>
+                        <td style='padding:0 12px 10px 12px;'></td>
+                        <td colspan='2' style='padding:0 12px 10px 12px; text-align:center;'><span class='reports-gp-box'>${formatGpBox(partsSales, partsCost)}</span></td>
+                        <td colspan='2' style='padding:0 12px 10px 12px; text-align:center;'><span class='reports-gp-box'>${formatGpBox(laborSales, laborCost)}</span></td>
+                        <td colspan='2' style='padding:0 12px 10px 12px; text-align:center;'><span class='reports-gp-box'>${formatGpBox(totalSales, totalCost)}</span></td>
                     </tr>`;
                 }
             }
@@ -153,4 +184,17 @@ def get_reports_screen_html():
         }
     });
     </script>
+    <style>
+        .reports-gp-box {
+            display: inline-block;
+            border: 1px solid #9e9e9e;
+            border-radius: 6px;
+            background: #fff;
+            padding: 5px 10px;
+            font-size: 12px;
+            font-weight: 700;
+            color: #222;
+            white-space: nowrap;
+        }
+    </style>
     '''
