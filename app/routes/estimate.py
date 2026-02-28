@@ -385,23 +385,6 @@ def _ensure_ro_payment_entries_table(cur) -> None:
     cur.execute("CREATE INDEX IF NOT EXISTS idx_ro_payment_entries_domain_ro_type ON ro_payment_entries(domain, ro, payer_type)")
 
 
-def _ensure_closed_ro_archive_table(cur) -> None:
-    cur.execute(
-        """
-        CREATE TABLE IF NOT EXISTS closed_ro_archive (
-            id SERIAL PRIMARY KEY,
-            ro VARCHAR(255) NOT NULL,
-            domain VARCHAR(255) NOT NULL,
-            archived_payload JSONB NOT NULL,
-            closed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-        """
-    )
-    cur.execute("ALTER TABLE closed_ro_archive ADD COLUMN IF NOT EXISTS archived_payload JSONB")
-    cur.execute("ALTER TABLE closed_ro_archive ADD COLUMN IF NOT EXISTS closed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP")
-    cur.execute("CREATE INDEX IF NOT EXISTS idx_closed_ro_archive_domain_ro ON closed_ro_archive(domain, ro)")
-
-
 def _ensure_parts_orders_table(cur) -> None:
     cur.execute(
         """
@@ -515,20 +498,6 @@ def _activity_to_datetime(value) -> datetime:
     if isinstance(value, date):
         return datetime.combine(value, datetime.min.time())
     return datetime.utcnow()
-
-
-def _to_archive_json_value(value):
-    if isinstance(value, datetime):
-        return value.isoformat()
-    if isinstance(value, date):
-        return value.isoformat()
-    if isinstance(value, Decimal):
-        return str(value)
-    if isinstance(value, dict):
-        return {str(key): _to_archive_json_value(item) for key, item in value.items()}
-    if isinstance(value, list):
-        return [_to_archive_json_value(item) for item in value]
-    return value
 
 
 def _log_ro_activity(cur, domain: str, ro: str, activity_type: str, message: str, occurred_at=None) -> None:
@@ -2257,21 +2226,18 @@ async def close_ro_from_payments(request: Request):
     conn = get_conn()
     cur = conn.cursor()
     previous_autocommit = conn.autocommit
-    archived_rows_by_table = {}
 
     try:
         conn.autocommit = False
 
         _ensure_saved_estimates_table(cur)
         _ensure_ro_phases_table(cur)
-        _ensure_closed_ro_archive_table(cur)
 
         resolved_domain = domain
-        latest_saved_row = None
         if ro_value:
             cur.execute(
                 """
-                SELECT *
+                SELECT domain
                 FROM saved_estimates
                 WHERE ro = %s
                 ORDER BY saved_at DESC NULLS LAST, id DESC
@@ -2295,64 +2261,15 @@ async def close_ro_from_payments(request: Request):
                 (ro_value, "complete/finish", resolved_domain),
             )
 
-        if ro_value and latest_saved_row:
-            archived_rows_by_table["saved_estimates"] = [
-                _to_archive_json_value(dict(latest_saved_row))
-            ]
-
-            cur.execute(
-                """
-                SELECT ro, phase, domain, updated_at
-                FROM ro_phases
-                WHERE ro = %s
-                ORDER BY updated_at DESC NULLS LAST, id DESC
-                LIMIT 1
-                """,
-                (ro_value,),
-            )
-            latest_phase_row = cur.fetchone()
-            if latest_phase_row:
-                archived_rows_by_table["ro_phases"] = [
-                    _to_archive_json_value(dict(latest_phase_row))
-                ]
-
-        archived_payload = {
-            "ro": ro_value,
-            "domain": resolved_domain,
-            "tables": archived_rows_by_table,
-        }
-        if ro_value:
-            cur.execute(
-                """
-                DELETE FROM closed_ro_archive
-                WHERE ro = %s
-                """,
-                (ro_value,),
-            )
-            cur.execute(
-                """
-                INSERT INTO closed_ro_archive (ro, domain, archived_payload, closed_at)
-                VALUES (%s, %s, %s::jsonb, CURRENT_TIMESTAMP)
-                """,
-                (ro_value, resolved_domain, json.dumps(archived_payload)),
-            )
-
         conn.commit()
         return {
             "status": "success",
             "ro": ro_value,
             "phase": "complete/finish",
-            "archived_tables": sorted(list(archived_rows_by_table.keys())),
         }
     except Exception as exc:
         conn.rollback()
-        return {
-            "status": "success",
-            "ro": ro_value,
-            "phase": "complete/finish",
-            "archived_tables": [],
-            "message": str(exc),
-        }
+        return JSONResponse(status_code=500, content={"error": str(exc)})
     finally:
         conn.autocommit = previous_autocommit
         cur.close()

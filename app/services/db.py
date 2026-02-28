@@ -101,17 +101,6 @@ def get_closed_ros_and_summary():
             )
             """
         )
-        cur.execute(
-            """
-            CREATE TABLE IF NOT EXISTS closed_ro_archive (
-                id SERIAL PRIMARY KEY,
-                ro VARCHAR(255) NOT NULL,
-                domain VARCHAR(255),
-                archived_payload JSONB,
-                closed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            )
-            """
-        )
 
         cur.execute(
             """
@@ -141,15 +130,6 @@ def get_closed_ros_and_summary():
         )
         rows = cur.fetchall() or []
 
-        cur.execute(
-            """
-            SELECT ro, archived_payload, closed_at
-            FROM closed_ro_archive
-            ORDER BY closed_at DESC NULLS LAST, id DESC
-            """
-        )
-        archived_rows = cur.fetchall() or []
-
         closed_ros = []
         seen_ros = set()
         total_sales = 0.0
@@ -159,78 +139,6 @@ def get_closed_ros_and_summary():
             vehicle="",
             tech="",
             parts="",
-            insurance="",
-            customer="",
-            in_date="",
-            picked_up="",
-            hours=0.0,
-            total=0.0,
-        ):
-            ro_key = str(ro_number or "").strip()
-            if not ro_key or ro_key in seen_ros:
-                return
-            nonlocal total_sales
-            parsed_total = _parse_float(total)
-            total_sales += parsed_total
-            closed_ros.append(
-                {
-                    "ro_number": ro_key,
-                    "vehicle": str(vehicle or "").strip(),
-                    "tech": str(tech or "").strip(),
-                    "parts": str(parts or "").strip(),
-                    "insurance": str(insurance or "").strip(),
-                    "customer": str(customer or "").strip(),
-                    "in_date": str(in_date or "").strip(),
-                    "picked_up": str(picked_up or "").strip(),
-                    "hours": _parse_float(hours),
-                    "total": parsed_total,
-                    "status": "closed",
-                    "gp_percent": 0,
-                    "gp_dollar": 0,
-                    "type": "ro",
-                }
-            )
-            seen_ros.add(ro_key)
-
-        for row in archived_rows:
-            ro_value = str(row.get("ro") or "").strip()
-            if not ro_value or ro_value in seen_ros:
-                continue
-
-            archived_payload = row.get("archived_payload")
-            if isinstance(archived_payload, str):
-                try:
-                    archived_payload = json.loads(archived_payload)
-                except Exception:
-                    archived_payload = {}
-            if not isinstance(archived_payload, dict):
-                archived_payload = {}
-
-            tables = archived_payload.get("tables") if isinstance(archived_payload.get("tables"), dict) else {}
-            saved_rows = tables.get("saved_estimates") if isinstance(tables.get("saved_estimates"), list) else []
-            latest_saved = saved_rows[0] if saved_rows else {}
-
-            if not latest_saved:
-                repair_rows = tables.get("repair_orders") if isinstance(tables.get("repair_orders"), list) else []
-                latest_saved = repair_rows[0] if repair_rows else {}
-
-            if not latest_saved and isinstance(archived_payload, dict):
-                latest_saved = archived_payload
-
-            if not isinstance(latest_saved, dict):
-                latest_saved = {}
-
-            year = (latest_saved.get("year") or "").strip()
-            make = (latest_saved.get("make") or "").strip()
-            model = (latest_saved.get("model") or "").strip()
-            vehicle = " ".join(part for part in (year, make, model) if part) or (latest_saved.get("vehicle") or "")
-
-            owner_info = (latest_saved.get("owner_info") or "").strip()
-            customer = _parse_owner_customer(owner_info)
-            insurance = (latest_saved.get("insurance_company") or "").strip()
-
-            labor_repairs = latest_saved.get("labor_repairs")
-            if isinstance(labor_repairs, str):
                 try:
                     labor_repairs = json.loads(labor_repairs)
                 except Exception:
@@ -311,36 +219,6 @@ def get_closed_ros_and_summary():
                 hours=hours,
                 total=total,
             )
-
-        cur.execute("SELECT to_regclass('public.repair_orders') AS table_name")
-        repair_orders_table = cur.fetchone() or {}
-        if repair_orders_table.get("table_name"):
-            cur.execute(
-                """
-                SELECT ro_number, vehicle, tech, parts, insurance, customer, in_date, picked_up, hours, total
-                FROM repair_orders
-                WHERE COALESCE(LOWER(TRIM(status)), '') = 'closed'
-                ORDER BY picked_up DESC NULLS LAST, ro_number ASC
-                """
-            )
-            legacy_rows = cur.fetchall() or []
-            for row in legacy_rows:
-                in_date = row.get("in_date")
-                picked_up = row.get("picked_up")
-                in_date_text = in_date.isoformat() if hasattr(in_date, "isoformat") else (str(in_date) if in_date else "")
-                picked_up_text = picked_up.isoformat() if hasattr(picked_up, "isoformat") else (str(picked_up) if picked_up else "")
-                append_closed_ro(
-                    ro_number=row.get("ro_number"),
-                    vehicle=row.get("vehicle"),
-                    tech=row.get("tech"),
-                    parts=row.get("parts"),
-                    insurance=row.get("insurance"),
-                    customer=row.get("customer"),
-                    in_date=in_date_text,
-                    picked_up=picked_up_text,
-                    hours=row.get("hours"),
-                    total=row.get("total"),
-                )
 
         closed_ros.sort(key=lambda item: str(item.get("picked_up") or ""), reverse=True)
 

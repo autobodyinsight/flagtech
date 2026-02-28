@@ -9,7 +9,6 @@ from .dashboard import get_dashboard_screen_html
 from .techs import get_techs_screen_html
 from .phase import get_phase_screen_html
 from .payments import get_payments_screen_html
-from .archive import get_archive_screen_html
 from .reports import get_reports_screen_html
 
 try:
@@ -232,7 +231,6 @@ async def home_screen(request: Request):
         <div class="nav-tab" onclick="switchScreen('phase')">ROADMAP</div>
         <div class="nav-tab" onclick="switchScreen('flagtech')">FLAGOUT</div>
         <div class="nav-tab" onclick="switchScreen('parts')">PARTS</div>
-        <div class="nav-tab" onclick="switchScreen('archive')">ARCHIVE</div>
         <div class="nav-tab" onclick="switchScreen('reports')">REPORTS</div>
     </div>
     
@@ -245,7 +243,6 @@ async def home_screen(request: Request):
         {get_phase_screen_html()}
         {get_parts_screen_html()}
         {get_flagtech_screen_html()}
-        {get_archive_screen_html()}
         {get_reports_screen_html()}
     </div>
     

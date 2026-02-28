@@ -693,9 +693,6 @@ def get_dashboard_screen_html():
                                 if (typeof window.opener.loadDashboardData === 'function') {
                                     window.opener.loadDashboardData();
                                 }
-                                if (typeof window.opener.loadArchiveClosedRos === 'function') {
-                                    window.opener.loadArchiveClosedRos();
-                                }
                             }
                         } catch (error) {
                             console.error('Error closing RO:', error);
