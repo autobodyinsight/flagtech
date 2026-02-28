@@ -362,6 +362,7 @@ def get_dashboard_screen_html():
             const bannerHtml = `
                 <div id="roHeaderBar" style="background:#23272a; color:#fff; padding:16px 24px 18px 24px; border-bottom:3px solid #d32f2f; position:relative; min-height:132px; z-index:120;">
                     <div style="font-size:20px; font-weight:bold; margin-bottom:10px;">RO Window</div>
+                    <div id="roClosedStatusLabel" style="position:absolute; top:14px; left:50%; transform:translateX(-50%); font-weight:900; letter-spacing:1.5px; font-size:20px; color:#fff; display:${String((ro.phase || '')).toLowerCase().includes('complete') ? 'block' : 'none'};">CLOSED</div>
                     ${buttonsHtml}
                     <div id="roSummaryHeaderGrid" style="display:grid; grid-template-columns:repeat(3, minmax(0, 1fr)); gap:20px 28px; margin-right:230px; align-items:start;">
                         <div class="ro-header-col" style="display:flex; flex-direction:column; gap:8px; text-align:left; min-width:0;">
@@ -681,6 +682,11 @@ def get_dashboard_screen_html():
                                 body: JSON.stringify({ ro: ro.ro }),
                             });
 
+                            const closedLabel = roWindowDoc.getElementById('roClosedStatusLabel');
+                            if (closedLabel) {
+                                closedLabel.style.display = 'block';
+                            }
+
                             closeRoConfirmPopover();
 
                             if (window.opener && !window.opener.closed) {
@@ -704,30 +710,17 @@ def get_dashboard_screen_html():
             function bindCloseRoButton() {
                 const closeButton = roWindowDoc.getElementById('roCloseButton');
                 if (!closeButton) return;
-                closeButton.addEventListener('click', async (event) => {
+                closeButton.addEventListener('click', (event) => {
                     event.stopPropagation();
-                    closeButton.disabled = true;
-                    try {
-                        await flushHeaderDateInputs();
-                        await popupFetchJson('/api/payments/close-ro', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ ro: ro.ro }),
-                        });
+                    openRoConfirmPopover();
+                });
 
-                        if (window.opener && !window.opener.closed) {
-                            if (typeof window.opener.loadDashboardData === 'function') {
-                                window.opener.loadDashboardData();
-                            }
-                            if (typeof window.opener.loadArchiveClosedRos === 'function') {
-                                window.opener.loadArchiveClosedRos();
-                            }
-                        }
-                    } catch (error) {
-                        console.error('Error closing RO:', error);
-                    } finally {
-                        closeButton.disabled = false;
-                    }
+                roWindowDoc.addEventListener('click', (event) => {
+                    const panel = roWindowDoc.getElementById('roCloseConfirmPopover');
+                    if (!panel) return;
+                    const target = event.target;
+                    if (panel.contains(target) || target === closeButton) return;
+                    closeRoConfirmPopover();
                 });
             }
 

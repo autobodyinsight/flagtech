@@ -69,6 +69,20 @@ def get_archive_screen_html():
                 document.getElementById('archiveRoListBody').innerHTML = `<tr><td colspan='8' style='padding:20px; text-align:center; color:#c00;'>Error loading data</td></tr>`;
             }
         }
+        function ensureArchiveAutoRefresh() {
+            const archiveScreen = document.getElementById('archive');
+            if (!archiveScreen) return;
+            let lastActive = archiveScreen.classList.contains('active');
+            setInterval(() => {
+                const isActive = archiveScreen.classList.contains('active');
+                if (isActive && !lastActive) {
+                    loadArchiveClosedRos();
+                }
+                lastActive = isActive;
+            }, 600);
+        }
+        loadArchiveClosedRos();
+        ensureArchiveAutoRefresh();
         document.addEventListener('DOMContentLoaded', loadArchiveClosedRos);
         </script>
     </div>

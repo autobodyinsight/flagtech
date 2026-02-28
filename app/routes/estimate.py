@@ -2267,20 +2267,21 @@ async def close_ro_from_payments(request: Request):
         _ensure_closed_ro_archive_table(cur)
 
         resolved_domain = domain
+        latest_saved_row = None
         if ro_value:
             cur.execute(
                 """
-                SELECT COALESCE(NULLIF(TRIM(domain), ''), %s) AS resolved_domain
+                SELECT *
                 FROM saved_estimates
                 WHERE ro = %s
                 ORDER BY saved_at DESC NULLS LAST, id DESC
                 LIMIT 1
                 """,
-                (domain, ro_value),
+                (ro_value,),
             )
-            existing_ro_row = cur.fetchone()
-            if existing_ro_row:
-                resolved_domain = str(existing_ro_row.get("resolved_domain") or domain).strip() or domain
+            latest_saved_row = cur.fetchone()
+            if latest_saved_row:
+                resolved_domain = str(latest_saved_row.get("domain") or domain).strip() or domain
 
         if ro_value:
             cur.execute(
@@ -2294,39 +2295,25 @@ async def close_ro_from_payments(request: Request):
                 (ro_value, "complete/finish", resolved_domain),
             )
 
-        cur.execute(
-            """
-            SELECT table_name
-            FROM information_schema.columns
-            WHERE table_schema = 'public'
-              AND column_name IN ('ro', 'domain')
-            GROUP BY table_name
-            HAVING COUNT(DISTINCT column_name) = 2
-            ORDER BY table_name
-            """
-        )
-        ro_table_rows = cur.fetchall() or []
+        if ro_value and latest_saved_row:
+            archived_rows_by_table["saved_estimates"] = [
+                _to_archive_json_value(dict(latest_saved_row))
+            ]
 
-        excluded_tables = {"closed_ro_archive"}
-
-        if ro_value:
-            for row in ro_table_rows:
-                table_name = str(row.get("table_name") or "").strip()
-                if not table_name or table_name in excluded_tables:
-                    continue
-
-                select_stmt = sql.SQL("SELECT * FROM {} WHERE ro = %s").format(
-                    sql.Identifier(table_name)
-                )
-                cur.execute(select_stmt, (ro_value,))
-                table_rows = cur.fetchall() or []
-
-                if not table_rows:
-                    continue
-
-                archived_rows_by_table[table_name] = [
-                    _to_archive_json_value(dict(table_row))
-                    for table_row in table_rows
+            cur.execute(
+                """
+                SELECT ro, phase, domain, updated_at
+                FROM ro_phases
+                WHERE ro = %s
+                ORDER BY updated_at DESC NULLS LAST, id DESC
+                LIMIT 1
+                """,
+                (ro_value,),
+            )
+            latest_phase_row = cur.fetchone()
+            if latest_phase_row:
+                archived_rows_by_table["ro_phases"] = [
+                    _to_archive_json_value(dict(latest_phase_row))
                 ]
 
         archived_payload = {

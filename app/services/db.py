@@ -154,6 +154,44 @@ def get_closed_ros_and_summary():
         seen_ros = set()
         total_sales = 0.0
 
+        def append_closed_ro(
+            ro_number,
+            vehicle="",
+            tech="",
+            parts="",
+            insurance="",
+            customer="",
+            in_date="",
+            picked_up="",
+            hours=0.0,
+            total=0.0,
+        ):
+            ro_key = str(ro_number or "").strip()
+            if not ro_key or ro_key in seen_ros:
+                return
+            nonlocal total_sales
+            parsed_total = _parse_float(total)
+            total_sales += parsed_total
+            closed_ros.append(
+                {
+                    "ro_number": ro_key,
+                    "vehicle": str(vehicle or "").strip(),
+                    "tech": str(tech or "").strip(),
+                    "parts": str(parts or "").strip(),
+                    "insurance": str(insurance or "").strip(),
+                    "customer": str(customer or "").strip(),
+                    "in_date": str(in_date or "").strip(),
+                    "picked_up": str(picked_up or "").strip(),
+                    "hours": _parse_float(hours),
+                    "total": parsed_total,
+                    "status": "closed",
+                    "gp_percent": 0,
+                    "gp_dollar": 0,
+                    "type": "ro",
+                }
+            )
+            seen_ros.add(ro_key)
+
         for row in archived_rows:
             ro_value = str(row.get("ro") or "").strip()
             if not ro_value or ro_value in seen_ros:
@@ -171,6 +209,14 @@ def get_closed_ros_and_summary():
             tables = archived_payload.get("tables") if isinstance(archived_payload.get("tables"), dict) else {}
             saved_rows = tables.get("saved_estimates") if isinstance(tables.get("saved_estimates"), list) else []
             latest_saved = saved_rows[0] if saved_rows else {}
+
+            if not latest_saved:
+                repair_rows = tables.get("repair_orders") if isinstance(tables.get("repair_orders"), list) else []
+                latest_saved = repair_rows[0] if repair_rows else {}
+
+            if not latest_saved and isinstance(archived_payload, dict):
+                latest_saved = archived_payload
+
             if not isinstance(latest_saved, dict):
                 latest_saved = {}
 
@@ -206,25 +252,18 @@ def get_closed_ros_and_summary():
             in_date_text = in_date.isoformat() if hasattr(in_date, "isoformat") else (str(in_date) if in_date else "")
             picked_up_text = closed_at.date().isoformat() if hasattr(closed_at, "date") else (str(closed_at)[:10] if closed_at else "")
 
-            closed_ros.append(
-                {
-                    "ro_number": ro_value,
-                    "vehicle": vehicle,
-                    "tech": "",
-                    "parts": "",
-                    "insurance": insurance,
-                    "customer": customer,
-                    "in_date": in_date_text,
-                    "picked_up": picked_up_text,
-                    "hours": hours,
-                    "total": total,
-                    "status": "closed",
-                    "gp_percent": 0,
-                    "gp_dollar": 0,
-                    "type": "ro",
-                }
+            append_closed_ro(
+                ro_number=ro_value,
+                vehicle=vehicle,
+                tech=latest_saved.get("tech") or latest_saved.get("technician") or "",
+                parts=latest_saved.get("parts") or "",
+                insurance=insurance,
+                customer=customer,
+                in_date=in_date_text,
+                picked_up=picked_up_text,
+                hours=hours,
+                total=total,
             )
-            seen_ros.add(ro_value)
 
         for row in rows:
             ro_value = str(row.get("ro") or "").strip()
@@ -262,25 +301,46 @@ def get_closed_ros_and_summary():
             in_date_text = in_date.isoformat() if hasattr(in_date, "isoformat") else (str(in_date) if in_date else "")
             picked_up_text = closed_at.date().isoformat() if hasattr(closed_at, "date") else (str(closed_at)[:10] if closed_at else "")
 
-            closed_ros.append(
-                {
-                    "ro_number": ro_value,
-                    "vehicle": vehicle,
-                    "tech": "",
-                    "parts": "",
-                    "insurance": insurance,
-                    "customer": customer,
-                    "in_date": in_date_text,
-                    "picked_up": picked_up_text,
-                    "hours": hours,
-                    "total": total,
-                    "status": "closed",
-                    "gp_percent": 0,
-                    "gp_dollar": 0,
-                    "type": "ro",
-                }
+            append_closed_ro(
+                ro_number=ro_value,
+                vehicle=vehicle,
+                insurance=insurance,
+                customer=customer,
+                in_date=in_date_text,
+                picked_up=picked_up_text,
+                hours=hours,
+                total=total,
             )
-            seen_ros.add(ro_value)
+
+        cur.execute("SELECT to_regclass('public.repair_orders') AS table_name")
+        repair_orders_table = cur.fetchone() or {}
+        if repair_orders_table.get("table_name"):
+            cur.execute(
+                """
+                SELECT ro_number, vehicle, tech, parts, insurance, customer, in_date, picked_up, hours, total
+                FROM repair_orders
+                WHERE COALESCE(LOWER(TRIM(status)), '') = 'closed'
+                ORDER BY picked_up DESC NULLS LAST, ro_number ASC
+                """
+            )
+            legacy_rows = cur.fetchall() or []
+            for row in legacy_rows:
+                in_date = row.get("in_date")
+                picked_up = row.get("picked_up")
+                in_date_text = in_date.isoformat() if hasattr(in_date, "isoformat") else (str(in_date) if in_date else "")
+                picked_up_text = picked_up.isoformat() if hasattr(picked_up, "isoformat") else (str(picked_up) if picked_up else "")
+                append_closed_ro(
+                    ro_number=row.get("ro_number"),
+                    vehicle=row.get("vehicle"),
+                    tech=row.get("tech"),
+                    parts=row.get("parts"),
+                    insurance=row.get("insurance"),
+                    customer=row.get("customer"),
+                    in_date=in_date_text,
+                    picked_up=picked_up_text,
+                    hours=row.get("hours"),
+                    total=row.get("total"),
+                )
 
         closed_ros.sort(key=lambda item: str(item.get("picked_up") or ""), reverse=True)
 
