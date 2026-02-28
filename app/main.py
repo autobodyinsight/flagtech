@@ -1,7 +1,5 @@
 from fastapi import FastAPI
-from fastapi import Request
 from fastapi.responses import RedirectResponse
-from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 
 # Routers
@@ -9,9 +7,7 @@ from app.routes.estimate import router as estimate_router
 from app.routes.UI.ui import router as ui_router
 from app.routes.UI.ui_with_processing import router as processing_router
 from app.routes.UI.upload_ui.routes import router as ui_routes_router
-from app.routes.auth import router as auth_router
 from app.routes.payments import router as payments_router
-from app.services.auth import SESSION_COOKIE_NAME, get_session_by_token
 
 
 app = FastAPI(title="FlagTech Estimate Parser")
@@ -46,36 +42,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-
-@app.middleware("http")
-async def auth_middleware(request: Request, call_next):
-    path = request.url.path
-    method = request.method.upper()
-
-    public_prefixes = (
-        "/auth",
-        "/docs",
-        "/redoc",
-        "/openapi.json",
-    )
-    if method == "OPTIONS" or any(path.startswith(prefix) for prefix in public_prefixes):
-        return await call_next(request)
-
-    protected_path = path == "/" or path.startswith("/ui") or path.startswith("/api")
-    if not protected_path:
-        return await call_next(request)
-
-    token = request.cookies.get(SESSION_COOKIE_NAME)
-    session = get_session_by_token(token) if token else None
-    if not session:
-        if path.startswith("/api"):
-            return JSONResponse({"detail": "Authentication required"}, status_code=401)
-        return RedirectResponse(url="/auth/start", status_code=303)
-
-    request.state.user = session
-    return await call_next(request)
-
-
 # ---------------------------------------------------------
 # ROUTERS
 # ---------------------------------------------------------
@@ -83,9 +49,6 @@ async def auth_middleware(request: Request, call_next):
 # API endpoints
 app.include_router(estimate_router, prefix="/api")
 app.include_router(payments_router, prefix="/api")
-
-# Authentication endpoints
-app.include_router(auth_router)
 
 # Main UI display
 app.include_router(ui_router, prefix="/ui")
@@ -102,4 +65,4 @@ app.include_router(ui_routes_router, prefix="/ui")
 
 @app.get("/", include_in_schema=False)
 def root():
-    return RedirectResponse(url="/auth/start")
+    return RedirectResponse(url="/ui/")
