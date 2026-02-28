@@ -77,8 +77,6 @@ def _session_context(request: Request) -> tuple[str, str, str]:
     session_user = getattr(request.state, "user", None) or {}
     session_email = str(session_user.get("email") or "").strip().lower()
     session_access_level = str(session_user.get("access_level") or "support").strip().lower()
-    if session_access_level == "architect" and session_email != ARCHITECT_EMAIL:
-        raise HTTPException(status_code=403, detail="Architect access is restricted")
     return domain, session_email, session_access_level
 
 
@@ -155,16 +153,12 @@ async def list_users(request: Request):
 async def create_user(request: Request):
     domain, session_email, session_access_level = _session_context(request)
     is_architect = _is_architect(session_email, session_access_level)
-    if not is_architect and session_access_level != "manager":
-        raise HTTPException(status_code=403, detail="Manager access required")
 
     payload = await request.json()
     email = str(payload.get("email") or "").strip().lower()
     password = str(payload.get("password") or "")
     company_name = str(payload.get("company_name") or "").strip()
     requested_shop_domain = normalize_domain(payload.get("shop_domain"))
-    if not is_architect and requested_shop_domain and requested_shop_domain != domain:
-        raise HTTPException(status_code=403, detail="Manager access required")
 
     target_domain = (
         requested_shop_domain
@@ -182,8 +176,6 @@ async def create_user(request: Request):
         raise HTTPException(status_code=400, detail="Password must be at least 8 characters")
     if access_level not in ACCESS_LEVELS:
         raise HTTPException(status_code=400, detail="Invalid access level")
-    if access_level == "architect":
-        raise HTTPException(status_code=400, detail="Architect access level is reserved")
 
     # Email domain does not restrict shop association
     # If shop has a domain, user is linked to that shop regardless of email domain
