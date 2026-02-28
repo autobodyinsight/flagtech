@@ -2266,18 +2266,19 @@ async def close_ro_from_payments(request: Request):
 
         cur.execute(
             """
-            SELECT 1
+                        SELECT COALESCE(NULLIF(TRIM(domain), ''), %s) AS resolved_domain
             FROM saved_estimates
-            WHERE domain = %s
-              AND ro = %s
-            LIMIT 1
+                        WHERE ro = %s
+                        ORDER BY saved_at DESC NULLS LAST, id DESC
+                        LIMIT 1
             """,
-            (domain, ro_value),
+                        (domain, ro_value),
         )
-        existing_ro = cur.fetchone()
-        if not existing_ro:
+                existing_ro_row = cur.fetchone()
+                if not existing_ro_row:
             conn.rollback()
             return JSONResponse(status_code=404, content={"error": "RO not found"})
+                resolved_domain = str(existing_ro_row.get("resolved_domain") or domain).strip() or domain
 
         cur.execute(
             """
@@ -2287,7 +2288,7 @@ async def close_ro_from_payments(request: Request):
             DO UPDATE SET phase = EXCLUDED.phase,
                           updated_at = CURRENT_TIMESTAMP
             """,
-            (ro_value, "complete/finish", domain),
+            (ro_value, "complete/finish", resolved_domain),
         )
 
         cur.execute(
@@ -2311,10 +2312,10 @@ async def close_ro_from_payments(request: Request):
             if not table_name or table_name in excluded_tables:
                 continue
 
-            select_stmt = sql.SQL("SELECT * FROM {} WHERE domain = %s AND ro = %s").format(
+            select_stmt = sql.SQL("SELECT * FROM {} WHERE ro = %s").format(
                 sql.Identifier(table_name)
             )
-            cur.execute(select_stmt, (domain, ro_value))
+            cur.execute(select_stmt, (ro_value,))
             table_rows = cur.fetchall() or []
 
             if not table_rows:
@@ -2327,23 +2328,22 @@ async def close_ro_from_payments(request: Request):
 
         archived_payload = {
             "ro": ro_value,
-            "domain": domain,
+            "domain": resolved_domain,
             "tables": archived_rows_by_table,
         }
         cur.execute(
             """
             DELETE FROM closed_ro_archive
-            WHERE domain = %s
-              AND ro = %s
+            WHERE ro = %s
             """,
-            (domain, ro_value),
+            (ro_value,),
         )
         cur.execute(
             """
             INSERT INTO closed_ro_archive (ro, domain, archived_payload, closed_at)
             VALUES (%s, %s, %s::jsonb, CURRENT_TIMESTAMP)
             """,
-            (ro_value, domain, json.dumps(archived_payload)),
+            (ro_value, resolved_domain, json.dumps(archived_payload)),
         )
 
         conn.commit()

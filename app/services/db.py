@@ -6,8 +6,6 @@ from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 import psycopg2
 import psycopg2.extras
 
-from app.services.middleware import DEFAULT_SCOPE_DOMAIN
-
 DATABASE_URL = os.getenv("DATABASE_URL")
 
 conn = None
@@ -103,8 +101,18 @@ def get_closed_ros_and_summary():
             )
             """
         )
+        cur.execute(
+            """
+            CREATE TABLE IF NOT EXISTS closed_ro_archive (
+                id SERIAL PRIMARY KEY,
+                ro VARCHAR(255) NOT NULL,
+                domain VARCHAR(255),
+                archived_payload JSONB,
+                closed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+            """
+        )
 
-        domain = DEFAULT_SCOPE_DOMAIN
         cur.execute(
             """
             SELECT rp.ro,
@@ -124,22 +132,32 @@ def get_closed_ros_and_summary():
                 SELECT *
                 FROM saved_estimates se
                 WHERE se.ro = rp.ro
-                  AND (se.domain = rp.domain OR (se.domain IS NULL AND rp.domain IS NULL))
                 ORDER BY se.saved_at DESC, se.id DESC
                 LIMIT 1
             ) se ON TRUE
             WHERE COALESCE(LOWER(TRIM(rp.phase)), '') IN ('complete', 'complete/finish')
-              AND (rp.domain = %s OR (%s IS NULL AND rp.domain IS NULL))
             ORDER BY rp.updated_at DESC NULLS LAST, rp.ro ASC
-            """,
-            (domain, domain),
+            """
         )
         rows = cur.fetchall() or []
 
+        cur.execute(
+            """
+            SELECT ro, archived_payload, closed_at
+            FROM closed_ro_archive
+            ORDER BY closed_at DESC NULLS LAST, id DESC
+            """
+        )
+        archived_rows = cur.fetchall() or []
+
         closed_ros = []
+        seen_ros = set()
         total_sales = 0.0
 
         for row in rows:
+            ro_value = str(row.get("ro") or "").strip()
+            if not ro_value or ro_value in seen_ros:
+                continue
             year = (row.get("year") or "").strip()
             make = (row.get("make") or "").strip()
             model = (row.get("model") or "").strip()
@@ -174,7 +192,7 @@ def get_closed_ros_and_summary():
 
             closed_ros.append(
                 {
-                    "ro_number": str(row.get("ro") or ""),
+                    "ro_number": ro_value,
                     "vehicle": vehicle,
                     "tech": "",
                     "parts": "",
@@ -190,6 +208,81 @@ def get_closed_ros_and_summary():
                     "type": "ro",
                 }
             )
+            seen_ros.add(ro_value)
+
+        for row in archived_rows:
+            ro_value = str(row.get("ro") or "").strip()
+            if not ro_value or ro_value in seen_ros:
+                continue
+
+            archived_payload = row.get("archived_payload")
+            if isinstance(archived_payload, str):
+                try:
+                    archived_payload = json.loads(archived_payload)
+                except Exception:
+                    archived_payload = {}
+            if not isinstance(archived_payload, dict):
+                archived_payload = {}
+
+            tables = archived_payload.get("tables") if isinstance(archived_payload.get("tables"), dict) else {}
+            saved_rows = tables.get("saved_estimates") if isinstance(tables.get("saved_estimates"), list) else []
+            latest_saved = saved_rows[0] if saved_rows else {}
+            if not isinstance(latest_saved, dict):
+                latest_saved = {}
+
+            year = (latest_saved.get("year") or "").strip()
+            make = (latest_saved.get("make") or "").strip()
+            model = (latest_saved.get("model") or "").strip()
+            vehicle = " ".join(part for part in (year, make, model) if part) or (latest_saved.get("vehicle") or "")
+
+            owner_info = (latest_saved.get("owner_info") or "").strip()
+            customer = _parse_owner_customer(owner_info)
+            insurance = (latest_saved.get("insurance_company") or "").strip()
+
+            labor_repairs = latest_saved.get("labor_repairs")
+            if isinstance(labor_repairs, str):
+                try:
+                    labor_repairs = json.loads(labor_repairs)
+                except Exception:
+                    labor_repairs = []
+
+            paint_repairs = latest_saved.get("paint_repairs")
+            if isinstance(paint_repairs, str):
+                try:
+                    paint_repairs = json.loads(paint_repairs)
+                except Exception:
+                    paint_repairs = []
+
+            hours = _parse_hours(labor_repairs, paint_repairs)
+            total = _parse_float(latest_saved.get("grand_total"))
+            total_sales += total
+
+            in_date = latest_saved.get("in_date")
+            closed_at = row.get("closed_at")
+            in_date_text = in_date.isoformat() if hasattr(in_date, "isoformat") else (str(in_date) if in_date else "")
+            picked_up_text = closed_at.date().isoformat() if hasattr(closed_at, "date") else (str(closed_at)[:10] if closed_at else "")
+
+            closed_ros.append(
+                {
+                    "ro_number": ro_value,
+                    "vehicle": vehicle,
+                    "tech": "",
+                    "parts": "",
+                    "insurance": insurance,
+                    "customer": customer,
+                    "in_date": in_date_text,
+                    "picked_up": picked_up_text,
+                    "hours": hours,
+                    "total": total,
+                    "status": "closed",
+                    "gp_percent": 0,
+                    "gp_dollar": 0,
+                    "type": "ro",
+                }
+            )
+            seen_ros.add(ro_value)
+
+        closed_ros.sort(key=lambda item: str(item.get("picked_up") or ""), reverse=True)
 
         summary = {
             "RO'S": {"sales": total_sales, "gp_percent": 0, "gp_dollar": 0},
