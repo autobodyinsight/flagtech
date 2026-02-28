@@ -234,6 +234,20 @@ def require_architect(user: dict | None) -> None:
         raise PermissionError("Architect access required")
 
 
+def can_manage_users(user: dict | None) -> bool:
+    if not isinstance(user, dict):
+        return False
+    if _is_architect_session(user):
+        return True
+    role = str(user.get("role") or "").strip().lower()
+    return role == "admin"
+
+
+def require_user_management(user: dict | None) -> None:
+    if not can_manage_users(user):
+        raise PermissionError("User management access required")
+
+
 def create_session_for_user(user: dict, ttl_days: int = 7) -> str:
     token = secrets.token_urlsafe(48)
     expires_at = _utc_now() + timedelta(days=ttl_days)
