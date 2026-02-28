@@ -30,6 +30,12 @@ def _build_scope_key(domain: str | None) -> str:
 
 def get_user_domain(request: Request) -> Optional[str]:
     """Resolve the active tenant domain scope."""
+    state_user = getattr(request.state, "user", None)
+    if isinstance(state_user, dict):
+        state_domain = _clean(state_user.get("domain"))
+        if state_domain:
+            return _build_scope_key(state_domain)
+
     cookie_domain = _clean(request.cookies.get("user_domain"))
     if cookie_domain:
         return _build_scope_key(cookie_domain)
