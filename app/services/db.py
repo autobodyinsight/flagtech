@@ -1,3 +1,4 @@
+import json
 import os
 import re
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
@@ -65,12 +66,30 @@ def _normalize_json_list(value):
     return []
 
 
+def _normalize_json_obj(value):
+    if isinstance(value, dict):
+        return value
+    if isinstance(value, str):
+        try:
+            parsed = json.loads(value)
+            return parsed if isinstance(parsed, dict) else {}
+        except Exception:
+            return {}
+    return {}
+
+
 def _sum_hours(items) -> float:
     total = 0.0
     for item in _normalize_json_list(items):
         if isinstance(item, dict):
             total += _parse_float(item.get("value"))
     return total
+
+
+def _percent(numerator: float, denominator: float) -> float:
+    if denominator <= 0:
+        return 0.0
+    return (numerator / denominator) * 100.0
 
 
 def get_closed_ros_and_summary():
@@ -106,12 +125,44 @@ def get_closed_ros_and_summary():
                 labor_repairs JSONB,
                 paint_repairs JSONB,
                 parts_repairs JSONB,
+                estimate_totals JSONB,
                 parts_total NUMERIC,
                 grand_total NUMERIC,
                 saved_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
             """
         )
+        cur.execute("ALTER TABLE saved_estimates ADD COLUMN IF NOT EXISTS estimate_totals JSONB")
+
+        cur.execute(
+            """
+            CREATE TABLE IF NOT EXISTS parts_received (
+                id SERIAL PRIMARY KEY,
+                ro VARCHAR(255) NOT NULL,
+                invoice_number VARCHAR(255),
+                invoice_total NUMERIC,
+                cost NUMERIC,
+                domain VARCHAR(255),
+                received_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+            """
+        )
+        cur.execute("ALTER TABLE parts_received ADD COLUMN IF NOT EXISTS invoice_number VARCHAR(255)")
+        cur.execute("ALTER TABLE parts_received ADD COLUMN IF NOT EXISTS invoice_total NUMERIC")
+        cur.execute("ALTER TABLE parts_received ADD COLUMN IF NOT EXISTS cost NUMERIC")
+
+        cur.execute(
+            """
+            CREATE TABLE IF NOT EXISTS ro_flagout_lines (
+                id SERIAL PRIMARY KEY,
+                ro VARCHAR(255) NOT NULL,
+                pay_amount NUMERIC,
+                domain VARCHAR(255),
+                flagged_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+            """
+        )
+        cur.execute("ALTER TABLE ro_flagout_lines ADD COLUMN IF NOT EXISTS pay_amount NUMERIC")
 
         cur.execute(
             """
@@ -125,6 +176,7 @@ def get_closed_ros_and_summary():
                    se.insurance_company,
                    se.in_date,
                    se.picked_up,
+                   se.estimate_totals,
                    se.labor_repairs,
                    se.paint_repairs,
                    se.parts_repairs,
@@ -144,10 +196,59 @@ def get_closed_ros_and_summary():
         )
         rows = cur.fetchall() or []
 
+                cur.execute(
+                        """
+                        SELECT
+                                invoices.ro,
+                                COALESCE(SUM(invoices.invoice_paid_total), 0) AS parts_cost
+                        FROM (
+                                SELECT
+                                        ro,
+                                        invoice_number,
+                                        COALESCE(NULLIF(SUM(DISTINCT invoice_total), 0), SUM(cost), 0) AS invoice_paid_total
+                                FROM parts_received
+                                WHERE ro IS NOT NULL
+                                    AND ro <> ''
+                                    AND invoice_number IS NOT NULL
+                                    AND TRIM(invoice_number) <> ''
+                                GROUP BY ro, invoice_number
+
+                                UNION ALL
+
+                                SELECT
+                                        ro,
+                                        '__NO_INVOICE__' AS invoice_number,
+                                        COALESCE(SUM(cost), 0) AS invoice_paid_total
+                                FROM parts_received
+                                WHERE ro IS NOT NULL
+                                    AND ro <> ''
+                                    AND (invoice_number IS NULL OR TRIM(invoice_number) = '')
+                                GROUP BY ro
+                        ) invoices
+                        GROUP BY invoices.ro
+                        """
+                )
+                parts_cost_rows = cur.fetchall() or []
+                parts_cost_by_ro = {str(row.get("ro") or "").strip(): _parse_float(row.get("parts_cost")) for row in parts_cost_rows}
+
+                cur.execute(
+                        """
+                        SELECT ro, COALESCE(SUM(pay_amount), 0) AS labor_cost
+                        FROM ro_flagout_lines
+                        WHERE ro IS NOT NULL
+                            AND ro <> ''
+                        GROUP BY ro
+                        """
+                )
+                labor_cost_rows = cur.fetchall() or []
+                labor_cost_by_ro = {str(row.get("ro") or "").strip(): _parse_float(row.get("labor_cost")) for row in labor_cost_rows}
+
         closed_ros = []
         total_sales = 0.0
-        total_parts = 0.0
-        total_labor = 0.0
+                total_parts_sales = 0.0
+                total_labor_sales = 0.0
+                total_parts_cost = 0.0
+                total_labor_cost = 0.0
 
         for row in rows:
             year = (row.get("year") or "").strip()
@@ -171,11 +272,20 @@ def get_closed_ros_and_summary():
                 )
 
             total = _parse_float(row.get("grand_total"))
-            labor_total = max(total - parts_total, 0.0)
+            estimate_totals = _normalize_json_obj(row.get("estimate_totals"))
+            labor_keys = ["body_labor", "paint_labor", "frame_labor", "mechanical_labor", "glass_labor"]
+            labor_values = [_parse_float(estimate_totals.get(key)) for key in labor_keys]
+            labor_total = sum(labor_values)
+            if labor_total <= 0.0:
+                labor_total = max(total - parts_total, 0.0)
 
             total_sales += total
-            total_parts += parts_total
-            total_labor += labor_total
+            total_parts_sales += parts_total
+            total_labor_sales += labor_total
+
+            ro_key = str(row.get("ro") or "").strip()
+            total_parts_cost += parts_cost_by_ro.get(ro_key, 0.0)
+            total_labor_cost += labor_cost_by_ro.get(ro_key, 0.0)
 
             in_date = row.get("in_date")
             picked_up = row.get("picked_up")
@@ -204,10 +314,26 @@ def get_closed_ros_and_summary():
                 }
             )
 
+        ro_gp_dollar = total_sales - total_parts_cost - total_labor_cost
+        parts_gp_dollar = total_parts_sales - total_parts_cost
+        labor_gp_dollar = total_labor_sales - total_labor_cost
+
         summary = {
-            "RO'S": {"sales": total_sales, "gp_percent": 0, "gp_dollar": 0},
-            "PARTS": {"sales": total_parts, "gp_percent": 0, "gp_dollar": 0},
-            "LABOR": {"sales": total_labor, "gp_percent": 0, "gp_dollar": 0},
+            "RO'S": {
+                "sales": total_sales,
+                "gp_percent": _percent(ro_gp_dollar, total_sales),
+                "gp_dollar": ro_gp_dollar,
+            },
+            "PARTS": {
+                "sales": total_parts_sales,
+                "gp_percent": _percent(parts_gp_dollar, total_parts_sales),
+                "gp_dollar": parts_gp_dollar,
+            },
+            "LABOR": {
+                "sales": total_labor_sales,
+                "gp_percent": _percent(labor_gp_dollar, total_labor_sales),
+                "gp_dollar": labor_gp_dollar,
+            },
         }
         return closed_ros, summary
     finally:
