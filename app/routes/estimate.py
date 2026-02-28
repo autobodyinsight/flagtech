@@ -3985,10 +3985,14 @@ async def phase_board(request: Request):
         )
         phase_rows = cur.fetchall()
         phase_map = {row.get("ro"): row.get("phase") for row in phase_rows}
+        closed_phase_keys = {"complete", "complete/finish"}
 
         items = []
         for row in estimate_rows:
             ro = row.get("ro")
+            phase_value = str(phase_map.get(ro, "teardown") or "teardown").strip().lower()
+            if phase_value in closed_phase_keys:
+                continue
             labor_repairs = _parse_json_field(row.get("labor_repairs"))
             paint_repairs = _parse_json_field(row.get("paint_repairs"))
 
@@ -4005,7 +4009,7 @@ async def phase_board(request: Request):
                 {
                     "ro": ro,
                     "vehicle": vehicle_display,
-                    "phase": phase_map.get(ro, "teardown"),
+                    "phase": phase_value,
                     "labor_tech": "Unassigned",
                     "labor_hours": labor_hours,
                     "paint_tech": "Unassigned",
@@ -4223,6 +4227,7 @@ async def list_parts_ros(request: Request):
         _ensure_parts_orders_table(cur)
         _ensure_parts_received_table(cur)
         _ensure_ro_line_assignments_table(cur)
+        _ensure_ro_phases_table(cur)
 
         cur.execute(
             """
@@ -4240,6 +4245,18 @@ async def list_parts_ros(request: Request):
             (domain,),
         )
         rows = cur.fetchall()
+
+        cur.execute(
+            """
+            SELECT ro, phase
+            FROM ro_phases
+            WHERE domain = %s
+            """,
+            (domain,),
+        )
+        phase_rows = cur.fetchall() or []
+        phase_map = {str(row.get("ro") or "").strip(): str(row.get("phase") or "").strip().lower() for row in phase_rows}
+        closed_phase_keys = {"complete", "complete/finish"}
 
         cur.execute(
             """
@@ -4361,6 +4378,9 @@ async def list_parts_ros(request: Request):
         ros = []
         for row in rows:
             ro = row["ro"]
+            phase_value = phase_map.get(str(ro or "").strip(), "")
+            if phase_value in closed_phase_keys:
+                continue
             parts_repairs = _parse_json_field(row.get("parts_repairs"))
             if not isinstance(parts_repairs, list):
                 parts_repairs = []
