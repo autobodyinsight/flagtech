@@ -328,6 +328,7 @@ def get_dashboard_screen_html():
 
             const inDateValue = normalizeIsoDateForInput(ro.in_date);
             const ecdDateValue = normalizeIsoDateForInput(ro.ecd_date);
+            const pickedUpDateValue = normalizeIsoDateForInput(ro.picked_up);
             // SVG line icons (white, flat, no fill)
             const icons = {
                 notepad: `<svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="5" y="6" width="18" height="16" rx="2" stroke="white" stroke-width="2"/><line x1="9" y1="10" x2="19" y2="10" stroke="white" stroke-width="2"/><line x1="9" y1="14" x2="19" y2="14" stroke="white" stroke-width="2"/><line x1="9" y1="18" x2="15" y2="18" stroke="white" stroke-width="2"/></svg>`,
@@ -355,6 +356,10 @@ def get_dashboard_screen_html():
                 <div style="position:absolute; top:18px; right:24px; display:flex; gap:12px; z-index:10;">
                     <button onclick="window.print()" style="padding:7px 18px; background:#d32f2f; color:#fff; border:none; border-radius:4px; font-weight:bold; font-size:15px; cursor:pointer;">Print</button>
                     <button id="roCloseButton" type="button" style="padding:7px 18px; background:#505050; color:#fff; border:none; border-radius:4px; font-weight:bold; font-size:15px; cursor:pointer;">Close RO</button>
+                </div>
+                <div style="position:absolute; top:58px; right:24px; display:flex; align-items:center; gap:8px; z-index:10;">
+                    <span class="ro-header-label" style="margin-right:0;">Picked Up:</span>
+                    <input type="date" id="roHeaderPickedUpDate" class="ro-header-date-input" value="${pickedUpDateValue}" data-field="picked_up" data-ro="${ro.ro || ''}" />
                 </div>
             `;
 
@@ -426,6 +431,10 @@ def get_dashboard_screen_html():
                     border-color:#d32f2f;
                     box-shadow:0 0 0 2px rgba(211,47,47,0.25);
                 }
+                                @keyframes roCloseWarnBlink {
+                                        0%, 49% { opacity: 1; }
+                                        50%, 100% { opacity: 0.25; }
+                                }
                                 .ro-window-card { background:#fafafa; border:1px solid #ddd; border-radius:8px; padding:14px; }
                 @media (max-width: 700px) {
                   #roSidebar { width:44px; }
@@ -614,6 +623,7 @@ def get_dashboard_screen_html():
                 const dateFields = [
                     roWindowDoc.getElementById('roHeaderInDate'),
                     roWindowDoc.getElementById('roHeaderEcdDate'),
+                    roWindowDoc.getElementById('roHeaderPickedUpDate'),
                 ].filter(Boolean);
 
                 for (const input of dateFields) {
@@ -654,6 +664,7 @@ def get_dashboard_screen_html():
 
                 panel.innerHTML = `
                     <div style="font-size:14px; color:#222; margin-bottom:10px;">You're about to close the RO. Confirm?</div>
+                    <div id="roCloseMissingPickupWarning" style="display:none; margin:0 0 10px 0; color:#d32f2f; font-weight:800; animation: roCloseWarnBlink 0.9s linear infinite;">ENTER PICK UP DATE FIRST</div>
                     <div style="display:flex; justify-content:flex-end; gap:8px;">
                         <button id="roCloseConfirmCancel" type="button" style="padding:7px 12px; background:#999; color:#fff; border:none; border-radius:5px; cursor:pointer;">Cancel</button>
                         <button id="roCloseConfirmYes" type="button" style="padding:7px 12px; background:#d32f2f; color:#fff; border:none; border-radius:5px; cursor:pointer; font-weight:700;">Yes</button>
@@ -664,6 +675,22 @@ def get_dashboard_screen_html():
 
                 const cancelBtn = roWindowDoc.getElementById('roCloseConfirmCancel');
                 const yesBtn = roWindowDoc.getElementById('roCloseConfirmYes');
+                const warningEl = roWindowDoc.getElementById('roCloseMissingPickupWarning');
+                const pickedUpInput = roWindowDoc.getElementById('roHeaderPickedUpDate');
+
+                function syncPickedUpWarning() {
+                    const hasPickedUp = !!String(pickedUpInput?.value || '').trim();
+                    if (warningEl) {
+                        warningEl.style.display = hasPickedUp ? 'none' : 'block';
+                    }
+                    return hasPickedUp;
+                }
+
+                syncPickedUpWarning();
+                if (pickedUpInput) {
+                    pickedUpInput.addEventListener('input', syncPickedUpWarning);
+                    pickedUpInput.addEventListener('change', syncPickedUpWarning);
+                }
 
                 if (cancelBtn) {
                     cancelBtn.addEventListener('click', () => {
@@ -673,6 +700,9 @@ def get_dashboard_screen_html():
 
                 if (yesBtn) {
                     yesBtn.addEventListener('click', async () => {
+                        if (!syncPickedUpWarning()) {
+                            return;
+                        }
                         yesBtn.disabled = true;
                         try {
                             await flushHeaderDateInputs();
@@ -702,6 +732,34 @@ def get_dashboard_screen_html():
                         }
                     });
                 }
+            }
+
+            function bindPickedUpEnterSave() {
+                const input = roWindowDoc.getElementById('roHeaderPickedUpDate');
+                if (!input) return;
+                input.dataset.lastValue = input.value || '';
+                input.addEventListener('keydown', async function(event) {
+                    if (event.key !== 'Enter') return;
+                    event.preventDefault();
+
+                    const roNumber = this.dataset.ro || '';
+                    const field = this.dataset.field || '';
+                    const nextValue = this.value || '';
+                    const prevValue = this.dataset.lastValue || '';
+                    if (!roNumber || !field || !nextValue || nextValue === prevValue) return;
+
+                    this.disabled = true;
+                    try {
+                        await patchRoDate(roNumber, field, nextValue);
+                        this.dataset.lastValue = nextValue;
+                    } catch (error) {
+                        console.error('Error updating picked up date:', error);
+                        this.value = prevValue;
+                        alert('Unable to save Picked Up date.');
+                    } finally {
+                        this.disabled = false;
+                    }
+                });
             }
 
             function bindCloseRoButton() {
@@ -1698,6 +1756,7 @@ def get_dashboard_screen_html():
 
             bindDateAutosave('roHeaderInDate');
             bindDateAutosave('roHeaderEcdDate');
+            bindPickedUpEnterSave();
             bindSidebarButtons();
             bindCloseRoButton();
             showSidebarView('notes');

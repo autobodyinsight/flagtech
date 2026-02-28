@@ -20,11 +20,12 @@ def get_records_screen_html():
                             <th class="dashboard-header-cell" style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold;">INSURANCE</th>
                             <th class="dashboard-header-cell" style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold;">IN</th>
                             <th class="dashboard-header-cell" style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold;">OUT</th>
+                            <th class="dashboard-header-cell" style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold;">CLOSED</th>
                             <th class="dashboard-header-cell" style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold; text-align:right;">TOTAL</th>
                         </tr>
                     </thead>
                     <tbody id="recordsRoListBody">
-                        <tr><td colspan="7" style="padding:20px; text-align:center; color:#999;">Loading...</td></tr>
+                        <tr><td colspan="8" style="padding:20px; text-align:center; color:#999;">Loading...</td></tr>
                     </tbody>
                 </table>
             </div>
@@ -55,6 +56,21 @@ def get_records_screen_html():
             return `${mm}/${dd}/${yy}`;
         }
 
+        function formatRecordsDateTime(value) {
+            const source = String(value || '').trim();
+            if (!source) return '';
+            const dt = new Date(source);
+            if (Number.isNaN(dt.getTime())) return source;
+            const mm = String(dt.getMonth() + 1).padStart(2, '0');
+            const dd = String(dt.getDate()).padStart(2, '0');
+            const yy = String(dt.getFullYear()).slice(-2);
+            let hours = dt.getHours();
+            const minutes = String(dt.getMinutes()).padStart(2, '0');
+            const ampm = hours >= 12 ? 'PM' : 'AM';
+            hours = hours % 12 || 12;
+            return `${mm}/${dd}/${yy} ${hours}:${minutes} ${ampm}`;
+        }
+
         function formatRecordsMoney(value) {
             const amount = Number(value || 0);
             return '$' + amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -69,7 +85,7 @@ def get_records_screen_html():
                 const rows = Array.isArray(data.rows) ? data.rows : [];
                 body.innerHTML = '';
                 if (!rows.length) {
-                    body.innerHTML = `<tr><td colspan='7' style='padding:20px; text-align:center; color:#999;'>No closed repair orders found.</td></tr>`;
+                    body.innerHTML = `<tr><td colspan='8' style='padding:20px; text-align:center; color:#999;'>No closed repair orders found.</td></tr>`;
                     return;
                 }
 
@@ -81,11 +97,12 @@ def get_records_screen_html():
                         <td style='padding:12px;'>${row.insurance || ''}</td>
                         <td style='padding:12px;'>${formatRecordsDate(row.in_date)}</td>
                         <td style='padding:12px;'>${formatRecordsDate(row.out_date)}</td>
+                        <td style='padding:12px;'>${formatRecordsDateTime(row.closed_date)}</td>
                         <td style='padding:12px; text-align:right;'>${formatRecordsMoney(row.total)}</td>
                     </tr>`;
                 });
             } catch (error) {
-                body.innerHTML = `<tr><td colspan='7' style='padding:20px; text-align:center; color:#c00;'>Error loading data</td></tr>`;
+                body.innerHTML = `<tr><td colspan='8' style='padding:20px; text-align:center; color:#c00;'>Error loading data</td></tr>`;
             }
         }
         </script>

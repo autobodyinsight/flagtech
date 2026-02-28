@@ -308,6 +308,7 @@ def _ensure_saved_estimates_table(cur) -> None:
             insurance_pay NUMERIC,
             in_date DATE DEFAULT CURRENT_DATE,
             ecd_date DATE,
+            picked_up DATE,
             domain VARCHAR(255),
             saved_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
@@ -333,6 +334,7 @@ def _ensure_saved_estimates_table(cur) -> None:
     cur.execute("ALTER TABLE saved_estimates ADD COLUMN IF NOT EXISTS vin VARCHAR(32)")
     cur.execute("ALTER TABLE saved_estimates ADD COLUMN IF NOT EXISTS in_date DATE DEFAULT CURRENT_DATE")
     cur.execute("ALTER TABLE saved_estimates ADD COLUMN IF NOT EXISTS ecd_date DATE")
+    cur.execute("ALTER TABLE saved_estimates ADD COLUMN IF NOT EXISTS picked_up DATE")
     cur.execute("ALTER TABLE saved_estimates ADD COLUMN IF NOT EXISTS domain VARCHAR(255)")
     cur.execute("CREATE INDEX IF NOT EXISTS idx_saved_estimates_ro_domain ON saved_estimates(ro, domain)")
 
@@ -1659,6 +1661,7 @@ async def get_dashboard_data(request: Request):
                                      customer_email,
                                      in_date,
                                      ecd_date,
+                                     picked_up,
                                      saved_at
             FROM saved_estimates
             WHERE domain = %s
@@ -1811,6 +1814,7 @@ async def get_dashboard_data(request: Request):
                     "painter": paint_tech,
                     "in_date": in_date_value.isoformat() if in_date_value else None,
                     "ecd_date": ecd_date_value.isoformat() if ecd_date_value else None,
+                    "picked_up": row.get("picked_up").isoformat() if row.get("picked_up") else None,
                     "hours": ro_hours,
                     "total": grand_total,
                     "labor_repairs": labor_repairs if isinstance(labor_repairs, list) else [],
@@ -2076,6 +2080,7 @@ async def list_records_closed_ros(request: Request):
                 se.owner_info,
                 se.insurance_company,
                 se.in_date,
+                se.picked_up,
                 se.grand_total
             FROM ro_phases rp
             LEFT JOIN LATERAL (
@@ -2103,8 +2108,9 @@ async def list_records_closed_ros(request: Request):
             customer_name, _ = _parse_owner_info((row.get("owner_info") or "").strip())
 
             in_date_value = _coerce_date(row.get("in_date"))
-            out_date_raw = row.get("updated_at")
-            out_date_value = out_date_raw.date() if isinstance(out_date_raw, datetime) else _coerce_date(out_date_raw)
+            out_date_value = _coerce_date(row.get("picked_up"))
+            closed_raw = row.get("updated_at")
+            closed_date_value = closed_raw if isinstance(closed_raw, datetime) else None
 
             records_rows.append(
                 {
@@ -2114,6 +2120,7 @@ async def list_records_closed_ros(request: Request):
                     "insurance": (row.get("insurance_company") or "").strip(),
                     "in_date": in_date_value.isoformat() if in_date_value else None,
                     "out_date": out_date_value.isoformat() if out_date_value else None,
+                    "closed_date": closed_date_value.isoformat() if closed_date_value else None,
                     "total": _parse_float_value(row.get("grand_total")),
                 }
             )
@@ -2557,7 +2564,7 @@ async def update_ro_dates(request: Request):
     field = (data.get("field") or "").strip().lower()
     value = (data.get("value") or "").strip()
 
-    if not ro_value or field not in {"in_date", "ecd_date"} or not value:
+    if not ro_value or field not in {"in_date", "ecd_date", "picked_up"} or not value:
         return JSONResponse(status_code=400, content={"error": "ro, field, and value are required"})
 
     try:
@@ -2572,7 +2579,7 @@ async def update_ro_dates(request: Request):
         _ensure_ro_activity_log_table(cur)
         cur.execute(
             """
-            SELECT id, in_date, ecd_date
+            SELECT id, in_date, ecd_date, picked_up
             FROM saved_estimates
             WHERE domain = %s AND ro = %s
             ORDER BY saved_at DESC, id DESC
@@ -2586,6 +2593,7 @@ async def update_ro_dates(request: Request):
 
         old_in_date = _coerce_date(row.get("in_date"))
         old_ecd_date = _coerce_date(row.get("ecd_date"))
+        old_picked_up = _coerce_date(row.get("picked_up"))
 
         if field == "in_date":
             cur.execute(
@@ -2596,7 +2604,7 @@ async def update_ro_dates(request: Request):
                 """,
                 (parsed_date, row.get("id")),
             )
-        else:
+        elif field == "ecd_date":
             cur.execute(
                 """
                 UPDATE saved_estimates
@@ -2605,10 +2613,19 @@ async def update_ro_dates(request: Request):
                 """,
                 (parsed_date, row.get("id")),
             )
+        else:
+            cur.execute(
+                """
+                UPDATE saved_estimates
+                SET picked_up = %s
+                WHERE id = %s
+                """,
+                (parsed_date, row.get("id")),
+            )
 
-        old_value = old_in_date if field == "in_date" else old_ecd_date
+        old_value = old_in_date if field == "in_date" else (old_ecd_date if field == "ecd_date" else old_picked_up)
         if old_value != parsed_date:
-            label = "In-date" if field == "in_date" else "ECD"
+            label = "In-date" if field == "in_date" else ("ECD" if field == "ecd_date" else "Picked Up")
             old_display = old_value.isoformat() if old_value else "-"
             _log_ro_activity(
                 cur,
