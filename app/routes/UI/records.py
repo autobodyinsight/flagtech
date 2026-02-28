@@ -56,21 +56,6 @@ def get_records_screen_html():
             return `${mm}/${dd}/${yy}`;
         }
 
-        function formatRecordsDateTime(value) {
-            const source = String(value || '').trim();
-            if (!source) return '';
-            const dt = new Date(source);
-            if (Number.isNaN(dt.getTime())) return source;
-            const mm = String(dt.getMonth() + 1).padStart(2, '0');
-            const dd = String(dt.getDate()).padStart(2, '0');
-            const yy = String(dt.getFullYear()).slice(-2);
-            let hours = dt.getHours();
-            const minutes = String(dt.getMinutes()).padStart(2, '0');
-            const ampm = hours >= 12 ? 'PM' : 'AM';
-            hours = hours % 12 || 12;
-            return `${mm}/${dd}/${yy} ${hours}:${minutes} ${ampm}`;
-        }
-
         function formatRecordsMoney(value) {
             const amount = Number(value || 0);
             return '$' + amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -89,16 +74,17 @@ def get_records_screen_html():
                     return;
                 }
 
-                rows.forEach((row) => {
+                rows.forEach((row, index) => {
+                    const rowBg = (index % 2 === 0) ? '#d3d3d3' : '#f2f0ef';
                     body.innerHTML += `<tr>
-                        <td style='padding:12px;'>${row.ro || ''}</td>
-                        <td style='padding:12px;'>${row.vehicle || ''}</td>
-                        <td style='padding:12px;'>${row.customer || ''}</td>
-                        <td style='padding:12px;'>${row.insurance || ''}</td>
-                        <td style='padding:12px;'>${formatRecordsDate(row.in_date)}</td>
-                        <td style='padding:12px;'>${formatRecordsDate(row.out_date)}</td>
-                        <td style='padding:12px;'>${formatRecordsDateTime(row.closed_date)}</td>
-                        <td style='padding:12px; text-align:right;'>${formatRecordsMoney(row.total)}</td>
+                        <td style='padding:12px; background:${rowBg};'>${row.ro || ''}</td>
+                        <td style='padding:12px; background:${rowBg};'>${row.vehicle || ''}</td>
+                        <td style='padding:12px; background:${rowBg};'>${row.customer || ''}</td>
+                        <td style='padding:12px; background:${rowBg};'>${row.insurance || ''}</td>
+                        <td style='padding:12px; background:${rowBg};'>${formatRecordsDate(row.in_date)}</td>
+                        <td style='padding:12px; background:${rowBg};'>${formatRecordsDate(row.out_date)}</td>
+                        <td style='padding:12px; background:${rowBg};'>${formatRecordsDate(row.closed_date)}</td>
+                        <td style='padding:12px; text-align:right; background:${rowBg};'>${formatRecordsMoney(row.total)}</td>
                     </tr>`;
                 });
             } catch (error) {
