@@ -1475,12 +1475,112 @@ def get_dashboard_screen_html():
                 if (!roWindowContentEl) return;
                 roWindowContentEl.innerHTML = `
                     <div class="ro-window-card">
-                        <div style="font-weight:700; font-size:18px; margin-bottom:10px; color:#333;">Payments Log</div>
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+                            <div style="font-weight:700; font-size:18px; color:#333;">Payments</div>
+                            <button id="roPopupPaymentsSave" type="button" style="padding:9px 14px; background:#d32f2f; color:#fff; border:none; border-radius:6px; cursor:pointer; font-weight:700;">SAVE</button>
+                        </div>
                         <div id="roPopupPaymentsLog"><div style="color:#777;">Loading...</div></div>
                     </div>
                 `;
 
                 const logEl = roWindowDoc.getElementById('roPopupPaymentsLog');
+                const saveBtn = roWindowDoc.getElementById('roPopupPaymentsSave');
+
+                function formatShortPaymentDate(value) {
+                    const source = String(value || '').trim();
+                    if (!source) return '--/--/--';
+                    let dt;
+                    if (/^\d{4}-\d{2}-\d{2}$/.test(source)) {
+                        dt = new Date(`${source}T00:00:00`);
+                    } else {
+                        dt = new Date(source);
+                    }
+                    if (Number.isNaN(dt.getTime())) return '--/--/--';
+                    const mm = String(dt.getMonth() + 1).padStart(2, '0');
+                    const dd = String(dt.getDate()).padStart(2, '0');
+                    const yy = String(dt.getFullYear()).slice(-2);
+                    return `${mm}/${dd}/${yy}`;
+                }
+
+                function formatBalance(value) {
+                    const numeric = Number(value || 0);
+                    if (!Number.isFinite(numeric) || numeric <= 0) return '-';
+                    return popupFormatMoney(numeric);
+                }
+
+                function renderPaymentLog(entries) {
+                    const sorted = [...entries].sort((a, b) => {
+                        const aDate = new Date(a.business_date || a.paid_at || a.date || '').getTime() || 0;
+                        const bDate = new Date(b.business_date || b.paid_at || b.date || '').getTime() || 0;
+                        return bDate - aDate;
+                    });
+                    if (!sorted.length) {
+                        return '<div style="color:#777; padding:6px 0;">No payments yet.</div>';
+                    }
+                    return sorted.map((entry) => {
+                        const dateText = formatShortPaymentDate(entry.business_date || entry.paid_at || entry.date);
+                        const typeText = String(entry.payment_type || 'CARD').trim().toUpperCase() || 'CARD';
+                        return `
+                            <div style="display:flex; justify-content:space-between; align-items:center; padding:6px 0; border-bottom:1px solid #f0f0f0;">
+                                <div style="color:#333;">${escapePopupHtml(dateText)} – ${escapePopupHtml(typeText)}</div>
+                                <div style="font-weight:600; color:#333;">${popupFormatMoney(entry.amount || 0)}</div>
+                            </div>
+                        `;
+                    }).join('');
+                }
+
+                function renderPaymentsScreenForRow(row) {
+                    const insuranceEntries = Array.isArray(row.insurance_payment_entries) ? row.insurance_payment_entries : [];
+                    const customerEntries = Array.isArray(row.customer_payment_entries) ? row.customer_payment_entries : [];
+
+                    const insuranceTotal = Number(row.insurance_total || 0);
+                    const customerTotal = Number(row.customer_total || 0);
+                    const insurancePaid = Number(row.insurance_paid || 0);
+                    const customerPaid = Number(row.customer_paid || 0);
+
+                    const insuranceBalance = formatBalance(Math.max(0, insuranceTotal - insurancePaid));
+                    const customerBalance = formatBalance(Math.max(0, customerTotal - customerPaid));
+
+                    const insuranceName = String(row.insurance_name || '').trim() || '-';
+                    const customerName = String(row.customer || '').trim() || '-';
+
+                    logEl.innerHTML = `
+                        <div style="border:1px solid #e2e2e2; border-radius:6px; padding:12px; margin-bottom:14px; background:#fff;">
+                            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; color:#333; font-weight:700;">
+                                <div>INSURANCE: ${escapePopupHtml(insuranceName)}</div>
+                                <div>BALANCE: ${escapePopupHtml(insuranceBalance)}</div>
+                            </div>
+                            <div style="display:flex; gap:8px; align-items:center; margin-bottom:10px;">
+                                <input id="roPopupInsurancePaymentInput" type="number" step="0.01" min="0" placeholder="0.00" style="padding:8px; border:1px solid #ccc; border-radius:4px; width:180px;" />
+                                <select id="roPopupInsurancePaymentType" style="padding:8px; border:1px solid #ccc; border-radius:4px; width:120px;">
+                                    <option value="CARD">CARD</option>
+                                    <option value="CASH">CASH</option>
+                                    <option value="CHECK">CHECK</option>
+                                </select>
+                            </div>
+                            <div style="height:1px; background:#ddd; margin:8px 0 10px 0;"></div>
+                            <div id="roPopupInsuranceLog">${renderPaymentLog(insuranceEntries)}</div>
+                        </div>
+
+                        <div style="border:1px solid #e2e2e2; border-radius:6px; padding:12px; background:#fff;">
+                            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; color:#333; font-weight:700;">
+                                <div>CUSTOMER: ${escapePopupHtml(customerName)}</div>
+                                <div>BALANCE: ${escapePopupHtml(customerBalance)}</div>
+                            </div>
+                            <div style="display:flex; gap:8px; align-items:center; margin-bottom:10px;">
+                                <input id="roPopupCustomerPaymentInput" type="number" step="0.01" min="0" placeholder="0.00" style="padding:8px; border:1px solid #ccc; border-radius:4px; width:180px;" />
+                                <select id="roPopupCustomerPaymentType" style="padding:8px; border:1px solid #ccc; border-radius:4px; width:120px;">
+                                    <option value="CARD">CARD</option>
+                                    <option value="CASH">CASH</option>
+                                    <option value="CHECK">CHECK</option>
+                                </select>
+                            </div>
+                            <div style="height:1px; background:#ddd; margin:8px 0 10px 0;"></div>
+                            <div id="roPopupCustomerLog">${renderPaymentLog(customerEntries)}</div>
+                        </div>
+                    `;
+                }
+
                 try {
                     const data = await popupFetchJson('/api/payments/open-ros');
                     const rows = Array.isArray(data.rows) ? data.rows : [];
@@ -1490,54 +1590,57 @@ def get_dashboard_screen_html():
                         return;
                     }
 
-                    const insuranceEntries = Array.isArray(row.insurance_payment_entries) ? row.insurance_payment_entries : [];
-                    const customerEntries = Array.isArray(row.customer_payment_entries) ? row.customer_payment_entries : [];
+                    renderPaymentsScreenForRow(row);
 
-                    const allEntries = [
-                        ...insuranceEntries.map((entry) => ({ ...entry, source: 'Insurance' })),
-                        ...customerEntries.map((entry) => ({ ...entry, source: 'Customer' })),
-                    ].sort((a, b) => {
-                        const aDate = new Date(a.business_date || a.paid_at || a.date || '').getTime() || 0;
-                        const bDate = new Date(b.business_date || b.paid_at || b.date || '').getTime() || 0;
-                        return aDate - bDate;
-                    });
+                    if (saveBtn) {
+                        saveBtn.onclick = async () => {
+                            const insuranceInput = roWindowDoc.getElementById('roPopupInsurancePaymentInput');
+                            const customerInput = roWindowDoc.getElementById('roPopupCustomerPaymentInput');
+                            const insuranceTypeSelect = roWindowDoc.getElementById('roPopupInsurancePaymentType');
+                            const customerTypeSelect = roWindowDoc.getElementById('roPopupCustomerPaymentType');
 
-                    if (!allEntries.length) {
-                        logEl.innerHTML = '<div style="color:#777;">No payment entries yet.</div>';
-                        return;
+                            const insuranceAmount = parseFloat((insuranceInput?.value || '').trim());
+                            const customerAmount = parseFloat((customerInput?.value || '').trim());
+
+                            const hasInsurance = Number.isFinite(insuranceAmount) && insuranceAmount > 0;
+                            const hasCustomer = Number.isFinite(customerAmount) && customerAmount > 0;
+
+                            if (!hasInsurance && !hasCustomer) {
+                                alert('Enter an insurance or customer payment amount.');
+                                return;
+                            }
+
+                            const payload = {
+                                ro: ro.ro,
+                                insurance_payment: hasInsurance ? insuranceAmount : undefined,
+                                customer_payment: hasCustomer ? customerAmount : undefined,
+                                insurance_payment_type: String(insuranceTypeSelect?.value || 'CARD').toUpperCase(),
+                                customer_payment_type: String(customerTypeSelect?.value || 'CARD').toUpperCase(),
+                                business_date: new Date().toISOString().slice(0, 10),
+                            };
+
+                            saveBtn.disabled = true;
+                            try {
+                                const saveRes = await popupFetchJson('/api/payments/save', {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify(payload),
+                                });
+                                if (saveRes?.error) {
+                                    throw new Error(saveRes.error);
+                                }
+
+                                if (insuranceInput) insuranceInput.value = '';
+                                if (customerInput) customerInput.value = '';
+                                await renderPaymentsView();
+                            } catch (saveError) {
+                                console.error('Error saving payment:', saveError);
+                                alert('Error saving payment.');
+                            } finally {
+                                if (saveBtn) saveBtn.disabled = false;
+                            }
+                        };
                     }
-
-                    logEl.innerHTML = `
-                        <div style="margin-bottom:8px; color:#333;">
-                            <strong>Insurance Paid:</strong> ${popupFormatMoney(row.insurance_paid || 0)} &nbsp;|&nbsp;
-                            <strong>Customer Paid:</strong> ${popupFormatMoney(row.customer_paid || 0)}
-                        </div>
-                        <div style="overflow:auto; border:1px solid #e2e2e2; border-radius:6px;">
-                            <table style="width:100%; border-collapse:collapse;">
-                                <thead>
-                                    <tr style="background:#3c4142; color:#fff; text-align:left;">
-                                        <th style="padding:8px;">Date</th>
-                                        <th style="padding:8px; text-align:right;">Amount</th>
-                                        <th style="padding:8px;">Source</th>
-                                        <th style="padding:8px;">Ref/Note</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    ${allEntries.map((entry, idx) => {
-                                        const ref = entry.reference || entry.note || '-';
-                                        return `
-                                            <tr style="background:${idx % 2 === 0 ? '#f2f0ef' : '#fff'}; border-bottom:1px solid #eee;">
-                                                <td style="padding:8px;">${escapePopupHtml(popupFormatDate(entry.business_date || entry.paid_at || entry.date))}</td>
-                                                <td style="padding:8px; text-align:right;">${popupFormatMoney(entry.amount || 0)}</td>
-                                                <td style="padding:8px;">${escapePopupHtml(entry.source || '-')}</td>
-                                                <td style="padding:8px;">${escapePopupHtml(ref)}</td>
-                                            </tr>
-                                        `;
-                                    }).join('')}
-                                </tbody>
-                            </table>
-                        </div>
-                    `;
                 } catch (error) {
                     console.error('Error loading payments log:', error);
                     logEl.innerHTML = '<div style="color:#c62828;">Error loading payments log.</div>';

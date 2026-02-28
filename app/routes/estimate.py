@@ -367,6 +367,7 @@ def _ensure_ro_payment_entries_table(cur) -> None:
             ro VARCHAR(255) NOT NULL,
             domain VARCHAR(255) NOT NULL,
             payer_type VARCHAR(32) NOT NULL,
+            payment_method VARCHAR(16),
             amount NUMERIC NOT NULL,
             business_date DATE,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -376,6 +377,7 @@ def _ensure_ro_payment_entries_table(cur) -> None:
     cur.execute("ALTER TABLE ro_payment_entries ADD COLUMN IF NOT EXISTS ro VARCHAR(255)")
     cur.execute("ALTER TABLE ro_payment_entries ADD COLUMN IF NOT EXISTS domain VARCHAR(255)")
     cur.execute("ALTER TABLE ro_payment_entries ADD COLUMN IF NOT EXISTS payer_type VARCHAR(32)")
+    cur.execute("ALTER TABLE ro_payment_entries ADD COLUMN IF NOT EXISTS payment_method VARCHAR(16)")
     cur.execute("ALTER TABLE ro_payment_entries ADD COLUMN IF NOT EXISTS amount NUMERIC")
     cur.execute("ALTER TABLE ro_payment_entries ADD COLUMN IF NOT EXISTS business_date DATE")
     cur.execute("ALTER TABLE ro_payment_entries ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP")
@@ -1958,7 +1960,7 @@ async def list_open_ros_for_payments(request: Request):
 
         cur.execute(
             """
-            SELECT ro, payer_type, amount, business_date
+            SELECT ro, payer_type, payment_method, amount, business_date
             FROM ro_payment_entries
             WHERE domain = %s
             ORDER BY business_date DESC NULLS LAST, id DESC
@@ -1986,6 +1988,7 @@ async def list_open_ros_for_payments(request: Request):
                 {
                     "amount": _parse_float_value(entry_row.get("amount")),
                     "business_date": business_date_display,
+                    "payment_type": str(entry_row.get("payment_method") or "").strip().upper(),
                 }
             )
 
@@ -2096,8 +2099,14 @@ async def save_ro_payments(request: Request):
     customer_paid_raw = data.get("customer_paid", 0)
     insurance_payment_raw = data.get("insurance_payment", None)
     customer_payment_raw = data.get("customer_payment", None)
+    insurance_payment_type_raw = str(data.get("insurance_payment_type") or "").strip().upper()
+    customer_payment_type_raw = str(data.get("customer_payment_type") or "").strip().upper()
     business_date_raw = str(data.get("business_date") or "").strip()
     has_incremental_values = insurance_payment_raw is not None or customer_payment_raw is not None
+
+    allowed_payment_types = {"CARD", "CASH", "CHECK"}
+    insurance_payment_type = insurance_payment_type_raw if insurance_payment_type_raw in allowed_payment_types else ""
+    customer_payment_type = customer_payment_type_raw if customer_payment_type_raw in allowed_payment_types else ""
 
     def _parse_payment_amount(raw_value) -> float:
         cleaned = str(raw_value if raw_value is not None else "").replace("$", "").replace(",", "").strip()
@@ -2201,19 +2210,19 @@ async def save_ro_payments(request: Request):
         if insurance_entry_amount > 0:
             cur.execute(
                 """
-                INSERT INTO ro_payment_entries (ro, domain, payer_type, amount, business_date, created_at)
-                VALUES (%s, %s, 'insurance', %s, %s, CURRENT_TIMESTAMP)
+                INSERT INTO ro_payment_entries (ro, domain, payer_type, payment_method, amount, business_date, created_at)
+                VALUES (%s, %s, 'insurance', %s, %s, %s, CURRENT_TIMESTAMP)
                 """,
-                (ro_value, domain, insurance_entry_amount, business_date_value),
+                (ro_value, domain, insurance_payment_type or None, insurance_entry_amount, business_date_value),
             )
 
         if customer_entry_amount > 0:
             cur.execute(
                 """
-                INSERT INTO ro_payment_entries (ro, domain, payer_type, amount, business_date, created_at)
-                VALUES (%s, %s, 'customer', %s, %s, CURRENT_TIMESTAMP)
+                INSERT INTO ro_payment_entries (ro, domain, payer_type, payment_method, amount, business_date, created_at)
+                VALUES (%s, %s, 'customer', %s, %s, %s, CURRENT_TIMESTAMP)
                 """,
-                (ro_value, domain, customer_entry_amount, business_date_value),
+                (ro_value, domain, customer_payment_type or None, customer_entry_amount, business_date_value),
             )
 
         conn.commit()
