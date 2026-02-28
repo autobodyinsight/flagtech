@@ -112,10 +112,22 @@ def get_reports_screen_html():
         return { gpDollar, gpPercent };
     }
 
-    function formatGpBox(sales, cost) {
+    function renderGpEnclosure(sales, cost) {
         const gp = computeGpValues(sales, cost);
+        const salesText = formatReportsMoney(sales);
+        const costText = formatReportsMoney(cost);
         const gpDollarText = Number(gp.gpDollar || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-        return `[GP ${formatReportsPercent(gp.gpPercent)}% – GP$${gpDollarText}]`;
+
+        return `<div class='reports-gp-enclosure'>
+            <div class='reports-gp-enclosure-top'>
+                <span>${salesText}</span>
+                <span>${costText}</span>
+            </div>
+            <div class='reports-gp-enclosure-bottom'>
+                <span>GP ${formatReportsPercent(gp.gpPercent)}%</span>
+                <span>GP $${gpDollarText}</span>
+            </div>
+        </div>`;
     }
 
     async function loadReportsData() {
@@ -165,9 +177,9 @@ def get_reports_screen_html():
                         <td style='padding:0 12px 10px 12px;'></td>
                         <td style='padding:0 12px 10px 12px;'></td>
                         <td style='padding:0 12px 10px 12px;'></td>
-                        <td colspan='2' style='padding:0 12px 10px 12px; text-align:center;'><span class='reports-gp-box'>${formatGpBox(partsSales, partsCost)}</span></td>
-                        <td colspan='2' style='padding:0 12px 10px 12px; text-align:center;'><span class='reports-gp-box'>${formatGpBox(laborSales, laborCost)}</span></td>
-                        <td colspan='2' style='padding:0 12px 10px 12px; text-align:center;'><span class='reports-gp-box'>${formatGpBox(totalSales, totalCost)}</span></td>
+                        <td colspan='2' style='padding:0 12px 10px 12px;'>${renderGpEnclosure(partsSales, partsCost)}</td>
+                        <td colspan='2' style='padding:0 12px 10px 12px;'>${renderGpEnclosure(laborSales, laborCost)}</td>
+                        <td colspan='2' style='padding:0 12px 10px 12px;'>${renderGpEnclosure(totalSales, totalCost)}</td>
                     </tr>`;
                 }
             }
@@ -185,16 +197,31 @@ def get_reports_screen_html():
     });
     </script>
     <style>
-        .reports-gp-box {
-            display: inline-block;
+        .reports-gp-enclosure {
             border: 1px solid #9e9e9e;
-            border-radius: 6px;
             background: #fff;
-            padding: 5px 10px;
-            font-size: 12px;
-            font-weight: 700;
-            color: #222;
-            white-space: nowrap;
+            width: 100%;
+            font-size: inherit;
+            font-weight: normal;
+            color: inherit;
+        }
+        .reports-gp-enclosure-top {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 6px 10px;
+            border-bottom: 1px solid #9e9e9e;
+            font-size: inherit;
+            font-weight: normal;
+        }
+        .reports-gp-enclosure-bottom {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 18px;
+            padding: 6px 10px;
+            font-size: inherit;
+            font-weight: normal;
         }
     </style>
     '''
