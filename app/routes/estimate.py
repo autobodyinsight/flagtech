@@ -293,6 +293,8 @@ def _ensure_saved_estimates_table(cur) -> None:
             claim_number VARCHAR(64),
             phone_original TEXT,
             phone_override TEXT,
+            customer_phones JSONB,
+            customer_email TEXT,
             vin VARCHAR(32),
             labor_repairs JSONB,
             paint_repairs JSONB,
@@ -324,6 +326,8 @@ def _ensure_saved_estimates_table(cur) -> None:
     cur.execute("ALTER TABLE saved_estimates ADD COLUMN IF NOT EXISTS claim_number VARCHAR(64)")
     cur.execute("ALTER TABLE saved_estimates ADD COLUMN IF NOT EXISTS phone_original TEXT")
     cur.execute("ALTER TABLE saved_estimates ADD COLUMN IF NOT EXISTS phone_override TEXT")
+    cur.execute("ALTER TABLE saved_estimates ADD COLUMN IF NOT EXISTS customer_phones JSONB")
+    cur.execute("ALTER TABLE saved_estimates ADD COLUMN IF NOT EXISTS customer_email TEXT")
     cur.execute("ALTER TABLE saved_estimates ADD COLUMN IF NOT EXISTS written_by TEXT")
     cur.execute("ALTER TABLE saved_estimates ADD COLUMN IF NOT EXISTS estimator TEXT")
     cur.execute("ALTER TABLE saved_estimates ADD COLUMN IF NOT EXISTS vin VARCHAR(32)")
@@ -1682,6 +1686,8 @@ async def get_dashboard_data(request: Request):
                    vin,
                    phone_original,
                                      phone_override,
+                                     customer_phones,
+                                     customer_email,
                                      in_date,
                                      ecd_date,
                                      saved_at
@@ -1764,9 +1770,25 @@ async def get_dashboard_data(request: Request):
                 estimator_match = re.search(r"estimator\s*:\s*([^\n,]+)", owner_info, re.IGNORECASE)
                 if estimator_match:
                     estimator = (estimator_match.group(1) or "").strip()
+            stored_phone_values = _parse_json_field(row.get("customer_phones"))
+            phone_numbers = []
+            if isinstance(stored_phone_values, list):
+                for value in stored_phone_values:
+                    phone_value = str(value or "").strip()
+                    if phone_value and phone_value not in phone_numbers:
+                        phone_numbers.append(phone_value)
             phone_override = (row.get("phone_override") or "").strip()
             phone_original = (row.get("phone_original") or customer_phone).strip()
-            current_phone = phone_override or customer_phone
+            if not phone_numbers:
+                fallback_phone = phone_override or customer_phone
+                if fallback_phone:
+                    phone_numbers.append(fallback_phone)
+            current_phone = phone_numbers[0] if phone_numbers else (phone_override or customer_phone)
+            customer_email = (row.get("customer_email") or "").strip()
+            if not customer_email:
+                email_match = re.search(r"[A-Z0-9._%+\-]+@[A-Z0-9.\-]+\.[A-Z]{2,}", owner_info, re.IGNORECASE)
+                if email_match:
+                    customer_email = (email_match.group(0) or "").strip()
             in_date_value = _coerce_date(row.get("in_date")) or _to_local_business_date(row.get("saved_at"))
             ecd_date_value = _coerce_date(row.get("ecd_date")) or _calculate_ecd_date(in_date_value, ro_hours)
 
@@ -1803,6 +1825,8 @@ async def get_dashboard_data(request: Request):
                     "customer": customer_name,
                     "phone": current_phone,
                     "phone_original": phone_original,
+                    "phone_numbers": phone_numbers,
+                    "email": customer_email,
                     "owner_info": owner_info,
                     "written_by": written_by,
                     "estimator": estimator,
@@ -2378,10 +2402,24 @@ async def update_ro_phone(request: Request):
 
     data = await request.json()
     ro_value = (data.get("ro") or "").strip()
+    action = (data.get("action") or "replace_primary").strip().lower()
     new_phone = (data.get("phone") or "").strip()
+    new_email = (data.get("email") or "").strip()
 
-    if not ro_value or not new_phone:
-        return JSONResponse(status_code=400, content={"error": "ro and phone are required"})
+    if not ro_value:
+        return JSONResponse(status_code=400, content={"error": "ro is required"})
+
+    allowed_actions = {"replace_primary", "add_phone", "set_email"}
+    if action not in allowed_actions:
+        if new_phone:
+            action = "replace_primary"
+        elif "email" in data:
+            action = "set_email"
+        else:
+            return JSONResponse(status_code=400, content={"error": "invalid action"})
+
+    if action in {"replace_primary", "add_phone"} and not new_phone:
+        return JSONResponse(status_code=400, content={"error": "phone is required"})
 
     conn = get_conn()
     cur = conn.cursor()
@@ -2390,7 +2428,7 @@ async def update_ro_phone(request: Request):
         _ensure_ro_activity_log_table(cur)
         cur.execute(
             """
-            SELECT id, owner_info, phone_original, phone_override
+            SELECT id, owner_info, phone_original, phone_override, customer_phones, customer_email
             FROM saved_estimates
             WHERE domain = %s AND ro = %s
             ORDER BY saved_at DESC, id DESC
@@ -2403,20 +2441,59 @@ async def update_ro_phone(request: Request):
             return JSONResponse(status_code=404, content={"error": "RO not found"})
 
         _, parsed_phone = _parse_owner_info(row.get("owner_info") or "")
-        old_phone = (row.get("phone_override") or parsed_phone or "").strip()
-        phone_original = (row.get("phone_original") or parsed_phone or "").strip()
+        old_email = (row.get("customer_email") or "").strip()
+        stored_phone_values = _parse_json_field(row.get("customer_phones"))
+        phone_numbers = []
+        if isinstance(stored_phone_values, list):
+            for value in stored_phone_values:
+                phone_value = str(value or "").strip()
+                if phone_value and phone_value not in phone_numbers:
+                    phone_numbers.append(phone_value)
+
+        if not phone_numbers:
+            fallback_phone = (row.get("phone_override") or parsed_phone or "").strip()
+            if fallback_phone:
+                phone_numbers.append(fallback_phone)
+
+        old_phone = phone_numbers[0] if phone_numbers else ""
+        phone_original = (row.get("phone_original") or parsed_phone or old_phone or "").strip()
+
+        if action == "replace_primary":
+            if phone_numbers:
+                phone_numbers[0] = new_phone
+            else:
+                phone_numbers.append(new_phone)
+        elif action == "add_phone":
+            if new_phone not in phone_numbers:
+                phone_numbers.append(new_phone)
+
+        updated_email = old_email
+        if action == "set_email":
+            updated_email = new_email
+
+        primary_phone = phone_numbers[0] if phone_numbers else ""
+        if not phone_original:
+            phone_original = primary_phone
 
         cur.execute(
             """
             UPDATE saved_estimates
             SET phone_override = %s,
-                phone_original = COALESCE(phone_original, %s)
+                phone_original = COALESCE(NULLIF(TRIM(phone_original), ''), %s),
+                customer_phones = %s::jsonb,
+                customer_email = %s
             WHERE id = %s
             """,
-            (new_phone, phone_original, row.get("id")),
+            (
+                primary_phone or None,
+                phone_original or primary_phone or None,
+                json.dumps(phone_numbers),
+                updated_email or None,
+                row.get("id"),
+            ),
         )
 
-        if old_phone != new_phone:
+        if action == "replace_primary" and old_phone != new_phone:
             old_display = old_phone or "-"
             _log_ro_activity(
                 cur,
@@ -2425,8 +2502,34 @@ async def update_ro_phone(request: Request):
                 "phone_changed",
                 f"Phone changed: {old_display} → {new_phone}",
             )
+        elif action == "add_phone" and new_phone:
+            _log_ro_activity(
+                cur,
+                domain,
+                ro_value,
+                "phone_added",
+                f"Additional phone added: {new_phone}",
+            )
+
+        if action == "set_email" and old_email != updated_email:
+            old_display = old_email or "-"
+            new_display = updated_email or "-"
+            _log_ro_activity(
+                cur,
+                domain,
+                ro_value,
+                "email_changed",
+                f"Email changed: {old_display} → {new_display}",
+            )
+
         conn.commit()
-        return {"status": "success", "phone": new_phone, "phone_original": phone_original}
+        return {
+            "status": "success",
+            "phone": primary_phone,
+            "phone_original": phone_original,
+            "phone_numbers": phone_numbers,
+            "email": updated_email,
+        }
     finally:
         cur.close()
 

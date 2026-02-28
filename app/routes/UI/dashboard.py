@@ -2013,68 +2013,173 @@ def get_dashboard_screen_html():
                 toggleRoNotes(roNumber);
             }
 
-            function toggleOldPhone(event, rowId) {
-                if (event) event.stopPropagation();
-                const oldEl = document.getElementById(`phone-old-${rowId}`);
-                if (!oldEl) return;
-                oldEl.style.display = oldEl.style.display === 'none' ? 'inline-block' : 'none';
-            }
-
-            function startPhoneEdit(event, rowId) {
-                if (event) event.stopPropagation();
-                const displayEl = document.getElementById(`phone-display-${rowId}`);
-                const editEl = document.getElementById(`phone-edit-${rowId}`);
-                if (!displayEl || !editEl) return;
-                displayEl.style.display = 'none';
-                editEl.style.display = 'inline-flex';
-                const input = document.getElementById(`phone-input-${rowId}`);
-                if (input) {
-                    input.focus();
-                    input.select();
-                }
-            }
-
-            function cancelPhoneEdit(event, rowId) {
-                if (event) event.stopPropagation();
-                const displayEl = document.getElementById(`phone-display-${rowId}`);
-                const editEl = document.getElementById(`phone-edit-${rowId}`);
-                if (!displayEl || !editEl) return;
-                editEl.style.display = 'none';
-                displayEl.style.display = 'inline-flex';
-            }
-
-            function confirmPhoneEdit(event, rowId, roNumber) {
-                if (event) event.stopPropagation();
-                const input = document.getElementById(`phone-input-${rowId}`);
-                const displayValue = document.getElementById(`phone-current-${rowId}`);
-                const oldValue = document.getElementById(`phone-old-value-${rowId}`);
-                if (!input || !displayValue || !oldValue) return;
-
-                const newPhone = (input.value || '').trim();
-                if (!newPhone) {
-                    alert('Please enter a phone number.');
-                    return;
-                }
-
-                fetch('/api/ro-phone', {
+            async function saveRoContactPayload(roNumber, payload) {
+                const response = await fetch('/api/ro-phone', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     credentials: 'include',
-                    body: JSON.stringify({ ro: roNumber, phone: newPhone })
-                })
-                .then(r => r.json())
-                .then(res => {
-                    if (res.error) {
-                        throw new Error(res.error);
-                    }
-                    displayValue.textContent = res.phone || newPhone;
-                    oldValue.textContent = res.phone_original || oldValue.textContent;
-                    cancelPhoneEdit(event, rowId);
-                })
-                .catch(err => {
-                    console.error('Error updating phone:', err);
-                    alert('Error updating phone.');
+                    body: JSON.stringify({ ro: roNumber, ...payload })
                 });
+                const result = await response.json();
+                if (!response.ok || result.error) {
+                    throw new Error(result.error || 'Error saving contact details');
+                }
+                return result;
+            }
+
+            function normalizePhoneList(phoneValues) {
+                const values = Array.isArray(phoneValues) ? phoneValues : [];
+                const seen = new Set();
+                const normalized = [];
+                values.forEach((value) => {
+                    const cleaned = cleanPhoneNumber(value);
+                    if (!cleaned || cleaned === '-' || seen.has(cleaned)) {
+                        return;
+                    }
+                    seen.add(cleaned);
+                    normalized.push(cleaned);
+                });
+                return normalized;
+            }
+
+            function renderAdditionalPhones(rowId, additionalPhones) {
+                const container = document.getElementById(`phone-additional-${rowId}`);
+                if (!container) return;
+                const values = normalizePhoneList(additionalPhones);
+                if (values.length === 0) {
+                    container.innerHTML = '';
+                    return;
+                }
+                container.innerHTML = values
+                    .map((phone) => `<div style="font-size:12px; color:#666;">${escapeHtml(phone)}</div>`)
+                    .join('');
+            }
+
+            function updateRoContactInMemory(roNumber, phoneValues, emailValue) {
+                if (!dashboardData || !Array.isArray(dashboardData.roList)) return;
+                const normalizedPhones = normalizePhoneList(phoneValues);
+                dashboardData.roList = dashboardData.roList.map((row) => {
+                    if (!row || String(row.ro) !== String(roNumber)) {
+                        return row;
+                    }
+                    const nextRow = { ...row };
+                    if (normalizedPhones.length > 0) {
+                        nextRow.phone_numbers = normalizedPhones;
+                        nextRow.phone = normalizedPhones[0];
+                        nextRow.phone_original = normalizedPhones[0];
+                    }
+                    if (typeof emailValue === 'string') {
+                        nextRow.email = emailValue;
+                    }
+                    return nextRow;
+                });
+            }
+
+            async function handlePrimaryPhoneEnter(event, rowId, roNumber) {
+                if (!event || event.key !== 'Enter') return;
+                event.preventDefault();
+                event.stopPropagation();
+
+                const input = document.getElementById(`phone-primary-input-${rowId}`);
+                if (!input) return;
+
+                const enteredPhone = (input.value || '').trim();
+                if (!enteredPhone) {
+                    return;
+                }
+
+                input.disabled = true;
+                try {
+                    const result = await saveRoContactPayload(roNumber, {
+                        action: 'replace_primary',
+                        phone: enteredPhone,
+                    });
+                    const updatedPhones = normalizePhoneList(result.phone_numbers);
+                    const primaryPhone = updatedPhones[0] || cleanPhoneNumber(result.phone || enteredPhone);
+                    input.value = primaryPhone === '-' ? '' : primaryPhone;
+                    renderAdditionalPhones(rowId, updatedPhones.slice(1));
+                    updateRoContactInMemory(roNumber, updatedPhones, result.email);
+                    refreshRoSlideDownHeight(roNumber, 'customer-contact');
+                } catch (error) {
+                    console.error('Error updating phone:', error);
+                    alert('Error updating phone.');
+                } finally {
+                    input.disabled = false;
+                }
+            }
+
+            function showAddPhoneInput(event, rowId) {
+                if (event) {
+                    event.stopPropagation();
+                    event.preventDefault();
+                }
+                const wrapper = document.getElementById(`phone-add-input-wrap-${rowId}`);
+                const input = document.getElementById(`phone-add-input-${rowId}`);
+                if (!wrapper || !input) return;
+                wrapper.style.display = 'block';
+                input.value = '';
+                input.focus();
+                input.select();
+            }
+
+            async function handleAdditionalPhoneEnter(event, rowId, roNumber) {
+                if (!event || event.key !== 'Enter') return;
+                event.preventDefault();
+                event.stopPropagation();
+
+                const input = document.getElementById(`phone-add-input-${rowId}`);
+                const wrapper = document.getElementById(`phone-add-input-wrap-${rowId}`);
+                if (!input || !wrapper) return;
+
+                const enteredPhone = (input.value || '').trim();
+                if (!enteredPhone) {
+                    return;
+                }
+
+                input.disabled = true;
+                try {
+                    const result = await saveRoContactPayload(roNumber, {
+                        action: 'add_phone',
+                        phone: enteredPhone,
+                    });
+                    const updatedPhones = normalizePhoneList(result.phone_numbers);
+                    renderAdditionalPhones(rowId, updatedPhones.slice(1));
+                    updateRoContactInMemory(roNumber, updatedPhones, result.email);
+                    wrapper.style.display = 'none';
+                    input.value = '';
+                    refreshRoSlideDownHeight(roNumber, 'customer-contact');
+                } catch (error) {
+                    console.error('Error adding phone:', error);
+                    alert('Error saving additional phone.');
+                } finally {
+                    input.disabled = false;
+                }
+            }
+
+            async function handleEmailEnter(event, rowId, roNumber) {
+                if (!event || event.key !== 'Enter') return;
+                event.preventDefault();
+                event.stopPropagation();
+
+                const input = document.getElementById(`email-input-${rowId}`);
+                if (!input) return;
+
+                const enteredEmail = (input.value || '').trim();
+                input.disabled = true;
+                try {
+                    const result = await saveRoContactPayload(roNumber, {
+                        action: 'set_email',
+                        email: enteredEmail,
+                    });
+                    input.value = result.email || '';
+                    updateRoContactInMemory(roNumber, result.phone_numbers, result.email || '');
+                    refreshRoSlideDownHeight(roNumber, 'customer-contact');
+                } catch (error) {
+                    console.error('Error updating email:', error);
+                    alert('Error updating email.');
+                } finally {
+                    input.disabled = false;
+                }
             }
 
             // Clean phone number to display only digits
@@ -2545,7 +2650,13 @@ def get_dashboard_screen_html():
                     const phaseDisplay = formatPhaseDisplay(ro.phase);
                     const phaseSelectOptions = getPhaseDropdownOptions(ro.phase);
                     const vinDisplay = ro.vin || '-';
-                    const phoneOriginal = cleanPhoneNumber(ro.phone_original) || phoneDisplay || '-';
+                    const phoneNumbers = normalizePhoneList(ro.phone_numbers);
+                    if (phoneNumbers.length === 0 && phoneDisplay && phoneDisplay !== '-') {
+                        phoneNumbers.push(phoneDisplay);
+                    }
+                    const primaryPhoneDisplay = phoneNumbers[0] || '-';
+                    const additionalPhoneDisplays = phoneNumbers.slice(1);
+                    const emailDisplay = (ro.email || '').trim();
                     const inIso = ro.in_date || '';
                     const ecdIso = ro.ecd_date || computeEcdIso(inIso, Number(ro.hours || 0));
                     const inDisplay = formatShortDate(inIso);
@@ -2674,20 +2785,24 @@ def get_dashboard_screen_html():
                         <tr id="customer-contact-row-${rowId}" style="display:none; background:${rowBg};">
                             <td colspan="10" style="padding:0 16px 10px 16px; border-bottom:1px solid #eee;">
                                 <div class="ro-slide-panel" style="max-height:0; overflow:hidden; opacity:0; transition:max-height 0.22s ease, opacity 0.22s ease;">
-                                    <div style="background:#fafafa; border:1px solid #ddd; border-radius:6px; padding:10px 12px; display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
-                                        <span style="font-weight:bold; color:#555;">Phone:</span>
-                                        <span id="phone-display-${rowId}" style="display:inline-flex; align-items:center; gap:6px;">
-                                            <button type="button" onclick="startPhoneEdit(event, '${rowId}')" style="background:none; border:none; color:#0066cc; text-decoration:underline; cursor:pointer; padding:0; font:inherit;">
-                                                <span id="phone-current-${rowId}">${phoneDisplay}</span>
-                                            </button>
-                                            <button type="button" onclick="toggleOldPhone(event, '${rowId}')" style="background:#eee; border:1px solid #ccc; border-radius:3px; padding:0 6px; font-size:12px; cursor:pointer;">+</button>
-                                            <span id="phone-old-${rowId}" style="display:none; font-size:12px; color:#777;">Old: <span id="phone-old-value-${rowId}">${phoneOriginal}</span></span>
-                                        </span>
-                                        <span id="phone-edit-${rowId}" style="display:none; align-items:center; gap:6px;">
-                                            <input id="phone-input-${rowId}" value="${phoneDisplay === '-' ? '' : phoneDisplay}" style="padding:4px 6px; width:140px;" />
-                                            <button type="button" onclick="confirmPhoneEdit(event, '${rowId}', '${ro.ro}')" style="padding:4px 8px; font-size:12px; background:#4CAF50; color:#fff; border:none; border-radius:4px; cursor:pointer;">Confirm</button>
-                                            <button type="button" onclick="cancelPhoneEdit(event, '${rowId}')" style="padding:4px 8px; font-size:12px; background:#999; color:#fff; border:none; border-radius:4px; cursor:pointer;">Cancel</button>
-                                        </span>
+                                    <div style="background:#fafafa; border:1px solid #ddd; border-radius:6px; padding:10px 12px; display:flex; align-items:flex-start; gap:16px; flex-wrap:wrap;">
+                                        <div style="display:flex; flex-direction:column; gap:6px;">
+                                            <div style="display:flex; align-items:center; gap:8px;">
+                                                <span style="font-weight:bold; color:#555;">Phone:</span>
+                                                <input id="phone-primary-input-${rowId}" value="${primaryPhoneDisplay === '-' ? '' : primaryPhoneDisplay}" onkeydown="handlePrimaryPhoneEnter(event, '${rowId}', '${ro.ro}')" style="padding:4px 6px; width:150px;" />
+                                                <button type="button" onclick="showAddPhoneInput(event, '${rowId}')" style="background:#d32f2f; border:1px solid #b71c1c; color:#fff; border-radius:3px; padding:0 8px; font-size:13px; cursor:pointer;">+</button>
+                                            </div>
+                                            <div id="phone-additional-${rowId}" style="display:flex; flex-direction:column; gap:3px; margin-left:56px;">
+                                                ${additionalPhoneDisplays.map(phone => `<div style="font-size:12px; color:#666;">${escapeHtml(phone)}</div>`).join('')}
+                                            </div>
+                                            <div id="phone-add-input-wrap-${rowId}" style="display:none; margin-left:56px;">
+                                                <input id="phone-add-input-${rowId}" placeholder="Add phone and press Enter" onkeydown="handleAdditionalPhoneEnter(event, '${rowId}', '${ro.ro}')" style="padding:4px 6px; width:190px;" />
+                                            </div>
+                                        </div>
+                                        <div style="display:flex; align-items:center; gap:8px; margin-left:auto;">
+                                            <span style="font-weight:bold; color:#555;">Email:</span>
+                                            <input id="email-input-${rowId}" value="${escapeHtml(emailDisplay)}" placeholder="Enter email and press Enter" onkeydown="handleEmailEnter(event, '${rowId}', '${ro.ro}')" style="padding:4px 6px; width:220px;" />
+                                        </div>
                                     </div>
                                 </div>
                             </td>
