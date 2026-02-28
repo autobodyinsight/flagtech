@@ -7,7 +7,6 @@ from .flagout import get_flagtech_screen_html
 from .parts import get_parts_screen_html, get_parts_script
 from .dashboard import get_dashboard_screen_html
 from .techs import get_techs_screen_html
-from .users import get_users_screen_html
 from .phase import get_phase_screen_html
 from .payments import get_payments_screen_html
 from .archive import get_archive_screen_html
@@ -30,9 +29,7 @@ router = APIRouter()
 @router.get("/", response_class=HTMLResponse)
 async def home_screen(request: Request):
     """Main UI screen with sidebar navigation."""
-    users_nav_html = '<div class="nav-tab" onclick="switchScreen(\'users\')">USERS</div>'
-    users_screen_html = get_users_screen_html()
-    
+
     return f"""
 <!DOCTYPE html>
 <html>
@@ -232,7 +229,6 @@ async def home_screen(request: Request):
         <div class="nav-tab" onclick="switchScreen('upload')">UPLOAD</div>
         <div class="nav-tab" onclick="switchScreen('payments')">PAYMENTS</div>
         <div class="nav-tab" onclick="switchScreen('tech')">TECHS</div>
-        {users_nav_html}
         <div class="nav-tab" onclick="switchScreen('phase')">ROADMAP</div>
         <div class="nav-tab" onclick="switchScreen('flagtech')">FLAGOUT</div>
         <div class="nav-tab" onclick="switchScreen('parts')">PARTS</div>
@@ -246,7 +242,6 @@ async def home_screen(request: Request):
         {get_estimate_summary_html()}
         {get_payments_screen_html()}
         {get_techs_screen_html()}
-        {users_screen_html}
         {get_phase_screen_html()}
         {get_parts_screen_html()}
         {get_flagtech_screen_html()}
@@ -322,10 +317,6 @@ async def home_screen(request: Request):
 
             if (screenName === 'tech' && typeof loadTechsList === 'function') {{
                 loadTechsList();
-            }}
-
-            if (screenName === 'users' && typeof loadUsersList === 'function') {{
-                loadUsersList();
             }}
 
             if (screenName === 'phase' && typeof loadPhaseData === 'function') {{
