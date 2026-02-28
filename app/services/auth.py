@@ -1,8 +1,12 @@
 import base64
 import hashlib
 import hmac
+import os
 import secrets
 from datetime import datetime, timedelta, timezone
+from email.message import EmailMessage
+import smtplib
+from urllib.parse import quote
 
 from app.services.db import get_conn
 
@@ -11,6 +15,7 @@ PASSWORD_SCHEME = "pbkdf2_sha256"
 PASSWORD_ITERATIONS = 390000
 ARCHITECT_EMAIL = "jorge@autobodyinsight.com"
 ALLOWED_USER_ROLES = ("user", "admin", "manager", "estimator", "tech")
+PASSWORD_RESET_TTL_MINUTES = 30
 
 
 def _utc_now() -> datetime:
@@ -23,6 +28,30 @@ def normalize_email(value: str | None) -> str:
 
 def normalize_domain(value: str | None) -> str:
     return (value or "").strip().lower()
+
+
+def _token_secret() -> str:
+    secret = (os.getenv("APP_SECRET_KEY") or "").strip()
+    if secret:
+        return secret
+    database_url = (os.getenv("DATABASE_URL") or "").strip()
+    if database_url:
+        return database_url
+    raise RuntimeError("APP_SECRET_KEY or DATABASE_URL must be set for token signing")
+
+
+def _b64url_encode(value: bytes) -> str:
+    return base64.urlsafe_b64encode(value).decode("utf-8").rstrip("=")
+
+
+def _b64url_decode(value: str) -> bytes:
+    padding = "=" * ((4 - len(value) % 4) % 4)
+    return base64.urlsafe_b64decode((value + padding).encode("utf-8"))
+
+
+def _password_fingerprint(stored_hash: str) -> str:
+    digest = hashlib.sha256((stored_hash or "").encode("utf-8")).hexdigest()
+    return digest[:16]
 
 
 def _table_columns(table_name: str) -> set[str]:
@@ -158,6 +187,103 @@ def get_user_by_email(email: str) -> dict | None:
     row = cur.fetchone()
     cur.close()
     return row
+
+
+def generate_password_reset_token(user: dict, ttl_minutes: int = PASSWORD_RESET_TTL_MINUTES) -> str:
+    email = normalize_email(user.get("email"))
+    if not email:
+        raise ValueError("User email is required")
+
+    password_hash = str(user.get("password_hash") or "")
+    if not password_hash:
+        raise ValueError("User password hash is required")
+
+    expires_ts = int((_utc_now() + timedelta(minutes=ttl_minutes)).timestamp())
+    nonce = secrets.token_urlsafe(16)
+    fingerprint = _password_fingerprint(password_hash)
+    payload = f"{email}|{expires_ts}|{nonce}|{fingerprint}"
+    signature = hmac.new(
+        _token_secret().encode("utf-8"),
+        payload.encode("utf-8"),
+        hashlib.sha256,
+    ).digest()
+    return f"{_b64url_encode(payload.encode('utf-8'))}.{_b64url_encode(signature)}"
+
+
+def verify_password_reset_token(token: str) -> dict | None:
+    try:
+        payload_b64, signature_b64 = str(token or "").split(".", 1)
+    except ValueError:
+        return None
+
+    try:
+        payload_raw = _b64url_decode(payload_b64)
+        provided_sig = _b64url_decode(signature_b64)
+    except Exception:
+        return None
+
+    expected_sig = hmac.new(
+        _token_secret().encode("utf-8"),
+        payload_raw,
+        hashlib.sha256,
+    ).digest()
+    if not hmac.compare_digest(provided_sig, expected_sig):
+        return None
+
+    try:
+        payload = payload_raw.decode("utf-8")
+        email, expires_text, _nonce, fingerprint = payload.split("|", 3)
+        expires_ts = int(expires_text)
+    except Exception:
+        return None
+
+    if int(_utc_now().timestamp()) > expires_ts:
+        return None
+
+    user = get_user_by_email(email)
+    if not user or not user.get("active"):
+        return None
+    current_fingerprint = _password_fingerprint(str(user.get("password_hash") or ""))
+    if current_fingerprint != fingerprint:
+        return None
+    return user
+
+
+def send_password_reset_email(to_email: str, reset_link: str) -> None:
+    smtp_host = (os.getenv("SMTP_HOST") or "").strip()
+    smtp_port = int((os.getenv("SMTP_PORT") or "587").strip())
+    smtp_user = (os.getenv("SMTP_USER") or "").strip()
+    smtp_password = (os.getenv("SMTP_PASSWORD") or "").strip()
+    smtp_from = (os.getenv("SMTP_FROM") or smtp_user).strip()
+    use_tls = (os.getenv("SMTP_USE_TLS") or "true").strip().lower() not in {"0", "false", "no"}
+
+    if not smtp_host or not smtp_from:
+        raise RuntimeError("SMTP_HOST and SMTP_FROM/SMTP_USER must be configured")
+
+    message = EmailMessage()
+    message["Subject"] = "FlagTech password reset"
+    message["From"] = smtp_from
+    message["To"] = to_email
+    message.set_content(
+        "You requested a password reset for FlagTech.\n\n"
+        f"Use this link to reset your password (valid for {PASSWORD_RESET_TTL_MINUTES} minutes):\n"
+        f"{reset_link}\n\n"
+        "If you did not request this, you can ignore this email."
+    )
+
+    with smtplib.SMTP(smtp_host, smtp_port, timeout=20) as smtp:
+        if use_tls:
+            smtp.starttls()
+        if smtp_user:
+            smtp.login(smtp_user, smtp_password)
+        smtp.send_message(message)
+
+
+def build_password_reset_link(token: str) -> str:
+    base_url = (os.getenv("APP_BASE_URL") or "").strip().rstrip("/")
+    if not base_url:
+        base_url = "http://localhost:8000"
+    return f"{base_url}/auth/reset-password?token={quote(token)}"
 
 
 def create_user(email: str, password: str, role: str = "user") -> dict:
