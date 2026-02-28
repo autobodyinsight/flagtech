@@ -139,39 +139,38 @@ def get_closed_ros_and_summary():
             vehicle="",
             tech="",
             parts="",
-                try:
-                    labor_repairs = json.loads(labor_repairs)
-                except Exception:
-                    labor_repairs = []
-
-            paint_repairs = latest_saved.get("paint_repairs")
-            if isinstance(paint_repairs, str):
-                try:
-                    paint_repairs = json.loads(paint_repairs)
-                except Exception:
-                    paint_repairs = []
-
-            hours = _parse_hours(labor_repairs, paint_repairs)
-            total = _parse_float(latest_saved.get("grand_total"))
-            total_sales += total
-
-            in_date = latest_saved.get("in_date")
-            closed_at = row.get("closed_at")
-            in_date_text = in_date.isoformat() if hasattr(in_date, "isoformat") else (str(in_date) if in_date else "")
-            picked_up_text = closed_at.date().isoformat() if hasattr(closed_at, "date") else (str(closed_at)[:10] if closed_at else "")
-
-            append_closed_ro(
-                ro_number=ro_value,
-                vehicle=vehicle,
-                tech=latest_saved.get("tech") or latest_saved.get("technician") or "",
-                parts=latest_saved.get("parts") or "",
-                insurance=insurance,
-                customer=customer,
-                in_date=in_date_text,
-                picked_up=picked_up_text,
-                hours=hours,
-                total=total,
+            insurance="",
+            customer="",
+            in_date="",
+            picked_up="",
+            hours=0.0,
+            total=0.0,
+        ):
+            ro_key = str(ro_number or "").strip()
+            if not ro_key or ro_key in seen_ros:
+                return
+            nonlocal total_sales
+            parsed_total = _parse_float(total)
+            total_sales += parsed_total
+            closed_ros.append(
+                {
+                    "ro_number": ro_key,
+                    "vehicle": str(vehicle or "").strip(),
+                    "tech": str(tech or "").strip(),
+                    "parts": str(parts or "").strip(),
+                    "insurance": str(insurance or "").strip(),
+                    "customer": str(customer or "").strip(),
+                    "in_date": str(in_date or "").strip(),
+                    "picked_up": str(picked_up or "").strip(),
+                    "hours": _parse_float(hours),
+                    "total": parsed_total,
+                    "status": "closed",
+                    "gp_percent": 0,
+                    "gp_dollar": 0,
+                    "type": "ro",
+                }
             )
+            seen_ros.add(ro_key)
 
         for row in rows:
             ro_value = str(row.get("ro") or "").strip()
