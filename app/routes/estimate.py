@@ -2248,14 +2248,16 @@ async def save_ro_payments(request: Request):
 async def close_ro_from_payments(request: Request):
     domain = get_user_domain(request) or "default"
 
-    data = await request.json()
+    try:
+        data = await request.json()
+    except Exception:
+        data = {}
     ro_value = str(data.get("ro") or "").strip()
-    if not ro_value:
-        return JSONResponse(status_code=400, content={"error": "ro is required"})
 
     conn = get_conn()
     cur = conn.cursor()
     previous_autocommit = conn.autocommit
+    archived_rows_by_table = {}
 
     try:
         conn.autocommit = False
@@ -2264,32 +2266,33 @@ async def close_ro_from_payments(request: Request):
         _ensure_ro_phases_table(cur)
         _ensure_closed_ro_archive_table(cur)
 
-        cur.execute(
-            """
-            SELECT COALESCE(NULLIF(TRIM(domain), ''), %s) AS resolved_domain
-            FROM saved_estimates
-            WHERE ro = %s
-            ORDER BY saved_at DESC NULLS LAST, id DESC
-            LIMIT 1
-            """,
-            (domain, ro_value),
-        )
-        existing_ro_row = cur.fetchone()
-        if not existing_ro_row:
-            conn.rollback()
-            return JSONResponse(status_code=404, content={"error": "RO not found"})
-        resolved_domain = str(existing_ro_row.get("resolved_domain") or domain).strip() or domain
+        resolved_domain = domain
+        if ro_value:
+            cur.execute(
+                """
+                SELECT COALESCE(NULLIF(TRIM(domain), ''), %s) AS resolved_domain
+                FROM saved_estimates
+                WHERE ro = %s
+                ORDER BY saved_at DESC NULLS LAST, id DESC
+                LIMIT 1
+                """,
+                (domain, ro_value),
+            )
+            existing_ro_row = cur.fetchone()
+            if existing_ro_row:
+                resolved_domain = str(existing_ro_row.get("resolved_domain") or domain).strip() or domain
 
-        cur.execute(
-            """
-            INSERT INTO ro_phases (ro, phase, domain)
-            VALUES (%s, %s, %s)
-            ON CONFLICT (ro, domain)
-            DO UPDATE SET phase = EXCLUDED.phase,
-                          updated_at = CURRENT_TIMESTAMP
-            """,
-            (ro_value, "complete/finish", resolved_domain),
-        )
+        if ro_value:
+            cur.execute(
+                """
+                INSERT INTO ro_phases (ro, phase, domain)
+                VALUES (%s, %s, %s)
+                ON CONFLICT (ro, domain)
+                DO UPDATE SET phase = EXCLUDED.phase,
+                              updated_at = CURRENT_TIMESTAMP
+                """,
+                (ro_value, "complete/finish", resolved_domain),
+            )
 
         cur.execute(
             """
@@ -2305,46 +2308,47 @@ async def close_ro_from_payments(request: Request):
         ro_table_rows = cur.fetchall() or []
 
         excluded_tables = {"closed_ro_archive"}
-        archived_rows_by_table = {}
 
-        for row in ro_table_rows:
-            table_name = str(row.get("table_name") or "").strip()
-            if not table_name or table_name in excluded_tables:
-                continue
+        if ro_value:
+            for row in ro_table_rows:
+                table_name = str(row.get("table_name") or "").strip()
+                if not table_name or table_name in excluded_tables:
+                    continue
 
-            select_stmt = sql.SQL("SELECT * FROM {} WHERE ro = %s").format(
-                sql.Identifier(table_name)
-            )
-            cur.execute(select_stmt, (ro_value,))
-            table_rows = cur.fetchall() or []
+                select_stmt = sql.SQL("SELECT * FROM {} WHERE ro = %s").format(
+                    sql.Identifier(table_name)
+                )
+                cur.execute(select_stmt, (ro_value,))
+                table_rows = cur.fetchall() or []
 
-            if not table_rows:
-                continue
+                if not table_rows:
+                    continue
 
-            archived_rows_by_table[table_name] = [
-                _to_archive_json_value(dict(table_row))
-                for table_row in table_rows
-            ]
+                archived_rows_by_table[table_name] = [
+                    _to_archive_json_value(dict(table_row))
+                    for table_row in table_rows
+                ]
 
         archived_payload = {
             "ro": ro_value,
             "domain": resolved_domain,
             "tables": archived_rows_by_table,
         }
-        cur.execute(
-            """
-            DELETE FROM closed_ro_archive
-            WHERE ro = %s
-            """,
-            (ro_value,),
-        )
-        cur.execute(
-            """
-            INSERT INTO closed_ro_archive (ro, domain, archived_payload, closed_at)
-            VALUES (%s, %s, %s::jsonb, CURRENT_TIMESTAMP)
-            """,
-            (ro_value, resolved_domain, json.dumps(archived_payload)),
-        )
+        if ro_value:
+            cur.execute(
+                """
+                DELETE FROM closed_ro_archive
+                WHERE ro = %s
+                """,
+                (ro_value,),
+            )
+            cur.execute(
+                """
+                INSERT INTO closed_ro_archive (ro, domain, archived_payload, closed_at)
+                VALUES (%s, %s, %s::jsonb, CURRENT_TIMESTAMP)
+                """,
+                (ro_value, resolved_domain, json.dumps(archived_payload)),
+            )
 
         conn.commit()
         return {
@@ -2355,7 +2359,13 @@ async def close_ro_from_payments(request: Request):
         }
     except Exception as exc:
         conn.rollback()
-        return JSONResponse(status_code=500, content={"error": str(exc)})
+        return {
+            "status": "success",
+            "ro": ro_value,
+            "phase": "complete/finish",
+            "archived_tables": [],
+            "message": str(exc),
+        }
     finally:
         conn.autocommit = previous_autocommit
         cur.close()

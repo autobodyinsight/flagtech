@@ -704,17 +704,30 @@ def get_dashboard_screen_html():
             function bindCloseRoButton() {
                 const closeButton = roWindowDoc.getElementById('roCloseButton');
                 if (!closeButton) return;
-                closeButton.addEventListener('click', (event) => {
+                closeButton.addEventListener('click', async (event) => {
                     event.stopPropagation();
-                    openRoConfirmPopover();
-                });
+                    closeButton.disabled = true;
+                    try {
+                        await flushHeaderDateInputs();
+                        await popupFetchJson('/api/payments/close-ro', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ ro: ro.ro }),
+                        });
 
-                roWindowDoc.addEventListener('click', (event) => {
-                    const panel = roWindowDoc.getElementById('roCloseConfirmPopover');
-                    if (!panel) return;
-                    const target = event.target;
-                    if (panel.contains(target) || target === closeButton) return;
-                    closeRoConfirmPopover();
+                        if (window.opener && !window.opener.closed) {
+                            if (typeof window.opener.loadDashboardData === 'function') {
+                                window.opener.loadDashboardData();
+                            }
+                            if (typeof window.opener.loadArchiveClosedRos === 'function') {
+                                window.opener.loadArchiveClosedRos();
+                            }
+                        }
+                    } catch (error) {
+                        console.error('Error closing RO:', error);
+                    } finally {
+                        closeButton.disabled = false;
+                    }
                 });
             }
 

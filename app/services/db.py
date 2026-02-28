@@ -154,62 +154,6 @@ def get_closed_ros_and_summary():
         seen_ros = set()
         total_sales = 0.0
 
-        for row in rows:
-            ro_value = str(row.get("ro") or "").strip()
-            if not ro_value or ro_value in seen_ros:
-                continue
-            year = (row.get("year") or "").strip()
-            make = (row.get("make") or "").strip()
-            model = (row.get("model") or "").strip()
-            vehicle = " ".join(part for part in (year, make, model) if part) or (row.get("vehicle") or "")
-
-            owner_info = (row.get("owner_info") or "").strip()
-            customer = _parse_owner_customer(owner_info)
-            insurance = (row.get("insurance_company") or "").strip()
-
-            labor_repairs = row.get("labor_repairs")
-            if isinstance(labor_repairs, str):
-                try:
-                    labor_repairs = json.loads(labor_repairs)
-                except Exception:
-                    labor_repairs = []
-
-            paint_repairs = row.get("paint_repairs")
-            if isinstance(paint_repairs, str):
-                try:
-                    paint_repairs = json.loads(paint_repairs)
-                except Exception:
-                    paint_repairs = []
-
-            hours = _parse_hours(labor_repairs, paint_repairs)
-            total = _parse_float(row.get("grand_total"))
-            total_sales += total
-
-            in_date = row.get("in_date")
-            closed_at = row.get("closed_at")
-            in_date_text = in_date.isoformat() if hasattr(in_date, "isoformat") else (str(in_date) if in_date else "")
-            picked_up_text = closed_at.date().isoformat() if hasattr(closed_at, "date") else (str(closed_at)[:10] if closed_at else "")
-
-            closed_ros.append(
-                {
-                    "ro_number": ro_value,
-                    "vehicle": vehicle,
-                    "tech": "",
-                    "parts": "",
-                    "insurance": insurance,
-                    "customer": customer,
-                    "in_date": in_date_text,
-                    "picked_up": picked_up_text,
-                    "hours": hours,
-                    "total": total,
-                    "status": "closed",
-                    "gp_percent": 0,
-                    "gp_dollar": 0,
-                    "type": "ro",
-                }
-            )
-            seen_ros.add(ro_value)
-
         for row in archived_rows:
             ro_value = str(row.get("ro") or "").strip()
             if not ro_value or ro_value in seen_ros:
@@ -258,6 +202,62 @@ def get_closed_ros_and_summary():
             total_sales += total
 
             in_date = latest_saved.get("in_date")
+            closed_at = row.get("closed_at")
+            in_date_text = in_date.isoformat() if hasattr(in_date, "isoformat") else (str(in_date) if in_date else "")
+            picked_up_text = closed_at.date().isoformat() if hasattr(closed_at, "date") else (str(closed_at)[:10] if closed_at else "")
+
+            closed_ros.append(
+                {
+                    "ro_number": ro_value,
+                    "vehicle": vehicle,
+                    "tech": "",
+                    "parts": "",
+                    "insurance": insurance,
+                    "customer": customer,
+                    "in_date": in_date_text,
+                    "picked_up": picked_up_text,
+                    "hours": hours,
+                    "total": total,
+                    "status": "closed",
+                    "gp_percent": 0,
+                    "gp_dollar": 0,
+                    "type": "ro",
+                }
+            )
+            seen_ros.add(ro_value)
+
+        for row in rows:
+            ro_value = str(row.get("ro") or "").strip()
+            if not ro_value or ro_value in seen_ros:
+                continue
+            year = (row.get("year") or "").strip()
+            make = (row.get("make") or "").strip()
+            model = (row.get("model") or "").strip()
+            vehicle = " ".join(part for part in (year, make, model) if part) or (row.get("vehicle") or "")
+
+            owner_info = (row.get("owner_info") or "").strip()
+            customer = _parse_owner_customer(owner_info)
+            insurance = (row.get("insurance_company") or "").strip()
+
+            labor_repairs = row.get("labor_repairs")
+            if isinstance(labor_repairs, str):
+                try:
+                    labor_repairs = json.loads(labor_repairs)
+                except Exception:
+                    labor_repairs = []
+
+            paint_repairs = row.get("paint_repairs")
+            if isinstance(paint_repairs, str):
+                try:
+                    paint_repairs = json.loads(paint_repairs)
+                except Exception:
+                    paint_repairs = []
+
+            hours = _parse_hours(labor_repairs, paint_repairs)
+            total = _parse_float(row.get("grand_total"))
+            total_sales += total
+
+            in_date = row.get("in_date")
             closed_at = row.get("closed_at")
             in_date_text = in_date.isoformat() if hasattr(in_date, "isoformat") else (str(in_date) if in_date else "")
             picked_up_text = closed_at.date().isoformat() if hasattr(closed_at, "date") else (str(closed_at)[:10] if closed_at else "")
