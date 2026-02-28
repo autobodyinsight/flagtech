@@ -93,6 +93,7 @@ def _is_architect(session_email: str, session_access_level: str) -> bool:
 async def list_users(request: Request):
     domain, session_email, session_access_level = _session_context(request)
     is_architect = _is_architect(session_email, session_access_level)
+    can_manage_users = True
 
     ensure_auth_tables()
     conn = get_conn()
@@ -117,7 +118,7 @@ async def list_users(request: Request):
                 ORDER BY domain ASC, email ASC
                 """
             )
-    elif session_access_level == "manager":
+    elif can_manage_users:
         cur.execute(
             """
             SELECT id, email, first_name, last_name, domain, company_name, access_level, active, created_at, last_login
@@ -143,7 +144,7 @@ async def list_users(request: Request):
         "users": rows,
         "domain": domain,
         "my_access_level": session_access_level,
-        "can_manage_users": session_access_level == "manager" or is_architect,
+        "can_manage_users": can_manage_users,
         "is_architect": is_architect,
         "architect_email": ARCHITECT_EMAIL,
     }
