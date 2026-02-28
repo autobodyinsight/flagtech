@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Form, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
+import os
 
 from app.services.auth import (
     SESSION_COOKIE_NAME,
@@ -11,6 +12,16 @@ from app.services.auth import (
 )
 
 router = APIRouter()
+
+
+def _env_flag(name: str, default: bool) -> bool:
+    value = os.getenv(name)
+    if value is None:
+        return default
+    return value.strip().lower() in {"1", "true", "yes", "on"}
+
+
+DISABLE_LOGIN_SCREEN = _env_flag("FLAGTECH_DISABLE_LOGIN_SCREEN", True)
 
 
 def _render_login_page(error: str = "", info: str = "") -> str:
@@ -179,6 +190,9 @@ def _render_login_page(error: str = "", info: str = "") -> str:
 
 @router.get("/auth/login", response_class=HTMLResponse)
 async def login_page(request: Request):
+    if DISABLE_LOGIN_SCREEN:
+        return RedirectResponse(url="/ui/", status_code=303)
+
     token = request.cookies.get(SESSION_COOKIE_NAME)
     session = get_session_by_token(token) if token else None
     if session:
@@ -196,6 +210,9 @@ async def login_page(request: Request):
 
 @router.post("/auth/login", response_class=HTMLResponse)
 async def login_submit(email: str = Form(...), password: str = Form(...)):
+    if DISABLE_LOGIN_SCREEN:
+        return RedirectResponse(url="/ui/", status_code=303)
+
     normalized_email = (email or "").strip().lower()
     user = get_user_by_email(normalized_email)
 
@@ -230,6 +247,12 @@ async def login_submit(email: str = Form(...), password: str = Form(...)):
 
 @router.get("/auth/logout")
 async def logout(request: Request):
+    if DISABLE_LOGIN_SCREEN:
+        response = RedirectResponse(url="/ui/", status_code=303)
+        response.delete_cookie(SESSION_COOKIE_NAME, path="/")
+        response.delete_cookie("user_domain", path="/")
+        return response
+
     token = request.cookies.get(SESSION_COOKIE_NAME)
     delete_session_by_token(token)
     response = RedirectResponse(url="/auth/login?reason=logged_out", status_code=303)

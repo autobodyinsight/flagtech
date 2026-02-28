@@ -3,6 +3,7 @@ from fastapi import Request
 from fastapi.responses import RedirectResponse
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
+import os
 
 # Routers
 from app.routes.estimate import router as estimate_router
@@ -16,6 +17,16 @@ from app.services.auth import SESSION_COOKIE_NAME, get_session_by_token
 
 
 app = FastAPI(title="FlagTech Estimate Parser")
+
+
+def _env_flag(name: str, default: bool) -> bool:
+    value = os.getenv(name)
+    if value is None:
+        return default
+    return value.strip().lower() in {"1", "true", "yes", "on"}
+
+
+DISABLE_LOGIN_SCREEN = _env_flag("FLAGTECH_DISABLE_LOGIN_SCREEN", True)
 
 # ---------------------------------------------------------
 # CORS CONFIGURATION
@@ -68,6 +79,15 @@ async def auth_middleware(request: Request, call_next):
     token = request.cookies.get(SESSION_COOKIE_NAME)
     session = get_session_by_token(token) if token else None
     if not session:
+        if DISABLE_LOGIN_SCREEN:
+            request.state.user = {
+                "email": "guest@flagtech.local",
+                "domain": "default",
+                "company_name": "Default Shop",
+                "access_level": "architect",
+            }
+            return await call_next(request)
+
         if path.startswith("/api"):
             return JSONResponse({"detail": "Authentication required"}, status_code=401)
         return RedirectResponse(url="/auth/login?reason=auth_required", status_code=303)
