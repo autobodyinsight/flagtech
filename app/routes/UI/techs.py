@@ -37,26 +37,9 @@ def get_techs_screen_html():
                 <h3 style="margin-bottom:14px;">Manage Techs</h3>
 
                 <div style="border:1px solid #ddd; border-radius:6px; padding:12px; background:#fff; margin-bottom:14px;">
-                    <div style="font-weight:bold; margin-bottom:10px;">Add New Tech</div>
-                    <div style="display:grid; grid-template-columns:1.7fr 1fr 1fr auto; gap:8px; align-items:end;">
-                        <div>
-                            <label for="manageNewTechName" style="display:block; margin-bottom:4px;">Name</label>
-                            <input id="manageNewTechName" type="text" placeholder="First Last" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:4px;" />
-                        </div>
-                        <div>
-                            <label for="manageNewTechRole" style="display:block; margin-bottom:4px;">Role</label>
-                            <select id="manageNewTechRole" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:4px;">
-                                <option value="Body">Body</option>
-                                <option value="Frame">Frame</option>
-                                <option value="Mech">Mech</option>
-                                <option value="Paint">Paint</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label for="manageNewTechRate" style="display:block; margin-bottom:4px;">Pay Rate</label>
-                            <input id="manageNewTechRate" type="number" step="0.01" min="0" placeholder="0.00" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:4px; text-align:right;" />
-                        </div>
-                        <button onclick="queueManageTechAdd()" style="padding:10px 14px; background:#b22222; color:#fff; border:none; border-radius:4px; cursor:pointer; font-weight:bold;">ADD</button>
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+                        <div style="font-weight:bold;">Add New Tech</div>
+                        <button onclick="appendManageTechDraftRow()" style="padding:8px 14px; background:#b22222; color:#fff; border:none; border-radius:4px; cursor:pointer; font-weight:bold;">Add Tech</button>
                     </div>
                     <div id="managePendingAdds" style="margin-top:10px;"></div>
                 </div>
@@ -893,44 +876,58 @@ def get_techs_screen_html():
             const container = document.getElementById('managePendingAdds');
             if (!container) return;
             if (!manageQueuedAdds.length) {
-                container.innerHTML = '<div style="font-size:12px; color:#777;">No queued additions.</div>';
+                container.innerHTML = '<div style="font-size:12px; color:#777;">Click Add Tech to append a new row.</div>';
                 return;
             }
-            container.innerHTML = manageQueuedAdds.map((item, idx) => `
-                <div style="display:flex; justify-content:space-between; align-items:center; border:1px solid #eee; border-radius:4px; padding:6px 8px; margin-top:6px; background:#fafafa;">
-                    <div>${escapeHtml(item.name)} — ${escapeHtml(item.role)} — ${formatCurrency(item.pay_rate)}/hr</div>
-                    <button type="button" onclick="removeQueuedTechAdd(${idx})" style="background:none; border:none; color:#b22222; cursor:pointer; font-weight:bold;">Remove</button>
+            container.innerHTML = `
+                <div style="display:grid; grid-template-columns:1.7fr 1fr 1fr auto; gap:8px; padding:6px 4px; border-bottom:1px solid #eee; font-weight:bold; color:#555;">
+                    <div>Name</div>
+                    <div style="text-align:center;">Role</div>
+                    <div style="text-align:center;">Pay Rate</div>
+                    <div style="text-align:center;">Remove</div>
                 </div>
-            `).join('');
+                ${manageQueuedAdds.map((item, idx) => `
+                    <div class="manage-add-row" data-add-index="${idx}" style="display:grid; grid-template-columns:1.7fr 1fr 1fr auto; gap:8px; align-items:center; border:1px solid #eee; border-radius:4px; padding:8px; margin-top:8px; background:#fafafa;">
+                        <div>
+                            <input class="manage-add-name" type="text" value="${escapeHtml(item.name || '')}" placeholder="First Last" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:4px;" />
+                        </div>
+                        <div>
+                            <select class="manage-add-role" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:4px;">
+                                <option value="Body" ${(item.role || 'Body') === 'Body' ? 'selected' : ''}>Body</option>
+                                <option value="Frame" ${(item.role || '') === 'Frame' ? 'selected' : ''}>Frame</option>
+                                <option value="Mech" ${(item.role || '') === 'Mech' ? 'selected' : ''}>Mech</option>
+                                <option value="Paint" ${(item.role || '') === 'Paint' ? 'selected' : ''}>Paint</option>
+                            </select>
+                        </div>
+                        <div>
+                            <input class="manage-add-rate" type="number" min="0" step="0.01" value="${Number(item.pay_rate || 0) > 0 ? Number(item.pay_rate).toFixed(2) : ''}" placeholder="0.00" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:4px; text-align:right;" />
+                        </div>
+                        <div style="text-align:center;">
+                            <button type="button" onclick="removeQueuedTechAdd(${idx})" style="background:none; border:none; color:#b22222; cursor:pointer; font-weight:bold;">Remove</button>
+                        </div>
+                    </div>
+                `).join('')}
+            `;
         }
 
-        function queueManageTechAdd() {
-            const nameInput = document.getElementById('manageNewTechName');
-            const roleInput = document.getElementById('manageNewTechRole');
-            const rateInput = document.getElementById('manageNewTechRate');
-            if (!nameInput || !roleInput || !rateInput) return;
+        function collectQueuedDraftRows() {
+            const rows = Array.from(document.querySelectorAll('.manage-add-row'));
+            if (!rows.length) return [...manageQueuedAdds];
+            return rows.map((row) => ({
+                name: (row.querySelector('.manage-add-name')?.value || '').trim(),
+                role: (row.querySelector('.manage-add-role')?.value || 'Body').trim() || 'Body',
+                pay_rate: parseFloat(row.querySelector('.manage-add-rate')?.value || '0'),
+            }));
+        }
 
-            const name = (nameInput.value || '').trim();
-            const role = (roleInput.value || '').trim();
-            const pay_rate = parseFloat(rateInput.value || '0');
-            if (!name || !role || !Number.isFinite(pay_rate) || pay_rate <= 0) {
-                alert('Enter a valid name, role, and pay rate.');
-                return;
-            }
-
-            if (!splitNameParts(name)) {
-                alert('Name must include first and last name.');
-                return;
-            }
-
-            manageQueuedAdds.push({ name, role, pay_rate });
-            nameInput.value = '';
-            rateInput.value = '';
-            roleInput.value = 'Body';
+        function appendManageTechDraftRow() {
+            manageQueuedAdds = collectQueuedDraftRows();
+            manageQueuedAdds.push({ name: '', role: 'Body', pay_rate: 0 });
             renderManageQueuedAdds();
         }
 
         function removeQueuedTechAdd(index) {
+            manageQueuedAdds = collectQueuedDraftRows();
             manageQueuedAdds = manageQueuedAdds.filter((_, idx) => idx !== index);
             renderManageQueuedAdds();
         }
@@ -968,53 +965,41 @@ def get_techs_screen_html():
         }
 
         async function saveAllManageTechChanges() {
-            const errors = [];
-            let addedCount = 0;
             try {
-                const pendingToProcess = [...manageQueuedAdds];
-                const stillPending = [];
+                manageQueuedAdds = collectQueuedDraftRows();
 
-                for (const pending of pendingToProcess) {
-                    const nameParts = splitNameParts(pending.name);
-                    if (!nameParts) {
-                        errors.push(`Invalid queued name: ${pending.name}`);
-                        stillPending.push(pending);
+                for (const pending of manageQueuedAdds) {
+                    const pendingName = (pending.name || '').trim();
+                    const pendingRole = (pending.role || '').trim() || 'Body';
+                    const pendingRate = parseFloat(pending.pay_rate || '0');
+
+                    if (!pendingName && (!Number.isFinite(pendingRate) || pendingRate <= 0)) {
                         continue;
                     }
 
-                    try {
-                        const addRes = await fetch('/api/techs/add', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            credentials: 'include',
-                            body: JSON.stringify({
-                                first_name: nameParts.first_name,
-                                last_name: nameParts.last_name,
-                                role: pending.role,
-                                pay_rate: pending.pay_rate
-                            })
-                        });
-                        const addData = await addRes.json();
-                        if (!addRes.ok || addData.error) {
-                            throw new Error(addData.error || 'Unable to add technician');
-                        }
-                        addedCount += 1;
-                    } catch (addErr) {
-                        const reason = addErr?.message || 'Unable to add technician';
-                        errors.push(`${pending.name}: ${reason}`);
-                        stillPending.push(pending);
+                    if (!pendingName || !pendingRole || !Number.isFinite(pendingRate) || pendingRate <= 0) {
+                        throw new Error('Each new tech row must include valid Name, Role, and Pay Rate, or be left fully blank.');
                     }
-                }
 
-                manageQueuedAdds = stillPending;
-                renderManageQueuedAdds();
-
-                if (addedCount > 0) {
-                    await new Promise((resolve) => {
-                        loadTechsList();
-                        setTimeout(resolve, 180);
+                    const nameParts = splitNameParts(pending.name);
+                    if (!nameParts) {
+                        throw new Error(`Invalid queued name: ${pending.name}`);
+                    }
+                    const addRes = await fetch('/api/techs/add', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        credentials: 'include',
+                        body: JSON.stringify({
+                            first_name: nameParts.first_name,
+                            last_name: nameParts.last_name,
+                            role: pendingRole,
+                            pay_rate: pendingRate
+                        })
                     });
-                    renderManageTechsList();
+                    const addData = await addRes.json();
+                    if (addData.error) {
+                        throw new Error(addData.error);
+                    }
                 }
 
                 const rows = Array.from(document.querySelectorAll('.manage-tech-row'));
@@ -1039,12 +1024,10 @@ def get_techs_screen_html():
                     const originalRate = parseFloat(row.getAttribute('data-original-rate') || '0');
 
                     if (!currentName) {
-                        errors.push('Name cannot be blank.');
-                        continue;
+                        throw new Error('Name cannot be blank.');
                     }
                     if (!Number.isFinite(currentRate) || currentRate <= 0) {
-                        errors.push(`Pay rate must be greater than zero for ${currentName}.`);
-                        continue;
+                        throw new Error('Pay rate must be greater than zero.');
                     }
 
                     const changed = currentName !== originalName || currentRole !== originalRole || Math.abs(currentRate - originalRate) > 0.0001;
@@ -1052,58 +1035,42 @@ def get_techs_screen_html():
 
                     const parts = splitNameParts(currentName);
                     if (!parts) {
-                        errors.push(`Name must include first and last name: ${currentName}`);
-                        continue;
+                        throw new Error(`Name must include first and last name: ${currentName}`);
                     }
 
-                    try {
-                        const updateRes = await fetch('/api/techs/update', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            credentials: 'include',
-                            body: JSON.stringify({
-                                id: techId,
-                                first_name: parts.first_name,
-                                last_name: parts.last_name,
-                                role: currentRole,
-                                pay_rate: currentRate
-                            })
-                        });
-                        const updateData = await updateRes.json();
-                        if (!updateRes.ok || updateData.error) {
-                            throw new Error(updateData.error || 'Unable to update technician');
-                        }
-                    } catch (updateErr) {
-                        errors.push(updateErr?.message || `Unable to update ${currentName}.`);
+                    const updateRes = await fetch('/api/techs/update', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        credentials: 'include',
+                        body: JSON.stringify({
+                            id: techId,
+                            first_name: parts.first_name,
+                            last_name: parts.last_name,
+                            role: currentRole,
+                            pay_rate: currentRate
+                        })
+                    });
+                    const updateData = await updateRes.json();
+                    if (updateData.error) {
+                        throw new Error(updateData.error);
                     }
                 }
 
                 if (archiveIds.length) {
-                    try {
-                        const archiveRes = await fetch('/api/techs/archive', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            credentials: 'include',
-                            body: JSON.stringify({ ids: archiveIds })
-                        });
-                        const archiveData = await archiveRes.json();
-                        if (!archiveRes.ok || archiveData.error) {
-                            throw new Error(archiveData.error || 'Unable to archive technicians');
-                        }
-                    } catch (archiveErr) {
-                        errors.push(archiveErr?.message || 'Unable to archive technicians.');
+                    const archiveRes = await fetch('/api/techs/archive', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        credentials: 'include',
+                        body: JSON.stringify({ ids: archiveIds })
+                    });
+                    const archiveData = await archiveRes.json();
+                    if (archiveData.error) {
+                        throw new Error(archiveData.error);
                     }
                 }
 
+                closeManageTechsModal();
                 loadTechsList();
-                renderManageTechsList();
-
-                if (!errors.length) {
-                    closeManageTechsModal();
-                    return;
-                }
-
-                alert(`Saved with ${errors.length} issue(s):\n- ${errors.join('\n- ')}`);
             } catch (err) {
                 console.error('Error saving manage tech changes:', err);
                 alert(err?.message || 'Error saving tech changes.');
