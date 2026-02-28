@@ -75,6 +75,50 @@ async def api_update_user(user_id: int, request: Request):
     return {"ok": True, "user": updated}
 
 
+@router.patch("/users/{user_id}/role")
+async def api_assign_user_role(user_id: int, request: Request):
+    _require_architect_request(request)
+    payload = await request.json()
+
+    role = str(payload.get("role") or "").strip().lower()
+    if not role:
+        raise HTTPException(status_code=400, detail="Role is required")
+
+    try:
+        updated = update_user(user_id=user_id, role=role)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+    if not updated:
+        raise HTTPException(status_code=404, detail="User not found or no changes applied")
+
+    return {"ok": True, "user": updated}
+
+
+@router.patch("/users/{user_id}/password")
+async def api_reset_user_password(user_id: int, request: Request):
+    _require_architect_request(request)
+    payload = await request.json()
+
+    password = str(payload.get("password") or "")
+    if len(password) < 8:
+        raise HTTPException(status_code=400, detail="Password must be at least 8 characters")
+
+    try:
+        updated = update_user(user_id=user_id, password=password)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+    if not updated:
+        raise HTTPException(status_code=404, detail="User not found or no changes applied")
+
+    return {"ok": True, "user": updated}
+
+
 @router.delete("/users/{user_id}")
 async def api_delete_user(user_id: int, request: Request):
     _require_architect_request(request)

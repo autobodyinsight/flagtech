@@ -35,7 +35,7 @@ def get_users_screen_html():
                     <label for="newUserPassword" style="display:block; margin-bottom:4px;">Password</label>
                     <input id="newUserPassword" type="password" placeholder="minimum 8 chars" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:4px;" />
                 </div>
-                <div style="font-size:12px; color:#666;">Use row actions to update role/email/password later.</div>
+                <div style="font-size:12px; color:#666;">Use row actions below to assign role and reset passwords.</div>
                 <button onclick="createManagedUser()" style="padding:10px 16px; border:none; border-radius:4px; font-weight:bold; cursor:pointer;">Create</button>
             </div>
         </div>
@@ -43,10 +43,10 @@ def get_users_screen_html():
         <div style="background:#fff; border:1px solid #ddd; border-radius:6px; overflow:hidden;">
             <div style="display:flex; background:#3c4142; color:#fff; padding:10px; font-weight:bold;">
                 <div style="flex:1.6;">Email</div>
-                <div style="flex:0.8; text-align:center;">Role</div>
+                <div style="flex:1.1; text-align:center;">Role</div>
                 <div style="flex:1.1; text-align:center;">Created</div>
                 <div style="flex:1.1; text-align:center;">Updated</div>
-                <div style="flex:1.5; text-align:right;">Actions</div>
+                <div style="flex:1.8; text-align:right;">Actions</div>
             </div>
             <div id="usersListContainer"></div>
         </div>
@@ -76,6 +76,14 @@ def get_users_screen_html():
         return date.toLocaleString();
     }
 
+    function usersRoleOptions(selectedRole) {
+        const roles = ['user', 'admin', 'manager', 'estimator', 'tech'];
+        return roles.map((role) => {
+            const selected = String(selectedRole || 'user').toLowerCase() === role ? 'selected' : '';
+            return `<option value="${role}" ${selected}>${role}</option>`;
+        }).join('');
+    }
+
     function logoutCurrentUser() {
         window.location.href = '/auth/logout';
     }
@@ -100,15 +108,21 @@ def get_users_screen_html():
 
             list.innerHTML = users.map((user) => {
                 const id = Number(user.id);
+                const safeEmail = usersEscapeHtml(user.email);
                 return `
                     <div style="display:flex; padding:10px; border-top:1px solid #eee; align-items:center; gap:10px;">
-                        <div style="flex:1.6;">${usersEscapeHtml(user.email)}</div>
-                        <div style="flex:0.8; text-align:center; text-transform:lowercase;">${usersEscapeHtml(user.role || 'user')}</div>
+                        <div style="flex:1.6;">${safeEmail}</div>
+                        <div style="flex:1.1; text-align:center;">
+                            <select id="usersRole_${id}" style="padding:6px; border:1px solid #ccc; border-radius:4px; min-width:120px; text-transform:lowercase;">
+                                ${usersRoleOptions(user.role || 'user')}
+                            </select>
+                        </div>
                         <div style="flex:1.1; text-align:center;">${usersEscapeHtml(formatUsersDate(user.created_at))}</div>
                         <div style="flex:1.1; text-align:center;">${usersEscapeHtml(formatUsersDate(user.updated_at))}</div>
-                        <div style="flex:1.5; text-align:right; display:flex; justify-content:flex-end; gap:6px;">
-                            <button onclick="updateManagedUser(${id}, '${usersEscapeHtml(user.email)}', '${usersEscapeHtml(user.role || 'user')}')" style="padding:6px 8px; border:1px solid #bbb; background:#fff; border-radius:4px; cursor:pointer;">Update</button>
-                            <button onclick="deleteManagedUser(${id}, '${usersEscapeHtml(user.email)}')" style="padding:6px 8px; border:1px solid #bbb; background:#fff; border-radius:4px; cursor:pointer;">Delete</button>
+                        <div style="flex:1.8; text-align:right; display:flex; justify-content:flex-end; gap:6px; flex-wrap:wrap;">
+                            <button onclick="assignManagedRole(${id})" style="padding:6px 8px; border:1px solid #bbb; background:#fff; border-radius:4px; cursor:pointer;">Assign Role</button>
+                            <button onclick="resetManagedPassword(${id}, '${safeEmail}')" style="padding:6px 8px; border:1px solid #bbb; background:#fff; border-radius:4px; cursor:pointer;">Reset Password</button>
+                            <button onclick="deleteManagedUser(${id}, '${safeEmail}')" style="padding:6px 8px; border:1px solid #bbb; background:#fff; border-radius:4px; cursor:pointer;">Delete</button>
                         </div>
                     </div>
                 `;
@@ -156,18 +170,14 @@ def get_users_screen_html():
         }
     }
 
-    async function updateManagedUser(userId, currentEmail, currentRole) {
-        const email = window.prompt('New email (leave blank to keep current):', currentEmail || '');
-        const role = window.prompt('New role (user/admin/manager/estimator/tech):', currentRole || 'user');
-        const password = window.prompt('Optional new password (blank to keep):', '');
+    async function assignManagedRole(userId) {
+        const roleEl = document.getElementById(`usersRole_${userId}`);
+        const role = String(roleEl ? roleEl.value : 'user').trim().toLowerCase();
 
-        const body = {};
-        if (email && String(email).trim()) body.email = String(email).trim().toLowerCase();
-        if (role && String(role).trim()) body.role = String(role).trim().toLowerCase();
-        if (password && String(password).trim()) body.password = String(password);
+        const body = { role };
 
         try {
-            const response = await fetch(`/api/users/${userId}`, {
+            const response = await fetch(`/api/users/${userId}/role`, {
                 method: 'PATCH',
                 credentials: 'include',
                 headers: { 'Content-Type': 'application/json' },
@@ -175,13 +185,41 @@ def get_users_screen_html():
             });
             const payload = await response.json();
             if (!response.ok) {
-                throw new Error(payload.detail || 'Unable to update user');
+                throw new Error(payload.detail || 'Unable to assign role');
             }
 
-            setUsersStatus('User updated.', '#2e7d32');
+            setUsersStatus('Role assigned.', '#2e7d32');
             await loadUsersList();
         } catch (err) {
-            setUsersStatus(err.message || 'Unable to update user', '#b22222');
+            setUsersStatus(err.message || 'Unable to assign role', '#b22222');
+        }
+    }
+
+    async function resetManagedPassword(userId, email) {
+        const password = window.prompt(`New password for ${email}:`, '');
+        if (!password || !String(password).trim()) {
+            setUsersStatus('Password reset cancelled.', '#666');
+            return;
+        }
+
+        const body = { password: String(password) };
+
+        try {
+            const response = await fetch(`/api/users/${userId}/password`, {
+                method: 'PATCH',
+                credentials: 'include',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(body),
+            });
+            const payload = await response.json();
+            if (!response.ok) {
+                throw new Error(payload.detail || 'Unable to reset password');
+            }
+
+            setUsersStatus('Password reset.', '#2e7d32');
+            await loadUsersList();
+        } catch (err) {
+            setUsersStatus(err.message || 'Unable to reset password', '#b22222');
         }
     }
 
