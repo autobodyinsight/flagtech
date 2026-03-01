@@ -4,11 +4,30 @@
 def get_records_screen_html():
     """Return the HTML content for the RECORDS window."""
     return r'''
-    <div id="records" class="screen" style="padding:20px;">
+    <div id="records" class="screen" style="padding:20px; position:relative;">
+        <div id="recordsSidebar" style="position:fixed; left:0; top:76px; height:calc(100vh - 76px); width:64px; background:#23272a; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:38px; z-index:100; box-shadow:2px 0 8px rgba(0,0,0,0.08);">
+            <div style="display:flex; flex-direction:column; align-items:center; gap:38px; width:100%;">
+                <button id="recordsSidebarBtn-ros" class="records-sidebar-btn active" data-view="ros" title="RO's" onclick="recordsSwitchView('ros')" style="background:none; border:none; padding:0; cursor:pointer;">
+                    <svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="6" y="3" width="16" height="22" rx="2" stroke="white" stroke-width="2"/><line x1="9" y1="8" x2="19" y2="8" stroke="white" stroke-width="2"/><rect x="9" y="11" width="4" height="3" rx="0.8" stroke="white" stroke-width="1.8"/><rect x="15" y="11" width="4" height="3" rx="0.8" stroke="white" stroke-width="1.8"/><rect x="9" y="16" width="4" height="3" rx="0.8" stroke="white" stroke-width="1.8"/><rect x="15" y="16" width="4" height="3" rx="0.8" stroke="white" stroke-width="1.8"/><line x1="9" y1="22" x2="19" y2="22" stroke="white" stroke-width="2"/></svg>
+                </button>
+                <button id="recordsSidebarBtn-tech" class="records-sidebar-btn" data-view="tech" title="Tech" onclick="recordsSwitchView('tech')" style="background:none; border:none; padding:0; cursor:pointer;">
+                    <svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="14" cy="9" r="4" stroke="white" stroke-width="2"/><rect x="7" y="17" width="14" height="6" rx="3" stroke="white" stroke-width="2"/><path d="M21 21l2.5 2.5" stroke="white" stroke-width="2" stroke-linecap="round"/><path d="M7 21l-2.5 2.5" stroke="white" stroke-width="2" stroke-linecap="round"/></svg>
+                </button>
+                <button id="recordsSidebarBtn-parts" class="records-sidebar-btn" data-view="parts" title="Parts" onclick="recordsSwitchView('parts')" style="background:none; border:none; padding:0; cursor:pointer;">
+                    <svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="10" cy="23" r="2" stroke="white" stroke-width="2"/><circle cx="20" cy="23" r="2" stroke="white" stroke-width="2"/><rect x="5" y="7" width="18" height="10" rx="2" stroke="white" stroke-width="2"/><path d="M7 7V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v2" stroke="white" stroke-width="2"/></svg>
+                </button>
+                <button id="recordsSidebarBtn-vendors" class="records-sidebar-btn" data-view="vendors" title="Vendors" onclick="recordsSwitchView('vendors')" style="background:none; border:none; padding:0; cursor:pointer;">
+                    <svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="5" y="10" width="18" height="13" rx="1.8" stroke="white" stroke-width="2"/><path d="M4 10h20" stroke="white" stroke-width="2"/><path d="M8 10V6h12v4" stroke="white" stroke-width="2"/><path d="M10 14v9" stroke="white" stroke-width="2"/><path d="M14 14v9" stroke="white" stroke-width="2"/><path d="M18 14v9" stroke="white" stroke-width="2"/></svg>
+                </button>
+            </div>
+        </div>
+
+        <div id="recordsMainPanel" style="margin-left:84px;">
         <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:30px; gap:20px;">
             <h1 style="text-align:center; margin:0; flex:1;">RECORDS</h1>
         </div>
-        <div style="background:#fff; padding:20px; border-radius:8px; box-shadow:0 2px 4px rgba(0,0,0,0.1);">
+
+        <div id="recordsPanel-ros" class="records-content-panel" style="display:block; background:#fff; padding:20px; border-radius:8px; box-shadow:0 2px 4px rgba(0,0,0,0.1);">
             <h3 style="margin:0 0 18px 0; color:#333;">Closed Repair Orders</h3>
             <div style="overflow-x:auto;">
                 <table id="recordsRoListTable" style="width:100%; border-collapse:collapse;">
@@ -30,6 +49,22 @@ def get_records_screen_html():
                 </table>
             </div>
         </div>
+
+        <div id="recordsPanel-tech" class="records-content-panel" style="display:none; background:#fff; padding:20px; border-radius:8px; box-shadow:0 2px 4px rgba(0,0,0,0.1);">
+            <h3 style="margin:0 0 18px 0; color:#333;">Tech</h3>
+            <div style="color:#666;">Tech screen</div>
+        </div>
+
+        <div id="recordsPanel-parts" class="records-content-panel" style="display:none; background:#fff; padding:20px; border-radius:8px; box-shadow:0 2px 4px rgba(0,0,0,0.1);">
+            <h3 style="margin:0 0 18px 0; color:#333;">Parts</h3>
+            <div style="color:#666;">Parts screen</div>
+        </div>
+
+        <div id="recordsPanel-vendors" class="records-content-panel" style="display:none; background:#fff; padding:20px; border-radius:8px; box-shadow:0 2px 4px rgba(0,0,0,0.1);">
+            <h3 style="margin:0 0 18px 0; color:#333;">Vendors</h3>
+            <div style="color:#666;">Vendors screen</div>
+        </div>
+        </div>
         <style>
             .dashboard-header-row th, .dashboard-header-cell {
                 font-family: inherit;
@@ -38,8 +73,45 @@ def get_records_screen_html():
                 background: #23272a;
                 color: #fff;
             }
+            #recordsSidebar svg { display:block; margin:0 auto; }
+            #recordsSidebar .records-sidebar-btn { opacity:0.72; transition:opacity 0.15s ease, transform 0.15s ease; }
+            #recordsSidebar .records-sidebar-btn:hover { opacity:1; transform:translateY(-1px); }
+            #recordsSidebar .records-sidebar-btn.active { opacity:1; }
+            #recordsSidebar { box-shadow:2px 0 8px rgba(0,0,0,0.08); }
+            @media (max-width: 700px) {
+                #recordsSidebar { width:44px; }
+                #recordsSidebar svg { width:22px; height:22px; }
+                #recordsMainPanel { margin-left:64px !important; }
+            }
         </style>
         <script>
+        function recordsSetActiveSidebar(view) {
+            document.querySelectorAll('#recordsSidebar .records-sidebar-btn').forEach((button) => {
+                const btnView = String(button.getAttribute('data-view') || '').toLowerCase();
+                button.classList.toggle('active', btnView === String(view || '').toLowerCase());
+            });
+        }
+
+        function recordsSwitchView(view) {
+            const normalizedView = String(view || 'ros').toLowerCase();
+            document.querySelectorAll('#records .records-content-panel').forEach((panel) => {
+                panel.style.display = 'none';
+            });
+
+            const targetPanel = document.getElementById(`recordsPanel-${normalizedView}`);
+            if (targetPanel) {
+                targetPanel.style.display = 'block';
+            } else {
+                const defaultPanel = document.getElementById('recordsPanel-ros');
+                if (defaultPanel) defaultPanel.style.display = 'block';
+            }
+
+            recordsSetActiveSidebar(normalizedView);
+            if (normalizedView === 'ros') {
+                loadRecordsData();
+            }
+        }
+
         function formatRecordsDate(value) {
             const source = String(value || '').trim();
             if (!source) return '';
@@ -62,6 +134,7 @@ def get_records_screen_html():
         }
 
         async function loadRecordsData() {
+            recordsSetActiveSidebar('ros');
             const body = document.getElementById('recordsRoListBody');
             if (!body) return;
             try {
@@ -91,6 +164,10 @@ def get_records_screen_html():
                 body.innerHTML = `<tr><td colspan='8' style='padding:20px; text-align:center; color:#c00;'>Error loading data</td></tr>`;
             }
         }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            recordsSwitchView('ros');
+        });
         </script>
     </div>
     '''
