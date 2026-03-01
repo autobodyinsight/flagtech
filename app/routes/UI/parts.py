@@ -1093,6 +1093,44 @@ def get_parts_script():
             if (!partsOnOrderReceiveMode) {
                 return;
             }
+            const draft = {
+                checkedKeys: new Set(),
+                partNumbers: {},
+                listValues: {},
+                qtyValues: {},
+                costValues: {},
+            };
+
+            Array.from(document.querySelectorAll('#partsOnOrderBody .parts-onorder-check')).forEach((checkbox) => {
+                const lineId = String(checkbox.getAttribute('data-line-id') || '').trim();
+                const orderId = String(checkbox.getAttribute('data-order-id') || '').trim();
+                if (!lineId || !orderId) return;
+                if (checkbox.checked) {
+                    draft.checkedKeys.add(`${orderId}:${lineId}`);
+                }
+            });
+
+            Array.from(document.querySelectorAll('#partsOnOrderBody .parts-onorder-partnum')).forEach((input) => {
+                const lineId = String(input.getAttribute('data-line-id') || '').trim();
+                if (!lineId) return;
+                draft.partNumbers[lineId] = input.value;
+            });
+            Array.from(document.querySelectorAll('#partsOnOrderBody .parts-onorder-list')).forEach((input) => {
+                const lineId = String(input.getAttribute('data-line-id') || '').trim();
+                if (!lineId) return;
+                draft.listValues[lineId] = input.value;
+            });
+            Array.from(document.querySelectorAll('#partsOnOrderBody .parts-onorder-qty')).forEach((input) => {
+                const lineId = String(input.getAttribute('data-line-id') || '').trim();
+                if (!lineId) return;
+                draft.qtyValues[lineId] = input.value;
+            });
+            Array.from(document.querySelectorAll('#partsOnOrderBody .parts-onorder-cost')).forEach((input) => {
+                const lineId = String(input.getAttribute('data-line-id') || '').trim();
+                if (!lineId) return;
+                draft.costValues[lineId] = input.value;
+            });
+
             partsOnOrderManualLines.push({
                 description: '',
                 qty_received: '1',
@@ -1100,6 +1138,34 @@ def get_parts_script():
                 cost: '',
             });
             partsRenderOnOrderLines();
+
+            Array.from(document.querySelectorAll('#partsOnOrderBody .parts-onorder-check')).forEach((checkbox) => {
+                const lineId = String(checkbox.getAttribute('data-line-id') || '').trim();
+                const orderId = String(checkbox.getAttribute('data-order-id') || '').trim();
+                if (!lineId || !orderId) return;
+                checkbox.checked = draft.checkedKeys.has(`${orderId}:${lineId}`);
+            });
+
+            Array.from(document.querySelectorAll('#partsOnOrderBody .parts-onorder-partnum')).forEach((input) => {
+                const lineId = String(input.getAttribute('data-line-id') || '').trim();
+                if (!lineId || !(lineId in draft.partNumbers)) return;
+                input.value = draft.partNumbers[lineId];
+            });
+            Array.from(document.querySelectorAll('#partsOnOrderBody .parts-onorder-list')).forEach((input) => {
+                const lineId = String(input.getAttribute('data-line-id') || '').trim();
+                if (!lineId || !(lineId in draft.listValues)) return;
+                input.value = draft.listValues[lineId];
+            });
+            Array.from(document.querySelectorAll('#partsOnOrderBody .parts-onorder-qty')).forEach((input) => {
+                const lineId = String(input.getAttribute('data-line-id') || '').trim();
+                if (!lineId || !(lineId in draft.qtyValues)) return;
+                input.value = draft.qtyValues[lineId];
+            });
+            Array.from(document.querySelectorAll('#partsOnOrderBody .parts-onorder-cost')).forEach((input) => {
+                const lineId = String(input.getAttribute('data-line-id') || '').trim();
+                if (!lineId || !(lineId in draft.costValues)) return;
+                input.value = draft.costValues[lineId];
+            });
         }
 
         function partsLoadOnOrderLines() {
