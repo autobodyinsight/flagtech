@@ -869,24 +869,57 @@ def get_dashboard_screen_html():
                         return;
                     }
 
-                    const sections = [];
+                    const sectionsByTech = new Map();
                     for (const target of targets) {
-                        const techId = Number(target.tech_id);
-                        if (!Number.isFinite(techId)) continue;
-                        const details = await popupFetchJson(`/api/tech-assignment-lines?tech_id=${encodeURIComponent(techId)}&ro=${encodeURIComponent(ro.ro)}`);
+                        const techName = String(target.tech_name || target.tech || '').trim();
+                        const repairType = normalizeTypeLabelLocal(target.repair_type || target.type || 'body');
+                        if (!techName) continue;
+
+                        const query = new URLSearchParams({
+                            ro: ro.ro,
+                            mode: 'tech',
+                            repair_type: repairType,
+                            tech_name: techName,
+                        });
+                        const details = await popupFetchJson(`/api/ro-assignment-lines?${query.toString()}`);
                         const lines = Array.isArray(details.lines) ? details.lines : [];
-                        const rowsHtml = lines.map((line) => `
+
+                        if (!sectionsByTech.has(techName)) {
+                            sectionsByTech.set(techName, []);
+                        }
+                        const targetLines = sectionsByTech.get(techName);
+                        lines.forEach((line) => {
+                            targetLines.push({
+                                line_number: line.line_number || line.line_key || '-',
+                                description: line.description || '-',
+                                repair_type: normalizeTypeLabelLocal(line.repair_type || repairType),
+                                hours: popupToNumber(line.hours || 0),
+                            });
+                        });
+                    }
+
+                    const sections = Array.from(sectionsByTech.entries()).map(([techName, techLines]) => {
+                        const sortedLines = [...techLines].sort((a, b) => {
+                            const aNum = popupExtractLineNumber(a.line_number);
+                            const bNum = popupExtractLineNumber(b.line_number);
+                            if (aNum === null && bNum === null) return 0;
+                            if (aNum === null) return 1;
+                            if (bNum === null) return -1;
+                            return aNum - bNum;
+                        });
+
+                        const rowsHtml = sortedLines.map((line) => `
                             <tr>
-                                <td>${escapePopupHtml(line.line || line.line_number || '-')}</td>
+                                <td>${escapePopupHtml(line.line_number || '-')}</td>
                                 <td>${escapePopupHtml(line.description || '-')}</td>
                                 <td>${escapePopupHtml(normalizeTypeLabelLocal(line.repair_type || ''))}</td>
                                 <td class="num">${popupToNumber(line.hours || 0).toFixed(1)}</td>
                             </tr>
                         `).join('');
 
-                        sections.push(`
+                        return `
                             <div style="margin-top:18px;">
-                                <div style="font-size:16px; font-weight:700; margin-bottom:6px;">${escapePopupHtml(target.tech || `Tech #${techId}`)}</div>
+                                <div style="font-size:16px; font-weight:700; margin-bottom:6px;">${escapePopupHtml(techName)}</div>
                                 <table>
                                     <thead>
                                         <tr><th>Line</th><th>Description</th><th>Type</th><th class="num">HRS</th></tr>
@@ -894,8 +927,8 @@ def get_dashboard_screen_html():
                                     <tbody>${rowsHtml || '<tr><td colspan="4" style="text-align:center; color:#777;">No lines assigned.</td></tr>'}</tbody>
                                 </table>
                             </div>
-                        `);
-                    }
+                        `;
+                    });
 
                     roOpenPrintWindow(
                         `RO ${ro.ro} Service Order`,
@@ -1024,21 +1057,33 @@ def get_dashboard_screen_html():
                     </div>
                 `).join('');
 
+                const inDateText = escapePopupHtml(popupFormatDate(ro.in_date));
+                const outDateText = escapePopupHtml(popupFormatDate(ro.picked_up));
+                const customerText = escapePopupHtml(ro.customer || '-');
+                const insuranceText = escapePopupHtml(ro.insurance || '-');
+                const vehicleText = escapePopupHtml(ro.vehicle || '-');
+                const vinText = escapePopupHtml(ro.vin || '-');
+
                 roOpenPrintWindow(
                     `RO ${ro.ro} Service Tag`,
                     `
-                        <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:8px;">
-                            <div style="font-size:36px; font-weight:800;">RO ${escapePopupHtml(ro.ro || '-')}</div>
-                            <div style="font-size:16px;"><strong>In Date:</strong> ${escapePopupHtml(popupFormatDate(ro.in_date))}</div>
-                        </div>
-                        <div style="display:flex; justify-content:center; margin-bottom:8px; font-size:18px;">${escapePopupHtml(ro.customer || '-')}</div>
-                        <div style="display:flex; justify-content:flex-end; margin-bottom:8px; font-size:18px;">${escapePopupHtml(ro.insurance || '-')}</div>
-                        <div style="display:flex; justify-content:space-between; margin-bottom:8px; font-size:18px;">
-                            <div>${escapePopupHtml(ro.vehicle || '-')}</div>
-                            <div><strong>ECD:</strong> ${escapePopupHtml(popupFormatDate(ro.ecd_date))}</div>
+                        <div style="height:50vh; display:flex; flex-direction:column; justify-content:center; gap:14px;">
+                            <div style="display:flex; justify-content:space-between; align-items:flex-end;">
+                                <div style="font-size:108px; font-weight:800; line-height:1;">RO ${escapePopupHtml(ro.ro || '-')}</div>
+                                <div style="font-size:32px; font-weight:700;">IN DATE: ${inDateText}</div>
+                            </div>
+                            <div style="display:flex; justify-content:space-between; align-items:flex-end; font-size:36px; font-weight:600; line-height:1.1;">
+                                <div>${customerText}</div>
+                                <div>OUT DATE: ${outDateText}</div>
+                            </div>
+                            <div style="display:flex; justify-content:space-between; align-items:flex-end; font-size:34px; font-weight:600; line-height:1.1;">
+                                <div>${vehicleText}</div>
+                                <div>${insuranceText}</div>
+                            </div>
+                            <div style="font-size:32px; font-weight:600; line-height:1.1;">${vinText}</div>
                         </div>
                         <div class="line-break"></div>
-                        <div style="margin-top:12px;">${checksHtml}</div>
+                        <div style="height:45vh; display:flex; flex-direction:column; justify-content:center; margin-top:12px;">${checksHtml}</div>
                     `
                 );
             }
