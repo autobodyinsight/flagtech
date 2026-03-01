@@ -1427,16 +1427,63 @@ def get_parts_script():
             }
         }
 
+        function partsKeepOnOrderReceiveEditable(focusSelector = '') {
+            partsOnOrderReceiveMode = true;
+
+            const receiveBtn = document.getElementById('partsOnOrderReceiveBtn');
+            const addPartBtn = document.getElementById('partsOnOrderAddPartBtn');
+            const saveBtn = document.getElementById('partsOnOrderSaveBtn');
+            const invoiceWrap = document.getElementById('partsOnOrderInvoiceWrap');
+            const checkHeader = document.getElementById('partsOnOrderCheckHeader');
+            const costHeader = document.getElementById('partsOnOrderCostHeader');
+
+            if (receiveBtn) receiveBtn.textContent = 'Receive (On)';
+            if (addPartBtn) addPartBtn.style.display = 'inline-block';
+            if (saveBtn) saveBtn.style.display = 'inline-block';
+            if (invoiceWrap) invoiceWrap.style.display = 'block';
+            if (checkHeader) checkHeader.style.display = 'table-cell';
+            if (costHeader) costHeader.style.display = 'table-cell';
+
+            const topFields = [
+                document.getElementById('partsOnOrderVendorInput'),
+                document.getElementById('partsOnOrderInvoiceNumber'),
+                document.getElementById('partsOnOrderInvoiceTotal'),
+            ];
+            topFields.forEach((field) => {
+                if (!field) return;
+                field.disabled = false;
+                field.readOnly = false;
+                field.style.pointerEvents = 'auto';
+                field.style.opacity = '1';
+            });
+
+            Array.from(document.querySelectorAll('#partsOnOrderBody input, #partsOnOrderBody select, #partsOnOrderBody textarea')).forEach((field) => {
+                field.disabled = false;
+                field.readOnly = false;
+                field.style.pointerEvents = 'auto';
+                field.style.opacity = '1';
+            });
+
+            if (focusSelector) {
+                const focusEl = document.querySelector(focusSelector);
+                if (focusEl && typeof focusEl.focus === 'function') {
+                    try {
+                        focusEl.focus();
+                    } catch (_) {
+                    }
+                }
+            }
+        }
+
         function partsSaveOnOrderReceive() {
             if (!partsOnOrderReceiveMode) {
                 alert('Click Receive first.');
                 return;
             }
 
-            const draft = partsCaptureOnOrderReceiveDraft();
             const failValidation = (message, focusSelector = '') => {
                 alert(message);
-                partsRestoreOnOrderReceiveDraft(draft, focusSelector);
+                partsKeepOnOrderReceiveEditable(focusSelector);
                 return;
             };
 
@@ -1592,7 +1639,7 @@ def get_parts_script():
             .catch(err => {
                 console.error('Error receiving on-order parts:', err);
                 alert(err.message || 'Error saving received parts.');
-                partsRestoreOnOrderReceiveDraft(draft);
+                partsKeepOnOrderReceiveEditable();
             });
         }
 
