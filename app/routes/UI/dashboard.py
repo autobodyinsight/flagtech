@@ -354,7 +354,26 @@ def get_dashboard_screen_html():
             // Top-right Print/Close buttons
             const buttonsHtml = `
                 <div style="position:absolute; top:18px; right:24px; display:flex; gap:12px; z-index:10;">
-                    <button onclick="window.print()" style="padding:7px 18px; background:#d32f2f; color:#fff; border:none; border-radius:4px; font-weight:bold; font-size:15px; cursor:pointer;">Print</button>
+                    <div style="position:relative;">
+                        <button id="roPrintTrigger" class="mini-popup-trigger" type="button" style="padding:7px 18px; background:#d32f2f; color:#fff; border:none; border-radius:4px; font-weight:bold; font-size:15px; cursor:pointer;">Print</button>
+                        <div id="roPrintOptionsModal" class="mini-popup-panel" style="display:none; right:0; left:auto; top:100%;">
+                            <h2 style="margin:0 0 14px 0; color:#333; font-size:18px;">Print RO</h2>
+                            <p style="margin:0 0 12px 0; font-weight:bold; color:#555;">Print by:</p>
+                            <div style="display:flex; flex-direction:column; gap:8px;">
+                                <button id="roPrintOptionBill" type="button" style="padding:10px 12px; background:#f5f5f5; color:#333; border:1px solid #ddd; border-radius:4px; cursor:pointer; text-align:left; font-size:14px;">Bill</button>
+                                <button id="roPrintOptionServiceOrder" type="button" style="padding:10px 12px; background:#f5f5f5; color:#333; border:1px solid #ddd; border-radius:4px; cursor:pointer; text-align:left; font-size:14px;">Service Order</button>
+                                <button id="roPrintOptionParts" type="button" style="padding:10px 12px; background:#f5f5f5; color:#333; border:1px solid #ddd; border-radius:4px; cursor:pointer; text-align:left; font-size:14px;">Parts</button>
+                                <button id="roPrintOptionServiceTag" type="button" style="padding:10px 12px; background:#f5f5f5; color:#333; border:1px solid #ddd; border-radius:4px; cursor:pointer; text-align:left; font-size:14px;">Service Tag</button>
+                            </div>
+                            <div id="roPrintServiceOrderWrap" style="display:none; margin-top:10px; padding-top:10px; border-top:1px solid #eee;">
+                                <label for="roPrintTechSelect" style="display:block; margin-bottom:6px; color:#555; font-weight:600;">Tech</label>
+                                <select id="roPrintTechSelect" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:4px; margin-bottom:8px;">
+                                    <option value="">Loading...</option>
+                                </select>
+                                <button id="roPrintServiceOrderGo" type="button" style="padding:10px 12px; width:100%; background:#d32f2f; color:#fff; border:none; border-radius:4px; cursor:pointer; font-size:14px; font-weight:700;">Print Service Order</button>
+                            </div>
+                        </div>
+                    </div>
                     <button id="roCloseButton" type="button" style="padding:7px 18px; background:#505050; color:#fff; border:none; border-radius:4px; font-weight:bold; font-size:15px; cursor:pointer;">Close RO</button>
                 </div>
                 <div style="position:absolute; top:58px; right:24px; display:flex; align-items:center; gap:8px; z-index:10;">
@@ -412,6 +431,29 @@ def get_dashboard_screen_html():
                 #roSidebar .ro-sidebar-btn:hover { opacity:1; transform:translateY(-1px); }
                 #roSidebar .ro-sidebar-btn.active { opacity:1; }
                 #roSidebar { box-shadow:2px 0 8px rgba(0,0,0,0.08); }
+                .mini-popup-panel {
+                    position: absolute;
+                    top: 100%;
+                    left: 0;
+                    z-index: 1000;
+                    background: #fff;
+                    border: 2px solid #b22222;
+                    border-radius: 6px;
+                    padding: 12px;
+                    min-width: 300px;
+                    max-width: 500px;
+                    box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+                    margin-top: 4px;
+                    opacity: 0;
+                    transform: translateY(-6px);
+                    transition: opacity 0.18s ease, transform 0.18s ease;
+                    pointer-events: none;
+                }
+                .mini-popup-panel.open {
+                    opacity: 1;
+                    transform: translateY(0);
+                    pointer-events: auto;
+                }
                 .ro-header-item { font-size:15px; line-height:1.25; min-width:0; }
                 .ro-header-label { color:#d32f2f; font-weight:700; margin-right:6px; white-space:nowrap; }
                 .ro-header-value { color:#fff; font-weight:600; word-break:break-word; }
@@ -457,7 +499,8 @@ def get_dashboard_screen_html():
                 techAssignContext: null,
                 techAssignLines: [],
                 techAssignManualLines: [],
-                techAssignNextManualId: 1
+                techAssignNextManualId: 1,
+                roPrintTechOptions: []
             };
 
             function escapePopupHtml(value) {
@@ -553,6 +596,480 @@ def get_dashboard_screen_html():
                     throw new Error(payload.error || 'Request failed');
                 }
                 return payload;
+            }
+
+            function popupToNumber(value, fallback = 0) {
+                const parsed = Number(value);
+                return Number.isFinite(parsed) ? parsed : fallback;
+            }
+
+            function popupExtractLineNumber(value) {
+                if (value === null || value === undefined) return null;
+                const text = String(value);
+                const match = text.match(/\d+/);
+                if (!match) return null;
+                const parsed = Number(match[0]);
+                return Number.isFinite(parsed) ? parsed : null;
+            }
+
+            function popupNormalizeDisplayNumber(value) {
+                const numeric = popupToNumber(value, 0);
+                return Number.isInteger(numeric)
+                    ? String(numeric)
+                    : numeric.toFixed(2).replace(/\.00$/, '').replace(/(\.\d*[1-9])0+$/, '$1');
+            }
+
+            function popupBuildUnifiedLinesFromSections(sectionList) {
+                const byLine = new Map();
+
+                function getLineRecord(lineNumber) {
+                    if (!byLine.has(lineNumber)) {
+                        byLine.set(lineNumber, {
+                            lineNumber,
+                            description: '',
+                            labor: 0,
+                            paint: 0,
+                            qty: null,
+                            partNumber: '',
+                            extendedPrice: null,
+                        });
+                    }
+                    return byLine.get(lineNumber);
+                }
+
+                (Array.isArray(sectionList) ? sectionList : []).forEach((section) => {
+                    const sectionKey = String(section?.key || '').toLowerCase();
+                    const items = Array.isArray(section?.items) ? section.items : [];
+                    items.forEach((item) => {
+                        const lineNumber = popupExtractLineNumber(item?.line ?? item?.lineNumber);
+                        if (lineNumber === null) return;
+
+                        const record = getLineRecord(lineNumber);
+                        const desc = String(item?.description || '').trim();
+                        if (desc && !record.description) {
+                            record.description = desc;
+                        }
+
+                        if (sectionKey === 'labor') {
+                            record.labor = popupToNumber(item?.value, 0);
+                            return;
+                        }
+                        if (sectionKey === 'paint') {
+                            record.paint = popupToNumber(item?.value, 0);
+                            return;
+                        }
+                        if (sectionKey === 'parts') {
+                            const qtyRaw = item?.qty;
+                            if (qtyRaw !== null && qtyRaw !== undefined && String(qtyRaw).trim() !== '') {
+                                record.qty = popupToNumber(qtyRaw, 0);
+                            }
+                            const partNumber = String(
+                                item?.partNumber || item?.part_number || item?.part_no || item?.['part#'] || item?.pn || ''
+                            ).trim();
+                            if (partNumber) {
+                                record.partNumber = partNumber;
+                            }
+                            const extPriceRaw = item?.extendedPrice ?? item?.price;
+                            if (extPriceRaw !== null && extPriceRaw !== undefined && String(extPriceRaw).trim() !== '') {
+                                record.extendedPrice = popupToNumber(extPriceRaw, 0);
+                            }
+                        }
+                    });
+                });
+
+                return Array.from(byLine.values()).sort((a, b) => a.lineNumber - b.lineNumber);
+            }
+
+            function popupGetUnifiedEstimateLines(estimate) {
+                const unified = Array.isArray(estimate?.unified_lines)
+                    ? [...estimate.unified_lines].sort((a, b) => popupToNumber(a?.lineNumber, 0) - popupToNumber(b?.lineNumber, 0))
+                    : popupBuildUnifiedLinesFromSections(Array.isArray(estimate?.sections) ? estimate.sections : []);
+                return unified;
+            }
+
+            function roTogglePrintPopup(panel) {
+                if (!panel) return;
+                const isOpen = panel.classList.contains('open');
+                roWindowDoc.querySelectorAll('.mini-popup-panel.open').forEach((openPanel) => {
+                    openPanel.classList.remove('open');
+                    openPanel.style.display = 'none';
+                });
+                if (!isOpen) {
+                    panel.style.display = 'block';
+                    panel.classList.add('open');
+                }
+            }
+
+            function roClosePrintOptionsModal() {
+                const panel = roWindowDoc.getElementById('roPrintOptionsModal');
+                if (!panel) return;
+                panel.classList.remove('open');
+                panel.style.display = 'none';
+                const wrap = roWindowDoc.getElementById('roPrintServiceOrderWrap');
+                if (wrap) wrap.style.display = 'none';
+            }
+
+            function roOpenPrintWindow(title, bodyHtml) {
+                const printWindow = window.open('', '_blank');
+                if (!printWindow) {
+                    alert('Unable to open print preview. Please allow pop-ups for this site.');
+                    return;
+                }
+                printWindow.document.write(`
+                    <!DOCTYPE html>
+                    <html>
+                        <head>
+                            <title>${escapePopupHtml(title)}</title>
+                            <style>
+                                @media print { @page { margin: 0.5in; } body { margin: 0; } }
+                                body { font-family: Arial, sans-serif; color:#222; padding:20px; }
+                                .header { text-align:center; margin-bottom:16px; border-bottom:2px solid #b22222; padding-bottom:8px; }
+                                .header h1 { margin:0 0 6px 0; color:#b22222; font-size:24px; }
+                                .header p { margin:0; color:#666; }
+                                table { width:100%; border-collapse:collapse; margin-top:10px; }
+                                thead th { background:#3c4142; color:#fff; text-align:left; padding:8px; font-size:12px; }
+                                tbody td { padding:8px; border-bottom:1px solid #eee; font-size:12px; }
+                                .num { text-align:right; }
+                                .line-break { height:1px; background:#444; margin:14px 0; }
+                            </style>
+                        </head>
+                        <body>${bodyHtml}</body>
+                    </html>
+                `);
+                printWindow.document.close();
+                printWindow.focus();
+                setTimeout(() => printWindow.print(), 250);
+            }
+
+            async function roPrintBill() {
+                roClosePrintOptionsModal();
+                try {
+                    const res = await popupFetchJson(`/api/ro-estimate?ro=${encodeURIComponent(ro.ro)}`);
+                    const estimate = res.estimate || {};
+                    const lines = popupGetUnifiedEstimateLines(estimate);
+
+                    const linesHtml = lines.map((line) => {
+                        const lineNumber = popupToNumber(line?.lineNumber, 0);
+                        const description = escapePopupHtml(String(line?.description || '').trim() || '-');
+                        const partNumber = escapePopupHtml(String(line?.partNumber || '').trim() || '-');
+                        const qty = line?.qty;
+                        const qtyDisplay = qty === null || qty === undefined || String(qty).trim() === '' ? '-' : popupNormalizeDisplayNumber(qty);
+                        const labor = popupNormalizeDisplayNumber(line?.labor || 0);
+                        const paint = popupNormalizeDisplayNumber(line?.paint || 0);
+                        const price = (line?.extendedPrice === null || line?.extendedPrice === undefined || String(line?.extendedPrice).trim() === '')
+                            ? '-'
+                            : popupNormalizeDisplayNumber(line?.extendedPrice);
+                        return `
+                            <tr>
+                                <td>${escapePopupHtml(lineNumber)}</td>
+                                <td>${description}</td>
+                                <td>${partNumber}</td>
+                                <td class="num">${escapePopupHtml(qtyDisplay)}</td>
+                                <td class="num">${escapePopupHtml(labor)}</td>
+                                <td class="num">${escapePopupHtml(paint)}</td>
+                                <td class="num">${escapePopupHtml(price)}</td>
+                            </tr>
+                        `;
+                    }).join('');
+
+                    const grandTotal = popupToNumber(ro.total || ro.grand_total || 0);
+                    const insuranceDueRaw = popupToNumber(ro.insurance_pay || 0);
+                    const customerDueRaw = popupToNumber(ro.customer_pay || 0);
+                    const insuranceDue = insuranceDueRaw > 0 ? insuranceDueRaw : 0;
+                    const customerDue = customerDueRaw > 0 ? customerDueRaw : Math.max(0, grandTotal - insuranceDue);
+
+                    roOpenPrintWindow(
+                        `RO ${ro.ro} Bill`,
+                        `
+                            <div class="header">
+                                <h1>Invoice</h1>
+                                <p>RO #${escapePopupHtml(ro.ro || '-')}</p>
+                            </div>
+                            <div style="display:grid; grid-template-columns:1fr 1fr; gap:14px; font-size:13px;">
+                                <div>
+                                    <div><strong>RO Number:</strong> ${escapePopupHtml(ro.ro || '-')}</div>
+                                    <div><strong>Customer:</strong> ${escapePopupHtml(ro.customer || '-')}</div>
+                                    <div><strong>Phone:</strong> ${escapePopupHtml(ro.phone || '-')}</div>
+                                </div>
+                                <div>
+                                    <div><strong>Insurance:</strong> ${escapePopupHtml(ro.insurance || '-')}</div>
+                                    <div><strong>Vehicle:</strong> ${escapePopupHtml(ro.vehicle || '-')}</div>
+                                    <div><strong>RO Info:</strong> In ${escapePopupHtml(popupFormatDate(ro.in_date))} | ECD ${escapePopupHtml(popupFormatDate(ro.ecd_date))} | Picked Up ${escapePopupHtml(popupFormatDate(ro.picked_up))}</div>
+                                </div>
+                            </div>
+                            <div class="line-break"></div>
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>Line #</th>
+                                        <th>Description</th>
+                                        <th>Part #</th>
+                                        <th class="num">Qty</th>
+                                        <th class="num">Labor</th>
+                                        <th class="num">Paint</th>
+                                        <th class="num">Price</th>
+                                    </tr>
+                                </thead>
+                                <tbody>${linesHtml || '<tr><td colspan="7" style="text-align:center; color:#777;">No repair lines found.</td></tr>'}</tbody>
+                            </table>
+                            <div style="margin-top:16px; display:flex; justify-content:flex-end;">
+                                <div style="min-width:360px; font-size:13px;">
+                                    <div style="display:flex; justify-content:space-between; padding:4px 0;"><span><strong>Grand Total Due</strong></span><span><strong>${popupFormatMoney(grandTotal)}</strong></span></div>
+                                    <div style="display:flex; justify-content:space-between; padding:4px 0;"><span>Total Due from Insurance</span><span>${popupFormatMoney(insuranceDue)}</span></div>
+                                    <div style="display:flex; justify-content:space-between; padding:4px 0;"><span>Total Due from Customer</span><span>${popupFormatMoney(customerDue)}</span></div>
+                                </div>
+                            </div>
+                        `
+                    );
+                } catch (error) {
+                    console.error('Error printing bill:', error);
+                    alert('Unable to generate Bill print.');
+                }
+            }
+
+            async function roOpenServiceOrderSelector() {
+                const wrap = roWindowDoc.getElementById('roPrintServiceOrderWrap');
+                const selectEl = roWindowDoc.getElementById('roPrintTechSelect');
+                if (!wrap || !selectEl) return;
+                wrap.style.display = 'block';
+                try {
+                    const data = await popupFetchJson(`/api/ro-tech-lines?ro=${encodeURIComponent(ro.ro)}`);
+                    const options = (Array.isArray(data.tech_lines) ? data.tech_lines : [])
+                        .filter((item) => String(item.mode || '').toLowerCase() === 'tech' && item.tech_id);
+
+                    popupState.roPrintTechOptions = options;
+                    selectEl.innerHTML = '<option value="all">All Techs</option>';
+                    options.forEach((item) => {
+                        const option = roWindowDoc.createElement('option');
+                        option.value = String(item.tech_id);
+                        option.textContent = `${item.tech || `Tech #${item.tech_id}`}`;
+                        selectEl.appendChild(option);
+                    });
+                } catch (error) {
+                    console.error('Error loading tech selector:', error);
+                    selectEl.innerHTML = '<option value="all">All Techs</option>';
+                    popupState.roPrintTechOptions = [];
+                }
+            }
+
+            async function roPrintServiceOrderSelected() {
+                const selectEl = roWindowDoc.getElementById('roPrintTechSelect');
+                if (!selectEl) return;
+                const selectedValue = String(selectEl.value || 'all');
+                roClosePrintOptionsModal();
+
+                try {
+                    let targets = popupState.roPrintTechOptions || [];
+                    if (selectedValue !== 'all') {
+                        targets = targets.filter((item) => String(item.tech_id) === selectedValue);
+                    }
+
+                    if (!targets.length) {
+                        alert('No tech lines available for Service Order.');
+                        return;
+                    }
+
+                    const sections = [];
+                    for (const target of targets) {
+                        const techId = Number(target.tech_id);
+                        if (!Number.isFinite(techId)) continue;
+                        const details = await popupFetchJson(`/api/tech-assignment-lines?tech_id=${encodeURIComponent(techId)}&ro=${encodeURIComponent(ro.ro)}`);
+                        const lines = Array.isArray(details.lines) ? details.lines : [];
+                        const rowsHtml = lines.map((line) => `
+                            <tr>
+                                <td>${escapePopupHtml(line.line || line.line_number || '-')}</td>
+                                <td>${escapePopupHtml(line.description || '-')}</td>
+                                <td>${escapePopupHtml(normalizeTypeLabelLocal(line.repair_type || ''))}</td>
+                                <td class="num">${popupToNumber(line.hours || 0).toFixed(1)}</td>
+                            </tr>
+                        `).join('');
+
+                        sections.push(`
+                            <div style="margin-top:18px;">
+                                <div style="font-size:16px; font-weight:700; margin-bottom:6px;">${escapePopupHtml(target.tech || `Tech #${techId}`)}</div>
+                                <table>
+                                    <thead>
+                                        <tr><th>Line</th><th>Description</th><th>Type</th><th class="num">HRS</th></tr>
+                                    </thead>
+                                    <tbody>${rowsHtml || '<tr><td colspan="4" style="text-align:center; color:#777;">No lines assigned.</td></tr>'}</tbody>
+                                </table>
+                            </div>
+                        `);
+                    }
+
+                    roOpenPrintWindow(
+                        `RO ${ro.ro} Service Order`,
+                        `<div class="header"><h1>Service Order</h1><p>RO #${escapePopupHtml(ro.ro || '-')}</p></div>${sections.join('')}`
+                    );
+                } catch (error) {
+                    console.error('Error printing service order:', error);
+                    alert('Unable to generate Service Order print.');
+                }
+            }
+
+            async function roPrintParts() {
+                roClosePrintOptionsModal();
+                try {
+                    const [linesRes, onOrderRes, arrivedRes, returnedRes, receivedRes] = await Promise.all([
+                        popupFetchJson(`/api/parts/ro-lines?ro=${encodeURIComponent(ro.ro)}`),
+                        popupFetchJson(`/api/parts/on-order-lines?ro=${encodeURIComponent(ro.ro)}`),
+                        popupFetchJson(`/api/parts/arrived-lines?ro=${encodeURIComponent(ro.ro)}`),
+                        popupFetchJson(`/api/parts/returned-lines?ro=${encodeURIComponent(ro.ro)}`),
+                        popupFetchJson(`/api/parts/received?ro=${encodeURIComponent(ro.ro)}`),
+                    ]);
+
+                    const lines = Array.isArray(linesRes.lines) ? linesRes.lines : [];
+                    const onOrder = Array.isArray(onOrderRes.items) ? onOrderRes.items : [];
+                    const arrived = Array.isArray(arrivedRes.items) ? arrivedRes.items : [];
+                    const returned = Array.isArray(returnedRes.items) ? returnedRes.items : [];
+                    const received = Array.isArray(receivedRes.items) ? receivedRes.items : [];
+
+                    const arrivedSet = new Set(arrived.map((item) => Number(item.line_id)));
+                    const returnedSet = new Set(returned.map((item) => Number(item.line_id)));
+                    const onOrderSet = new Set(onOrder.map((item) => Number(item.line_id)));
+
+                    const partNumberByLine = new Map();
+                    const vendorByLine = new Map();
+                    const etaByLine = new Map();
+                    const listByLine = new Map();
+                    const costByLine = new Map();
+
+                    [...onOrder, ...arrived, ...returned, ...received].forEach((entry) => {
+                        const lineId = Number(entry.line_id);
+                        if (!Number.isFinite(lineId) || lineId <= 0) return;
+                        const partNumber = String(entry.part_number || '').trim();
+                        const vendor = String(entry.vendor || '').trim();
+                        const eta = String(entry.eta || entry.arrival_date || '').trim();
+                        const listVal = Number(entry.list);
+                        const costVal = Number(entry.cost);
+
+                        if (partNumber && !partNumberByLine.has(lineId)) partNumberByLine.set(lineId, partNumber);
+                        if (vendor && !vendorByLine.has(lineId)) vendorByLine.set(lineId, vendor);
+                        if (eta && !etaByLine.has(lineId)) etaByLine.set(lineId, eta);
+                        if (Number.isFinite(listVal) && !listByLine.has(lineId)) listByLine.set(lineId, listVal);
+                        if (Number.isFinite(costVal) && !costByLine.has(lineId)) costByLine.set(lineId, costVal);
+                    });
+
+                    const rowsHtml = lines.map((line) => {
+                        const idNum = Number(line.id);
+                        const extracted = extractPartNumberAndDescription(
+                            line.description || '',
+                            line.part_number || partNumberByLine.get(idNum) || ''
+                        );
+                        const cleanDescription = extracted.description || '—';
+                        const linePartNumber = String(extracted.partNumber || '').trim();
+                        const lineList = Number.isFinite(Number(listByLine.get(idNum)))
+                            ? Number(listByLine.get(idNum))
+                            : Number(line.price || 0);
+                        const lineCost = Number.isFinite(Number(costByLine.get(idNum))) ? Number(costByLine.get(idNum)) : null;
+                        const lineVendor = String(vendorByLine.get(idNum) || '').trim();
+                        const lineEtaRaw = String(etaByLine.get(idNum) || '').trim();
+                        const lineEta = lineEtaRaw ? popupFormatDate(lineEtaRaw) : '—';
+                        const isOnOrder = onOrderSet.has(idNum) || !!line.is_ordered;
+                        const isArrived = arrivedSet.has(idNum);
+                        const isReturned = returnedSet.has(idNum);
+
+                        return `
+                            <tr>
+                                <td>${escapePopupHtml(line.line || '-')}</td>
+                                <td>${escapePopupHtml(cleanDescription)}</td>
+                                <td>${escapePopupHtml(linePartNumber || '-')}</td>
+                                <td class="num">${popupFormatMoney(lineList)}</td>
+                                <td class="num">${lineCost === null ? '—' : popupFormatMoney(lineCost)}</td>
+                                <td class="num">${escapePopupHtml(line.qty || 0)}</td>
+                                <td>${escapePopupHtml(lineVendor || '-')}</td>
+                                <td>${escapePopupHtml(lineEta)}</td>
+                                <td style="text-align:center;">${isOnOrder ? 'Yes' : '—'}</td>
+                                <td style="text-align:center;">${isArrived ? 'Yes' : '—'}</td>
+                                <td style="text-align:center;">${isReturned ? 'Yes' : '—'}</td>
+                            </tr>
+                        `;
+                    }).join('');
+
+                    roOpenPrintWindow(
+                        `RO ${ro.ro} Parts`,
+                        `
+                            <div class="header"><h1>Parts</h1><p>RO #${escapePopupHtml(ro.ro || '-')}</p></div>
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>Line</th><th>Description</th><th>Part #</th><th class="num">List</th><th class="num">Cost</th><th class="num">QTY</th><th>Vendor</th><th>ETA</th><th style="text-align:center;">On Order</th><th style="text-align:center;">Arrived</th><th style="text-align:center;">Returned</th>
+                                    </tr>
+                                </thead>
+                                <tbody>${rowsHtml || '<tr><td colspan="11" style="text-align:center; color:#777;">No parts lines found.</td></tr>'}</tbody>
+                            </table>
+                        `
+                    );
+                } catch (error) {
+                    console.error('Error printing parts:', error);
+                    alert('Unable to generate Parts print.');
+                }
+            }
+
+            function roPrintServiceTag() {
+                roClosePrintOptionsModal();
+                const checkpoints = [
+                    'Parts Verified',
+                    'Bodywork Passed',
+                    'Primer / Prep Passed',
+                    'Paint Passed',
+                    'Re-Assembly Passed',
+                    'QC Fit / Finish / Functions OK',
+                ];
+                const checksHtml = checkpoints.map((item) => `
+                    <div style="display:grid; grid-template-columns:1.4fr 1fr 1fr; gap:20px; align-items:end; margin-bottom:16px; font-size:15px;">
+                        <div>${escapePopupHtml(item)}</div>
+                        <div style="border-bottom:1px solid #333; min-height:24px;"><span style="font-size:11px; color:#666;">Date</span></div>
+                        <div style="border-bottom:1px solid #333; min-height:24px;"><span style="font-size:11px; color:#666;">Signature</span></div>
+                    </div>
+                `).join('');
+
+                roOpenPrintWindow(
+                    `RO ${ro.ro} Service Tag`,
+                    `
+                        <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:8px;">
+                            <div style="font-size:36px; font-weight:800;">RO ${escapePopupHtml(ro.ro || '-')}</div>
+                            <div style="font-size:16px;"><strong>In Date:</strong> ${escapePopupHtml(popupFormatDate(ro.in_date))}</div>
+                        </div>
+                        <div style="display:flex; justify-content:center; margin-bottom:8px; font-size:18px;">${escapePopupHtml(ro.customer || '-')}</div>
+                        <div style="display:flex; justify-content:flex-end; margin-bottom:8px; font-size:18px;">${escapePopupHtml(ro.insurance || '-')}</div>
+                        <div style="display:flex; justify-content:space-between; margin-bottom:8px; font-size:18px;">
+                            <div>${escapePopupHtml(ro.vehicle || '-')}</div>
+                            <div><strong>ECD:</strong> ${escapePopupHtml(popupFormatDate(ro.ecd_date))}</div>
+                        </div>
+                        <div class="line-break"></div>
+                        <div style="margin-top:12px;">${checksHtml}</div>
+                    `
+                );
+            }
+
+            function bindRoPrintActions() {
+                const trigger = roWindowDoc.getElementById('roPrintTrigger');
+                const panel = roWindowDoc.getElementById('roPrintOptionsModal');
+                const billBtn = roWindowDoc.getElementById('roPrintOptionBill');
+                const serviceOrderBtn = roWindowDoc.getElementById('roPrintOptionServiceOrder');
+                const partsBtn = roWindowDoc.getElementById('roPrintOptionParts');
+                const serviceTagBtn = roWindowDoc.getElementById('roPrintOptionServiceTag');
+                const serviceOrderGoBtn = roWindowDoc.getElementById('roPrintServiceOrderGo');
+
+                if (trigger && panel) {
+                    trigger.addEventListener('click', (event) => {
+                        event.stopPropagation();
+                        roTogglePrintPopup(panel);
+                    });
+                }
+                if (billBtn) billBtn.addEventListener('click', () => { roPrintBill(); });
+                if (serviceOrderBtn) serviceOrderBtn.addEventListener('click', async () => { await roOpenServiceOrderSelector(); });
+                if (serviceOrderGoBtn) serviceOrderGoBtn.addEventListener('click', async () => { await roPrintServiceOrderSelected(); });
+                if (partsBtn) partsBtn.addEventListener('click', () => { roPrintParts(); });
+                if (serviceTagBtn) serviceTagBtn.addEventListener('click', () => { roPrintServiceTag(); });
+
+                roWindowDoc.addEventListener('click', (event) => {
+                    if (!panel || !panel.classList.contains('open')) return;
+                    const target = event.target;
+                    if ((trigger && trigger.contains(target)) || panel.contains(target)) return;
+                    roClosePrintOptionsModal();
+                });
             }
 
             async function patchRoDate(roNumber, field, isoValue) {
@@ -1840,6 +2357,7 @@ def get_dashboard_screen_html():
             bindDateAutosave('roHeaderInDate');
             bindDateAutosave('roHeaderEcdDate');
             bindPickedUpEnterSave();
+            bindRoPrintActions();
             bindSidebarButtons();
             bindCloseRoButton();
             showSidebarView('notes');
