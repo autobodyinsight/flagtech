@@ -262,23 +262,23 @@ def get_closed_ros_and_summary():
         labor_cost_rows = cur.fetchall() or []
         labor_cost_by_ro = {str(row.get("ro") or "").strip(): _parse_float(row.get("labor_cost")) for row in labor_cost_rows}
 
-                cur.execute(
-                        """
-                        SELECT ro, STRING_AGG(DISTINCT TRIM(tech_name), ', ' ORDER BY TRIM(tech_name)) AS tech_names
-                        FROM ro_line_assignments
-                        WHERE ro IS NOT NULL
-                            AND ro <> ''
-                            AND tech_name IS NOT NULL
-                            AND TRIM(tech_name) <> ''
-                        GROUP BY ro
-                        """
-                )
-                tech_rows = cur.fetchall() or []
-                tech_by_ro = {
-                        str(row.get("ro") or "").strip(): (row.get("tech_names") or "").strip()
-                        for row in tech_rows
-                        if str(row.get("ro") or "").strip()
-                }
+        cur.execute(
+            """
+            SELECT ro, STRING_AGG(DISTINCT TRIM(tech_name), ', ' ORDER BY TRIM(tech_name)) AS tech_names
+            FROM ro_line_assignments
+            WHERE ro IS NOT NULL
+              AND ro <> ''
+              AND tech_name IS NOT NULL
+              AND TRIM(tech_name) <> ''
+            GROUP BY ro
+            """
+        )
+        tech_rows = cur.fetchall() or []
+        tech_by_ro = {
+            str(row.get("ro") or "").strip(): (row.get("tech_names") or "").strip()
+            for row in tech_rows
+            if str(row.get("ro") or "").strip()
+        }
 
         closed_ros = []
         total_sales = 0.0
