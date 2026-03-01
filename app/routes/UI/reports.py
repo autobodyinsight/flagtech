@@ -112,7 +112,7 @@ def get_reports_screen_html():
         return { gpDollar, gpPercent };
     }
 
-    function renderGpEnclosure(sales, cost) {
+    function renderGpEnclosure(salesLabel, costLabel, sales, cost) {
         const gp = computeGpValues(sales, cost);
         const salesText = formatReportsMoney(sales);
         const costText = formatReportsMoney(cost);
@@ -120,11 +120,13 @@ def get_reports_screen_html():
 
         return `<div class='reports-gp-enclosure'>
             <div class='reports-gp-enclosure-top'>
-                <span>${salesText}</span>
-                <span>${costText}</span>
+                <span>${salesLabel} : ${salesText}</span>
+                <span>|</span>
+                <span>${costLabel} : ${costText}</span>
             </div>
             <div class='reports-gp-enclosure-bottom'>
                 <span>GP ${formatReportsPercent(gp.gpPercent)}%</span>
+                <span>-</span>
                 <span>GP $${gpDollarText}</span>
             </div>
         </div>`;
@@ -164,12 +166,12 @@ def get_reports_screen_html():
                         <td style='padding:12px;'>${ro.vehicle || ''}</td>
                         <td style='padding:12px;'>${ro.insurance || ''}</td>
                         <td style='padding:12px; text-align:right;'>${ro.hours || ''}</td>
-                        <td style='padding:12px; text-align:right;'>${formatReportsMoney(partsSales)}</td>
-                        <td style='padding:12px; text-align:right;'>${formatReportsMoney(partsCost)}</td>
-                        <td style='padding:12px; text-align:right;'>${formatReportsMoney(laborSales)}</td>
-                        <td style='padding:12px; text-align:right;'>${formatReportsMoney(laborCost)}</td>
-                        <td style='padding:12px; text-align:right;'>${formatReportsMoney(totalSales)}</td>
-                        <td style='padding:12px; text-align:right;'>${formatReportsMoney(totalCost)}</td>
+                        <td style='padding:12px; text-align:right;'></td>
+                        <td style='padding:12px; text-align:right;'></td>
+                        <td style='padding:12px; text-align:right;'></td>
+                        <td style='padding:12px; text-align:right;'></td>
+                        <td style='padding:12px; text-align:right;'></td>
+                        <td style='padding:12px; text-align:right;'></td>
                     </tr>`;
 
                     roBody.innerHTML += `<tr>
@@ -177,9 +179,9 @@ def get_reports_screen_html():
                         <td style='padding:0 12px 10px 12px;'></td>
                         <td style='padding:0 12px 10px 12px;'></td>
                         <td style='padding:0 12px 10px 12px;'></td>
-                        <td colspan='2' style='padding:0 12px 10px 12px;'>${renderGpEnclosure(partsSales, partsCost)}</td>
-                        <td colspan='2' style='padding:0 12px 10px 12px;'>${renderGpEnclosure(laborSales, laborCost)}</td>
-                        <td colspan='2' style='padding:0 12px 10px 12px;'>${renderGpEnclosure(totalSales, totalCost)}</td>
+                        <td colspan='2' style='padding:0 12px 10px 12px;'>${renderGpEnclosure('PARTS-S', 'PARTS-C', partsSales, partsCost)}</td>
+                        <td colspan='2' style='padding:0 12px 10px 12px;'>${renderGpEnclosure('LABOR-S', 'LABOR-C', laborSales, laborCost)}</td>
+                        <td colspan='2' style='padding:0 12px 10px 12px;'>${renderGpEnclosure('TOTAL-S', 'TOTAL-C', totalSales, totalCost)}</td>
                     </tr>`;
                 }
             }
@@ -207,8 +209,9 @@ def get_reports_screen_html():
         }
         .reports-gp-enclosure-top {
             display: flex;
-            justify-content: space-between;
+            justify-content: center;
             align-items: center;
+            gap: 10px;
             padding: 6px 10px;
             border-bottom: 1px solid #9e9e9e;
             font-size: inherit;
