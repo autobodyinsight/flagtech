@@ -171,7 +171,8 @@ def get_reports_screen_html():
         return String(source[groupKey] || '').trim();
     }
 
-    function reportsBuildRoRowsHtml(rows) {
+    function reportsBuildRoRowsHtml(rows, options = {}) {
+        const boldGpDollar = !!options.boldGpDollar;
         const normalizedRows = Array.isArray(rows) ? rows : [];
         return normalizedRows.map((ro, index) => {
             const partsSales = Number(ro.parts_sales || 0);
@@ -188,6 +189,16 @@ def get_reports_screen_html():
             const rowBg = index % 2 === 0 ? '#f2f0ef' : '#ffffff';
             const gpBg = index % 2 === 0 ? '#ececec' : '#f7f7f7';
 
+            const partsGpDollarHtml = boldGpDollar
+                ? `<strong>${formatReportsMoney(partsGp.gpDollar)}</strong>`
+                : `${formatReportsMoney(partsGp.gpDollar)}`;
+            const laborGpDollarHtml = boldGpDollar
+                ? `<strong>${formatReportsMoney(laborGp.gpDollar)}</strong>`
+                : `${formatReportsMoney(laborGp.gpDollar)}`;
+            const totalGpDollarHtml = boldGpDollar
+                ? `<strong>${formatReportsMoney(totalGp.gpDollar)}</strong>`
+                : `${formatReportsMoney(totalGp.gpDollar)}`;
+
             return `
                 <tr style="background:${rowBg};">
                     <td style='padding:12px;'>${reportsEscapeHtml(ro.ro_number || '')}</td>
@@ -203,9 +214,9 @@ def get_reports_screen_html():
                 </tr>
                 <tr style="background:${gpBg};">
                     <td colspan='4' style='padding:8px 12px;'></td>
-                    <td colspan='2' style='padding:8px 12px; text-align:right; font-size:12px;'>Parts GP: ${formatReportsPercent(partsGp.gpPercent)}% | ${formatReportsMoney(partsGp.gpDollar)}</td>
-                    <td colspan='2' style='padding:8px 12px; text-align:right; font-size:12px;'>Labor GP: ${formatReportsPercent(laborGp.gpPercent)}% | ${formatReportsMoney(laborGp.gpDollar)}</td>
-                    <td colspan='2' style='padding:8px 12px; text-align:right; font-size:12px;'>Total GP: ${formatReportsPercent(totalGp.gpPercent)}% | ${formatReportsMoney(totalGp.gpDollar)}</td>
+                    <td colspan='2' style='padding:8px 12px; text-align:right; font-size:12px;'>Parts GP: ${formatReportsPercent(partsGp.gpPercent)}% | ${partsGpDollarHtml}</td>
+                    <td colspan='2' style='padding:8px 12px; text-align:right; font-size:12px;'>Labor GP: ${formatReportsPercent(laborGp.gpPercent)}% | ${laborGpDollarHtml}</td>
+                    <td colspan='2' style='padding:8px 12px; text-align:right; font-size:12px;'>Total GP: ${formatReportsPercent(totalGp.gpPercent)}% | ${totalGpDollarHtml}</td>
                 </tr>
             `;
         }).join('');
@@ -246,7 +257,7 @@ def get_reports_screen_html():
 
     function reportsClosedRoTableHtml(rows) {
         const normalizedRows = Array.isArray(rows) ? rows : [];
-        const rowsHtml = reportsBuildRoRowsHtml(normalizedRows);
+        const rowsHtml = reportsBuildRoRowsHtml(normalizedRows, { boldGpDollar: true });
 
         return `
             <table style="width:100%; border-collapse:collapse; margin-top:12px;">
@@ -276,11 +287,12 @@ def get_reports_screen_html():
         const rowColors = ['#d3d3d3', '#f2f0ef'];
         const bodyHtml = rows.map((row, index) => {
             const bg = rowColors[index % 2];
+            const gpDollarText = formatReportsMoney(row.gp_dollar);
             return `<tr style="background:${bg};">
                 <td style='padding:12px;'>${reportsEscapeHtml(row.category)}</td>
                 <td style='padding:12px;'>${formatReportsMoney(row.sales)}</td>
                 <td style='padding:12px;'>${formatReportsPercent(row.gp_percent)}%</td>
-                <td style='padding:12px;'>${formatReportsMoney(row.gp_dollar)}</td>
+                <td style='padding:12px;'><strong>${gpDollarText}</strong></td>
             </tr>`;
         }).join('');
 

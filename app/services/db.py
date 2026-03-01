@@ -120,6 +120,8 @@ def get_closed_ros_and_summary():
                 model VARCHAR(80),
                 owner_info TEXT,
                 insurance_company TEXT,
+                estimator TEXT,
+                written_by TEXT,
                 in_date DATE,
                 picked_up DATE,
                 labor_repairs JSONB,
@@ -133,6 +135,21 @@ def get_closed_ros_and_summary():
             """
         )
         cur.execute("ALTER TABLE saved_estimates ADD COLUMN IF NOT EXISTS estimate_totals JSONB")
+        cur.execute("ALTER TABLE saved_estimates ADD COLUMN IF NOT EXISTS estimator TEXT")
+        cur.execute("ALTER TABLE saved_estimates ADD COLUMN IF NOT EXISTS written_by TEXT")
+
+        cur.execute(
+            """
+            CREATE TABLE IF NOT EXISTS ro_line_assignments (
+                id SERIAL PRIMARY KEY,
+                ro VARCHAR(255),
+                tech_name VARCHAR(255),
+                domain VARCHAR(255),
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+            """
+        )
+        cur.execute("ALTER TABLE ro_line_assignments ADD COLUMN IF NOT EXISTS tech_name VARCHAR(255)")
 
         cur.execute(
             """
@@ -174,6 +191,8 @@ def get_closed_ros_and_summary():
                    se.model,
                    se.owner_info,
                    se.insurance_company,
+                     se.estimator,
+                     se.written_by,
                    se.in_date,
                    se.picked_up,
                    se.estimate_totals,
@@ -243,6 +262,24 @@ def get_closed_ros_and_summary():
         labor_cost_rows = cur.fetchall() or []
         labor_cost_by_ro = {str(row.get("ro") or "").strip(): _parse_float(row.get("labor_cost")) for row in labor_cost_rows}
 
+                cur.execute(
+                        """
+                        SELECT ro, STRING_AGG(DISTINCT TRIM(tech_name), ', ' ORDER BY TRIM(tech_name)) AS tech_names
+                        FROM ro_line_assignments
+                        WHERE ro IS NOT NULL
+                            AND ro <> ''
+                            AND tech_name IS NOT NULL
+                            AND TRIM(tech_name) <> ''
+                        GROUP BY ro
+                        """
+                )
+                tech_rows = cur.fetchall() or []
+                tech_by_ro = {
+                        str(row.get("ro") or "").strip(): (row.get("tech_names") or "").strip()
+                        for row in tech_rows
+                        if str(row.get("ro") or "").strip()
+                }
+
         closed_ros = []
         total_sales = 0.0
         total_parts_sales = 0.0
@@ -257,6 +294,7 @@ def get_closed_ros_and_summary():
             vehicle = " ".join(part for part in (year, make, model) if part) or (row.get("vehicle") or "")
             customer = _parse_owner_customer((row.get("owner_info") or "").strip())
             insurance = (row.get("insurance_company") or "").strip()
+            estimator = (row.get("estimator") or "").strip() or (row.get("written_by") or "").strip()
 
             labor_repairs = _normalize_json_list(row.get("labor_repairs"))
             paint_repairs = _normalize_json_list(row.get("paint_repairs"))
@@ -284,6 +322,7 @@ def get_closed_ros_and_summary():
             total_labor_sales += labor_total
 
             ro_key = str(row.get("ro") or "").strip()
+            tech_name = tech_by_ro.get(ro_key, "")
             total_parts_cost += parts_cost_by_ro.get(ro_key, 0.0)
             total_labor_cost += labor_cost_by_ro.get(ro_key, 0.0)
 
@@ -299,7 +338,8 @@ def get_closed_ros_and_summary():
                 {
                     "ro_number": str(row.get("ro") or ""),
                     "vehicle": vehicle,
-                    "tech": "",
+                    "tech": tech_name,
+                    "estimator": estimator,
                     "parts": "",
                     "insurance": insurance,
                     "customer": customer,
