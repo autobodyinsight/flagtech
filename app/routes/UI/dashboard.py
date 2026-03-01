@@ -364,6 +364,7 @@ def get_dashboard_screen_html():
                                 <button id="roPrintOptionServiceOrder" type="button" style="padding:10px 12px; background:#f5f5f5; color:#333; border:1px solid #ddd; border-radius:4px; cursor:pointer; text-align:left; font-size:14px;">Service Order</button>
                                 <button id="roPrintOptionParts" type="button" style="padding:10px 12px; background:#f5f5f5; color:#333; border:1px solid #ddd; border-radius:4px; cursor:pointer; text-align:left; font-size:14px;">Parts</button>
                                 <button id="roPrintOptionServiceTag" type="button" style="padding:10px 12px; background:#f5f5f5; color:#333; border:1px solid #ddd; border-radius:4px; cursor:pointer; text-align:left; font-size:14px;">Service Tag</button>
+                                <button id="roPrintOptionServiceCover" type="button" style="padding:10px 12px; background:#f5f5f5; color:#333; border:1px solid #ddd; border-radius:4px; cursor:pointer; text-align:left; font-size:14px;">Service Cover</button>
                             </div>
                             <div id="roPrintServiceOrderWrap" style="display:none; margin-top:10px; padding-top:10px; border-top:1px solid #eee;">
                                 <label for="roPrintTechSelect" style="display:block; margin-bottom:6px; color:#555; font-weight:600;">Tech</label>
@@ -930,9 +931,17 @@ def get_dashboard_screen_html():
                         `;
                     });
 
+                    const totalAllHours = Array.from(sectionsByTech.values())
+                        .reduce((sum, lines) => sum + lines.reduce((lineSum, line) => lineSum + popupToNumber(line.hours, 0), 0), 0);
+                    const totalFooterHtml = `
+                        <div style="margin-top:16px; display:flex; justify-content:flex-end; font-size:14px; font-weight:700;">
+                            <div>Total Repair Line Hours: ${totalAllHours.toFixed(1)}</div>
+                        </div>
+                    `;
+
                     roOpenPrintWindow(
                         `RO ${ro.ro} Service Order`,
-                        `<div class="header"><h1>Service Order</h1><p>RO #${escapePopupHtml(ro.ro || '-')}</p></div>${sections.join('')}`
+                        `<div class="header"><h1>Service Order</h1><p>RO #${escapePopupHtml(ro.ro || '-')}</p></div>${sections.join('')}${totalFooterHtml}`
                     );
                 } catch (error) {
                     console.error('Error printing service order:', error);
@@ -1088,6 +1097,55 @@ def get_dashboard_screen_html():
                 );
             }
 
+            function roPrintServiceCover() {
+                roClosePrintOptionsModal();
+                const inDateText = escapePopupHtml(popupFormatDate(ro.in_date));
+                const outDateText = escapePopupHtml(popupFormatDate(ro.picked_up));
+                const customerText = escapePopupHtml(ro.customer || '-');
+                const insuranceText = escapePopupHtml(ro.insurance || '-');
+                const vehicleText = escapePopupHtml(ro.vehicle || '-');
+                const vinText = escapePopupHtml(ro.vin || '-');
+                const insuranceTotal = popupToNumber(ro.insurance_pay || 0);
+                const customerTotal = popupToNumber(ro.customer_pay || 0);
+
+                const noteLinesHtml = Array.from({ length: 6 }).map(() => `
+                    <div style="font-size:18px; margin-bottom:18px; letter-spacing:0.2px;">
+                        _____/_____/_______&nbsp;&nbsp;&nbsp;&nbsp;______________________________________________________
+                    </div>
+                `).join('');
+
+                roOpenPrintWindow(
+                    `RO ${ro.ro} Service Cover`,
+                    `
+                        <div style="height:50vh; display:flex; flex-direction:column; justify-content:center; gap:14px;">
+                            <div style="display:flex; justify-content:space-between; align-items:flex-end;">
+                                <div style="font-size:108px; font-weight:800; line-height:1;">RO ${escapePopupHtml(ro.ro || '-')}</div>
+                                <div style="font-size:32px; font-weight:700;">IN DATE: ${inDateText}</div>
+                            </div>
+                            <div style="display:flex; justify-content:space-between; align-items:flex-end; font-size:36px; font-weight:600; line-height:1.1;">
+                                <div>${customerText}</div>
+                                <div>OUT DATE: ${outDateText}</div>
+                            </div>
+                            <div style="display:flex; justify-content:space-between; align-items:flex-end; font-size:34px; font-weight:600; line-height:1.1;">
+                                <div>${vehicleText}</div>
+                                <div>${insuranceText}</div>
+                            </div>
+                            <div style="font-size:32px; font-weight:600; line-height:1.1;">${vinText}</div>
+                        </div>
+                        <div class="line-break"></div>
+                        <div style="height:45vh; display:flex; flex-direction:column; justify-content:flex-start; margin-top:8px;">
+                            <div style="display:grid; grid-template-columns:1fr 1fr 1fr 1fr; gap:16px; margin-bottom:18px; font-size:18px;">
+                                <div><strong>Insurance Total:</strong> ${popupFormatMoney(insuranceTotal)}</div>
+                                <div><strong>Customer Total:</strong> ${popupFormatMoney(customerTotal)}</div>
+                                <div><strong>In Date:</strong> ${inDateText}</div>
+                                <div><strong>Out Date:</strong> ${outDateText}</div>
+                            </div>
+                            ${noteLinesHtml}
+                        </div>
+                    `
+                );
+            }
+
             function bindRoPrintActions() {
                 const trigger = roWindowDoc.getElementById('roPrintTrigger');
                 const panel = roWindowDoc.getElementById('roPrintOptionsModal');
@@ -1095,6 +1153,7 @@ def get_dashboard_screen_html():
                 const serviceOrderBtn = roWindowDoc.getElementById('roPrintOptionServiceOrder');
                 const partsBtn = roWindowDoc.getElementById('roPrintOptionParts');
                 const serviceTagBtn = roWindowDoc.getElementById('roPrintOptionServiceTag');
+                const serviceCoverBtn = roWindowDoc.getElementById('roPrintOptionServiceCover');
                 const serviceOrderGoBtn = roWindowDoc.getElementById('roPrintServiceOrderGo');
 
                 if (trigger && panel) {
@@ -1108,6 +1167,7 @@ def get_dashboard_screen_html():
                 if (serviceOrderGoBtn) serviceOrderGoBtn.addEventListener('click', async () => { await roPrintServiceOrderSelected(); });
                 if (partsBtn) partsBtn.addEventListener('click', () => { roPrintParts(); });
                 if (serviceTagBtn) serviceTagBtn.addEventListener('click', () => { roPrintServiceTag(); });
+                if (serviceCoverBtn) serviceCoverBtn.addEventListener('click', () => { roPrintServiceCover(); });
 
                 roWindowDoc.addEventListener('click', (event) => {
                     if (!panel || !panel.classList.contains('open')) return;
