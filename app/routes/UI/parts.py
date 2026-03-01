@@ -120,6 +120,8 @@ def get_parts_screen_html():
                     </div>
                 </div>
 
+                <div id="partsOnOrderValidation" style="display:none; margin-bottom:12px; padding:10px 12px; border:1px solid #c62828; background:#fdecea; color:#7f1d1d; border-radius:4px;"></div>
+
                 <div style="overflow-x:auto;">
                     <table style="width:100%; border-collapse:collapse;">
                         <thead>
@@ -889,6 +891,17 @@ def get_parts_script():
             if (vendorInput) vendorInput.value = '';
             if (invoiceNumberInput) invoiceNumberInput.value = '';
             if (invoiceTotalInput) invoiceTotalInput.value = '';
+            partsRenderOnOrderValidation([]);
+
+            if (modal && !modal.dataset.onOrderValidationBound) {
+                modal.addEventListener('input', () => {
+                    partsRenderOnOrderValidation([]);
+                });
+                modal.addEventListener('change', () => {
+                    partsRenderOnOrderValidation([]);
+                });
+                modal.dataset.onOrderValidationBound = '1';
+            }
 
             partsLoadVendors(false)
                 .then(() => {
@@ -906,6 +919,7 @@ def get_parts_script():
             if (modal) modal.style.display = 'none';
             partsOnOrderReceiveMode = false;
             partsOnOrderManualLines = [];
+            partsRenderOnOrderValidation([]);
         }
 
         function openPartsArrivedModal(ro) {
@@ -1070,7 +1084,7 @@ def get_parts_script():
         function partsEnterReceiveMode() {
             if (!partsOnOrderRo) return;
             if (partsOnOrderReceiveMode) {
-                partsKeepOnOrderReceiveEditable('#partsOnOrderVendorInput');
+                partsRenderOnOrderValidation([]);
                 return;
             }
             partsOnOrderReceiveMode = true;
@@ -1082,6 +1096,7 @@ def get_parts_script():
             if (addPartBtn) addPartBtn.style.display = partsOnOrderReceiveMode ? 'inline-block' : 'none';
             if (saveBtn) saveBtn.style.display = partsOnOrderReceiveMode ? 'inline-block' : 'none';
 
+            partsRenderOnOrderValidation([]);
             partsRenderOnOrderLines();
         }
 
@@ -1283,202 +1298,42 @@ def get_parts_script():
             body.innerHTML = `${existingLinesHtml}${manualLinesHtml}`;
         }
 
-        function partsCaptureOnOrderReceiveDraft() {
-            const draft = {
-                vendorName: (document.getElementById('partsOnOrderVendorInput')?.value || '').trim(),
-                invoiceNumber: (document.getElementById('partsOnOrderInvoiceNumber')?.value || '').trim(),
-                invoiceTotal: (document.getElementById('partsOnOrderInvoiceTotal')?.value || '').trim(),
-                checkedKeys: new Set(),
-                partNumbers: {},
-                listValues: {},
-                qtyValues: {},
-                costValues: {},
-                manualLines: [],
-            };
+        function partsRenderOnOrderValidation(messages = []) {
+            const panel = document.getElementById('partsOnOrderValidation');
+            if (!panel) return;
 
-            Array.from(document.querySelectorAll('#partsOnOrderBody .parts-onorder-check')).forEach((checkbox) => {
-                const lineId = String(checkbox.getAttribute('data-line-id') || '').trim();
-                const orderId = String(checkbox.getAttribute('data-order-id') || '').trim();
-                if (!lineId || !orderId) return;
-                if (checkbox.checked) {
-                    draft.checkedKeys.add(`${orderId}:${lineId}`);
-                }
-            });
+            const uniqueMessages = Array.from(new Set((messages || [])
+                .map(msg => String(msg || '').trim())
+                .filter(Boolean)));
 
-            Array.from(document.querySelectorAll('#partsOnOrderBody .parts-onorder-partnum')).forEach((input) => {
-                const lineId = String(input.getAttribute('data-line-id') || '').trim();
-                if (!lineId) return;
-                draft.partNumbers[lineId] = input.value;
-            });
-            Array.from(document.querySelectorAll('#partsOnOrderBody .parts-onorder-list')).forEach((input) => {
-                const lineId = String(input.getAttribute('data-line-id') || '').trim();
-                if (!lineId) return;
-                draft.listValues[lineId] = input.value;
-            });
-            Array.from(document.querySelectorAll('#partsOnOrderBody .parts-onorder-qty')).forEach((input) => {
-                const lineId = String(input.getAttribute('data-line-id') || '').trim();
-                if (!lineId) return;
-                draft.qtyValues[lineId] = input.value;
-            });
-            Array.from(document.querySelectorAll('#partsOnOrderBody .parts-onorder-cost')).forEach((input) => {
-                const lineId = String(input.getAttribute('data-line-id') || '').trim();
-                if (!lineId) return;
-                draft.costValues[lineId] = input.value;
-            });
-
-            const manualDescInputs = Array.from(document.querySelectorAll('#partsOnOrderBody .parts-onorder-manual-description'));
-            if (manualDescInputs.length > 0) {
-                draft.manualLines = manualDescInputs.map((descriptionInput) => {
-                    const manualIndex = String(descriptionInput.getAttribute('data-manual-index') || '').trim();
-                    const qtyInput = document.querySelector(`.parts-onorder-manual-qty[data-manual-index="${manualIndex}"]`);
-                    const partNumberInput = document.querySelector(`.parts-onorder-manual-partnum[data-manual-index="${manualIndex}"]`);
-                    const costInput = document.querySelector(`.parts-onorder-manual-cost[data-manual-index="${manualIndex}"]`);
-                    return {
-                        description: (descriptionInput?.value || '').trim(),
-                        qty_received: (qtyInput?.value || '').trim(),
-                        part_number: (partNumberInput?.value || '').trim(),
-                        cost: (costInput?.value || '').trim(),
-                    };
-                });
-            } else {
-                draft.manualLines = Array.isArray(partsOnOrderManualLines)
-                    ? partsOnOrderManualLines.map(line => ({
-                        description: String(line?.description || ''),
-                        qty_received: String(line?.qty_received || ''),
-                        part_number: String(line?.part_number || ''),
-                        cost: String(line?.cost || ''),
-                    }))
-                    : [];
+            if (uniqueMessages.length === 0) {
+                panel.style.display = 'none';
+                panel.innerHTML = '';
+                return;
             }
 
-            return draft;
-        }
-
-        function partsRestoreOnOrderReceiveDraft(draft, focusSelector = '') {
-            if (!draft || typeof draft !== 'object') return;
-
-            partsOnOrderReceiveMode = true;
-            const receiveBtn = document.getElementById('partsOnOrderReceiveBtn');
-            const addPartBtn = document.getElementById('partsOnOrderAddPartBtn');
-            const saveBtn = document.getElementById('partsOnOrderSaveBtn');
-            if (receiveBtn) receiveBtn.textContent = 'Receive (On)';
-            if (addPartBtn) addPartBtn.style.display = 'inline-block';
-            if (saveBtn) saveBtn.style.display = 'inline-block';
-
-            partsOnOrderManualLines = Array.isArray(draft.manualLines)
-                ? draft.manualLines.map(line => ({
-                    description: String(line?.description || ''),
-                    qty_received: String(line?.qty_received || ''),
-                    part_number: String(line?.part_number || ''),
-                    cost: String(line?.cost || ''),
-                }))
-                : [];
-
-            partsRenderOnOrderLines();
-
-            const vendorInput = document.getElementById('partsOnOrderVendorInput');
-            const invoiceNumberInput = document.getElementById('partsOnOrderInvoiceNumber');
-            const invoiceTotalInput = document.getElementById('partsOnOrderInvoiceTotal');
-            if (vendorInput) vendorInput.value = String(draft.vendorName || '');
-            if (invoiceNumberInput) invoiceNumberInput.value = String(draft.invoiceNumber || '');
-            if (invoiceTotalInput) invoiceTotalInput.value = String(draft.invoiceTotal || '');
-
-            Array.from(document.querySelectorAll('#partsOnOrderBody .parts-onorder-check')).forEach((checkbox) => {
-                const lineId = String(checkbox.getAttribute('data-line-id') || '').trim();
-                const orderId = String(checkbox.getAttribute('data-order-id') || '').trim();
-                if (!lineId || !orderId) return;
-                checkbox.checked = Boolean(draft.checkedKeys?.has(`${orderId}:${lineId}`));
-            });
-            Array.from(document.querySelectorAll('#partsOnOrderBody .parts-onorder-partnum')).forEach((input) => {
-                const lineId = String(input.getAttribute('data-line-id') || '').trim();
-                if (!lineId || !(lineId in (draft.partNumbers || {}))) return;
-                input.value = draft.partNumbers[lineId];
-            });
-            Array.from(document.querySelectorAll('#partsOnOrderBody .parts-onorder-list')).forEach((input) => {
-                const lineId = String(input.getAttribute('data-line-id') || '').trim();
-                if (!lineId || !(lineId in (draft.listValues || {}))) return;
-                input.value = draft.listValues[lineId];
-            });
-            Array.from(document.querySelectorAll('#partsOnOrderBody .parts-onorder-qty')).forEach((input) => {
-                const lineId = String(input.getAttribute('data-line-id') || '').trim();
-                if (!lineId || !(lineId in (draft.qtyValues || {}))) return;
-                input.value = draft.qtyValues[lineId];
-            });
-            Array.from(document.querySelectorAll('#partsOnOrderBody .parts-onorder-cost')).forEach((input) => {
-                const lineId = String(input.getAttribute('data-line-id') || '').trim();
-                if (!lineId || !(lineId in (draft.costValues || {}))) return;
-                input.value = draft.costValues[lineId];
-            });
-
-            if (focusSelector) {
-                const focusEl = document.querySelector(focusSelector);
-                if (focusEl && typeof focusEl.focus === 'function') {
-                    try {
-                        focusEl.focus();
-                    } catch (_) {
-                    }
-                }
-            }
-        }
-
-        function partsKeepOnOrderReceiveEditable(focusSelector = '') {
-            partsOnOrderReceiveMode = true;
-
-            const receiveBtn = document.getElementById('partsOnOrderReceiveBtn');
-            const addPartBtn = document.getElementById('partsOnOrderAddPartBtn');
-            const saveBtn = document.getElementById('partsOnOrderSaveBtn');
-            const invoiceWrap = document.getElementById('partsOnOrderInvoiceWrap');
-            const checkHeader = document.getElementById('partsOnOrderCheckHeader');
-            const costHeader = document.getElementById('partsOnOrderCostHeader');
-
-            if (receiveBtn) receiveBtn.textContent = 'Receive (On)';
-            if (addPartBtn) addPartBtn.style.display = 'inline-block';
-            if (saveBtn) saveBtn.style.display = 'inline-block';
-            if (invoiceWrap) invoiceWrap.style.display = 'block';
-            if (checkHeader) checkHeader.style.display = 'table-cell';
-            if (costHeader) costHeader.style.display = 'table-cell';
-
-            const topFields = [
-                document.getElementById('partsOnOrderVendorInput'),
-                document.getElementById('partsOnOrderInvoiceNumber'),
-                document.getElementById('partsOnOrderInvoiceTotal'),
-            ];
-            topFields.forEach((field) => {
-                if (!field) return;
-                field.disabled = false;
-                field.readOnly = false;
-                field.style.pointerEvents = 'auto';
-                field.style.opacity = '1';
-            });
-
-            Array.from(document.querySelectorAll('#partsOnOrderBody input, #partsOnOrderBody select, #partsOnOrderBody textarea')).forEach((field) => {
-                field.disabled = false;
-                field.readOnly = false;
-                field.style.pointerEvents = 'auto';
-                field.style.opacity = '1';
-            });
-
-            if (focusSelector) {
-                const focusEl = document.querySelector(focusSelector);
-                if (focusEl && typeof focusEl.focus === 'function') {
-                    try {
-                        focusEl.focus();
-                    } catch (_) {
-                    }
-                }
-            }
+            panel.style.display = 'block';
+            panel.innerHTML = `
+                <div style="font-weight:700; margin-bottom:6px;">Please correct the following:</div>
+                <ul style="margin:0; padding-left:18px;">
+                    ${uniqueMessages.map(msg => `<li>${partsEscapeHtml(msg)}</li>`).join('')}
+                </ul>
+            `;
         }
 
         function partsSaveOnOrderReceive() {
             if (!partsOnOrderReceiveMode) {
-                alert('Click Receive first.');
+                partsRenderOnOrderValidation(['Click Receive first.']);
                 return;
             }
 
-            const failValidation = (message, focusSelector = '') => {
-                alert(message);
-                partsKeepOnOrderReceiveEditable(focusSelector);
-                return;
+            const validationMessages = [];
+            let firstFocusSelector = '';
+            const addValidation = (message, focusSelector = '') => {
+                validationMessages.push(message);
+                if (!firstFocusSelector && focusSelector) {
+                    firstFocusSelector = focusSelector;
+                }
             };
 
             const vendorName = (document.getElementById('partsOnOrderVendorInput')?.value || '').trim();
@@ -1487,17 +1342,14 @@ def get_parts_script():
             const invoiceTotal = parseFloat(invoiceTotalText || '0');
 
             if (!vendorName) {
-                failValidation('Vendor is required.', '#partsOnOrderVendorInput');
-                return;
+                addValidation('Vendor is required.', '#partsOnOrderVendorInput');
             }
 
             if (!invoiceNumber) {
-                failValidation('Invoice Number is required.', '#partsOnOrderInvoiceNumber');
-                return;
+                addValidation('Invoice Number is required.', '#partsOnOrderInvoiceNumber');
             }
             if (!Number.isFinite(invoiceTotal) || invoiceTotal <= 0) {
-                failValidation('Enter a valid Total Invoice Amount.', '#partsOnOrderInvoiceTotal');
-                return;
+                addValidation('Total Invoice Amount is required.', '#partsOnOrderInvoiceTotal');
             }
 
             const selectedChecks = Array.from(document.querySelectorAll('.parts-onorder-check:checked'));
@@ -1517,14 +1369,12 @@ def get_parts_script():
 
                 const cost = parseFloat((costInput?.value || '').trim());
                 if (!Number.isFinite(cost) || cost < 0) {
-                    failValidation('Enter a valid cost for selected parts.', `.parts-onorder-cost[data-line-id="${lineId}"]`);
-                    return;
+                    addValidation('Cost is required for selected lines.', `.parts-onorder-cost[data-line-id="${lineId}"]`);
                 }
 
                 const qtyReceived = parseFloat((qtyInput?.value || '').trim());
                 if (!Number.isFinite(qtyReceived) || qtyReceived <= 0) {
-                    failValidation('Enter a valid received QTY for selected parts.', `.parts-onorder-qty[data-line-id="${lineId}"]`);
-                    return;
+                    addValidation('Valid QTY is required for selected lines.', `.parts-onorder-qty[data-line-id="${lineId}"]`);
                 }
 
                 selectedCostTotal += cost;
@@ -1560,16 +1410,13 @@ def get_parts_script():
                 const qtyReceived = parseFloat(qtyText || '0');
                 const cost = parseFloat(costText || '0');
                 if (!description) {
-                    failValidation('Manual added parts require a description.', `.parts-onorder-manual-description[data-manual-index="${manualIndex}"]`);
-                    return;
+                    addValidation('Manual added parts require a description.', `.parts-onorder-manual-description[data-manual-index="${manualIndex}"]`);
                 }
                 if (!Number.isFinite(qtyReceived) || qtyReceived <= 0) {
-                    failValidation('Manual added parts require a valid QTY.', `.parts-onorder-manual-qty[data-manual-index="${manualIndex}"]`);
-                    return;
+                    addValidation('Manual added parts require a valid QTY.', `.parts-onorder-manual-qty[data-manual-index="${manualIndex}"]`);
                 }
                 if (!Number.isFinite(cost) || cost < 0) {
-                    failValidation('Manual added parts require a valid Cost.', `.parts-onorder-manual-cost[data-manual-index="${manualIndex}"]`);
-                    return;
+                    addValidation('Manual added parts require a valid Cost.', `.parts-onorder-manual-cost[data-manual-index="${manualIndex}"]`);
                 }
 
                 selectedCostTotal += cost;
@@ -1583,14 +1430,28 @@ def get_parts_script():
             }
 
             if (selectedChecks.length === 0 && manualItems.length === 0) {
-                failValidation('Select at least one part or add at least one manual part to receive.', '#partsOnOrderBody .parts-onorder-check');
-                return;
+                addValidation('Select at least one part to receive.', '#partsOnOrderBody .parts-onorder-check');
             }
 
             if (Math.abs(Number(selectedCostTotal.toFixed(2)) - Number(invoiceTotal.toFixed(2))) > 0.009) {
-                failValidation('Sum of selected/manual part costs must equal Total Invoice Amount.', '#partsOnOrderInvoiceTotal');
+                addValidation('Sum of selected/manual part costs must equal Total Invoice Amount.', '#partsOnOrderInvoiceTotal');
+            }
+
+            if (validationMessages.length > 0) {
+                partsRenderOnOrderValidation(validationMessages);
+                if (firstFocusSelector) {
+                    const focusEl = document.querySelector(firstFocusSelector);
+                    if (focusEl && typeof focusEl.focus === 'function') {
+                        try {
+                            focusEl.focus();
+                        } catch (_) {
+                        }
+                    }
+                }
                 return;
             }
+
+            partsRenderOnOrderValidation([]);
 
             fetch('/api/parts/on-order-receive', {
                 method: 'POST',
@@ -1626,14 +1487,14 @@ def get_parts_script():
                 if (invoiceNumberInput) invoiceNumberInput.value = '';
                 if (invoiceTotalInput) invoiceTotalInput.value = '';
                 partsOnOrderManualLines = [];
+                partsRenderOnOrderValidation([]);
 
                 partsLoadRos();
                 partsLoadOnOrderLines();
             })
             .catch(err => {
                 console.error('Error receiving on-order parts:', err);
-                alert(err.message || 'Error saving received parts.');
-                partsKeepOnOrderReceiveEditable();
+                partsRenderOnOrderValidation([err.message || 'Error saving received parts.']);
             });
         }
 
