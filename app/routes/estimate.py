@@ -1619,6 +1619,7 @@ async def get_dashboard_data(request: Request):
     try:
         _ensure_saved_estimates_table(cur)
         _ensure_ro_phases_table(cur)
+        _ensure_ro_line_assignments_table(cur)
         _ensure_ro_assignments_table(cur)
         _ensure_ro_line_assignments_table(cur)
         _ensure_techs_table(cur)
@@ -4150,6 +4151,36 @@ async def phase_board(request: Request):
         phase_map = {row.get("ro"): row.get("phase") for row in phase_rows}
         closed_phase_keys = {"complete", "complete/finish"}
 
+        for row in estimate_rows:
+            ro_value = (row.get("ro") or "").strip()
+            if ro_value:
+                _ensure_ro_line_assignments_for_ro(cur, domain, ro_value)
+
+        cur.execute(
+            """
+            SELECT ro, repair_type, tech_name, COALESCE(SUM(hours), 0) AS total_hours
+            FROM ro_line_assignments
+            WHERE domain = %s
+            GROUP BY ro, repair_type, tech_name
+            """,
+            (domain,),
+        )
+        assignment_rows = cur.fetchall()
+        tech_map = {}
+        for assignment in assignment_rows:
+            ro_value = (assignment.get("ro") or "").strip()
+            if not ro_value:
+                continue
+            current = tech_map.setdefault(ro_value, {"labor_tech": "", "paint_tech": ""})
+            repair_type = _normalize_repair_type(assignment.get("repair_type"))
+            tech_name = (assignment.get("tech_name") or "").strip()
+            if not tech_name:
+                continue
+            if repair_type == "body" and not current["labor_tech"]:
+                current["labor_tech"] = tech_name
+            elif repair_type == "paint" and not current["paint_tech"]:
+                current["paint_tech"] = tech_name
+
         items = []
         for row in estimate_rows:
             ro = row.get("ro")
@@ -4168,6 +4199,9 @@ async def phase_board(request: Request):
             short_vehicle = " ".join(part for part in (year, make, model) if part)
             vehicle_display = short_vehicle or row.get("vehicle") or ""
             estimator_display = (row.get("estimator") or "").strip() or (row.get("written_by") or "").strip()
+            ro_tech = tech_map.get(str(ro or "").strip(), {})
+            labor_tech = (ro_tech.get("labor_tech") or "").strip() or "Unassigned"
+            paint_tech = (ro_tech.get("paint_tech") or "").strip() or "Unassigned"
 
             items.append(
                 {
@@ -4175,9 +4209,9 @@ async def phase_board(request: Request):
                     "vehicle": vehicle_display,
                     "phase": phase_value,
                     "estimator": estimator_display,
-                    "labor_tech": "Unassigned",
+                    "labor_tech": labor_tech,
                     "labor_hours": labor_hours,
-                    "paint_tech": "Unassigned",
+                    "paint_tech": paint_tech,
                     "paint_hours": paint_hours,
                 }
             )
