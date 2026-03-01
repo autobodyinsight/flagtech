@@ -1315,10 +1315,6 @@ def get_parts_script():
             }
 
             const selectedChecks = Array.from(document.querySelectorAll('.parts-onorder-check:checked'));
-            if (selectedChecks.length === 0) {
-                alert('Select at least one part to receive.');
-                return;
-            }
 
             const items = [];
             const manualItems = [];
@@ -1398,6 +1394,11 @@ def get_parts_script():
                     cost,
                     vendor: vendorName,
                 });
+            }
+
+            if (selectedChecks.length === 0 && manualItems.length === 0) {
+                alert('Select at least one part or add at least one manual part to receive.');
+                return;
             }
 
             if (Math.abs(Number(selectedCostTotal.toFixed(2)) - Number(invoiceTotal.toFixed(2))) > 0.009) {
