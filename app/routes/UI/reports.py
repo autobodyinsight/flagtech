@@ -63,17 +63,11 @@ def get_reports_screen_html():
                             <th class="dashboard-header-cell" style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold; background:#23272a; color:#fff; cursor:pointer; user-select:none;">Vehicle</th>
                             <th class="dashboard-header-cell" style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold; background:#23272a; color:#fff; cursor:pointer; user-select:none;">Insurance</th>
                             <th class="dashboard-header-cell" style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold; background:#23272a; color:#fff; text-align:right; cursor:pointer; user-select:none;">HRS</th>
-                            <th class="dashboard-header-cell" style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold; background:#23272a; color:#fff; text-align:right; cursor:pointer; user-select:none;">PARTS-S</th>
-                            <th class="dashboard-header-cell" style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold; background:#23272a; color:#fff; text-align:right; cursor:pointer; user-select:none;">PARTS-C</th>
-                            <th class="dashboard-header-cell" style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold; background:#23272a; color:#fff; text-align:right; cursor:pointer; user-select:none;">LABOR-S</th>
-                            <th class="dashboard-header-cell" style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold; background:#23272a; color:#fff; text-align:right; cursor:pointer; user-select:none;">LABOR-C</th>
-                            <th class="dashboard-header-cell" style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold; background:#23272a; color:#fff; text-align:right; cursor:pointer; user-select:none;">TOTAL-S</th>
-                            <th class="dashboard-header-cell" style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold; background:#23272a; color:#fff; text-align:right; cursor:pointer; user-select:none;">TOTAL-C</th>
                         </tr>
                     </thead>
                     <tbody id="reportsRoListBody">
                         <tr>
-                            <td colspan="10" style="padding:20px; text-align:center; color:#999;">Loading...</td>
+                            <td colspan="4" style="padding:20px; text-align:center; color:#999;">Loading...</td>
                         </tr>
                     </tbody>
                 </table>
@@ -143,15 +137,15 @@ def get_reports_screen_html():
                 summaryBody.innerHTML += `<tr>
                     <td style='padding:12px;'>${row.category}</td>
                     <td style='padding:12px;'>$${row.sales.toLocaleString()}</td>
-                    <td style='padding:12px;'>${formatReportsPercent(row.gp_percent)}%</td>
-                    <td style='padding:12px;'>$${row.gp_dollar.toLocaleString()}</td>
+                    <td class='reports-green-bold' style='padding:12px;'>${formatReportsPercent(row.gp_percent)}%</td>
+                    <td class='reports-green-bold' style='padding:12px;'>$${row.gp_dollar.toLocaleString()}</td>
                 </tr>`;
             }
             // Render closed RO list
             const roBody = document.getElementById('reportsRoListBody');
             roBody.innerHTML = '';
             if (data.closed_ros.length === 0) {
-                roBody.innerHTML = `<tr><td colspan='10' style='padding:20px; text-align:center; color:#999;'>No closed repair orders found.</td></tr>`;
+                roBody.innerHTML = `<tr><td colspan='4' style='padding:20px; text-align:center; color:#999;'>No closed repair orders found.</td></tr>`;
             } else {
                 for (const ro of data.closed_ros) {
                     const partsSales = Number(ro.parts_sales || 0);
@@ -166,15 +160,22 @@ def get_reports_screen_html():
                         <td style='padding:12px;'>${ro.vehicle || ''}</td>
                         <td style='padding:12px;'>${ro.insurance || ''}</td>
                         <td style='padding:12px; text-align:right;'>${ro.hours || ''}</td>
-                        <td colspan='2' style='padding:8px 12px;'>${renderGpEnclosure('PARTS-S', 'PARTS-C', partsSales, partsCost)}</td>
-                        <td colspan='2' style='padding:8px 12px;'>${renderGpEnclosure('LABOR-S', 'LABOR-C', laborSales, laborCost)}</td>
-                        <td colspan='2' style='padding:8px 12px;'>${renderGpEnclosure('TOTAL-S', 'TOTAL-C', totalSales, totalCost)}</td>
+                    </tr>`;
+
+                    roBody.innerHTML += `<tr>
+                        <td colspan='4' style='padding:0 12px 12px 12px;'>
+                            <div class='reports-gp-row-grid'>
+                                ${renderGpEnclosure('PARTS-S', 'PARTS-C', partsSales, partsCost)}
+                                ${renderGpEnclosure('LABOR-S', 'LABOR-C', laborSales, laborCost)}
+                                ${renderGpEnclosure('TOTAL-S', 'TOTAL-C', totalSales, totalCost)}
+                            </div>
+                        </td>
                     </tr>`;
                 }
             }
         } catch (e) {
             document.getElementById('reportsSummaryBody').innerHTML = `<tr><td colspan='4' style='padding:20px; text-align:center; color:#c00;'>Error loading data</td></tr>`;
-            document.getElementById('reportsRoListBody').innerHTML = `<tr><td colspan='10' style='padding:20px; text-align:center; color:#c00;'>Error loading data</td></tr>`;
+            document.getElementById('reportsRoListBody').innerHTML = `<tr><td colspan='4' style='padding:20px; text-align:center; color:#c00;'>Error loading data</td></tr>`;
         }
     }
     // Load data when REPORTS screen is shown
@@ -214,6 +215,12 @@ def get_reports_screen_html():
             padding: 6px 10px;
             font-size: inherit;
             font-weight: normal;
+        }
+        .reports-gp-row-grid {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 12px;
+            align-items: stretch;
         }
     </style>
     '''
