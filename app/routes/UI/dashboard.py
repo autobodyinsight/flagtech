@@ -3293,8 +3293,8 @@ def get_dashboard_screen_html():
                     sublet: 'Sublet',
                     washqc: 'Wash/QC',
                     'wash/qc': 'Wash/QC',
-                    complete: 'Complete/Finish',
-                    'complete/finish': 'Complete/Finish'
+                    complete: 'Done',
+                    'complete/finish': 'Done'
                 };
                 return labelMap[key] || phase || 'Teardown';
             }
@@ -3317,7 +3317,7 @@ def get_dashboard_screen_html():
                     { value: 'reassy', label: 'Reassy' },
                     { value: 'sublet', label: 'Sublet' },
                     { value: 'washqc', label: 'Wash/QC' },
-                    { value: 'complete', label: 'Complete/Finish' }
+                    { value: 'complete', label: 'Done' }
                 ];
                 return options
                     .map((option) => `<option value="${option.value}" ${selected === option.value ? 'selected' : ''}>${option.label}</option>`)

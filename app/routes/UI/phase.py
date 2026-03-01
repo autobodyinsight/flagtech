@@ -41,7 +41,7 @@ def get_phase_screen_html():
                 <div id="phase-washqc" class="phase-cards"></div>
             </div>
             <div class="phase-column">
-                <div class="phase-header">Complete/Finish <span class="phase-count" id="phase-count-complete">0</span></div>
+                <div class="phase-header">Done <span class="phase-count" id="phase-count-complete">0</span></div>
                 <div id="phase-complete" class="phase-cards"></div>
             </div>
         </div>
