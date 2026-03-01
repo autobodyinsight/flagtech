@@ -5208,8 +5208,15 @@ async def receive_on_order_lines(request: Request):
         return JSONResponse(status_code=400, content={"error": "Vendor is required"})
     if not invoice_number:
         return JSONResponse(status_code=400, content={"error": "Invoice number is required"})
-    if not isinstance(items, list) or len(items) == 0:
-        return JSONResponse(status_code=400, content={"error": "Select at least one part"})
+    if not isinstance(items, list):
+        return JSONResponse(status_code=400, content={"error": "Selected items data is invalid"})
+    if manual_items is not None and not isinstance(manual_items, list):
+        return JSONResponse(status_code=400, content={"error": "Manual items data is invalid"})
+    if len(items) == 0 and len(manual_items or []) == 0:
+        return JSONResponse(
+            status_code=400,
+            content={"error": "Select at least one part or add at least one manual part"},
+        )
 
     try:
         invoice_total = float(invoice_total_amount)
@@ -5269,8 +5276,6 @@ async def receive_on_order_lines(request: Request):
 
     normalized_manual_items = []
     if manual_items:
-        if not isinstance(manual_items, list):
-            return JSONResponse(status_code=400, content={"error": "Manual items data is invalid"})
         for manual_item in manual_items:
             if not isinstance(manual_item, dict):
                 return JSONResponse(status_code=400, content={"error": "Manual item data is invalid"})

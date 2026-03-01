@@ -1402,7 +1402,7 @@ def get_parts_script():
             }
 
             if (Math.abs(Number(selectedCostTotal.toFixed(2)) - Number(invoiceTotal.toFixed(2))) > 0.009) {
-                alert('Sum of selected part costs must equal Total Invoice Amount.');
+                alert('Sum of selected/manual part costs must equal Total Invoice Amount.');
                 return;
             }
 
