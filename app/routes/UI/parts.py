@@ -96,6 +96,7 @@ def get_parts_screen_html():
 
                 <div style="display:flex; gap:10px; margin-bottom:12px;">
                     <button id="partsOnOrderReceiveBtn" onclick="partsEnterReceiveMode()" style="padding:10px 16px; background-color:#b22222; color:white; border:none; border-radius:4px; cursor:pointer; font-size:14px;">Receive</button>
+                    <button id="partsOnOrderAddPartBtn" onclick="partsAddOnOrderManualLine()" style="display:none; padding:10px 16px; background-color:#b22222; color:white; border:none; border-radius:4px; cursor:pointer; font-size:14px;">+ Add Part</button>
                     <button id="partsOnOrderSaveBtn" onclick="partsSaveOnOrderReceive()" style="display:none; padding:10px 16px; background-color:#b22222; color:white; border:none; border-radius:4px; cursor:pointer; font-size:14px;">Save</button>
                 </div>
 
@@ -313,6 +314,7 @@ def get_parts_script():
         let partsVendorsCache = [];
         let partsOnOrderRo = null;
         let partsOnOrderLines = [];
+        let partsOnOrderManualLines = [];
         let partsOnOrderReceiveMode = false;
         let partsArrivedRo = null;
         let partsArrivedItems = [];
@@ -868,16 +870,19 @@ def get_parts_script():
         function openPartsOnOrderModal(ro) {
             partsOnOrderRo = ro;
             partsOnOrderReceiveMode = false;
+            partsOnOrderManualLines = [];
             const modal = document.getElementById('partsOnOrderModal');
             if (!modal) return;
             modal.style.display = 'block';
 
             const receiveBtn = document.getElementById('partsOnOrderReceiveBtn');
+            const addPartBtn = document.getElementById('partsOnOrderAddPartBtn');
             const saveBtn = document.getElementById('partsOnOrderSaveBtn');
             const vendorInput = document.getElementById('partsOnOrderVendorInput');
             const invoiceNumberInput = document.getElementById('partsOnOrderInvoiceNumber');
             const invoiceTotalInput = document.getElementById('partsOnOrderInvoiceTotal');
             if (receiveBtn) receiveBtn.textContent = 'Receive';
+            if (addPartBtn) addPartBtn.style.display = 'none';
             if (saveBtn) saveBtn.style.display = 'none';
             if (vendorInput) vendorInput.value = '';
             if (invoiceNumberInput) invoiceNumberInput.value = '';
@@ -898,6 +903,7 @@ def get_parts_script():
             const modal = document.getElementById('partsOnOrderModal');
             if (modal) modal.style.display = 'none';
             partsOnOrderReceiveMode = false;
+            partsOnOrderManualLines = [];
         }
 
         function openPartsArrivedModal(ro) {
@@ -1064,8 +1070,10 @@ def get_parts_script():
             partsOnOrderReceiveMode = !partsOnOrderReceiveMode;
 
             const receiveBtn = document.getElementById('partsOnOrderReceiveBtn');
+            const addPartBtn = document.getElementById('partsOnOrderAddPartBtn');
             const saveBtn = document.getElementById('partsOnOrderSaveBtn');
             if (receiveBtn) receiveBtn.textContent = partsOnOrderReceiveMode ? 'Receive (On)' : 'Receive';
+            if (addPartBtn) addPartBtn.style.display = partsOnOrderReceiveMode ? 'inline-block' : 'none';
             if (saveBtn) saveBtn.style.display = partsOnOrderReceiveMode ? 'inline-block' : 'none';
 
             if (!partsOnOrderReceiveMode) {
@@ -1075,8 +1083,22 @@ def get_parts_script():
                 if (vendorInput) vendorInput.value = '';
                 if (invoiceNumberInput) invoiceNumberInput.value = '';
                 if (invoiceTotalInput) invoiceTotalInput.value = '';
+                partsOnOrderManualLines = [];
             }
 
+            partsRenderOnOrderLines();
+        }
+
+        function partsAddOnOrderManualLine() {
+            if (!partsOnOrderReceiveMode) {
+                return;
+            }
+            partsOnOrderManualLines.push({
+                description: '',
+                qty_received: '1',
+                part_number: '',
+                cost: '',
+            });
             partsRenderOnOrderLines();
         }
 
@@ -1103,19 +1125,22 @@ def get_parts_script():
             const costHeader = document.getElementById('partsOnOrderCostHeader');
             const invoiceWrap = document.getElementById('partsOnOrderInvoiceWrap');
             const saveBtn = document.getElementById('partsOnOrderSaveBtn');
+            const addPartBtn = document.getElementById('partsOnOrderAddPartBtn');
             if (!body || !checkHeader || !costHeader || !invoiceWrap) return;
 
             checkHeader.style.display = partsOnOrderReceiveMode ? 'table-cell' : 'none';
             costHeader.style.display = partsOnOrderReceiveMode ? 'table-cell' : 'none';
             invoiceWrap.style.display = partsOnOrderReceiveMode ? 'block' : 'none';
             if (saveBtn) saveBtn.style.display = partsOnOrderReceiveMode ? 'inline-block' : 'none';
+            if (addPartBtn) addPartBtn.style.display = partsOnOrderReceiveMode ? 'inline-block' : 'none';
 
-            if (!partsOnOrderLines || partsOnOrderLines.length === 0) {
+            const hasManualLines = partsOnOrderReceiveMode && Array.isArray(partsOnOrderManualLines) && partsOnOrderManualLines.length > 0;
+            if ((!partsOnOrderLines || partsOnOrderLines.length === 0) && !hasManualLines) {
                 body.innerHTML = '<tr><td colspan="9" style="padding:12px; text-align:center; color:#777;">No parts currently on order.</td></tr>';
                 return;
             }
 
-            body.innerHTML = partsOnOrderLines.map((item, idx) => {
+            const existingLinesHtml = (partsOnOrderLines || []).map((item, idx) => {
                 const lineId = Number(item.line_id);
                 const checkboxCell = partsOnOrderReceiveMode
                     ? `<td style="padding:10px; border-bottom:1px solid #eee;"><input type="checkbox" class="parts-onorder-check" data-line-id="${lineId}" data-order-id="${item.order_id}" /></td>`
@@ -1165,6 +1190,35 @@ def get_parts_script():
                     </tr>
                 `;
             }).join('');
+
+            const manualLinesHtml = hasManualLines
+                ? partsOnOrderManualLines.map((line, idx) => {
+                    const rowBg = ((partsOnOrderLines || []).length + idx) % 2 === 0 ? '#f2f0ef' : 'var(--list-row-white, #ffffff)';
+                    return `
+                        <tr style="background:${rowBg}; font-style:italic;">
+                            <td style="padding:10px; border-bottom:1px solid #eee;"></td>
+                            <td style="padding:10px; border-bottom:1px solid #eee;">—</td>
+                            <td style="padding:10px; border-bottom:1px solid #eee;">
+                                <input type="text" class="parts-onorder-manual-description" data-manual-index="${idx}" value="${partsEscapeHtml(line.description || '')}" placeholder="Description" style="width:100%; padding:6px; font-style:italic;" />
+                            </td>
+                            <td style="padding:10px; border-bottom:1px solid #eee; text-align:right;">
+                                <input type="number" min="0" step="0.01" class="parts-onorder-manual-qty" data-manual-index="${idx}" value="${partsEscapeHtml(line.qty_received || '1')}" style="width:80px; padding:6px; text-align:right; font-style:italic;" />
+                            </td>
+                            <td style="padding:10px; border-bottom:1px solid #eee;">
+                                <input type="text" class="parts-onorder-manual-partnum" data-manual-index="${idx}" value="${partsEscapeHtml(line.part_number || '')}" placeholder="Part #" style="width:100%; padding:6px; font-style:italic;" />
+                            </td>
+                            <td style="padding:10px; border-bottom:1px solid #eee; text-align:right;">—</td>
+                            <td style="padding:10px; border-bottom:1px solid #eee;">${partsEscapeHtml((document.getElementById('partsOnOrderVendorInput')?.value || '').trim() || '—')}</td>
+                            <td style="padding:10px; border-bottom:1px solid #eee;">—</td>
+                            <td style="padding:10px; border-bottom:1px solid #eee; text-align:right;">
+                                <input type="number" min="0" step="0.01" class="parts-onorder-manual-cost" data-manual-index="${idx}" value="${partsEscapeHtml(line.cost || '')}" placeholder="0.00" style="width:100px; padding:6px; text-align:right; font-style:italic;" />
+                            </td>
+                        </tr>
+                    `;
+                }).join('')
+                : '';
+
+            body.innerHTML = `${existingLinesHtml}${manualLinesHtml}`;
         }
 
         function partsSaveOnOrderReceive() {
@@ -1199,6 +1253,7 @@ def get_parts_script():
             }
 
             const items = [];
+            const manualItems = [];
             let selectedCostTotal = 0;
 
             for (const check of selectedChecks) {
@@ -1235,6 +1290,48 @@ def get_parts_script():
                 });
             }
 
+            const manualRows = Array.from(document.querySelectorAll('#partsOnOrderBody .parts-onorder-manual-description'));
+            for (const descriptionInput of manualRows) {
+                const manualIndex = descriptionInput.getAttribute('data-manual-index');
+                const qtyInput = document.querySelector(`.parts-onorder-manual-qty[data-manual-index="${manualIndex}"]`);
+                const partNumberInput = document.querySelector(`.parts-onorder-manual-partnum[data-manual-index="${manualIndex}"]`);
+                const costInput = document.querySelector(`.parts-onorder-manual-cost[data-manual-index="${manualIndex}"]`);
+
+                const description = (descriptionInput?.value || '').trim();
+                const partNumber = (partNumberInput?.value || '').trim();
+                const qtyText = (qtyInput?.value || '').trim();
+                const costText = (costInput?.value || '').trim();
+
+                const hasAnyValue = !!(description || partNumber || qtyText || costText);
+                if (!hasAnyValue) {
+                    continue;
+                }
+
+                const qtyReceived = parseFloat(qtyText || '0');
+                const cost = parseFloat(costText || '0');
+                if (!description) {
+                    alert('Manual added parts require a description.');
+                    return;
+                }
+                if (!Number.isFinite(qtyReceived) || qtyReceived <= 0) {
+                    alert('Manual added parts require a valid QTY.');
+                    return;
+                }
+                if (!Number.isFinite(cost) || cost < 0) {
+                    alert('Manual added parts require a valid Cost.');
+                    return;
+                }
+
+                selectedCostTotal += cost;
+                manualItems.push({
+                    description,
+                    qty_received: qtyReceived,
+                    part_number: partNumber,
+                    cost,
+                    vendor: vendorName,
+                });
+            }
+
             if (Math.abs(Number(selectedCostTotal.toFixed(2)) - Number(invoiceTotal.toFixed(2))) > 0.009) {
                 alert('Sum of selected part costs must equal Total Invoice Amount.');
                 return;
@@ -1251,6 +1348,7 @@ def get_parts_script():
                     invoice_total_amount: invoiceTotal,
                     local_business_date: partsGetLocalBusinessDateIso(),
                     items,
+                    manual_items: manualItems,
                 })
             })
             .then(r => r.json())
@@ -1266,10 +1364,13 @@ def get_parts_script():
                 const invoiceNumberInput = document.getElementById('partsOnOrderInvoiceNumber');
                 const invoiceTotalInput = document.getElementById('partsOnOrderInvoiceTotal');
                 if (receiveBtn) receiveBtn.textContent = 'Receive';
+                const addPartBtn = document.getElementById('partsOnOrderAddPartBtn');
                 if (saveBtn) saveBtn.style.display = 'none';
+                if (addPartBtn) addPartBtn.style.display = 'none';
                 if (vendorInput) vendorInput.value = '';
                 if (invoiceNumberInput) invoiceNumberInput.value = '';
                 if (invoiceTotalInput) invoiceTotalInput.value = '';
+                partsOnOrderManualLines = [];
 
                 partsLoadRos();
                 partsLoadOnOrderLines();
@@ -1649,7 +1750,8 @@ def get_parts_script():
                 .map(id => parseInt(id, 10))
                 .filter(id => !Number.isNaN(id));
 
-            const selectedLines = (partsCurrentLines || []).filter(line => checked.includes(Number(line.id)));
+            const checkedIdSet = new Set(checked.map(id => String(id)));
+            const selectedLines = (partsCurrentLines || []).filter(line => checkedIdSet.has(String(line.id)));
             const selectedVendor = (partsVendorsCache || []).find(v => String(v.id) === String(vendorId));
 
             if (!vendorId) {

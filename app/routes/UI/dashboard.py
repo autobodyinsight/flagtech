@@ -455,7 +455,9 @@ def get_dashboard_screen_html():
                 activeView: '',
                 techLineItems: [],
                 techAssignContext: null,
-                techAssignLines: []
+                techAssignLines: [],
+                techAssignManualLines: [],
+                techAssignNextManualId: 1
             };
 
             function escapePopupHtml(value) {
@@ -1052,7 +1054,8 @@ def get_dashboard_screen_html():
             function renderTechAssignLinesModal(lines) {
                 const container = roWindowDoc.getElementById('roPopupTechModalLines');
                 if (!container) return;
-                if (!lines || !lines.length) {
+                const manualLines = Array.isArray(popupState.techAssignManualLines) ? popupState.techAssignManualLines : [];
+                if ((!lines || !lines.length) && manualLines.length === 0) {
                     container.innerHTML = '<div style="padding:10px; color:#777;">No repair lines found.</div>';
                     return;
                 }
@@ -1061,7 +1064,7 @@ def get_dashboard_screen_html():
                     const bv = parseInt(String(b.line_number || b.line_key || '').match(/\d+/)?.[0] || '0', 10);
                     return av - bv;
                 });
-                container.innerHTML = sorted.map((line) => {
+                const standardRows = sorted.map((line) => {
                     const lineNumber = escapePopupHtml(line.line_number || line.line_key || '-');
                     const description = escapePopupHtml(String(line.description || '').trim());
                     const lineType = normalizeTypeLabelLocal(line.repair_type);
@@ -1074,6 +1077,59 @@ def get_dashboard_screen_html():
                         </div>
                     `;
                 }).join('');
+
+                const manualRows = manualLines.map((line) => {
+                    const lineKey = escapePopupHtml(line.line_key || '');
+                    const lineType = escapePopupHtml(normalizeTypeLabelLocal(line.repair_type || 'body'));
+                    const description = escapePopupHtml(String(line.description || ''));
+                    const hours = Number(line.hours || 0);
+                    return `
+                        <div class="ro-popup-tech-manual-row" data-line-key="${lineKey}" style="display:flex; align-items:center; gap:10px; padding:8px 10px; border-bottom:1px solid #eee; background:#fafafa; font-style:italic;">
+                            <input type="checkbox" class="roPopupTechLineCheckbox" checked data-is-manual="1" data-line-key="${lineKey}" data-repair-type="${lineType}" data-hours="${escapePopupHtml(hours.toFixed(1))}" style="width:16px; height:16px;" />
+                            <select class="roPopupTechManualPreset" data-line-key="${lineKey}" style="min-width:140px; padding:6px; border:1px solid #ccc; border-radius:4px; font-style:normal;">
+                                <option value="">Preset...</option>
+                                <option value="LKQ repair" ${description.toLowerCase() === 'lkq repair' ? 'selected' : ''}>LKQ repair</option>
+                                <option value="Shop damage" ${description.toLowerCase() === 'shop damage' ? 'selected' : ''}>Shop damage</option>
+                                <option value="Reassignment" ${description.toLowerCase() === 'reassignment' ? 'selected' : ''}>Reassignment</option>
+                                <option value="Tech change" ${description.toLowerCase() === 'tech change' ? 'selected' : ''}>Tech change</option>
+                            </select>
+                            <input type="text" class="roPopupTechManualDescription" data-line-key="${lineKey}" value="${description}" placeholder="Description" style="flex:1; padding:6px; border:1px solid #ccc; border-radius:4px; font-style:normal;" />
+                            <input type="number" class="roPopupTechManualHours" data-line-key="${lineKey}" min="0" step="0.1" value="${escapePopupHtml(hours.toFixed(1))}" style="width:90px; padding:6px; border:1px solid #ccc; border-radius:4px; text-align:right; font-style:normal;" />
+                            <div style="min-width:70px; text-align:right; font-weight:bold;">hrs</div>
+                        </div>
+                    `;
+                }).join('');
+
+                container.innerHTML = `${standardRows}${manualRows}`;
+
+                container.querySelectorAll('.roPopupTechManualPreset').forEach((selectEl) => {
+                    selectEl.addEventListener('change', (event) => {
+                        const selectTarget = event.currentTarget;
+                        const lineKey = selectTarget?.getAttribute('data-line-key') || '';
+                        const value = String(selectTarget?.value || '').trim();
+                        const descInput = container.querySelector(`.roPopupTechManualDescription[data-line-key="${lineKey}"]`);
+                        if (descInput && value) {
+                            descInput.value = value;
+                        }
+                    });
+                });
+            }
+
+            function addTechAssignManualLinePopup() {
+                const lineId = popupState.techAssignNextManualId || 1;
+                popupState.techAssignNextManualId = lineId + 1;
+                const typeSelect = roWindowDoc.getElementById('roPopupTechType');
+                const currentType = normalizeTypeLabelLocal(typeSelect?.value || 'body');
+                popupState.techAssignManualLines = Array.isArray(popupState.techAssignManualLines)
+                    ? popupState.techAssignManualLines
+                    : [];
+                popupState.techAssignManualLines.push({
+                    line_key: `manual-${lineId}`,
+                    repair_type: currentType,
+                    description: '',
+                    hours: 0,
+                });
+                renderTechAssignLinesModal(popupState.techAssignLines || []);
             }
 
             async function openTechAssignModalPopup(item) {
@@ -1095,6 +1151,8 @@ def get_dashboard_screen_html():
                         tech_name: sourceTech,
                     },
                 };
+                popupState.techAssignManualLines = [];
+                popupState.techAssignNextManualId = 1;
 
                 title.textContent = `Assign Repair Lines - RO# ${ro.ro}`;
                 modal.style.display = 'flex';
@@ -1140,10 +1198,28 @@ def get_dashboard_screen_html():
                     return;
                 }
 
-                const selectedLines = Array.from(roWindowDoc.querySelectorAll('.roPopupTechLineCheckbox:checked')).map((checkbox) => ({
-                    repair_type: checkbox.getAttribute('data-repair-type'),
-                    line_key: checkbox.getAttribute('data-line-key'),
-                }));
+                const selectedLines = Array.from(roWindowDoc.querySelectorAll('.roPopupTechLineCheckbox:checked')).map((checkbox) => {
+                    const lineKey = checkbox.getAttribute('data-line-key') || '';
+                    const repairType = checkbox.getAttribute('data-repair-type') || 'body';
+                    const isManual = checkbox.getAttribute('data-is-manual') === '1';
+                    const payload = {
+                        repair_type: repairType,
+                        line_key: lineKey,
+                    };
+
+                    if (isManual) {
+                        const descInput = roWindowDoc.querySelector(`.roPopupTechManualDescription[data-line-key="${lineKey}"]`);
+                        const hoursInput = roWindowDoc.querySelector(`.roPopupTechManualHours[data-line-key="${lineKey}"]`);
+                        payload.is_manual = true;
+                        payload.description = String(descInput?.value || '').trim();
+                        payload.hours = Number(hoursInput?.value || 0);
+                    }
+
+                    return payload;
+                }).filter((item) => {
+                    if (!item.is_manual) return true;
+                    return !!item.description && Number.isFinite(item.hours) && item.hours >= 0;
+                });
 
                 if (!selectedLines.length) {
                     alert('Select at least one repair line.');
@@ -1177,8 +1253,14 @@ def get_dashboard_screen_html():
             function bindTechModalActions() {
                 const closeBtn = roWindowDoc.getElementById('roPopupTechModalClose');
                 const saveBtn = roWindowDoc.getElementById('roPopupTechModalSave');
+                const addLineBtn = roWindowDoc.getElementById('roPopupTechModalAddLine');
                 const modal = roWindowDoc.getElementById('roPopupTechModal');
                 if (closeBtn && modal) closeBtn.onclick = () => { modal.style.display = 'none'; };
+                if (addLineBtn) {
+                    addLineBtn.onclick = () => {
+                        addTechAssignManualLinePopup();
+                    };
+                }
                 if (saveBtn) {
                     saveBtn.onclick = async () => {
                         try {
@@ -1221,6 +1303,7 @@ def get_dashboard_screen_html():
                             </div>
                             <div id="roPopupTechModalLines" style="border:1px solid #e2e2e2; border-radius:6px; max-height:52vh; overflow:auto;"></div>
                             <div style="display:flex; justify-content:flex-end; gap:8px; margin-top:12px;">
+                                <button id="roPopupTechModalAddLine" type="button" style="padding:9px 14px; background:#f5f5f5; color:#333; border:1px solid #ccc; border-radius:6px; cursor:pointer;">+ Add Line</button>
                                 <button id="roPopupTechModalSave" type="button" style="padding:9px 14px; background:#d32f2f; color:#fff; border:none; border-radius:6px; cursor:pointer; font-weight:700;">Save</button>
                             </div>
                         </div>

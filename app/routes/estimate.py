@@ -416,6 +416,7 @@ def _ensure_parts_received_table(cur) -> None:
             ro VARCHAR(255) NOT NULL,
             line_id INTEGER NOT NULL,
             vendor VARCHAR(255) NOT NULL,
+            description TEXT,
             part_number VARCHAR(255),
             qty_received NUMERIC,
             list_price NUMERIC,
@@ -432,6 +433,7 @@ def _ensure_parts_received_table(cur) -> None:
         )
         """
     )
+    cur.execute("ALTER TABLE parts_received ADD COLUMN IF NOT EXISTS description TEXT")
     cur.execute("ALTER TABLE parts_received ADD COLUMN IF NOT EXISTS part_number VARCHAR(255)")
     cur.execute("ALTER TABLE parts_received ADD COLUMN IF NOT EXISTS qty_received NUMERIC")
     cur.execute("ALTER TABLE parts_received ADD COLUMN IF NOT EXISTS list_price NUMERIC")
@@ -3082,22 +3084,40 @@ async def save_ro_assignment_lines(request: Request):
             if not active_named:
                 return JSONResponse(status_code=400, content={"error": "Selected tech is archived or unavailable"})
 
-        scope_rows = _get_scope_rows(cur, domain, ro_value, source)
-        if not scope_rows:
-            return {"status": "ok"}
+        selected_keys = set()
+        manual_lines = []
+        for item in selected_lines:
+            if not isinstance(item, dict):
+                continue
+            repair_type = _normalize_repair_type(item.get("repair_type") or target_type)
+            line_key = str(item.get("line_key") or "")
+            is_manual = bool(item.get("is_manual"))
 
+            if is_manual:
+                description = (item.get("description") or "").strip()
+                hours_value = _parse_float_value(item.get("hours"))
+                if not description:
+                    return JSONResponse(status_code=400, content={"error": "Manual line description is required"})
+                if hours_value < 0:
+                    return JSONResponse(status_code=400, content={"error": "Manual line hours cannot be negative"})
+                manual_lines.append(
+                    {
+                        "repair_type": repair_type,
+                        "description": description,
+                        "hours": hours_value,
+                    }
+                )
+                continue
+
+            if not line_key:
+                continue
+            selected_keys.add((repair_type, line_key))
+
+        scope_rows = _get_scope_rows(cur, domain, ro_value, source)
         scope_keys = {
             (str(row.get("repair_type") or ""), str(row.get("line_key") or "")): int(row.get("id"))
             for row in scope_rows
         }
-
-        selected_keys = set()
-        for item in selected_lines:
-            if not isinstance(item, dict):
-                continue
-            repair_type = _normalize_repair_type(item.get("repair_type"))
-            line_key = str(item.get("line_key") or "")
-            selected_keys.add((repair_type, line_key))
 
         selected_ids = []
         remainder_ids = []
@@ -3134,6 +3154,61 @@ async def save_ro_assignment_lines(request: Request):
                 (remainder_ids,),
             )
 
+        manual_insert_count = 0
+        if manual_lines:
+            cur.execute(
+                """
+                SELECT line_key
+                FROM ro_line_assignments
+                WHERE domain = %s
+                  AND ro = %s
+                """,
+                (domain, ro_value),
+            )
+            existing_line_keys = {str(row.get("line_key") or "") for row in (cur.fetchall() or [])}
+            base_stamp = int(datetime.utcnow().timestamp())
+
+            for index, manual_line in enumerate(manual_lines, start=1):
+                base_key = f"manual-{base_stamp}-{index}"
+                next_key = base_key
+                suffix = 1
+                while next_key in existing_line_keys:
+                    suffix += 1
+                    next_key = f"{base_key}-{suffix}"
+                existing_line_keys.add(next_key)
+
+                cur.execute(
+                    """
+                    INSERT INTO ro_line_assignments (
+                        ro,
+                        repair_type,
+                        source_repair_type,
+                        line_key,
+                        line_number,
+                        description,
+                        hours,
+                        tech_id,
+                        tech_name,
+                        is_pending,
+                        domain
+                    )
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, FALSE, %s)
+                    """,
+                    (
+                        ro_value,
+                        manual_line["repair_type"],
+                        manual_line["repair_type"],
+                        next_key,
+                        f"M{index}",
+                        manual_line["description"],
+                        manual_line["hours"],
+                        target_tech_id,
+                        target_tech_name or None,
+                        domain,
+                    ),
+                )
+                manual_insert_count += 1
+
         cur.execute(
             """
             SELECT repair_type, COALESCE(SUM(hours), 0) AS total_hours
@@ -3159,7 +3234,7 @@ async def save_ro_assignment_lines(request: Request):
             "frame": "Frame",
         }
 
-        if selected_ids:
+        if selected_ids or manual_insert_count > 0:
             tech_label = (target_tech_name or "").strip()
             if not tech_label and target_tech_id:
                 tech_label = f"Tech #{target_tech_id}"
@@ -4805,7 +4880,7 @@ async def list_arrived_lines(request: Request, ro: str):
 
         cur.execute(
             """
-                                                SELECT line_id, vendor, part_number, list_price, cost, invoice_number, received_business_date, received_at
+                                                SELECT line_id, vendor, description, part_number, list_price, cost, invoice_number, received_business_date, received_at
             FROM parts_received
             WHERE domain = %s
               AND ro = %s
@@ -4824,7 +4899,7 @@ async def list_arrived_lines(request: Request, ro: str):
                 {
                     "line_id": line_id,
                     "line": metadata.get("line") or line_id,
-                    "description": metadata.get("description") or "",
+                    "description": row.get("description") or metadata.get("description") or "",
                     "part_number": row.get("part_number") or metadata.get("part_number") or "",
                     "list": float(row.get("list_price") or metadata.get("list") or 0),
                     "vendor": row.get("vendor") or "",
@@ -4962,7 +5037,7 @@ async def list_returned_lines(request: Request, ro: str):
 
         cur.execute(
             """
-                        SELECT line_id, vendor, part_number, cost, returned_business_date, returned_at, received_business_date, received_at
+                        SELECT line_id, vendor, description, part_number, cost, returned_business_date, returned_at, received_business_date, received_at
             FROM parts_received
             WHERE domain = %s
               AND ro = %s
@@ -4987,7 +5062,7 @@ async def list_returned_lines(request: Request, ro: str):
                 {
                     "line_id": line_id,
                     "line": metadata.get("line") or line_id,
-                    "description": metadata.get("description") or "",
+                    "description": row.get("description") or metadata.get("description") or "",
                     "part_number": row.get("part_number") or metadata.get("part_number") or "",
                     "vendor": row.get("vendor") or "",
                     "cost": float(row.get("cost") or 0),
@@ -5116,6 +5191,7 @@ async def receive_on_order_lines(request: Request):
     invoice_total_amount = data.get("invoice_total_amount")
     local_business_date_text = (data.get("local_business_date") or "").strip()
     items = data.get("items") or []
+    manual_items = data.get("manual_items") or []
 
     local_business_date = None
     if local_business_date_text:
@@ -5189,6 +5265,44 @@ async def receive_on_order_lines(request: Request):
             }
         )
 
+    normalized_manual_items = []
+    if manual_items:
+        if not isinstance(manual_items, list):
+            return JSONResponse(status_code=400, content={"error": "Manual items data is invalid"})
+        for manual_item in manual_items:
+            if not isinstance(manual_item, dict):
+                return JSONResponse(status_code=400, content={"error": "Manual item data is invalid"})
+
+            description = str(manual_item.get("description") or "").strip()
+            part_number = str(manual_item.get("part_number") or "").strip()
+            vendor = str(manual_item.get("vendor") or vendor_name_input).strip()
+
+            try:
+                qty_received = float(manual_item.get("qty_received"))
+                cost = float(manual_item.get("cost"))
+            except (TypeError, ValueError):
+                return JSONResponse(status_code=400, content={"error": "Manual item values are invalid"})
+
+            if not description:
+                return JSONResponse(status_code=400, content={"error": "Manual item description is required"})
+            if qty_received <= 0:
+                return JSONResponse(status_code=400, content={"error": "Manual item quantity must be greater than zero"})
+            if cost < 0:
+                return JSONResponse(status_code=400, content={"error": "Manual item cost cannot be negative"})
+            if not vendor:
+                return JSONResponse(status_code=400, content={"error": "Vendor is required for manual items"})
+
+            selected_cost_total += cost
+            normalized_manual_items.append(
+                {
+                    "description": description,
+                    "part_number": part_number,
+                    "qty_received": qty_received,
+                    "cost": cost,
+                    "vendor": vendor,
+                }
+            )
+
     if round(selected_cost_total, 2) != round(invoice_total, 2):
         return JSONResponse(status_code=400, content={"error": "Selected part costs must equal total invoice amount"})
 
@@ -5225,12 +5339,13 @@ async def receive_on_order_lines(request: Request):
             cur.execute(
                 """
                 INSERT INTO parts_received
-                    (ro, line_id, vendor, part_number, qty_received, list_price, cost, eta, invoice_number, invoice_total, returned, received_business_date, domain)
+                    (ro, line_id, vendor, description, part_number, qty_received, list_price, cost, eta, invoice_number, invoice_total, returned, received_business_date, domain)
                 VALUES
-                    (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, FALSE, COALESCE(%s, CURRENT_DATE), %s)
+                    (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, FALSE, COALESCE(%s, CURRENT_DATE), %s)
                 ON CONFLICT (ro, line_id, domain)
                 DO UPDATE SET
                     vendor = EXCLUDED.vendor,
+                    description = EXCLUDED.description,
                     part_number = EXCLUDED.part_number,
                     qty_received = EXCLUDED.qty_received,
                     list_price = EXCLUDED.list_price,
@@ -5246,6 +5361,7 @@ async def receive_on_order_lines(request: Request):
                     ro_value,
                     item["line_id"],
                     item["vendor"],
+                    None,
                     item["part_number"] or None,
                     item["qty_received"],
                     item["list_price"],
@@ -5257,6 +5373,44 @@ async def receive_on_order_lines(request: Request):
                     domain,
                 ),
             )
+
+        if normalized_manual_items:
+            cur.execute(
+                """
+                SELECT COALESCE(MIN(line_id), 0) AS min_line_id
+                FROM parts_received
+                WHERE domain = %s
+                  AND ro = %s
+                """,
+                (domain, ro_value),
+            )
+            min_line_row = cur.fetchone() or {}
+            min_line_id = int(min_line_row.get("min_line_id") or 0)
+            next_manual_line_id = min_line_id - 1 if min_line_id <= 0 else -1
+
+            for manual_item in normalized_manual_items:
+                cur.execute(
+                    """
+                    INSERT INTO parts_received
+                        (ro, line_id, vendor, description, part_number, qty_received, list_price, cost, eta, invoice_number, invoice_total, returned, received_business_date, domain)
+                    VALUES
+                        (%s, %s, %s, %s, %s, %s, NULL, %s, NULL, %s, %s, FALSE, COALESCE(%s, CURRENT_DATE), %s)
+                    """,
+                    (
+                        ro_value,
+                        next_manual_line_id,
+                        manual_item["vendor"],
+                        manual_item["description"],
+                        manual_item["part_number"] or None,
+                        manual_item["qty_received"],
+                        manual_item["cost"],
+                        invoice_number,
+                        invoice_total,
+                        local_business_date,
+                        domain,
+                    ),
+                )
+                next_manual_line_id -= 1
 
         for order_id, selected_line_ids in line_ids_by_order.items():
             cur.execute(
