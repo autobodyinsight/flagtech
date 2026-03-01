@@ -96,9 +96,9 @@ def get_parts_screen_html():
                 <h2 style="margin-bottom:14px;">ON ORDER</h2>
 
                 <div style="display:flex; gap:10px; margin-bottom:12px;">
-                    <button id="partsOnOrderReceiveBtn" onclick="partsEnterReceiveMode()" style="padding:10px 16px; background-color:#b22222; color:white; border:none; border-radius:4px; cursor:pointer; font-size:14px;">Receive</button>
-                    <button id="partsOnOrderAddPartBtn" onclick="partsAddOnOrderManualLine()" style="display:none; padding:10px 16px; background-color:#b22222; color:white; border:none; border-radius:4px; cursor:pointer; font-size:14px;">+ Add Part</button>
-                    <button id="partsOnOrderSaveBtn" onclick="partsSaveOnOrderReceive()" style="display:none; padding:10px 16px; background-color:#b22222; color:white; border:none; border-radius:4px; cursor:pointer; font-size:14px;">Save</button>
+                    <button type="button" id="partsOnOrderReceiveBtn" onclick="partsEnterReceiveMode()" style="padding:10px 16px; background-color:#b22222; color:white; border:none; border-radius:4px; cursor:pointer; font-size:14px;">Receive</button>
+                    <button type="button" id="partsOnOrderAddPartBtn" onclick="partsAddOnOrderManualLine()" style="display:none; padding:10px 16px; background-color:#b22222; color:white; border:none; border-radius:4px; cursor:pointer; font-size:14px;">+ Add Part</button>
+                    <button type="button" id="partsOnOrderSaveBtn" onclick="partsSaveOnOrderReceive()" style="display:none; padding:10px 16px; background-color:#b22222; color:white; border:none; border-radius:4px; cursor:pointer; font-size:14px;">Save</button>
                 </div>
 
                 <div id="partsOnOrderInvoiceWrap" style="display:none; margin-bottom:14px;">
@@ -1069,7 +1069,11 @@ def get_parts_script():
 
         function partsEnterReceiveMode() {
             if (!partsOnOrderRo) return;
-            partsOnOrderReceiveMode = !partsOnOrderReceiveMode;
+            if (partsOnOrderReceiveMode) {
+                partsKeepOnOrderReceiveEditable('#partsOnOrderVendorInput');
+                return;
+            }
+            partsOnOrderReceiveMode = true;
 
             const receiveBtn = document.getElementById('partsOnOrderReceiveBtn');
             const addPartBtn = document.getElementById('partsOnOrderAddPartBtn');
@@ -1077,16 +1081,6 @@ def get_parts_script():
             if (receiveBtn) receiveBtn.textContent = partsOnOrderReceiveMode ? 'Receive (On)' : 'Receive';
             if (addPartBtn) addPartBtn.style.display = partsOnOrderReceiveMode ? 'inline-block' : 'none';
             if (saveBtn) saveBtn.style.display = partsOnOrderReceiveMode ? 'inline-block' : 'none';
-
-            if (!partsOnOrderReceiveMode) {
-                const vendorInput = document.getElementById('partsOnOrderVendorInput');
-                const invoiceNumberInput = document.getElementById('partsOnOrderInvoiceNumber');
-                const invoiceTotalInput = document.getElementById('partsOnOrderInvoiceTotal');
-                if (vendorInput) vendorInput.value = '';
-                if (invoiceNumberInput) invoiceNumberInput.value = '';
-                if (invoiceTotalInput) invoiceTotalInput.value = '';
-                partsOnOrderManualLines = [];
-            }
 
             partsRenderOnOrderLines();
         }
