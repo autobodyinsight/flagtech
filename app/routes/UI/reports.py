@@ -202,7 +202,9 @@ def get_reports_screen_html():
         .reports-gp-enclosure {
             border: 1px solid #9e9e9e;
             background: #fff;
-            width: 100%;
+            width: fit-content;
+            min-width: 320px;
+            margin: 0 auto;
             font-size: inherit;
             font-weight: normal;
             color: inherit;
