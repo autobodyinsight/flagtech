@@ -149,24 +149,66 @@ def get_reports_screen_html():
         return { gpDollar, gpPercent };
     }
 
-    function renderGpEnclosure(salesLabel, costLabel, sales, cost) {
-        const gp = computeGpValues(sales, cost);
-        const salesText = formatReportsMoney(sales);
-        const costText = formatReportsMoney(cost);
-        const gpDollarText = Number(gp.gpDollar || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    function formatReportsHours(value) {
+        const amount = Number(value || 0);
+        if (!Number.isFinite(amount)) {
+            return '0.0';
+        }
+        return amount.toFixed(1);
+    }
 
-        return `<div class='reports-gp-enclosure'>
-            <div class='reports-gp-enclosure-top'>
-                <span>${salesLabel} : ${salesText}</span>
-                <span>|</span>
-                <span>${costLabel} : ${costText}</span>
-            </div>
-            <div class='reports-gp-enclosure-bottom'>
-                <span>GP ${formatReportsPercent(gp.gpPercent)}%</span>
-                <span>-</span>
-                <span>GP $${gpDollarText}</span>
-            </div>
-        </div>`;
+    function reportsResolveGroupName(row, groupKey) {
+        const source = row || {};
+        if (groupKey === 'insurance') {
+            return String(source.insurance || source.insurance_company || '').trim();
+        }
+        if (groupKey === 'tech') {
+            return String(source.tech || source.tech_name || source.technician || '').trim();
+        }
+        if (groupKey === 'estimator') {
+            return String(source.estimator || source.written_by || source.estimate_by || '').trim();
+        }
+        return String(source[groupKey] || '').trim();
+    }
+
+    function reportsBuildRoRowsHtml(rows) {
+        const normalizedRows = Array.isArray(rows) ? rows : [];
+        return normalizedRows.map((ro, index) => {
+            const partsSales = Number(ro.parts_sales || 0);
+            const partsCost = Number(ro.parts_cost || 0);
+            const laborSales = Number(ro.labor_sales || 0);
+            const laborCost = Number(ro.labor_cost || 0);
+            const totalSales = Number((ro.total_sales ?? ro.total) || 0);
+            const totalCost = Number(ro.total_cost || 0);
+
+            const partsGp = computeGpValues(partsSales, partsCost);
+            const laborGp = computeGpValues(laborSales, laborCost);
+            const totalGp = computeGpValues(totalSales, totalCost);
+
+            const rowBg = index % 2 === 0 ? '#f2f0ef' : '#ffffff';
+            const gpBg = index % 2 === 0 ? '#ececec' : '#f7f7f7';
+
+            return `
+                <tr style="background:${rowBg};">
+                    <td style='padding:12px;'>${reportsEscapeHtml(ro.ro_number || '')}</td>
+                    <td style='padding:12px;'>${reportsEscapeHtml(ro.vehicle || '')}</td>
+                    <td style='padding:12px;'>${reportsEscapeHtml(ro.insurance || '')}</td>
+                    <td style='padding:12px; text-align:right;'>${formatReportsHours(ro.hours)}</td>
+                    <td style='padding:12px; text-align:right;'>${formatReportsMoney(partsSales)}</td>
+                    <td style='padding:12px; text-align:right;'>${formatReportsMoney(partsCost)}</td>
+                    <td style='padding:12px; text-align:right;'>${formatReportsMoney(laborSales)}</td>
+                    <td style='padding:12px; text-align:right;'>${formatReportsMoney(laborCost)}</td>
+                    <td style='padding:12px; text-align:right;'>${formatReportsMoney(totalSales)}</td>
+                    <td style='padding:12px; text-align:right;'>${formatReportsMoney(totalCost)}</td>
+                </tr>
+                <tr style="background:${gpBg};">
+                    <td colspan='4' style='padding:8px 12px;'></td>
+                    <td colspan='2' style='padding:8px 12px; text-align:right; font-size:12px;'>Parts GP: ${formatReportsPercent(partsGp.gpPercent)}% | ${formatReportsMoney(partsGp.gpDollar)}</td>
+                    <td colspan='2' style='padding:8px 12px; text-align:right; font-size:12px;'>Labor GP: ${formatReportsPercent(laborGp.gpPercent)}% | ${formatReportsMoney(laborGp.gpDollar)}</td>
+                    <td colspan='2' style='padding:8px 12px; text-align:right; font-size:12px;'>Total GP: ${formatReportsPercent(totalGp.gpPercent)}% | ${formatReportsMoney(totalGp.gpDollar)}</td>
+                </tr>
+            `;
+        }).join('');
     }
 
     function reportsEscapeHtml(value) {
@@ -204,26 +246,7 @@ def get_reports_screen_html():
 
     function reportsClosedRoTableHtml(rows) {
         const normalizedRows = Array.isArray(rows) ? rows : [];
-        const rowsHtml = normalizedRows.map((ro) => {
-            const partsSales = Number(ro.parts_sales || 0);
-            const partsCost = Number(ro.parts_cost || 0);
-            const laborSales = Number(ro.labor_sales || 0);
-            const laborCost = Number(ro.labor_cost || 0);
-            const totalSales = Number((ro.total_sales ?? ro.total) || 0);
-            const totalCost = Number(ro.total_cost || 0);
-            const hoursValue = Number(ro.hours || 0);
-            const hoursText = Number.isFinite(hoursValue) ? hoursValue.toFixed(1) : reportsEscapeHtml(ro.hours || '');
-
-            return `<tr>
-                <td style='padding:12px;'>${reportsEscapeHtml(ro.ro_number || '')}</td>
-                <td style='padding:12px;'>${reportsEscapeHtml(ro.vehicle || '')}</td>
-                <td style='padding:12px;'>${reportsEscapeHtml(ro.insurance || '')}</td>
-                <td style='padding:12px; text-align:right;'>${hoursText}</td>
-                <td colspan='2' style='padding:8px 12px;'>${renderGpEnclosure('PARTS-S', 'PARTS-C', partsSales, partsCost)}</td>
-                <td colspan='2' style='padding:8px 12px;'>${renderGpEnclosure('LABOR-S', 'LABOR-C', laborSales, laborCost)}</td>
-                <td colspan='2' style='padding:8px 12px;'>${renderGpEnclosure('TOTAL-S', 'TOTAL-C', totalSales, totalCost)}</td>
-            </tr>`;
-        }).join('');
+        const rowsHtml = reportsBuildRoRowsHtml(normalizedRows);
 
         return `
             <table style="width:100%; border-collapse:collapse; margin-top:12px;">
@@ -324,13 +347,12 @@ def get_reports_screen_html():
                         .header { text-align:center; margin-bottom:20px; border-bottom:2px solid #b22222; padding-bottom:10px; }
                         .header h1 { margin:0 0 6px 0; color:#b22222; font-size:26px; }
                         .header p { margin:0; color:#666; }
-                        .group-header { display:flex; justify-content:space-between; align-items:flex-start; gap:20px; margin-top:26px; margin-bottom:10px; padding-bottom:8px; border-bottom:1px solid #ddd; }
-                        .group-title { font-size:20px; font-weight:bold; color:#333; }
-                        .group-metrics { text-align:right; font-size:13px; line-height:1.5; color:#444; }
+                        .group-wrap { margin-top:24px; margin-bottom:8px; }
+                        .group-title { font-size:18px; font-weight:bold; color:#333; margin-bottom:4px; }
+                        .group-header-line { font-size:12px; line-height:1.4; color:#444; margin-bottom:8px; border-bottom:1px solid #ddd; padding-bottom:6px; }
                         table { width:100%; border-collapse:collapse; }
-                        .reports-gp-enclosure { border: 1px solid #9e9e9e; background: #fff; width: fit-content; min-width: 260px; margin: 0 auto; font-size: 12px; color: inherit; }
-                        .reports-gp-enclosure-top { display:flex; justify-content:center; align-items:center; gap:8px; padding:4px 8px; border-bottom:1px solid #9e9e9e; }
-                        .reports-gp-enclosure-bottom { display:flex; justify-content:center; align-items:center; gap:14px; padding:4px 8px; }
+                        thead th { font-size:12px; }
+                        tbody td { font-size:12px; }
                     </style>
                 </head>
                 <body>
@@ -369,7 +391,7 @@ def get_reports_screen_html():
         const key = printBy;
         const grouped = new Map();
         rows.forEach((row) => {
-            const groupName = String(row?.[key] || '').trim() || 'Unspecified';
+            const groupName = reportsResolveGroupName(row, key) || 'Unspecified';
             if (!grouped.has(groupName)) grouped.set(groupName, []);
             grouped.get(groupName).push(row);
         });
@@ -379,15 +401,9 @@ def get_reports_screen_html():
             .map(([groupName, groupRows]) => {
                 const metrics = reportsComputeMetrics(groupRows);
                 const groupHeaderHtml = `
-                    <div class="group-header">
+                    <div class="group-wrap">
                         <div class="group-title">${reportsEscapeHtml(groupName)}</div>
-                        <div class="group-metrics">
-                            <div><strong>Grand Total Sales:</strong> ${formatReportsMoney(metrics.totalSales)}</div>
-                            <div><strong>RO Count:</strong> ${metrics.roCount}</div>
-                            <div><strong>Total GP:</strong> ${formatReportsPercent(metrics.total.gpPercent)}% | ${formatReportsMoney(metrics.total.gpDollar)}</div>
-                            <div><strong>Parts GP:</strong> ${formatReportsPercent(metrics.parts.gpPercent)}% | ${formatReportsMoney(metrics.parts.gpDollar)}</div>
-                            <div><strong>Labor GP:</strong> ${formatReportsPercent(metrics.labor.gpPercent)}% | ${formatReportsMoney(metrics.labor.gpDollar)}</div>
-                        </div>
+                        <div class="group-header-line">RO Count: ${metrics.roCount} &nbsp;&nbsp;&nbsp;&nbsp; Grand Total Sales: ${formatReportsMoney(metrics.totalSales)} &nbsp;&nbsp;&nbsp;&nbsp; Total GP: ${formatReportsPercent(metrics.total.gpPercent)}% | ${formatReportsMoney(metrics.total.gpDollar)} &nbsp;&nbsp;&nbsp;&nbsp; Parts GP: ${formatReportsPercent(metrics.parts.gpPercent)}% | ${formatReportsMoney(metrics.parts.gpDollar)} &nbsp;&nbsp;&nbsp;&nbsp; Labor GP: ${formatReportsPercent(metrics.labor.gpPercent)}% | ${formatReportsMoney(metrics.labor.gpDollar)}</div>
                     </div>
                 `;
                 return `${groupHeaderHtml}${reportsClosedRoTableHtml(groupRows)}`;
@@ -428,24 +444,7 @@ def get_reports_screen_html():
             if (reportsDataCache.closed_ros.length === 0) {
                 roBody.innerHTML = `<tr><td colspan='10' style='padding:20px; text-align:center; color:#999;'>No closed repair orders found.</td></tr>`;
             } else {
-                for (const ro of reportsDataCache.closed_ros) {
-                    const partsSales = Number(ro.parts_sales || 0);
-                    const partsCost = Number(ro.parts_cost || 0);
-                    const laborSales = Number(ro.labor_sales || 0);
-                    const laborCost = Number(ro.labor_cost || 0);
-                    const totalSales = Number((ro.total_sales ?? ro.total) || 0);
-                    const totalCost = Number(ro.total_cost || 0);
-
-                    roBody.innerHTML += `<tr>
-                        <td style='padding:12px;'>${ro.ro_number || ''}</td>
-                        <td style='padding:12px;'>${ro.vehicle || ''}</td>
-                        <td style='padding:12px;'>${ro.insurance || ''}</td>
-                        <td style='padding:12px; text-align:right;'>${ro.hours || ''}</td>
-                        <td colspan='2' style='padding:8px 12px;'>${renderGpEnclosure('PARTS-S', 'PARTS-C', partsSales, partsCost)}</td>
-                        <td colspan='2' style='padding:8px 12px;'>${renderGpEnclosure('LABOR-S', 'LABOR-C', laborSales, laborCost)}</td>
-                        <td colspan='2' style='padding:8px 12px;'>${renderGpEnclosure('TOTAL-S', 'TOTAL-C', totalSales, totalCost)}</td>
-                    </tr>`;
-                }
+                roBody.innerHTML = reportsBuildRoRowsHtml(reportsDataCache.closed_ros);
             }
         } catch (e) {
             document.getElementById('reportsSummaryBody').innerHTML = `<tr><td colspan='4' style='padding:20px; text-align:center; color:#c00;'>Error loading data</td></tr>`;
@@ -466,35 +465,5 @@ def get_reports_screen_html():
         });
     });
     </script>
-    <style>
-        .reports-gp-enclosure {
-            border: 1px solid #9e9e9e;
-            background: #fff;
-            width: fit-content;
-            min-width: 320px;
-            margin: 0 auto;
-            font-size: inherit;
-            font-weight: normal;
-            color: inherit;
-        }
-        .reports-gp-enclosure-top {
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            gap: 10px;
-            padding: 6px 10px;
-            border-bottom: 1px solid #9e9e9e;
-            font-size: inherit;
-            font-weight: normal;
-        }
-        .reports-gp-enclosure-bottom {
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            gap: 18px;
-            padding: 6px 10px;
-            font-size: inherit;
-            font-weight: normal;
-        }
-    </style>
+    <style></style>
     '''
