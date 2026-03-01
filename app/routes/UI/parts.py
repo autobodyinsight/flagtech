@@ -29,6 +29,7 @@ def get_parts_screen_html():
                         <tr class="parts-header-row">
                             <th style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold;">RO#</th>
                             <th style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold;">Vehicle</th>
+                            <th style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold;">Estimator</th>
                             <th style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold;">Tech</th>
                             <th style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold;">Parts Qty</th>
                             <th style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold;">On Order</th>
@@ -38,7 +39,7 @@ def get_parts_screen_html():
                     </thead>
                     <tbody id="partsRoBody">
                         <tr>
-                            <td colspan="7" style="padding:20px; text-align:center; color:#999;">Loading...</td>
+                            <td colspan="8" style="padding:20px; text-align:center; color:#999;">Loading...</td>
                         </tr>
                     </tbody>
                 </table>
@@ -815,13 +816,13 @@ def get_parts_script():
             const tbody = document.getElementById('partsRoBody');
             if (!tbody) return;
 
-            tbody.innerHTML = '<tr><td colspan="7" style="padding:20px; text-align:center; color:#999;">Loading...</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="8" style="padding:20px; text-align:center; color:#999;">Loading...</td></tr>';
 
             fetch('/api/parts/ros', { credentials: 'include' })
                 .then(r => r.json())
                 .then(res => {
                     if (!res.ros || res.ros.length === 0) {
-                        tbody.innerHTML = '<tr><td colspan="7" style="padding:20px; text-align:center; color:#999;">No repair orders found</td></tr>';
+                        tbody.innerHTML = '<tr><td colspan="8" style="padding:20px; text-align:center; color:#999;">No repair orders found</td></tr>';
                         return;
                     }
 
@@ -831,6 +832,7 @@ def get_parts_script():
                             <tr style="background:${rowBg};">
                                 <td style="padding:12px; border-bottom:1px solid #eee; color:#333;">${ro.ro}</td>
                                 <td style="padding:12px; border-bottom:1px solid #eee; color:#333;">${ro.vehicle || '—'}</td>
+                                <td style="padding:12px; border-bottom:1px solid #eee; color:#333;">${ro.estimator || '—'}</td>
                                 <td style="padding:12px; border-bottom:1px solid #eee; color:#333;">${ro.tech || '—'}</td>
                                 <td style="padding:12px; border-bottom:1px solid #eee; color:#333;">
                                     <button class="link-button" onclick="openPartsOrderModal('${ro.ro}')" style="background:none; border:none; color:#0066cc; text-decoration:underline; cursor:pointer; padding:0;">
@@ -863,7 +865,7 @@ def get_parts_script():
                 })
                 .catch(err => {
                     console.error('Error loading parts ROs:', err);
-                    tbody.innerHTML = '<tr><td colspan="7" style="padding:20px; text-align:center; color:red;">Error loading repair orders.</td></tr>';
+                    tbody.innerHTML = '<tr><td colspan="8" style="padding:20px; text-align:center; color:red;">Error loading repair orders.</td></tr>';
                 });
         }
 

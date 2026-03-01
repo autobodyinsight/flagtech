@@ -4395,6 +4395,7 @@ async def list_parts_ros(request: Request):
             SELECT DISTINCT ON (ro)
                    ro,
                    vehicle,
+                 estimator,
                    parts_repairs,
                    saved_at
             FROM saved_estimates
@@ -4569,6 +4570,7 @@ async def list_parts_ros(request: Request):
                 {
                     "ro": ro,
                     "vehicle": row.get("vehicle"),
+                    "estimator": (row.get("estimator") or "").strip() or "—",
                     "tech": tech_by_ro.get(ro, "—"),
                     "parts_qty": float(parts_qty or line_count or 0),
                     "on_order": on_order,
