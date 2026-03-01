@@ -3138,7 +3138,10 @@ def get_dashboard_screen_html():
                             <td colspan="10" style="padding:0 16px 10px 16px; border-bottom:1px solid #eee;">
                                 <div class="ro-slide-panel" style="max-height:0; overflow:hidden; opacity:0; transition:max-height 0.22s ease, opacity 0.22s ease;">
                                     <div style="background:#fafafa; border:1px solid #ddd; border-radius:6px; padding:10px 12px;">
-                                        <div style="font-weight:bold; margin-bottom:8px; color:#333;">HRS Assignments</div>
+                                        <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:8px; color:#333;">
+                                            <div style="font-weight:bold;">HRS Assignments</div>
+                                            <div style="font-weight:bold; color:#333;">${escapeHtml(estimatorDisplay)}</div>
+                                        </div>
                                         <div id="hrs-assignment-content-${rowId}" style="width:100%;"></div>
                                     </div>
                                 </div>
