@@ -1289,11 +1289,156 @@ def get_parts_script():
             body.innerHTML = `${existingLinesHtml}${manualLinesHtml}`;
         }
 
+        function partsCaptureOnOrderReceiveDraft() {
+            const draft = {
+                vendorName: (document.getElementById('partsOnOrderVendorInput')?.value || '').trim(),
+                invoiceNumber: (document.getElementById('partsOnOrderInvoiceNumber')?.value || '').trim(),
+                invoiceTotal: (document.getElementById('partsOnOrderInvoiceTotal')?.value || '').trim(),
+                checkedKeys: new Set(),
+                partNumbers: {},
+                listValues: {},
+                qtyValues: {},
+                costValues: {},
+                manualLines: [],
+            };
+
+            Array.from(document.querySelectorAll('#partsOnOrderBody .parts-onorder-check')).forEach((checkbox) => {
+                const lineId = String(checkbox.getAttribute('data-line-id') || '').trim();
+                const orderId = String(checkbox.getAttribute('data-order-id') || '').trim();
+                if (!lineId || !orderId) return;
+                if (checkbox.checked) {
+                    draft.checkedKeys.add(`${orderId}:${lineId}`);
+                }
+            });
+
+            Array.from(document.querySelectorAll('#partsOnOrderBody .parts-onorder-partnum')).forEach((input) => {
+                const lineId = String(input.getAttribute('data-line-id') || '').trim();
+                if (!lineId) return;
+                draft.partNumbers[lineId] = input.value;
+            });
+            Array.from(document.querySelectorAll('#partsOnOrderBody .parts-onorder-list')).forEach((input) => {
+                const lineId = String(input.getAttribute('data-line-id') || '').trim();
+                if (!lineId) return;
+                draft.listValues[lineId] = input.value;
+            });
+            Array.from(document.querySelectorAll('#partsOnOrderBody .parts-onorder-qty')).forEach((input) => {
+                const lineId = String(input.getAttribute('data-line-id') || '').trim();
+                if (!lineId) return;
+                draft.qtyValues[lineId] = input.value;
+            });
+            Array.from(document.querySelectorAll('#partsOnOrderBody .parts-onorder-cost')).forEach((input) => {
+                const lineId = String(input.getAttribute('data-line-id') || '').trim();
+                if (!lineId) return;
+                draft.costValues[lineId] = input.value;
+            });
+
+            const manualDescInputs = Array.from(document.querySelectorAll('#partsOnOrderBody .parts-onorder-manual-description'));
+            if (manualDescInputs.length > 0) {
+                draft.manualLines = manualDescInputs.map((descriptionInput) => {
+                    const manualIndex = String(descriptionInput.getAttribute('data-manual-index') || '').trim();
+                    const qtyInput = document.querySelector(`.parts-onorder-manual-qty[data-manual-index="${manualIndex}"]`);
+                    const partNumberInput = document.querySelector(`.parts-onorder-manual-partnum[data-manual-index="${manualIndex}"]`);
+                    const costInput = document.querySelector(`.parts-onorder-manual-cost[data-manual-index="${manualIndex}"]`);
+                    return {
+                        description: (descriptionInput?.value || '').trim(),
+                        qty_received: (qtyInput?.value || '').trim(),
+                        part_number: (partNumberInput?.value || '').trim(),
+                        cost: (costInput?.value || '').trim(),
+                    };
+                });
+            } else {
+                draft.manualLines = Array.isArray(partsOnOrderManualLines)
+                    ? partsOnOrderManualLines.map(line => ({
+                        description: String(line?.description || ''),
+                        qty_received: String(line?.qty_received || ''),
+                        part_number: String(line?.part_number || ''),
+                        cost: String(line?.cost || ''),
+                    }))
+                    : [];
+            }
+
+            return draft;
+        }
+
+        function partsRestoreOnOrderReceiveDraft(draft, focusSelector = '') {
+            if (!draft || typeof draft !== 'object') return;
+
+            partsOnOrderReceiveMode = true;
+            const receiveBtn = document.getElementById('partsOnOrderReceiveBtn');
+            const addPartBtn = document.getElementById('partsOnOrderAddPartBtn');
+            const saveBtn = document.getElementById('partsOnOrderSaveBtn');
+            if (receiveBtn) receiveBtn.textContent = 'Receive (On)';
+            if (addPartBtn) addPartBtn.style.display = 'inline-block';
+            if (saveBtn) saveBtn.style.display = 'inline-block';
+
+            partsOnOrderManualLines = Array.isArray(draft.manualLines)
+                ? draft.manualLines.map(line => ({
+                    description: String(line?.description || ''),
+                    qty_received: String(line?.qty_received || ''),
+                    part_number: String(line?.part_number || ''),
+                    cost: String(line?.cost || ''),
+                }))
+                : [];
+
+            partsRenderOnOrderLines();
+
+            const vendorInput = document.getElementById('partsOnOrderVendorInput');
+            const invoiceNumberInput = document.getElementById('partsOnOrderInvoiceNumber');
+            const invoiceTotalInput = document.getElementById('partsOnOrderInvoiceTotal');
+            if (vendorInput) vendorInput.value = String(draft.vendorName || '');
+            if (invoiceNumberInput) invoiceNumberInput.value = String(draft.invoiceNumber || '');
+            if (invoiceTotalInput) invoiceTotalInput.value = String(draft.invoiceTotal || '');
+
+            Array.from(document.querySelectorAll('#partsOnOrderBody .parts-onorder-check')).forEach((checkbox) => {
+                const lineId = String(checkbox.getAttribute('data-line-id') || '').trim();
+                const orderId = String(checkbox.getAttribute('data-order-id') || '').trim();
+                if (!lineId || !orderId) return;
+                checkbox.checked = Boolean(draft.checkedKeys?.has(`${orderId}:${lineId}`));
+            });
+            Array.from(document.querySelectorAll('#partsOnOrderBody .parts-onorder-partnum')).forEach((input) => {
+                const lineId = String(input.getAttribute('data-line-id') || '').trim();
+                if (!lineId || !(lineId in (draft.partNumbers || {}))) return;
+                input.value = draft.partNumbers[lineId];
+            });
+            Array.from(document.querySelectorAll('#partsOnOrderBody .parts-onorder-list')).forEach((input) => {
+                const lineId = String(input.getAttribute('data-line-id') || '').trim();
+                if (!lineId || !(lineId in (draft.listValues || {}))) return;
+                input.value = draft.listValues[lineId];
+            });
+            Array.from(document.querySelectorAll('#partsOnOrderBody .parts-onorder-qty')).forEach((input) => {
+                const lineId = String(input.getAttribute('data-line-id') || '').trim();
+                if (!lineId || !(lineId in (draft.qtyValues || {}))) return;
+                input.value = draft.qtyValues[lineId];
+            });
+            Array.from(document.querySelectorAll('#partsOnOrderBody .parts-onorder-cost')).forEach((input) => {
+                const lineId = String(input.getAttribute('data-line-id') || '').trim();
+                if (!lineId || !(lineId in (draft.costValues || {}))) return;
+                input.value = draft.costValues[lineId];
+            });
+
+            if (focusSelector) {
+                const focusEl = document.querySelector(focusSelector);
+                if (focusEl && typeof focusEl.focus === 'function') {
+                    try {
+                        focusEl.focus();
+                    } catch (_) {
+                    }
+                }
+            }
+        }
+
         function partsSaveOnOrderReceive() {
             if (!partsOnOrderReceiveMode) {
                 alert('Click Receive first.');
                 return;
             }
+
+            const draft = partsCaptureOnOrderReceiveDraft();
+            const failValidation = (message, focusSelector = '') => {
+                alert(message);
+                partsRestoreOnOrderReceiveDraft(draft, focusSelector);
+                return;
+            };
 
             const vendorName = (document.getElementById('partsOnOrderVendorInput')?.value || '').trim();
             const invoiceNumber = (document.getElementById('partsOnOrderInvoiceNumber')?.value || '').trim();
@@ -1301,16 +1446,16 @@ def get_parts_script():
             const invoiceTotal = parseFloat(invoiceTotalText || '0');
 
             if (!vendorName) {
-                alert('Vendor is required.');
+                failValidation('Vendor is required.', '#partsOnOrderVendorInput');
                 return;
             }
 
             if (!invoiceNumber) {
-                alert('Invoice Number is required.');
+                failValidation('Invoice Number is required.', '#partsOnOrderInvoiceNumber');
                 return;
             }
             if (!Number.isFinite(invoiceTotal) || invoiceTotal <= 0) {
-                alert('Enter a valid Total Invoice Amount.');
+                failValidation('Enter a valid Total Invoice Amount.', '#partsOnOrderInvoiceTotal');
                 return;
             }
 
@@ -1331,13 +1476,13 @@ def get_parts_script():
 
                 const cost = parseFloat((costInput?.value || '').trim());
                 if (!Number.isFinite(cost) || cost < 0) {
-                    alert('Enter a valid cost for selected parts.');
+                    failValidation('Enter a valid cost for selected parts.', `.parts-onorder-cost[data-line-id="${lineId}"]`);
                     return;
                 }
 
                 const qtyReceived = parseFloat((qtyInput?.value || '').trim());
                 if (!Number.isFinite(qtyReceived) || qtyReceived <= 0) {
-                    alert('Enter a valid received QTY for selected parts.');
+                    failValidation('Enter a valid received QTY for selected parts.', `.parts-onorder-qty[data-line-id="${lineId}"]`);
                     return;
                 }
 
@@ -1374,15 +1519,15 @@ def get_parts_script():
                 const qtyReceived = parseFloat(qtyText || '0');
                 const cost = parseFloat(costText || '0');
                 if (!description) {
-                    alert('Manual added parts require a description.');
+                    failValidation('Manual added parts require a description.', `.parts-onorder-manual-description[data-manual-index="${manualIndex}"]`);
                     return;
                 }
                 if (!Number.isFinite(qtyReceived) || qtyReceived <= 0) {
-                    alert('Manual added parts require a valid QTY.');
+                    failValidation('Manual added parts require a valid QTY.', `.parts-onorder-manual-qty[data-manual-index="${manualIndex}"]`);
                     return;
                 }
                 if (!Number.isFinite(cost) || cost < 0) {
-                    alert('Manual added parts require a valid Cost.');
+                    failValidation('Manual added parts require a valid Cost.', `.parts-onorder-manual-cost[data-manual-index="${manualIndex}"]`);
                     return;
                 }
 
@@ -1397,12 +1542,12 @@ def get_parts_script():
             }
 
             if (selectedChecks.length === 0 && manualItems.length === 0) {
-                alert('Select at least one part or add at least one manual part to receive.');
+                failValidation('Select at least one part or add at least one manual part to receive.', '#partsOnOrderBody .parts-onorder-check');
                 return;
             }
 
             if (Math.abs(Number(selectedCostTotal.toFixed(2)) - Number(invoiceTotal.toFixed(2))) > 0.009) {
-                alert('Sum of selected/manual part costs must equal Total Invoice Amount.');
+                failValidation('Sum of selected/manual part costs must equal Total Invoice Amount.', '#partsOnOrderInvoiceTotal');
                 return;
             }
 
@@ -1447,6 +1592,7 @@ def get_parts_script():
             .catch(err => {
                 console.error('Error receiving on-order parts:', err);
                 alert(err.message || 'Error saving received parts.');
+                partsRestoreOnOrderReceiveDraft(draft);
             });
         }
 
