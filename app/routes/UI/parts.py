@@ -1473,6 +1473,167 @@ def get_parts_script():
             if (modal) modal.style.display = 'none';
         }
 
+        function partsOpenPrintOrderView(options) {
+            const ro = String(options?.ro || '').trim();
+            const vendorName = String(options?.vendorName || '').trim();
+            const arrivalDate = String(options?.arrivalDate || '').trim();
+            const orderedLines = Array.isArray(options?.orderedLines) ? options.orderedLines : [];
+            const vendorRecord = options?.vendorRecord || {};
+
+            const popup = window.open('', '_blank', 'width=1000,height=800');
+            if (!popup) {
+                alert('Unable to open print preview. Please allow pop-ups for this site.');
+                return;
+            }
+
+            const safe = (value) => String(value || '')
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/\"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+
+            const formatMoney = (value) => {
+                const amount = Number(value || 0);
+                return '$' + amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            };
+
+            const formatQty = (value) => {
+                const qty = Number(value || 0);
+                if (!Number.isFinite(qty)) return '0';
+                return Number.isInteger(qty) ? String(qty) : qty.toFixed(2).replace(/\.00$/, '');
+            };
+
+            const formatDate = (isoDate) => {
+                if (!isoDate) return '—';
+                const dt = new Date(`${isoDate}T00:00:00`);
+                if (Number.isNaN(dt.getTime())) return isoDate;
+                return dt.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: '2-digit' });
+            };
+
+            const vendorContact = String(vendorRecord.contact_person || '').trim();
+            const vendorPhone = String(vendorRecord.phone || '').trim();
+            const vendorStreet = String(vendorRecord.street || '').trim();
+            const vendorCity = String(vendorRecord.city || '').trim();
+            const vendorState = String(vendorRecord.state || '').trim();
+            const vendorZip = String(vendorRecord.zip || '').trim();
+            const vendorAddress = [vendorStreet, [vendorCity, vendorState].filter(Boolean).join(', '), vendorZip]
+                .filter(Boolean)
+                .join(' ')
+                .trim();
+
+            let totalAmount = 0;
+            const rowsHtml = orderedLines.map((line, index) => {
+                const qtyValue = Number(line.qty || 0);
+                const unitPrice = Number(line.price || 0);
+                const lineTotal = qtyValue * unitPrice;
+                totalAmount += Number.isFinite(lineTotal) ? lineTotal : 0;
+                return `
+                    <tr>
+                        <td>${index + 1}</td>
+                        <td>${safe(line.line || '—')}</td>
+                        <td>${safe(line.description || '')}</td>
+                        <td>${safe(line.part_type || '—')}</td>
+                        <td class="num">${formatQty(qtyValue)}</td>
+                        <td class="num">${formatMoney(unitPrice)}</td>
+                        <td class="num">${formatMoney(lineTotal)}</td>
+                    </tr>
+                `;
+            }).join('');
+
+            const now = new Date();
+            const generatedAt = now.toLocaleString('en-US', { year: 'numeric', month: 'short', day: '2-digit', hour: '2-digit', minute: '2-digit' });
+
+            popup.document.write(`
+                <!DOCTYPE html>
+                <html>
+                <head>
+                    <meta charset="UTF-8" />
+                    <title>Parts Order - RO ${safe(ro)}</title>
+                    <style>
+                        @page { margin: 24px; }
+                        body { font-family: Arial, sans-serif; color: #1f2937; margin: 0; }
+                        .sheet { max-width: 980px; margin: 0 auto; }
+                        .header { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px solid #e5e7eb; padding-bottom: 12px; margin-bottom: 14px; }
+                        .title { font-size: 26px; font-weight: 700; letter-spacing: 0.2px; color: #111827; }
+                        .sub { font-size: 13px; color: #4b5563; margin-top: 4px; }
+                        .cards { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 14px; }
+                        .card { border: 1px solid #e5e7eb; border-radius: 10px; padding: 12px; background: #fafafa; }
+                        .card h4 { margin: 0 0 8px 0; font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px; color: #374151; }
+                        .line { margin: 4px 0; font-size: 14px; }
+                        table { width: 100%; border-collapse: collapse; border: 1px solid #e5e7eb; border-radius: 8px; overflow: hidden; }
+                        thead th { background: #111827; color: #fff; font-size: 12px; text-transform: uppercase; letter-spacing: 0.4px; padding: 10px 8px; text-align: left; }
+                        tbody td { padding: 10px 8px; border-top: 1px solid #e5e7eb; font-size: 13px; }
+                        tbody tr:nth-child(even) { background: #f9fafb; }
+                        .num { text-align: right; white-space: nowrap; }
+                        .footer { display: flex; justify-content: flex-end; margin-top: 10px; }
+                        .total { min-width: 280px; border: 1px solid #e5e7eb; border-radius: 8px; padding: 10px 12px; background: #f9fafb; }
+                        .total-row { display: flex; justify-content: space-between; font-size: 14px; }
+                        .total-row strong { color: #111827; }
+                        .muted { color: #6b7280; font-size: 12px; margin-top: 12px; }
+                        @media print {
+                            .sheet { max-width: 100%; }
+                        }
+                    </style>
+                </head>
+                <body>
+                    <div class="sheet">
+                        <div class="header">
+                            <div>
+                                <div class="title">Parts Order</div>
+                                <div class="sub">RO #${safe(ro)} • Generated ${safe(generatedAt)}</div>
+                            </div>
+                            <div class="sub">Arrival Date: <strong>${safe(formatDate(arrivalDate))}</strong></div>
+                        </div>
+
+                        <div class="cards">
+                            <div class="card">
+                                <h4>Vendor</h4>
+                                <div class="line"><strong>${safe(vendorName || '—')}</strong></div>
+                                ${vendorContact ? `<div class="line">Contact: ${safe(vendorContact)}</div>` : ''}
+                                ${vendorPhone ? `<div class="line">Phone: ${safe(vendorPhone)}</div>` : ''}
+                                ${vendorAddress ? `<div class="line">Address: ${safe(vendorAddress)}</div>` : ''}
+                            </div>
+                            <div class="card">
+                                <h4>Order Details</h4>
+                                <div class="line">Line Count: <strong>${orderedLines.length}</strong></div>
+                                <div class="line">Expected Arrival: <strong>${safe(formatDate(arrivalDate))}</strong></div>
+                            </div>
+                        </div>
+
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th style="width:42px;">#</th>
+                                    <th style="width:80px;">Line</th>
+                                    <th>Description</th>
+                                    <th style="width:120px;">Part Type</th>
+                                    <th style="width:70px; text-align:right;">Qty</th>
+                                    <th style="width:110px; text-align:right;">Unit Price</th>
+                                    <th style="width:120px; text-align:right;">Line Total</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${rowsHtml || '<tr><td colspan="7" style="text-align:center; color:#6b7280;">No lines selected</td></tr>'}
+                            </tbody>
+                        </table>
+
+                        <div class="footer">
+                            <div class="total">
+                                <div class="total-row"><span>Order Total</span><strong>${formatMoney(totalAmount)}</strong></div>
+                            </div>
+                        </div>
+
+                        <div class="muted">Prepared by FlagTech Parts Order • RO ${safe(ro)}</div>
+                    </div>
+                </body>
+                </html>
+            `);
+            popup.document.close();
+            popup.focus();
+            setTimeout(() => popup.print(), 300);
+        }
+
         function savePartsOrder() {
             if (!partsCurrentRo) {
                 alert('No RO selected.');
@@ -1487,6 +1648,9 @@ def get_parts_script():
             const checked = Array.from(partsOrderSelectedIds)
                 .map(id => parseInt(id, 10))
                 .filter(id => !Number.isNaN(id));
+
+            const selectedLines = (partsCurrentLines || []).filter(line => checked.includes(Number(line.id)));
+            const selectedVendor = (partsVendorsCache || []).find(v => String(v.id) === String(vendorId));
 
             if (!vendorId) {
                 alert('Please select a vendor.');
@@ -1537,6 +1701,17 @@ def get_parts_script():
                 }
                 closePartsOrderModal();
                 partsLoadRos();
+                try {
+                    partsOpenPrintOrderView({
+                        ro: partsCurrentRo,
+                        vendorName,
+                        arrivalDate,
+                        vendorRecord: selectedVendor || {},
+                        orderedLines: selectedLines,
+                    });
+                } catch (printError) {
+                    console.error('Error opening parts order print view:', printError);
+                }
             })
             .catch(err => {
                 console.error('Error saving parts order:', err);
