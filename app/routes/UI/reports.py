@@ -166,22 +166,9 @@ def get_reports_screen_html():
                         <td style='padding:12px;'>${ro.vehicle || ''}</td>
                         <td style='padding:12px;'>${ro.insurance || ''}</td>
                         <td style='padding:12px; text-align:right;'>${ro.hours || ''}</td>
-                        <td style='padding:12px; text-align:right;'></td>
-                        <td style='padding:12px; text-align:right;'></td>
-                        <td style='padding:12px; text-align:right;'></td>
-                        <td style='padding:12px; text-align:right;'></td>
-                        <td style='padding:12px; text-align:right;'></td>
-                        <td style='padding:12px; text-align:right;'></td>
-                    </tr>`;
-
-                    roBody.innerHTML += `<tr>
-                        <td style='padding:0 12px 10px 12px;'></td>
-                        <td style='padding:0 12px 10px 12px;'></td>
-                        <td style='padding:0 12px 10px 12px;'></td>
-                        <td style='padding:0 12px 10px 12px;'></td>
-                        <td colspan='2' style='padding:0 12px 10px 12px;'>${renderGpEnclosure('PARTS-S', 'PARTS-C', partsSales, partsCost)}</td>
-                        <td colspan='2' style='padding:0 12px 10px 12px;'>${renderGpEnclosure('LABOR-S', 'LABOR-C', laborSales, laborCost)}</td>
-                        <td colspan='2' style='padding:0 12px 10px 12px;'>${renderGpEnclosure('TOTAL-S', 'TOTAL-C', totalSales, totalCost)}</td>
+                        <td colspan='2' style='padding:8px 12px;'>${renderGpEnclosure('PARTS-S', 'PARTS-C', partsSales, partsCost)}</td>
+                        <td colspan='2' style='padding:8px 12px;'>${renderGpEnclosure('LABOR-S', 'LABOR-C', laborSales, laborCost)}</td>
+                        <td colspan='2' style='padding:8px 12px;'>${renderGpEnclosure('TOTAL-S', 'TOTAL-C', totalSales, totalCost)}</td>
                     </tr>`;
                 }
             }
