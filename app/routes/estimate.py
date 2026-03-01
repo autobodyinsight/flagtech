@@ -4124,6 +4124,8 @@ async def phase_board(request: Request):
                    year,
                    make,
                    model,
+                 estimator,
+                 written_by,
                    labor_repairs,
                    paint_repairs
             FROM saved_estimates
@@ -4165,12 +4167,14 @@ async def phase_board(request: Request):
             model = (row.get("model") or "").strip()
             short_vehicle = " ".join(part for part in (year, make, model) if part)
             vehicle_display = short_vehicle or row.get("vehicle") or ""
+            estimator_display = (row.get("estimator") or "").strip() or (row.get("written_by") or "").strip()
 
             items.append(
                 {
                     "ro": ro,
                     "vehicle": vehicle_display,
                     "phase": phase_value,
+                    "estimator": estimator_display,
                     "labor_tech": "Unassigned",
                     "labor_hours": labor_hours,
                     "paint_tech": "Unassigned",
