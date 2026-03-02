@@ -123,11 +123,6 @@ def _parse_money(value):
         return None
 
 
-def _estimate_hash(payload: dict) -> str:
-    normalized = json.dumps(payload, sort_keys=True, separators=(",", ":"))
-    return hashlib.sha256(normalized.encode("utf-8")).hexdigest()
-
-
 def _to_float(value, default: float = 0.0) -> float:
     try:
         parsed = float(str(value).replace(",", "").strip())
@@ -149,6 +144,67 @@ def _line_key_for_item(item: dict, index: int) -> str:
 
 def _normalize_text(value) -> str:
     return re.sub(r"\s+", " ", str(value or "").strip())
+
+
+_PART_TOKEN_RE = re.compile(r"^[A-Z0-9-]{5,}$", re.IGNORECASE)
+
+
+def _normalize_operation(value: str) -> str:
+    token = _normalize_text(value).upper()
+    token = token.replace(" ", "")
+    token = token.replace("R/I", "R&I")
+    token = token.replace("R\I", "R&I")
+    if token in {"REPLACE", "REPL"}:
+        token = "REPL"
+    if token in {"R&I", "O/H", "REPL"}:
+        return token
+    if re.fullmatch(r"S\d{1,3}", token):
+        return token
+    return token
+
+
+def _looks_like_part_number(token: str) -> bool:
+    if not _PART_TOKEN_RE.fullmatch(token or ""):
+        return False
+    has_alpha = any(char.isalpha() for char in token)
+    has_digit = any(char.isdigit() for char in token)
+    return has_alpha and has_digit
+
+
+def _parse_line_components(operation_value, description_value, part_number_value) -> tuple[str, str, str]:
+    description = _normalize_text(description_value)
+    tokens = description.split()
+
+    operation = _normalize_operation(str(operation_value or ""))
+    if not operation and tokens:
+        candidate = _normalize_operation(tokens[0])
+        if candidate in {"R&I", "O/H", "REPL"} or re.fullmatch(r"S\d{1,3}", candidate):
+            operation = candidate
+            tokens = tokens[1:]
+
+    part_number = _normalize_text(part_number_value).upper()
+    if not part_number and tokens:
+        candidate = tokens[-1].strip().upper()
+        if _looks_like_part_number(candidate):
+            part_number = candidate
+            tokens = tokens[:-1]
+
+    description_core = _normalize_text(" ".join(tokens))
+    return operation, description_core, part_number
+
+
+def _line_signature(repair_type: str, operation_value, description_value, part_number_value) -> str:
+    operation, description_core, part_number = _parse_line_components(
+        operation_value,
+        description_value,
+        part_number_value,
+    )
+    return "|".join([
+        _normalize_text(repair_type).lower(),
+        operation,
+        description_core.lower(),
+        part_number,
+    ])
 
 
 def _canonical_labor_or_paint_lines(items) -> dict:
@@ -292,69 +348,75 @@ def _ensure_ro_line_assignments_table(cur) -> None:
     )
 
 
-def _sync_ro_line_assignments_for_estimate_update(cur, domain: str, ro_value: str, labor_repairs, paint_repairs) -> None:
-    def _build_lines(items, repair_type: str):
-        output = {}
-        if not isinstance(items, list):
-            return output
-        for index, item in enumerate(items):
-            if not isinstance(item, dict):
-                continue
-            line_key = _line_key_for_item(item, index)
-            output[(repair_type, line_key)] = {
-                "repair_type": repair_type,
-                "line_key": line_key,
-                "line_number": str(item.get("line") or line_key),
-                "description": _normalize_text(item.get("description")),
-                "hours": _to_float(item.get("value"), 0.0),
-            }
-        return output
-
-    new_map = {}
-    new_map.update(_build_lines(labor_repairs, "body"))
-    new_map.update(_build_lines(paint_repairs, "paint"))
-
+def _sync_ro_line_assignments_for_estimate_update(cur, domain: str, ro_value: str, labor_repairs, paint_repairs) -> list[dict]:
     cur.execute(
         """
-        SELECT id, repair_type, source_repair_type, line_key
+        SELECT repair_type, source_repair_type, description, tech_id, tech_name, is_pending, ready_to_flag, flagged_at
         FROM ro_line_assignments
-        WHERE domain = %s AND ro = %s
+        WHERE domain = %s
+          AND ro = %s
           AND COALESCE(source_repair_type, repair_type) IN ('body', 'paint')
         """,
         (domain, ro_value),
     )
-    existing_rows = cur.fetchall() or []
+    old_rows = cur.fetchall() or []
 
-    existing_map = {}
-    for row in existing_rows:
+    old_by_signature = {}
+    for row in old_rows:
         source_type = (row.get("source_repair_type") or row.get("repair_type") or "body").strip().lower()
-        line_key = str(row.get("line_key") or "").strip()
-        existing_map[(source_type, line_key)] = row
+        signature = _line_signature(source_type, "", row.get("description"), "")
+        old_by_signature.setdefault(signature, []).append(
+            {
+                "tech_id": row.get("tech_id"),
+                "tech_name": (row.get("tech_name") or "").strip(),
+                "is_pending": bool(row.get("is_pending")),
+                "ready_to_flag": bool(row.get("ready_to_flag")),
+                "flagged_at": row.get("flagged_at"),
+            }
+        )
 
-    for key, line_data in new_map.items():
-        existing = existing_map.get(key)
-        if existing:
-            cur.execute(
-                """
-                UPDATE ro_line_assignments
-                SET repair_type = %s,
-                    source_repair_type = %s,
-                    line_number = %s,
-                    description = %s,
-                    hours = %s,
-                    updated_at = CURRENT_TIMESTAMP
-                WHERE id = %s
-                """,
-                (
-                    line_data["repair_type"],
-                    line_data["repair_type"],
-                    line_data["line_number"],
-                    line_data["description"],
-                    line_data["hours"],
-                    existing.get("id"),
-                ),
+    cur.execute(
+        """
+        DELETE FROM ro_line_assignments
+        WHERE domain = %s
+          AND ro = %s
+          AND COALESCE(source_repair_type, repair_type) IN ('body', 'paint')
+        """,
+        (domain, ro_value),
+    )
+
+    inserted_rows = []
+
+    def _insert_role_lines(items, repair_type: str) -> None:
+        if not isinstance(items, list):
+            return
+        for index, item in enumerate(items):
+            if not isinstance(item, dict):
+                continue
+
+            line_key = _line_key_for_item(item, index)
+            line_number = str(item.get("line") or line_key)
+            description = _normalize_text(item.get("description"))
+            hours = _to_float(item.get("value"), 0.0)
+
+            signature = _line_signature(
+                repair_type,
+                item.get("operation"),
+                description,
+                item.get("part_number") or item.get("partNumber") or item.get("part_no") or "",
             )
-        else:
+            prior_match = None
+            if signature in old_by_signature and old_by_signature[signature]:
+                prior_match = old_by_signature[signature].pop(0)
+
+            tech_id = prior_match.get("tech_id") if prior_match else None
+            tech_name = prior_match.get("tech_name") if prior_match else None
+            if tech_name == "":
+                tech_name = None
+            is_pending = bool(prior_match.get("is_pending")) if prior_match and not tech_name else False
+            ready_to_flag = bool(prior_match.get("ready_to_flag")) if prior_match and tech_name else False
+            flagged_at = prior_match.get("flagged_at") if prior_match and ready_to_flag else None
+
             cur.execute(
                 """
                 INSERT INTO ro_line_assignments (
@@ -369,29 +431,42 @@ def _sync_ro_line_assignments_for_estimate_update(cur, domain: str, ro_value: st
                     tech_name,
                     is_pending,
                     ready_to_flag,
+                    flagged_at,
                     domain
                 )
-                VALUES (%s, %s, %s, %s, %s, %s, %s, NULL, NULL, FALSE, FALSE, %s)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                RETURNING line_key, repair_type, hours, tech_id, tech_name
                 """,
                 (
                     ro_value,
-                    line_data["repair_type"],
-                    line_data["repair_type"],
-                    line_data["line_key"],
-                    line_data["line_number"],
-                    line_data["description"],
-                    line_data["hours"],
+                    repair_type,
+                    repair_type,
+                    line_key,
+                    line_number,
+                    description,
+                    hours,
+                    tech_id,
+                    tech_name,
+                    is_pending,
+                    ready_to_flag,
+                    flagged_at,
                     domain,
                 ),
             )
+            inserted = cur.fetchone() or {}
+            inserted_rows.append(
+                {
+                    "line_key": str(inserted.get("line_key") or line_key),
+                    "repair_type": (inserted.get("repair_type") or repair_type).strip().lower(),
+                    "hours": _to_float(inserted.get("hours"), hours),
+                    "tech_id": inserted.get("tech_id"),
+                    "tech_name": (inserted.get("tech_name") or "").strip(),
+                }
+            )
 
-    keys_to_delete = [
-        row.get("id")
-        for key, row in existing_map.items()
-        if key not in new_map and row.get("id") is not None
-    ]
-    if keys_to_delete:
-        cur.execute("DELETE FROM ro_line_assignments WHERE id = ANY(%s)", (keys_to_delete,))
+    _insert_role_lines(labor_repairs, "body")
+    _insert_role_lines(paint_repairs, "paint")
+    return inserted_rows
 
 
 def _sum_hours_with_excluded(items, excluded_lines) -> float:
@@ -441,6 +516,58 @@ def _recalculate_ro_assignment_hours(cur, domain: str, ro_value: str, labor_repa
             WHERE id = %s
             """,
             (assigned_hours, row.get("id")),
+        )
+
+
+def _refresh_role_assignments_from_lines(cur, domain: str, ro_value: str, inserted_rows: list[dict]) -> None:
+    role_rows = {
+        "labor": [row for row in inserted_rows if row.get("repair_type") == "body"],
+        "paint": [row for row in inserted_rows if row.get("repair_type") == "paint"],
+    }
+
+    cur.execute(
+        """
+        SELECT id, role, tech_id, tech_name
+        FROM ro_assignments
+        WHERE domain = %s AND ro = %s AND role IN ('labor', 'paint')
+        """,
+        (domain, ro_value),
+    )
+    assignment_rows = cur.fetchall() or []
+
+    for assignment in assignment_rows:
+        role = (assignment.get("role") or "").strip().lower()
+        rows = role_rows.get(role, [])
+        assignment_tech_id = assignment.get("tech_id")
+        assignment_tech_name = (assignment.get("tech_name") or "").strip()
+
+        excluded = []
+        assigned_hours = 0.0
+        for row in rows:
+            row_line_key = str(row.get("line_key") or "").strip()
+            row_tech_id = row.get("tech_id")
+            row_tech_name = (row.get("tech_name") or "").strip()
+
+            is_assigned_to_role_tech = False
+            if assignment_tech_id is not None and row_tech_id is not None:
+                is_assigned_to_role_tech = int(assignment_tech_id) == int(row_tech_id)
+            elif assignment_tech_name and row_tech_name:
+                is_assigned_to_role_tech = assignment_tech_name == row_tech_name
+
+            if is_assigned_to_role_tech:
+                assigned_hours += _to_float(row.get("hours"), 0.0)
+            else:
+                excluded.append(row_line_key)
+
+        cur.execute(
+            """
+            UPDATE ro_assignments
+            SET excluded_lines = %s::jsonb,
+                assigned_hours = %s,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE id = %s
+            """,
+            (json.dumps(excluded), assigned_hours, assignment.get("id")),
         )
 
 
@@ -841,53 +968,6 @@ async def grid_ui(request: Request, file: UploadFile = File(...), ajax: str = No
         ro_match = re.search(r"\bRO\b.*?(\d+)", second_ro_line)
         ro_number = ro_match.group(1) if ro_match else None
 
-    duplicate_estimate = False
-
-    if domain and ro_number:
-        incoming_totals = {
-            "parts_total": parts_total,
-            "grand_total": grand_total,
-            "deductible": deductible,
-            "customer_pay": customer_pay,
-            "insurance_pay": insurance_pay,
-            "body_labor": result.get("body_labor"),
-            "paint_labor": result.get("paint_labor"),
-            "frame_labor": result.get("frame_labor"),
-            "mechanical_labor": result.get("mechanical_labor"),
-            "glass_labor": result.get("glass_labor"),
-        }
-
-        conn = get_conn()
-        cur = conn.cursor()
-        try:
-            _ensure_saved_estimates_table(cur)
-            cur.execute(
-                """
-                SELECT labor_repairs, paint_repairs, parts_repairs, estimate_totals
-                FROM saved_estimates
-                WHERE ro = %s AND domain = %s
-                ORDER BY saved_at DESC, id DESC
-                LIMIT 1
-                """,
-                (ro_number, domain),
-            )
-            saved_row = cur.fetchone()
-            duplicate_estimate = not _estimate_has_changes_against_saved(
-                saved_row,
-                labor_items,
-                paint_items,
-                parts_items,
-                incoming_totals,
-            )
-        finally:
-            cur.close()
-
-    if duplicate_estimate:
-        message = "<p style='color:#777;'>Duplicate estimate detected. No changes applied.</p>"
-        if ajax:
-            return message
-        return f"<html><body>{message}<br><a href='/ui'>Back</a></body></html>"
-
     # Generate pages HTML visualization
     pages_html = generate_pages_html(pages, anchor_page, anchor_ymid, subtotals_page, subtotals_ymid)
     
@@ -1046,7 +1126,19 @@ async def save_estimate(request: Request):
             cur.execute(
                 """
                 UPDATE saved_estimates
-                SET labor_repairs = %s,
+                SET vehicle = %s,
+                    year = %s,
+                    make = %s,
+                    model = %s,
+                    owner_info = %s,
+                    insurance_company = %s,
+                    vin = %s,
+                    claim_number = %s,
+                    written_by = %s,
+                    estimator = %s,
+                    in_date = %s,
+                    ecd_date = %s,
+                    labor_repairs = %s,
                     paint_repairs = %s,
                     parts_repairs = %s,
                     estimate_snapshot = %s,
@@ -1060,6 +1152,18 @@ async def save_estimate(request: Request):
                 WHERE id = %s
                 """,
                 (
+                    data.get("vehicle"),
+                    data.get("year"),
+                    data.get("make"),
+                    data.get("model"),
+                    data.get("owner_info"),
+                    data.get("insurance_company"),
+                    data.get("vin"),
+                    data.get("claim_number"),
+                    data.get("written_by"),
+                    data.get("estimator"),
+                    in_date_value,
+                    ecd_date_value,
                     json.dumps(labor_repairs),
                     json.dumps(paint_repairs),
                     json.dumps(parts_repairs),
@@ -1110,7 +1214,8 @@ async def save_estimate(request: Request):
                 ),
             )
 
-        _sync_ro_line_assignments_for_estimate_update(cur, domain, ro_value, labor_repairs, paint_repairs)
+        inserted_rows = _sync_ro_line_assignments_for_estimate_update(cur, domain, ro_value, labor_repairs, paint_repairs)
+        _refresh_role_assignments_from_lines(cur, domain, ro_value, inserted_rows)
         _recalculate_ro_assignment_hours(cur, domain, ro_value, labor_repairs, paint_repairs)
         conn.commit()
     finally:
