@@ -128,6 +128,322 @@ def _estimate_hash(payload: dict) -> str:
     return hashlib.sha256(normalized.encode("utf-8")).hexdigest()
 
 
+def _to_float(value, default: float = 0.0) -> float:
+    try:
+        parsed = float(str(value).replace(",", "").strip())
+        if math.isfinite(parsed):
+            return parsed
+    except Exception:
+        pass
+    return default
+
+
+def _line_key_for_item(item: dict, index: int) -> str:
+    if not isinstance(item, dict):
+        return str(index + 1)
+    value = item.get("line")
+    if value is None or str(value).strip() == "":
+        return str(index + 1)
+    return str(value).strip()
+
+
+def _normalize_text(value) -> str:
+    return re.sub(r"\s+", " ", str(value or "").strip())
+
+
+def _canonical_labor_or_paint_lines(items) -> dict:
+    result = {}
+    if not isinstance(items, list):
+        return result
+    for index, item in enumerate(items):
+        if not isinstance(item, dict):
+            continue
+        line_key = _line_key_for_item(item, index)
+        result[line_key] = {
+            "line": line_key,
+            "description": _normalize_text(item.get("description")),
+            "value": round(_to_float(item.get("value"), 0.0), 4),
+        }
+    return result
+
+
+def _canonical_parts_lines(items) -> dict:
+    result = {}
+    if not isinstance(items, list):
+        return result
+    for index, item in enumerate(items):
+        if not isinstance(item, dict):
+            continue
+        line_key = _line_key_for_item(item, index)
+        result[line_key] = {
+            "line": line_key,
+            "description": _normalize_text(item.get("description")),
+            "part_type": _normalize_text(item.get("part_type")).upper(),
+            "price": round(_to_float(item.get("price"), 0.0), 4),
+            "qty": round(_to_float(item.get("qty"), 0.0), 4),
+        }
+    return result
+
+
+def _canonical_totals(totals: dict | None) -> dict:
+    source = totals if isinstance(totals, dict) else {}
+    keys = [
+        "parts_total",
+        "grand_total",
+        "deductible",
+        "customer_pay",
+        "insurance_pay",
+        "body_labor",
+        "paint_labor",
+        "frame_labor",
+        "mechanical_labor",
+        "glass_labor",
+    ]
+    return {key: round(_to_float(source.get(key), 0.0), 4) for key in keys}
+
+
+def _estimate_has_changes_against_saved(saved_row: dict | None, labor_items, paint_items, parts_items, estimate_totals: dict) -> bool:
+    if not saved_row:
+        return True
+
+    saved_labor = _canonical_labor_or_paint_lines(saved_row.get("labor_repairs"))
+    saved_paint = _canonical_labor_or_paint_lines(saved_row.get("paint_repairs"))
+    saved_parts = _canonical_parts_lines(saved_row.get("parts_repairs"))
+    saved_totals = _canonical_totals(saved_row.get("estimate_totals"))
+
+    new_labor = _canonical_labor_or_paint_lines(labor_items)
+    new_paint = _canonical_labor_or_paint_lines(paint_items)
+    new_parts = _canonical_parts_lines(parts_items)
+    new_totals = _canonical_totals(estimate_totals)
+
+    if saved_labor != new_labor:
+        return True
+    if saved_paint != new_paint:
+        return True
+    if saved_parts != new_parts:
+        return True
+    if saved_totals != new_totals:
+        return True
+    return False
+
+
+def _ensure_ro_assignments_table(cur) -> None:
+    cur.execute(
+        """
+        CREATE TABLE IF NOT EXISTS ro_assignments (
+            id SERIAL PRIMARY KEY,
+            ro VARCHAR(255) NOT NULL,
+            role VARCHAR(20) NOT NULL,
+            tech_id INTEGER,
+            tech_name VARCHAR(255),
+            excluded_lines JSONB,
+            assigned_hours NUMERIC,
+            domain VARCHAR(255) NOT NULL,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+        """
+    )
+    cur.execute("ALTER TABLE ro_assignments ADD COLUMN IF NOT EXISTS assigned_hours NUMERIC")
+    cur.execute(
+        """
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_ro_assignments_ro_role_domain
+        ON ro_assignments(ro, role, domain)
+        """
+    )
+
+
+def _ensure_ro_line_assignments_table(cur) -> None:
+    cur.execute(
+        """
+        CREATE TABLE IF NOT EXISTS ro_line_assignments (
+            id SERIAL PRIMARY KEY,
+            ro VARCHAR(255) NOT NULL,
+            repair_type VARCHAR(20) NOT NULL,
+            line_key VARCHAR(64) NOT NULL,
+            line_number VARCHAR(64),
+            description TEXT,
+            hours NUMERIC,
+            tech_id INTEGER,
+            tech_name VARCHAR(255),
+            source_repair_type VARCHAR(20),
+            is_pending BOOLEAN DEFAULT FALSE,
+            ready_to_flag BOOLEAN DEFAULT FALSE,
+            flagged_at TIMESTAMP,
+            domain VARCHAR(255) NOT NULL,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+        """
+    )
+    cur.execute("ALTER TABLE ro_line_assignments ADD COLUMN IF NOT EXISTS source_repair_type VARCHAR(20)")
+    cur.execute("ALTER TABLE ro_line_assignments ADD COLUMN IF NOT EXISTS is_pending BOOLEAN DEFAULT FALSE")
+    cur.execute("ALTER TABLE ro_line_assignments ADD COLUMN IF NOT EXISTS ready_to_flag BOOLEAN DEFAULT FALSE")
+    cur.execute("ALTER TABLE ro_line_assignments ADD COLUMN IF NOT EXISTS flagged_at TIMESTAMP")
+    cur.execute(
+        """
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_ro_line_assignments_unique
+        ON ro_line_assignments(ro, repair_type, line_key, domain)
+        """
+    )
+    cur.execute(
+        """
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_ro_line_assignments_source_unique
+        ON ro_line_assignments(ro, source_repair_type, line_key, domain)
+        """
+    )
+
+
+def _sync_ro_line_assignments_for_estimate_update(cur, domain: str, ro_value: str, labor_repairs, paint_repairs) -> None:
+    def _build_lines(items, repair_type: str):
+        output = {}
+        if not isinstance(items, list):
+            return output
+        for index, item in enumerate(items):
+            if not isinstance(item, dict):
+                continue
+            line_key = _line_key_for_item(item, index)
+            output[(repair_type, line_key)] = {
+                "repair_type": repair_type,
+                "line_key": line_key,
+                "line_number": str(item.get("line") or line_key),
+                "description": _normalize_text(item.get("description")),
+                "hours": _to_float(item.get("value"), 0.0),
+            }
+        return output
+
+    new_map = {}
+    new_map.update(_build_lines(labor_repairs, "body"))
+    new_map.update(_build_lines(paint_repairs, "paint"))
+
+    cur.execute(
+        """
+        SELECT id, repair_type, source_repair_type, line_key
+        FROM ro_line_assignments
+        WHERE domain = %s AND ro = %s
+          AND COALESCE(source_repair_type, repair_type) IN ('body', 'paint')
+        """,
+        (domain, ro_value),
+    )
+    existing_rows = cur.fetchall() or []
+
+    existing_map = {}
+    for row in existing_rows:
+        source_type = (row.get("source_repair_type") or row.get("repair_type") or "body").strip().lower()
+        line_key = str(row.get("line_key") or "").strip()
+        existing_map[(source_type, line_key)] = row
+
+    for key, line_data in new_map.items():
+        existing = existing_map.get(key)
+        if existing:
+            cur.execute(
+                """
+                UPDATE ro_line_assignments
+                SET repair_type = %s,
+                    source_repair_type = %s,
+                    line_number = %s,
+                    description = %s,
+                    hours = %s,
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE id = %s
+                """,
+                (
+                    line_data["repair_type"],
+                    line_data["repair_type"],
+                    line_data["line_number"],
+                    line_data["description"],
+                    line_data["hours"],
+                    existing.get("id"),
+                ),
+            )
+        else:
+            cur.execute(
+                """
+                INSERT INTO ro_line_assignments (
+                    ro,
+                    repair_type,
+                    source_repair_type,
+                    line_key,
+                    line_number,
+                    description,
+                    hours,
+                    tech_id,
+                    tech_name,
+                    is_pending,
+                    ready_to_flag,
+                    domain
+                )
+                VALUES (%s, %s, %s, %s, %s, %s, %s, NULL, NULL, FALSE, FALSE, %s)
+                """,
+                (
+                    ro_value,
+                    line_data["repair_type"],
+                    line_data["repair_type"],
+                    line_data["line_key"],
+                    line_data["line_number"],
+                    line_data["description"],
+                    line_data["hours"],
+                    domain,
+                ),
+            )
+
+    keys_to_delete = [
+        row.get("id")
+        for key, row in existing_map.items()
+        if key not in new_map and row.get("id") is not None
+    ]
+    if keys_to_delete:
+        cur.execute("DELETE FROM ro_line_assignments WHERE id = ANY(%s)", (keys_to_delete,))
+
+
+def _sum_hours_with_excluded(items, excluded_lines) -> float:
+    if not isinstance(items, list):
+        return 0.0
+    excluded = {str(value).strip() for value in (excluded_lines or [])}
+    total = 0.0
+    for index, item in enumerate(items):
+        if not isinstance(item, dict):
+            continue
+        line_key = _line_key_for_item(item, index)
+        if line_key in excluded:
+            continue
+        total += _to_float(item.get("value"), 0.0)
+    return total
+
+
+def _recalculate_ro_assignment_hours(cur, domain: str, ro_value: str, labor_repairs, paint_repairs) -> None:
+    cur.execute(
+        """
+        SELECT id, role, excluded_lines
+        FROM ro_assignments
+        WHERE domain = %s AND ro = %s
+        """,
+        (domain, ro_value),
+    )
+    rows = cur.fetchall() or []
+    for row in rows:
+        role = str(row.get("role") or "").strip().lower()
+        excluded = row.get("excluded_lines")
+        if not isinstance(excluded, list):
+            try:
+                excluded = json.loads(excluded) if excluded else []
+            except Exception:
+                excluded = []
+        if role == "labor":
+            assigned_hours = _sum_hours_with_excluded(labor_repairs, excluded)
+        elif role == "paint":
+            assigned_hours = _sum_hours_with_excluded(paint_repairs, excluded)
+        else:
+            continue
+        cur.execute(
+            """
+            UPDATE ro_assignments
+            SET assigned_hours = %s,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE id = %s
+            """,
+            (assigned_hours, row.get("id")),
+        )
+
+
 def _safe_json(payload) -> str:
     return json.dumps(payload).replace("<", "\\u003c")
 
@@ -528,42 +844,41 @@ async def grid_ui(request: Request, file: UploadFile = File(...), ajax: str = No
     duplicate_estimate = False
 
     if domain and ro_number:
-        estimate_payload = {
-            "labor_items": labor_items,
-            "paint_items": paint_items,
-            "parts_items": parts_items,
-            "total_labor": total_labor,
-            "total_paint": total_paint,
-            "vehicle": vehicle_info_line,
+        incoming_totals = {
+            "parts_total": parts_total,
+            "grand_total": grand_total,
+            "deductible": deductible,
+            "customer_pay": customer_pay,
+            "insurance_pay": insurance_pay,
+            "body_labor": result.get("body_labor"),
+            "paint_labor": result.get("paint_labor"),
+            "frame_labor": result.get("frame_labor"),
+            "mechanical_labor": result.get("mechanical_labor"),
+            "glass_labor": result.get("glass_labor"),
         }
-        estimate_hash = _estimate_hash(estimate_payload)
 
         conn = get_conn()
         cur = conn.cursor()
         try:
-            _ensure_estimate_uploads_table(cur)
+            _ensure_saved_estimates_table(cur)
             cur.execute(
                 """
-                SELECT estimate_hash
-                FROM estimate_uploads
+                SELECT labor_repairs, paint_repairs, parts_repairs, estimate_totals
+                FROM saved_estimates
                 WHERE ro = %s AND domain = %s
+                ORDER BY saved_at DESC, id DESC
+                LIMIT 1
                 """,
                 (ro_number, domain),
             )
-            row = cur.fetchone()
-            if row and row.get("estimate_hash") == estimate_hash:
-                duplicate_estimate = True
-            else:
-                cur.execute(
-                    """
-                    INSERT INTO estimate_uploads (ro, estimate_hash, domain)
-                    VALUES (%s, %s, %s)
-                    ON CONFLICT (ro, domain)
-                    DO UPDATE SET estimate_hash = EXCLUDED.estimate_hash, updated_at = CURRENT_TIMESTAMP
-                    """,
-                    (ro_number, estimate_hash, domain),
-                )
-            conn.commit()
+            saved_row = cur.fetchone()
+            duplicate_estimate = not _estimate_has_changes_against_saved(
+                saved_row,
+                labor_items,
+                paint_items,
+                parts_items,
+                incoming_totals,
+            )
         finally:
             cur.close()
 
@@ -697,6 +1012,9 @@ async def save_estimate(request: Request):
         ro_value = match.group(1)
 
     estimate_totals = data.get("estimate_totals") or {}
+    labor_repairs = data.get("labor_repairs") or []
+    paint_repairs = data.get("paint_repairs") or []
+    parts_repairs = data.get("parts_repairs") or []
     domain = get_user_domain(request)
     local_upload_date = (data.get("local_upload_date") or "").strip()
     in_date_value = date.today()
@@ -709,41 +1027,91 @@ async def save_estimate(request: Request):
 
     try:
         _ensure_saved_estimates_table(cur)
+        _ensure_ro_line_assignments_table(cur)
+        _ensure_ro_assignments_table(cur)
+
         cur.execute(
             """
-            INSERT INTO saved_estimates
-            (ro, vehicle, year, make, model, owner_info, insurance_company, vin, claim_number,
-             written_by, estimator, labor_repairs, paint_repairs, parts_repairs,
-             estimate_snapshot, estimate_totals, parts_total, grand_total, deductible, customer_pay, insurance_pay, in_date, ecd_date, domain)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            SELECT id
+            FROM saved_estimates
+            WHERE domain = %s AND ro = %s
+            ORDER BY saved_at DESC, id DESC
+            LIMIT 1
             """,
-            (
-                ro_value,
-                data.get("vehicle"),
-                data.get("year"),
-                data.get("make"),
-                data.get("model"),
-                data.get("owner_info"),
-                data.get("insurance_company"),
-                data.get("vin"),
-                data.get("claim_number"),
-                data.get("written_by"),
-                data.get("estimator"),
-                json.dumps(data.get("labor_repairs") or []),
-                json.dumps(data.get("paint_repairs") or []),
-                json.dumps(data.get("parts_repairs") or []),
-                json.dumps(data.get("estimate_snapshot") or {}),
-                json.dumps(estimate_totals or {}),
-                _parse_money(estimate_totals.get("parts_total")),
-                _parse_money(estimate_totals.get("grand_total")),
-                _parse_money(estimate_totals.get("deductible")),
-                _parse_money(estimate_totals.get("customer_pay")),
-                _parse_money(estimate_totals.get("insurance_pay")),
-                in_date_value,
-                ecd_date_value,
-                domain,
-            ),
+            (domain, ro_value),
         )
+        existing_row = cur.fetchone()
+
+        if existing_row:
+            cur.execute(
+                """
+                UPDATE saved_estimates
+                SET labor_repairs = %s,
+                    paint_repairs = %s,
+                    parts_repairs = %s,
+                    estimate_snapshot = %s,
+                    estimate_totals = %s,
+                    parts_total = %s,
+                    grand_total = %s,
+                    deductible = %s,
+                    customer_pay = %s,
+                    insurance_pay = %s,
+                    saved_at = CURRENT_TIMESTAMP
+                WHERE id = %s
+                """,
+                (
+                    json.dumps(labor_repairs),
+                    json.dumps(paint_repairs),
+                    json.dumps(parts_repairs),
+                    json.dumps(data.get("estimate_snapshot") or {}),
+                    json.dumps(estimate_totals or {}),
+                    _parse_money(estimate_totals.get("parts_total")),
+                    _parse_money(estimate_totals.get("grand_total")),
+                    _parse_money(estimate_totals.get("deductible")),
+                    _parse_money(estimate_totals.get("customer_pay")),
+                    _parse_money(estimate_totals.get("insurance_pay")),
+                    existing_row.get("id"),
+                ),
+            )
+        else:
+            cur.execute(
+                """
+                INSERT INTO saved_estimates
+                (ro, vehicle, year, make, model, owner_info, insurance_company, vin, claim_number,
+                 written_by, estimator, labor_repairs, paint_repairs, parts_repairs,
+                 estimate_snapshot, estimate_totals, parts_total, grand_total, deductible, customer_pay, insurance_pay, in_date, ecd_date, domain)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                """,
+                (
+                    ro_value,
+                    data.get("vehicle"),
+                    data.get("year"),
+                    data.get("make"),
+                    data.get("model"),
+                    data.get("owner_info"),
+                    data.get("insurance_company"),
+                    data.get("vin"),
+                    data.get("claim_number"),
+                    data.get("written_by"),
+                    data.get("estimator"),
+                    json.dumps(labor_repairs),
+                    json.dumps(paint_repairs),
+                    json.dumps(parts_repairs),
+                    json.dumps(data.get("estimate_snapshot") or {}),
+                    json.dumps(estimate_totals or {}),
+                    _parse_money(estimate_totals.get("parts_total")),
+                    _parse_money(estimate_totals.get("grand_total")),
+                    _parse_money(estimate_totals.get("deductible")),
+                    _parse_money(estimate_totals.get("customer_pay")),
+                    _parse_money(estimate_totals.get("insurance_pay")),
+                    in_date_value,
+                    ecd_date_value,
+                    domain,
+                ),
+            )
+
+        _sync_ro_line_assignments_for_estimate_update(cur, domain, ro_value, labor_repairs, paint_repairs)
+        _recalculate_ro_assignment_hours(cur, domain, ro_value, labor_repairs, paint_repairs)
         conn.commit()
     finally:
         cur.close()
