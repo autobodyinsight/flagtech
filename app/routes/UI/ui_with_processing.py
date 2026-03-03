@@ -1310,19 +1310,88 @@ async def save_estimate(request: Request):
 
 
 @router.post("/auto-generate-ro")
-async def auto_generate_ro():
+async def auto_generate_ro(request: Request):
     conn = get_conn()
     cur = conn.cursor()
+    domain = get_user_domain(request)
 
     try:
         _ensure_ro_auto_sequence(cur)
-        cur.execute("SELECT nextval('ro_auto_counter_seq') AS next_value")
-        row = cur.fetchone() or {}
-        next_value = int((row.get("next_value") if isinstance(row, dict) else row[0]) or 12365)
+        _ensure_saved_estimates_table(cur)
+
+        cur.execute(
+            """
+            SELECT COALESCE(MAX(CAST(SUBSTRING(ro FROM 3 FOR 5) AS INTEGER)), 0) AS max_saved
+            FROM saved_estimates
+            WHERE ro ~ '^AB[0-9]{5}$'
+              AND (%s IS NULL OR domain = %s)
+            """,
+            (domain, domain),
+        )
+        saved_row = cur.fetchone() or {}
+        max_saved = int((saved_row.get("max_saved") if isinstance(saved_row, dict) else saved_row[0]) or 0)
+
+        max_repair_orders = 0
+        cur.execute("SELECT to_regclass('public.repair_orders') AS table_name")
+        ro_table = cur.fetchone() or {}
+        if (ro_table.get("table_name") if isinstance(ro_table, dict) else ro_table[0]):
+            cur.execute(
+                """
+                SELECT COALESCE(MAX(CAST(SUBSTRING(ro_number FROM 3 FOR 5) AS INTEGER)), 0) AS max_ro
+                FROM repair_orders
+                WHERE ro_number ~ '^AB[0-9]{5}$'
+                """
+            )
+            ro_row = cur.fetchone() or {}
+            max_repair_orders = int((ro_row.get("max_ro") if isinstance(ro_row, dict) else ro_row[0]) or 0)
+
+        max_existing = max(12364, max_saved, max_repair_orders)
+
+        cur.execute("SELECT last_value FROM ro_auto_counter_seq")
+        seq_row = cur.fetchone() or {}
+        current_last = int((seq_row.get("last_value") if isinstance(seq_row, dict) else seq_row[0]) or 12364)
+        if max_existing > current_last:
+            cur.execute("SELECT setval('ro_auto_counter_seq', %s, true)", (max_existing,))
+
+        candidate = None
+        while True:
+            cur.execute("SELECT nextval('ro_auto_counter_seq') AS next_value")
+            row = cur.fetchone() or {}
+            next_value = int((row.get("next_value") if isinstance(row, dict) else row[0]) or 12365)
+            generated_ro = f"AB{next_value:05d}"
+
+            cur.execute(
+                """
+                SELECT 1
+                FROM saved_estimates
+                WHERE ro = %s
+                  AND (%s IS NULL OR domain = %s)
+                LIMIT 1
+                """,
+                (generated_ro, domain, domain),
+            )
+            exists_in_saved = cur.fetchone() is not None
+
+            exists_in_repair_orders = False
+            if (ro_table.get("table_name") if isinstance(ro_table, dict) else ro_table[0]):
+                cur.execute(
+                    """
+                    SELECT 1
+                    FROM repair_orders
+                    WHERE ro_number = %s
+                    LIMIT 1
+                    """,
+                    (generated_ro,),
+                )
+                exists_in_repair_orders = cur.fetchone() is not None
+
+            if not exists_in_saved and not exists_in_repair_orders:
+                candidate = generated_ro
+                break
     finally:
         cur.close()
 
-    return {"ro_number": f"AB{next_value:05d}"}
+    return {"ro_number": candidate}
 
 
 @router.post("/aligned", response_class=HTMLResponse)
