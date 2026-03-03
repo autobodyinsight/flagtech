@@ -404,8 +404,6 @@ def _sync_ro_line_assignments_for_estimate_update(cur, domain: str, ro_value: st
     inserted_rows = []
     used_locked_ids = set()
     used_keys_by_type = {"body": set(), "paint": set()}
-    inserted_identity_to_row = {}
-    inserted_row_index_by_pk = {}
 
     def _unique_line_key_for_type(repair_type: str, preferred_key: str) -> str:
         key_base = str(preferred_key or "").strip() or "1"
@@ -459,11 +457,6 @@ def _sync_ro_line_assignments_for_estimate_update(cur, domain: str, ro_value: st
             line_number = str(item.get("line") or line_key)
             description = _normalize_text(item.get("description"))
             hours = _to_float(item.get("value"), 0.0)
-            signature = _signature_without_type(
-                item.get("operation"),
-                description,
-                item.get("part_number") or item.get("partNumber") or item.get("part_no") or "",
-            )
 
             locked_match = _take_locked_match(item, index)
             if locked_match:
@@ -490,54 +483,6 @@ def _sync_ro_line_assignments_for_estimate_update(cur, domain: str, ro_value: st
                 is_pending = False
                 ready_to_flag = False
                 flagged_at = None
-
-            identity_keys = []
-            if signature:
-                identity_keys.append(f"sig:{signature}")
-            description_key = description.lower()
-            if description_key:
-                identity_keys.append(f"desc:{description_key}")
-            if line_number:
-                identity_keys.append(f"line:{line_number}")
-
-            existing_pk = None
-            for identity_key in identity_keys:
-                if identity_key in inserted_identity_to_row:
-                    existing_pk = inserted_identity_to_row[identity_key]
-                    break
-
-            if existing_pk:
-                existing_repair_type, existing_line_key = existing_pk
-                cur.execute(
-                    """
-                    UPDATE ro_line_assignments
-                    SET line_number = %s,
-                        description = %s,
-                        hours = %s,
-                        updated_at = CURRENT_TIMESTAMP
-                    WHERE domain = %s
-                      AND ro = %s
-                      AND repair_type = %s
-                      AND line_key = %s
-                    """,
-                    (
-                        db_line_number,
-                        db_description,
-                        db_hours,
-                        domain,
-                        ro_value,
-                        existing_repair_type,
-                        existing_line_key,
-                    ),
-                )
-
-                existing_index = inserted_row_index_by_pk.get(existing_pk)
-                if existing_index is not None:
-                    inserted_rows[existing_index]["hours"] = db_hours
-
-                for identity_key in identity_keys:
-                    inserted_identity_to_row[identity_key] = existing_pk
-                continue
 
             db_line_key = _unique_line_key_for_type(db_repair_type, db_line_key)
 
@@ -578,23 +523,15 @@ def _sync_ro_line_assignments_for_estimate_update(cur, domain: str, ro_value: st
                 ),
             )
             inserted = cur.fetchone() or {}
-            current_pk = (
-                (inserted.get("repair_type") or db_repair_type).strip().lower(),
-                str(inserted.get("line_key") or db_line_key),
-            )
-            inserted_row_index_by_pk[current_pk] = len(inserted_rows)
             inserted_rows.append(
                 {
-                    "line_key": current_pk[1],
-                    "repair_type": current_pk[0],
+                    "line_key": str(inserted.get("line_key") or db_line_key),
+                    "repair_type": (inserted.get("repair_type") or db_repair_type).strip().lower(),
                     "hours": _to_float(inserted.get("hours"), db_hours),
                     "tech_id": inserted.get("tech_id"),
                     "tech_name": (inserted.get("tech_name") or "").strip(),
                 }
             )
-
-            for identity_key in identity_keys:
-                inserted_identity_to_row.setdefault(identity_key, current_pk)
 
     _insert_role_lines(labor_repairs, "body")
     _insert_role_lines(paint_repairs, "paint")
