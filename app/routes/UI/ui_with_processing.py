@@ -370,6 +370,8 @@ def _sync_ro_line_assignments_for_estimate_update(cur, domain: str, ro_value: st
         return "|".join([operation, description_core.lower(), part_number])
 
     old_locked_by_signature = {}
+    old_locked_by_description = {}
+    old_locked_by_line_number = {}
 
     for row in old_rows:
         tech_id = row.get("tech_id")
@@ -380,6 +382,14 @@ def _sync_ro_line_assignments_for_estimate_update(cur, domain: str, ro_value: st
 
         signature = _signature_without_type("", row.get("description"), "")
         old_locked_by_signature.setdefault(signature, []).append(row)
+
+        description_key = _normalize_text(row.get("description")).lower()
+        if description_key:
+            old_locked_by_description.setdefault(description_key, []).append(row)
+
+        line_number_key = str(row.get("line_number") or "").strip()
+        if line_number_key:
+            old_locked_by_line_number.setdefault(line_number_key, []).append(row)
 
     cur.execute(
         """
@@ -396,18 +406,24 @@ def _sync_ro_line_assignments_for_estimate_update(cur, domain: str, ro_value: st
 
     def _take_locked_match(item: dict, index: int):
         description = _normalize_text(item.get("description"))
+        line_number = str(item.get("line") or _line_key_for_item(item, index)).strip()
         signature = _signature_without_type(
             item.get("operation"),
             description,
             item.get("part_number") or item.get("partNumber") or item.get("part_no") or "",
         )
 
-        for candidate in old_locked_by_signature.get(signature, []):
-            candidate_id = candidate.get("id")
-            if candidate_id in used_locked_ids:
-                continue
-            used_locked_ids.add(candidate_id)
-            return candidate
+        for pool in (
+            old_locked_by_signature.get(signature, []),
+            old_locked_by_description.get(description.lower(), []),
+            old_locked_by_line_number.get(line_number, []),
+        ):
+            for candidate in pool:
+                candidate_id = candidate.get("id")
+                if candidate_id in used_locked_ids:
+                    continue
+                used_locked_ids.add(candidate_id)
+                return candidate
         return None
 
     def _insert_role_lines(items, repair_type: str) -> None:
