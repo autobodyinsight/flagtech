@@ -371,6 +371,7 @@ def _sync_ro_line_assignments_for_estimate_update(cur, domain: str, ro_value: st
 
     old_by_signature = {}
     old_by_description = {}
+    old_by_description_and_type = {}
     old_by_id = {}
 
     for row in old_rows:
@@ -386,11 +387,13 @@ def _sync_ro_line_assignments_for_estimate_update(cur, domain: str, ro_value: st
             old_by_signature.setdefault(row_sig, []).append(row_id)
         if row_desc:
             old_by_description.setdefault(row_desc, []).append(row_id)
+            row_type = (row.get("repair_type") or row.get("source_repair_type") or "body").strip().lower()
+            old_by_description_and_type.setdefault((row_desc, row_type), []).append(row_id)
 
     used_old_ids = set()
     rebuilt_rows = []
 
-    def _take_match(item: dict) -> dict | None:
+    def _take_match(item: dict, incoming_type: str) -> dict | None:
         operation, description_key, part_number = _signature_without_type(
             item.get("operation"),
             item.get("description"),
@@ -402,6 +405,7 @@ def _sync_ro_line_assignments_for_estimate_update(cur, domain: str, ro_value: st
         if use_signature:
             candidate_ids.extend(old_by_signature.get((operation, description_key, part_number), []))
         if description_key:
+            candidate_ids.extend(old_by_description_and_type.get((description_key, incoming_type), []))
             candidate_ids.extend(old_by_description.get(description_key, []))
 
         for candidate_id in candidate_ids:
@@ -424,25 +428,29 @@ def _sync_ro_line_assignments_for_estimate_update(cur, domain: str, ro_value: st
             description = _normalize_text(item.get("description"))
             hours = _to_float(item.get("value"), 0.0)
 
-            matched = _take_match(item)
+            matched = _take_match(item, repair_type)
 
             if matched:
+                matched_type = (matched.get("repair_type") or matched.get("source_repair_type") or repair_type).strip().lower()
                 tech_id = matched.get("tech_id")
                 tech_name = (matched.get("tech_name") or "").strip() or None
                 is_pending = bool(matched.get("is_pending"))
                 ready_to_flag = bool(matched.get("ready_to_flag"))
                 flagged_at = matched.get("flagged_at")
+                has_assignment = tech_id is not None or bool(tech_name)
+                effective_type = matched_type if has_assignment else repair_type
             else:
                 tech_id = None
                 tech_name = None
                 is_pending = False
                 ready_to_flag = False
                 flagged_at = None
+                effective_type = repair_type
 
             rebuilt_rows.append(
                 {
-                    "repair_type": repair_type,
-                    "source_repair_type": repair_type,
+                    "repair_type": effective_type,
+                    "source_repair_type": effective_type,
                     "line_key": line_key,
                     "line_number": line_number,
                     "description": description,
