@@ -107,6 +107,10 @@ def _ensure_saved_estimates_table(cur) -> None:
     cur.execute("CREATE INDEX IF NOT EXISTS idx_saved_estimates_ro_domain ON saved_estimates(ro, domain)")
 
 
+def _ensure_ro_auto_sequence(cur) -> None:
+    cur.execute("CREATE SEQUENCE IF NOT EXISTS ro_auto_counter_seq START WITH 12365 MINVALUE 12365")
+
+
 def _parse_money(value):
     if value is None:
         return None
@@ -1303,6 +1307,22 @@ async def save_estimate(request: Request):
         cur.close()
 
     return {"status": "success"}
+
+
+@router.post("/auto-generate-ro")
+async def auto_generate_ro():
+    conn = get_conn()
+    cur = conn.cursor()
+
+    try:
+        _ensure_ro_auto_sequence(cur)
+        cur.execute("SELECT nextval('ro_auto_counter_seq') AS next_value")
+        row = cur.fetchone() or {}
+        next_value = int((row.get("next_value") if isinstance(row, dict) else row[0]) or 12365)
+    finally:
+        cur.close()
+
+    return {"ro_number": f"AB{next_value:05d}"}
 
 
 @router.post("/aligned", response_class=HTMLResponse)

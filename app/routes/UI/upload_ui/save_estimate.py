@@ -28,6 +28,10 @@ def get_save_estimate_modal_html(
 
     <div style="margin-bottom: 15px;">
       <div style="font-weight: bold; font-size: 16px; margin-bottom: 5px;" id="roNumberDisplay">RO Number: -</div>
+      <div style="margin-bottom: 10px;">
+        <label for="saveRoInput" style="font-weight: bold; font-size: 12px; color: #666; display: block; margin-bottom: 4px;">RO NUMBER</label>
+        <input id="saveRoInput" type="text" placeholder="Enter RO number" style="width: 220px; padding: 8px; border: 1px solid #ddd; border-radius: 4px; font-size: 14px;" />
+      </div>
       <div style="margin-top: 10px; padding: 12px; background-color: #f9f9f9; border-radius: 3px; border: 1px solid #ddd;">
         <div style="display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 15px;">
           <div>
@@ -108,6 +112,17 @@ def get_save_estimate_modal_html(
     <div style="margin-top: 20px; display: flex; gap: 10px; justify-content: flex-end;">
       <button onclick="closeSaveEstimateModal()" style='padding:10px 20px; font-size:14px; cursor:pointer; background-color:#d32f2f; color:#fff; border:none; border-radius:4px; font-weight:bold;'>Close</button>
       <button onclick="executeSaveEstimate()" id="executeSaveBtn" style='padding:10px 20px; font-size:14px; cursor:pointer; background-color:#d32f2f; color:#fff; border:none; border-radius:4px; font-weight:bold;'>CONFIRM</button>
+    </div>
+  </div>
+</div>
+
+<div id="missingRoModal" class="modal" style="display: none;">
+  <div class="modal-content" style="max-width: 360px; height: auto; margin-top: 12%;">
+    <div style="font-size: 18px; font-weight: bold; margin-bottom: 10px;">Missing RO Number</div>
+    <div style="font-size: 14px; margin-bottom: 20px;">This estimate has no RO number. Auto-generate one?</div>
+    <div style="display: flex; justify-content: flex-end; gap: 10px;">
+      <button onclick="confirmMissingRoNo()" style='padding:8px 18px; font-size:13px; cursor:pointer; background-color:#d32f2f; color:#fff; border:none; border-radius:4px; font-weight:bold;'>NO</button>
+      <button onclick="confirmMissingRoYes()" style='padding:8px 18px; font-size:13px; cursor:pointer; background-color:#d32f2f; color:#fff; border:none; border-radius:4px; font-weight:bold;'>YES</button>
     </div>
   </div>
 </div>
@@ -446,6 +461,10 @@ function openSaveEstimateModal(estimateTotals) {{
   
   // Display RO number (already extracted on backend)
   document.getElementById('roNumberDisplay').textContent = 'RO NUMBER: ' + (saveRoNumber || '-');
+  const roInput = document.getElementById('saveRoInput');
+  if (roInput) {{
+    roInput.value = saveRoNumber || '';
+  }}
   
   // Display claim number if available
   document.getElementById('claimNumberDisplay').textContent = saveClaimNumber ? 'CLAIM: ' + saveClaimNumber : 'CLAIM: -';
@@ -548,9 +567,93 @@ function openSaveEstimateModal(estimateTotals) {{
 
 function closeSaveEstimateModal() {{
   document.getElementById('saveEstimateModal').style.display = 'none';
+  closeMissingRoModal();
 }}
 
-function executeSaveEstimate() {{
+function closeMissingRoModal() {{
+  const modal = document.getElementById('missingRoModal');
+  if (modal) {{
+    modal.style.display = 'none';
+  }}
+}}
+
+function _currentRoValue() {{
+  const roInput = document.getElementById('saveRoInput');
+  if (roInput) {{
+    return (roInput.value || '').trim();
+  }}
+  return (saveRoNumber || '').trim();
+}}
+
+function _setRoValue(value) {{
+  const normalized = (value || '').trim();
+  saveRoNumber = normalized;
+  const roInput = document.getElementById('saveRoInput');
+  if (roInput) {{
+    roInput.value = normalized;
+  }}
+  const roDisplay = document.getElementById('roNumberDisplay');
+  if (roDisplay) {{
+    roDisplay.textContent = 'RO NUMBER: ' + (normalized || '-');
+  }}
+}}
+
+function confirmMissingRoNo() {{
+  closeMissingRoModal();
+}}
+
+function confirmMissingRoYes() {{
+  const saveBtn = document.getElementById('executeSaveBtn');
+  const statusDiv = document.getElementById('saveEstimateStatus');
+
+  closeMissingRoModal();
+
+  if (saveBtn) {{
+    saveBtn.disabled = true;
+  }}
+  if (statusDiv) {{
+    statusDiv.textContent = 'Generating RO number...';
+    statusDiv.style.color = 'blue';
+  }}
+
+  fetch('/ui/auto-generate-ro', {{
+    method: 'POST',
+    credentials: 'include'
+  }})
+    .then(async (response) => {{
+      const raw = await response.text();
+      let parsed = {{}};
+      try {{
+        parsed = raw ? JSON.parse(raw) : {{}};
+      }} catch (_) {{
+        parsed = {{}};
+      }}
+      return {{ ok: response.ok, data: parsed }};
+    }})
+    .then((resultPayload) => {{
+      const ok = !!(resultPayload && resultPayload.ok);
+      const data = (resultPayload && resultPayload.data) || {{}};
+      const generatedRo = (data.ro_number || '').trim();
+
+      if (!ok || !generatedRo) {{
+        throw new Error('Failed to auto-generate RO number');
+      }}
+
+      _setRoValue(generatedRo);
+      executeSaveEstimateInternal();
+    }})
+    .catch((error) => {{
+      if (statusDiv) {{
+        statusDiv.textContent = 'Error: ' + (error && error.message ? error.message : 'Failed to auto-generate RO number');
+        statusDiv.style.color = 'red';
+      }}
+      if (saveBtn) {{
+        saveBtn.disabled = false;
+      }}
+    }});
+}}
+
+function executeSaveEstimateInternal() {{
   const saveBtn = document.getElementById('executeSaveBtn');
   const statusDiv = document.getElementById('saveEstimateStatus');
   if (saveBtn && saveBtn.disabled) {{
@@ -558,6 +661,8 @@ function executeSaveEstimate() {{
   }}
 
   try {{
+    const roValue = _currentRoValue();
+    _setRoValue(roValue);
     const laborData = Array.isArray(saveLaborItems) ? saveLaborItems.slice() : [];
     const paintData = Array.isArray(savePaintItems) ? savePaintItems.slice() : [];
     const partsResult = extractPartsReplacements();
@@ -726,6 +831,25 @@ function executeSaveEstimate() {{
     statusDiv.style.color = 'red';
     if (saveBtn) saveBtn.disabled = false;
   }}
+}}
+
+function executeSaveEstimate() {{
+  const saveBtn = document.getElementById('executeSaveBtn');
+  if (saveBtn && saveBtn.disabled) {{
+    return;
+  }}
+
+  const roValue = _currentRoValue();
+  if (!roValue) {{
+    const modal = document.getElementById('missingRoModal');
+    if (modal) {{
+      modal.style.display = 'block';
+    }}
+    return;
+  }}
+
+  _setRoValue(roValue);
+  executeSaveEstimateInternal();
 }}
 
 window.openSaveEstimateModal = openSaveEstimateModal;
