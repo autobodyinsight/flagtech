@@ -147,6 +147,7 @@ def _normalize_text(value) -> str:
 
 
 _PART_TOKEN_RE = re.compile(r"^[A-Z0-9-]{5,}$", re.IGNORECASE)
+_WORD_SPLIT_RE = re.compile(r"[^A-Za-z0-9]+")
 
 
 def _normalize_operation(value: str) -> str:
@@ -193,18 +194,64 @@ def _parse_line_components(operation_value, description_value, part_number_value
     return operation, description_core, part_number
 
 
-def _line_signature(repair_type: str, operation_value, description_value, part_number_value) -> str:
+def _line_identity(operation_value, description_value, part_number_value) -> tuple[str, str, str]:
     operation, description_core, part_number = _parse_line_components(
         operation_value,
         description_value,
         part_number_value,
     )
-    return "|".join([
-        _normalize_text(repair_type).lower(),
-        operation,
-        description_core.lower(),
-        part_number,
-    ])
+    return operation, description_core.lower(), part_number
+
+
+def _description_tokens(value: str) -> set[str]:
+    tokens = []
+    for piece in _WORD_SPLIT_RE.split(str(value or "").lower()):
+        token = piece.strip()
+        if not token:
+            continue
+        if token in {"the", "and", "for", "w", "with", "to", "a", "an", "of"}:
+            continue
+        tokens.append(token)
+    return set(tokens)
+
+
+def _description_similarity(left: str, right: str) -> float:
+    left_tokens = _description_tokens(left)
+    right_tokens = _description_tokens(right)
+    if not left_tokens and not right_tokens:
+        return 1.0
+    if not left_tokens or not right_tokens:
+        return 0.0
+    union = left_tokens | right_tokens
+    if not union:
+        return 0.0
+    return len(left_tokens & right_tokens) / len(union)
+
+
+def _line_match_score(new_identity: tuple[str, str, str], old_identity: tuple[str, str, str]) -> float:
+    new_op, new_desc, new_part = new_identity
+    old_op, old_desc, old_part = old_identity
+
+    if new_op == old_op and new_desc == old_desc and new_part == old_part:
+        return 100.0
+
+    desc_similarity = _description_similarity(new_desc, old_desc)
+    op_match = bool(new_op and old_op and new_op == old_op)
+    part_match = bool(new_part and old_part and new_part == old_part)
+
+    if op_match and part_match and desc_similarity >= 0.30:
+        return 85.0 + (desc_similarity * 10.0)
+
+    if op_match and desc_similarity >= 0.65:
+        return 70.0 + (desc_similarity * 10.0)
+
+    if part_match and desc_similarity >= 0.65:
+        return 65.0 + (desc_similarity * 10.0)
+
+    if desc_similarity >= 0.90:
+        return 60.0 + (desc_similarity * 10.0)
+
+    return 0.0
 
 
 def _canonical_labor_or_paint_lines(items) -> dict:
@@ -361,12 +408,11 @@ def _sync_ro_line_assignments_for_estimate_update(cur, domain: str, ro_value: st
     )
     old_rows = cur.fetchall() or []
 
-    old_by_signature = {}
+    old_pool = []
     for row in old_rows:
-        source_type = (row.get("source_repair_type") or row.get("repair_type") or "body").strip().lower()
-        signature = _line_signature(source_type, "", row.get("description"), "")
-        old_by_signature.setdefault(signature, []).append(
+        old_pool.append(
             {
+                "identity": _line_identity("", row.get("description"), ""),
                 "tech_id": row.get("tech_id"),
                 "tech_name": (row.get("tech_name") or "").strip(),
                 "is_pending": bool(row.get("is_pending")),
@@ -399,15 +445,22 @@ def _sync_ro_line_assignments_for_estimate_update(cur, domain: str, ro_value: st
             description = _normalize_text(item.get("description"))
             hours = _to_float(item.get("value"), 0.0)
 
-            signature = _line_signature(
-                repair_type,
+            new_identity = _line_identity(
                 item.get("operation"),
                 description,
                 item.get("part_number") or item.get("partNumber") or item.get("part_no") or "",
             )
+            best_index = -1
+            best_score = 0.0
+            for idx, candidate in enumerate(old_pool):
+                score = _line_match_score(new_identity, candidate.get("identity") or ("", "", ""))
+                if score > best_score:
+                    best_score = score
+                    best_index = idx
+
             prior_match = None
-            if signature in old_by_signature and old_by_signature[signature]:
-                prior_match = old_by_signature[signature].pop(0)
+            if best_index >= 0 and best_score >= 60.0:
+                prior_match = old_pool.pop(best_index)
 
             tech_id = prior_match.get("tech_id") if prior_match else None
             tech_name = prior_match.get("tech_name") if prior_match else None
