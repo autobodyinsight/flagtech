@@ -52,7 +52,22 @@ def get_records_screen_html():
 
         <div id="recordsPanel-tech" class="records-content-panel" style="display:none; background:#fff; padding:20px; border-radius:8px; box-shadow:0 2px 4px rgba(0,0,0,0.1);">
             <h3 style="margin:0 0 18px 0; color:#333;">Tech</h3>
-            <div style="color:#666;">Tech screen</div>
+            <div style="overflow-x:auto;">
+                <table id="recordsTechListTable" style="width:100%; border-collapse:collapse;">
+                    <thead>
+                        <tr class="dashboard-header-row">
+                            <th class="dashboard-header-cell" style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold;">TECH</th>
+                            <th class="dashboard-header-cell" style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold; text-align:right;">PAY RATE</th>
+                            <th class="dashboard-header-cell" style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold; text-align:right;">TOTAL HRS</th>
+                            <th class="dashboard-header-cell" style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold; text-align:center;">ASSIGNED RO'S</th>
+                            <th class="dashboard-header-cell" style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold;">ARCHIVED</th>
+                        </tr>
+                    </thead>
+                    <tbody id="recordsTechListBody">
+                        <tr><td colspan="5" style="padding:20px; text-align:center; color:#999;">Loading...</td></tr>
+                    </tbody>
+                </table>
+            </div>
         </div>
 
         <div id="recordsPanel-parts" class="records-content-panel" style="display:none; background:#fff; padding:20px; border-radius:8px; box-shadow:0 2px 4px rgba(0,0,0,0.1);">
@@ -109,6 +124,8 @@ def get_records_screen_html():
             recordsSetActiveSidebar(normalizedView);
             if (normalizedView === 'ros') {
                 loadRecordsData();
+            } else if (normalizedView === 'tech') {
+                loadRecordsArchivedTechs();
             }
         }
 
@@ -162,6 +179,43 @@ def get_records_screen_html():
                 });
             } catch (error) {
                 body.innerHTML = `<tr><td colspan='8' style='padding:20px; text-align:center; color:#c00;'>Error loading data</td></tr>`;
+            }
+        }
+
+        async function loadRecordsArchivedTechs() {
+            const body = document.getElementById('recordsTechListBody');
+            if (!body) return;
+
+            body.innerHTML = `<tr><td colspan='5' style='padding:20px; text-align:center; color:#999;'>Loading...</td></tr>`;
+            try {
+                const resp = await fetch('/api/techs/archived', { credentials: 'include' });
+                const data = await resp.json();
+                const rows = Array.isArray(data.archived) ? data.archived : [];
+
+                body.innerHTML = '';
+                if (!rows.length) {
+                    body.innerHTML = `<tr><td colspan='5' style='padding:20px; text-align:center; color:#999;'>No archived techs found.</td></tr>`;
+                    return;
+                }
+
+                rows.forEach((row, index) => {
+                    const rowBg = (index % 2 === 0) ? '#d3d3d3' : '#f2f0ef';
+                    const techName = String(row.tech_name || '').trim() || `Tech #${row.tech_id || ''}`;
+                    const assignedRos = Array.isArray(row.assigned_ros) ? row.assigned_ros : [];
+                    const assignedRosText = assignedRos.length
+                        ? assignedRos.map((item) => String(item.ro || '').trim()).filter(Boolean).join(', ')
+                        : '-';
+
+                    body.innerHTML += `<tr>
+                        <td style='padding:12px; background:${rowBg};'>${techName}</td>
+                        <td style='padding:12px; text-align:right; background:${rowBg};'>${formatRecordsMoney(row.pay_rate || 0)}</td>
+                        <td style='padding:12px; text-align:right; background:${rowBg};'>${Number(row.total_hours || 0).toFixed(1)}</td>
+                        <td style='padding:12px; text-align:center; background:${rowBg};'>${assignedRosText}</td>
+                        <td style='padding:12px; background:${rowBg};'>${formatRecordsDate(row.archived_at)}</td>
+                    </tr>`;
+                });
+            } catch (error) {
+                body.innerHTML = `<tr><td colspan='5' style='padding:20px; text-align:center; color:#c00;'>Error loading archived techs</td></tr>`;
             }
         }
 
