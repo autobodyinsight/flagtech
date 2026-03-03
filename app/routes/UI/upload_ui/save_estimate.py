@@ -656,9 +656,6 @@ function confirmMissingRoYes() {{
 function executeSaveEstimateInternal() {{
   const saveBtn = document.getElementById('executeSaveBtn');
   const statusDiv = document.getElementById('saveEstimateStatus');
-  if (saveBtn && saveBtn.disabled) {{
-    return;
-  }}
 
   try {{
     const roValue = _currentRoValue();
