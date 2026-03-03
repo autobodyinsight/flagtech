@@ -147,7 +147,6 @@ def _normalize_text(value) -> str:
 
 
 _PART_TOKEN_RE = re.compile(r"^[A-Z0-9-]{5,}$", re.IGNORECASE)
-_WORD_SPLIT_RE = re.compile(r"[^A-Za-z0-9]+")
 
 
 def _normalize_operation(value: str) -> str:
@@ -194,64 +193,18 @@ def _parse_line_components(operation_value, description_value, part_number_value
     return operation, description_core, part_number
 
 
-def _line_identity(operation_value, description_value, part_number_value) -> tuple[str, str, str]:
+def _line_signature(repair_type: str, operation_value, description_value, part_number_value) -> str:
     operation, description_core, part_number = _parse_line_components(
         operation_value,
         description_value,
         part_number_value,
     )
-    return operation, description_core.lower(), part_number
-
-
-def _description_tokens(value: str) -> set[str]:
-    tokens = []
-    for piece in _WORD_SPLIT_RE.split(str(value or "").lower()):
-        token = piece.strip()
-        if not token:
-            continue
-        if token in {"the", "and", "for", "w", "with", "to", "a", "an", "of"}:
-            continue
-        tokens.append(token)
-    return set(tokens)
-
-
-def _description_similarity(left: str, right: str) -> float:
-    left_tokens = _description_tokens(left)
-    right_tokens = _description_tokens(right)
-    if not left_tokens and not right_tokens:
-        return 1.0
-    if not left_tokens or not right_tokens:
-        return 0.0
-    union = left_tokens | right_tokens
-    if not union:
-        return 0.0
-    return len(left_tokens & right_tokens) / len(union)
-
-
-def _line_match_score(new_identity: tuple[str, str, str], old_identity: tuple[str, str, str]) -> float:
-    new_op, new_desc, new_part = new_identity
-    old_op, old_desc, old_part = old_identity
-
-    if new_op == old_op and new_desc == old_desc and new_part == old_part:
-        return 100.0
-
-    desc_similarity = _description_similarity(new_desc, old_desc)
-    op_match = bool(new_op and old_op and new_op == old_op)
-    part_match = bool(new_part and old_part and new_part == old_part)
-
-    if op_match and part_match and desc_similarity >= 0.30:
-        return 85.0 + (desc_similarity * 10.0)
-
-    if op_match and desc_similarity >= 0.65:
-        return 70.0 + (desc_similarity * 10.0)
-
-    if part_match and desc_similarity >= 0.65:
-        return 65.0 + (desc_similarity * 10.0)
-
-    if desc_similarity >= 0.90:
-        return 60.0 + (desc_similarity * 10.0)
-
-    return 0.0
+    return "|".join([
+        _normalize_text(repair_type).lower(),
+        operation,
+        description_core.lower(),
+        part_number,
+    ])
 
 
 def _canonical_labor_or_paint_lines(items) -> dict:
@@ -398,7 +351,7 @@ def _ensure_ro_line_assignments_table(cur) -> None:
 def _sync_ro_line_assignments_for_estimate_update(cur, domain: str, ro_value: str, labor_repairs, paint_repairs) -> list[dict]:
     cur.execute(
         """
-        SELECT repair_type, source_repair_type, description, tech_id, tech_name, is_pending, ready_to_flag, flagged_at
+        SELECT id, repair_type, source_repair_type, line_key, line_number, description, hours, tech_id, tech_name, is_pending, ready_to_flag, flagged_at
         FROM ro_line_assignments
         WHERE domain = %s
           AND ro = %s
@@ -408,18 +361,35 @@ def _sync_ro_line_assignments_for_estimate_update(cur, domain: str, ro_value: st
     )
     old_rows = cur.fetchall() or []
 
-    old_pool = []
-    for row in old_rows:
-        old_pool.append(
-            {
-                "identity": _line_identity("", row.get("description"), ""),
-                "tech_id": row.get("tech_id"),
-                "tech_name": (row.get("tech_name") or "").strip(),
-                "is_pending": bool(row.get("is_pending")),
-                "ready_to_flag": bool(row.get("ready_to_flag")),
-                "flagged_at": row.get("flagged_at"),
-            }
+    def _signature_without_type(operation_value, description_value, part_number_value) -> str:
+        operation, description_core, part_number = _parse_line_components(
+            operation_value,
+            description_value,
+            part_number_value,
         )
+        return "|".join([operation, description_core.lower(), part_number])
+
+    old_locked_by_line_key = {}
+    old_locked_by_signature = {}
+    old_locked_by_description = {}
+
+    for row in old_rows:
+        tech_id = row.get("tech_id")
+        tech_name = (row.get("tech_name") or "").strip()
+        is_locked = tech_id is not None or bool(tech_name)
+        if not is_locked:
+            continue
+
+        line_key = str(row.get("line_key") or "").strip()
+        if line_key:
+            old_locked_by_line_key.setdefault(line_key, []).append(row)
+
+        signature = _signature_without_type("", row.get("description"), "")
+        old_locked_by_signature.setdefault(signature, []).append(row)
+
+        description_key = _normalize_text(row.get("description")).lower()
+        if description_key:
+            old_locked_by_description.setdefault(description_key, []).append(row)
 
     cur.execute(
         """
@@ -432,6 +402,29 @@ def _sync_ro_line_assignments_for_estimate_update(cur, domain: str, ro_value: st
     )
 
     inserted_rows = []
+    used_locked_ids = set()
+
+    def _take_locked_match(item: dict, index: int):
+        line_key = _line_key_for_item(item, index)
+        description = _normalize_text(item.get("description"))
+        signature = _signature_without_type(
+            item.get("operation"),
+            description,
+            item.get("part_number") or item.get("partNumber") or item.get("part_no") or "",
+        )
+
+        for pool in (
+            old_locked_by_line_key.get(line_key, []),
+            old_locked_by_signature.get(signature, []),
+            old_locked_by_description.get(description.lower(), []),
+        ):
+            for candidate in pool:
+                candidate_id = candidate.get("id")
+                if candidate_id in used_locked_ids:
+                    continue
+                used_locked_ids.add(candidate_id)
+                return candidate
+        return None
 
     def _insert_role_lines(items, repair_type: str) -> None:
         if not isinstance(items, list):
@@ -445,30 +438,31 @@ def _sync_ro_line_assignments_for_estimate_update(cur, domain: str, ro_value: st
             description = _normalize_text(item.get("description"))
             hours = _to_float(item.get("value"), 0.0)
 
-            new_identity = _line_identity(
-                item.get("operation"),
-                description,
-                item.get("part_number") or item.get("partNumber") or item.get("part_no") or "",
-            )
-            best_index = -1
-            best_score = 0.0
-            for idx, candidate in enumerate(old_pool):
-                score = _line_match_score(new_identity, candidate.get("identity") or ("", "", ""))
-                if score > best_score:
-                    best_score = score
-                    best_index = idx
-
-            prior_match = None
-            if best_index >= 0 and best_score >= 60.0:
-                prior_match = old_pool.pop(best_index)
-
-            tech_id = prior_match.get("tech_id") if prior_match else None
-            tech_name = prior_match.get("tech_name") if prior_match else None
-            if tech_name == "":
+            locked_match = _take_locked_match(item, index)
+            if locked_match:
+                db_repair_type = (locked_match.get("repair_type") or repair_type).strip().lower()
+                db_source_type = (locked_match.get("source_repair_type") or db_repair_type).strip().lower()
+                db_line_key = str(locked_match.get("line_key") or line_key).strip() or line_key
+                db_line_number = str(locked_match.get("line_number") or line_number).strip() or line_number
+                db_description = _normalize_text(locked_match.get("description") or description)
+                db_hours = _to_float(locked_match.get("hours"), hours)
+                tech_id = locked_match.get("tech_id")
+                tech_name = (locked_match.get("tech_name") or "").strip() or None
+                is_pending = bool(locked_match.get("is_pending"))
+                ready_to_flag = bool(locked_match.get("ready_to_flag"))
+                flagged_at = locked_match.get("flagged_at")
+            else:
+                db_repair_type = repair_type
+                db_source_type = repair_type
+                db_line_key = line_key
+                db_line_number = line_number
+                db_description = description
+                db_hours = hours
+                tech_id = None
                 tech_name = None
-            is_pending = bool(prior_match.get("is_pending")) if prior_match and not tech_name else False
-            ready_to_flag = bool(prior_match.get("ready_to_flag")) if prior_match and tech_name else False
-            flagged_at = prior_match.get("flagged_at") if prior_match and ready_to_flag else None
+                is_pending = False
+                ready_to_flag = False
+                flagged_at = None
 
             cur.execute(
                 """
@@ -492,12 +486,12 @@ def _sync_ro_line_assignments_for_estimate_update(cur, domain: str, ro_value: st
                 """,
                 (
                     ro_value,
-                    repair_type,
-                    repair_type,
-                    line_key,
-                    line_number,
-                    description,
-                    hours,
+                    db_repair_type,
+                    db_source_type,
+                    db_line_key,
+                    db_line_number,
+                    db_description,
+                    db_hours,
                     tech_id,
                     tech_name,
                     is_pending,
@@ -509,9 +503,9 @@ def _sync_ro_line_assignments_for_estimate_update(cur, domain: str, ro_value: st
             inserted = cur.fetchone() or {}
             inserted_rows.append(
                 {
-                    "line_key": str(inserted.get("line_key") or line_key),
-                    "repair_type": (inserted.get("repair_type") or repair_type).strip().lower(),
-                    "hours": _to_float(inserted.get("hours"), hours),
+                    "line_key": str(inserted.get("line_key") or db_line_key),
+                    "repair_type": (inserted.get("repair_type") or db_repair_type).strip().lower(),
+                    "hours": _to_float(inserted.get("hours"), db_hours),
                     "tech_id": inserted.get("tech_id"),
                     "tech_name": (inserted.get("tech_name") or "").strip(),
                 }
