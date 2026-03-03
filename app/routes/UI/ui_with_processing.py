@@ -369,9 +369,7 @@ def _sync_ro_line_assignments_for_estimate_update(cur, domain: str, ro_value: st
         )
         return "|".join([operation, description_core.lower(), part_number])
 
-    old_locked_by_line_key = {}
     old_locked_by_signature = {}
-    old_locked_by_description = {}
 
     for row in old_rows:
         tech_id = row.get("tech_id")
@@ -380,16 +378,8 @@ def _sync_ro_line_assignments_for_estimate_update(cur, domain: str, ro_value: st
         if not is_locked:
             continue
 
-        line_key = str(row.get("line_key") or "").strip()
-        if line_key:
-            old_locked_by_line_key.setdefault(line_key, []).append(row)
-
         signature = _signature_without_type("", row.get("description"), "")
         old_locked_by_signature.setdefault(signature, []).append(row)
-
-        description_key = _normalize_text(row.get("description")).lower()
-        if description_key:
-            old_locked_by_description.setdefault(description_key, []).append(row)
 
     cur.execute(
         """
@@ -405,7 +395,6 @@ def _sync_ro_line_assignments_for_estimate_update(cur, domain: str, ro_value: st
     used_locked_ids = set()
 
     def _take_locked_match(item: dict, index: int):
-        line_key = _line_key_for_item(item, index)
         description = _normalize_text(item.get("description"))
         signature = _signature_without_type(
             item.get("operation"),
@@ -413,17 +402,12 @@ def _sync_ro_line_assignments_for_estimate_update(cur, domain: str, ro_value: st
             item.get("part_number") or item.get("partNumber") or item.get("part_no") or "",
         )
 
-        for pool in (
-            old_locked_by_line_key.get(line_key, []),
-            old_locked_by_signature.get(signature, []),
-            old_locked_by_description.get(description.lower(), []),
-        ):
-            for candidate in pool:
-                candidate_id = candidate.get("id")
-                if candidate_id in used_locked_ids:
-                    continue
-                used_locked_ids.add(candidate_id)
-                return candidate
+        for candidate in old_locked_by_signature.get(signature, []):
+            candidate_id = candidate.get("id")
+            if candidate_id in used_locked_ids:
+                continue
+            used_locked_ids.add(candidate_id)
+            return candidate
         return None
 
     def _insert_role_lines(items, repair_type: str) -> None:
@@ -442,10 +426,10 @@ def _sync_ro_line_assignments_for_estimate_update(cur, domain: str, ro_value: st
             if locked_match:
                 db_repair_type = (locked_match.get("repair_type") or repair_type).strip().lower()
                 db_source_type = (locked_match.get("source_repair_type") or db_repair_type).strip().lower()
-                db_line_key = str(locked_match.get("line_key") or line_key).strip() or line_key
-                db_line_number = str(locked_match.get("line_number") or line_number).strip() or line_number
-                db_description = _normalize_text(locked_match.get("description") or description)
-                db_hours = _to_float(locked_match.get("hours"), hours)
+                db_line_key = line_key
+                db_line_number = line_number
+                db_description = description
+                db_hours = hours
                 tech_id = locked_match.get("tech_id")
                 tech_name = (locked_match.get("tech_name") or "").strip() or None
                 is_pending = bool(locked_match.get("is_pending"))
