@@ -361,57 +361,112 @@ def _sync_ro_line_assignments_for_estimate_update(cur, domain: str, ro_value: st
     )
     old_rows = cur.fetchall() or []
 
-    def _signature_without_type(operation_value, description_value, part_number_value) -> str:
+    def _signature_without_type(operation_value, description_value, part_number_value) -> tuple[str, str, str]:
         operation, description_core, part_number = _parse_line_components(
             operation_value,
             description_value,
             part_number_value,
         )
-        return "|".join([operation, description_core.lower(), part_number])
+        return operation, description_core.lower(), part_number
 
-    old_locked_by_signature = {}
-    old_locked_by_description = {}
-    old_locked_by_line_number = {}
+    old_by_signature = {}
+    old_by_description = {}
+    old_by_id = {}
 
     for row in old_rows:
-        tech_id = row.get("tech_id")
-        tech_name = (row.get("tech_name") or "").strip()
-        is_locked = tech_id is not None or bool(tech_name)
-        if not is_locked:
+        row_id = row.get("id")
+        if row_id is None:
             continue
 
-        signature = _signature_without_type("", row.get("description"), "")
-        old_locked_by_signature.setdefault(signature, []).append(row)
+        row_sig = _signature_without_type("", row.get("description"), "")
+        row_desc = row_sig[1]
+        old_by_id[row_id] = row
 
-        description_key = _normalize_text(row.get("description")).lower()
+        if row_sig[0] and row_sig[2] and row_desc:
+            old_by_signature.setdefault(row_sig, []).append(row_id)
+        if row_desc:
+            old_by_description.setdefault(row_desc, []).append(row_id)
+
+    used_old_ids = set()
+    rebuilt_rows = []
+
+    def _take_match(item: dict) -> dict | None:
+        operation, description_key, part_number = _signature_without_type(
+            item.get("operation"),
+            item.get("description"),
+            item.get("part_number") or item.get("partNumber") or item.get("part_no") or "",
+        )
+
+        use_signature = bool(operation and part_number and description_key)
+        candidate_ids = []
+        if use_signature:
+            candidate_ids.extend(old_by_signature.get((operation, description_key, part_number), []))
         if description_key:
-            old_locked_by_description.setdefault(description_key, []).append(row)
+            candidate_ids.extend(old_by_description.get(description_key, []))
 
-        line_number_key = str(row.get("line_number") or "").strip()
-        if line_number_key:
-            old_locked_by_line_number.setdefault(line_number_key, []).append(row)
+        for candidate_id in candidate_ids:
+            if candidate_id in used_old_ids:
+                continue
+            used_old_ids.add(candidate_id)
+            return old_by_id.get(candidate_id)
+        return None
 
-    cur.execute(
-        """
-        DELETE FROM ro_line_assignments
-        WHERE domain = %s
-          AND ro = %s
-          AND COALESCE(source_repair_type, repair_type) IN ('body', 'paint')
-        """,
-        (domain, ro_value),
-    )
+    def _append_rebuilt_lines(items, repair_type: str) -> None:
+        if not isinstance(items, list):
+            return
 
-    inserted_rows = []
-    used_locked_ids = set()
+        for index, item in enumerate(items):
+            if not isinstance(item, dict):
+                continue
+
+            line_key = _line_key_for_item(item, index)
+            line_number = str(item.get("line") or line_key)
+            description = _normalize_text(item.get("description"))
+            hours = _to_float(item.get("value"), 0.0)
+
+            matched = _take_match(item)
+
+            if matched:
+                tech_id = matched.get("tech_id")
+                tech_name = (matched.get("tech_name") or "").strip() or None
+                is_pending = bool(matched.get("is_pending"))
+                ready_to_flag = bool(matched.get("ready_to_flag"))
+                flagged_at = matched.get("flagged_at")
+            else:
+                tech_id = None
+                tech_name = None
+                is_pending = False
+                ready_to_flag = False
+                flagged_at = None
+
+            rebuilt_rows.append(
+                {
+                    "repair_type": repair_type,
+                    "source_repair_type": repair_type,
+                    "line_key": line_key,
+                    "line_number": line_number,
+                    "description": description,
+                    "hours": hours,
+                    "tech_id": tech_id,
+                    "tech_name": tech_name,
+                    "is_pending": is_pending,
+                    "ready_to_flag": ready_to_flag,
+                    "flagged_at": flagged_at,
+                }
+            )
+
+    _append_rebuilt_lines(labor_repairs, "body")
+    _append_rebuilt_lines(paint_repairs, "paint")
+
     used_keys_by_type = {"body": set(), "paint": set()}
 
     def _unique_line_key_for_type(repair_type: str, preferred_key: str) -> str:
         key_base = str(preferred_key or "").strip() or "1"
-        repair_key = (repair_type or "body").strip().lower()
-        if repair_key not in used_keys_by_type:
-            used_keys_by_type[repair_key] = set()
+        type_key = (repair_type or "body").strip().lower()
+        if type_key not in used_keys_by_type:
+            used_keys_by_type[type_key] = set()
 
-        existing = used_keys_by_type[repair_key]
+        existing = used_keys_by_type[type_key]
         if key_base not in existing:
             existing.add(key_base)
             return key_base
@@ -424,117 +479,66 @@ def _sync_ro_line_assignments_for_estimate_update(cur, domain: str, ro_value: st
                 return candidate
             suffix += 1
 
-    def _take_locked_match(item: dict, index: int):
-        description = _normalize_text(item.get("description"))
-        line_number = str(item.get("line") or _line_key_for_item(item, index)).strip()
-        signature = _signature_without_type(
-            item.get("operation"),
-            description,
-            item.get("part_number") or item.get("partNumber") or item.get("part_no") or "",
+    cur.execute(
+        """
+        DELETE FROM ro_line_assignments
+        WHERE domain = %s
+          AND ro = %s
+          AND COALESCE(source_repair_type, repair_type) IN ('body', 'paint')
+        """,
+        (domain, ro_value),
+    )
+
+    inserted_rows = []
+    for row in rebuilt_rows:
+        row["line_key"] = _unique_line_key_for_type(row.get("repair_type"), row.get("line_key"))
+        cur.execute(
+            """
+            INSERT INTO ro_line_assignments (
+                ro,
+                repair_type,
+                source_repair_type,
+                line_key,
+                line_number,
+                description,
+                hours,
+                tech_id,
+                tech_name,
+                is_pending,
+                ready_to_flag,
+                flagged_at,
+                domain
+            )
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            RETURNING line_key, repair_type, hours, tech_id, tech_name
+            """,
+            (
+                ro_value,
+                row.get("repair_type"),
+                row.get("source_repair_type"),
+                row.get("line_key"),
+                row.get("line_number"),
+                row.get("description"),
+                row.get("hours"),
+                row.get("tech_id"),
+                row.get("tech_name"),
+                row.get("is_pending"),
+                row.get("ready_to_flag"),
+                row.get("flagged_at"),
+                domain,
+            ),
+        )
+        inserted = cur.fetchone() or {}
+        inserted_rows.append(
+            {
+                "line_key": str(inserted.get("line_key") or row.get("line_key") or ""),
+                "repair_type": (inserted.get("repair_type") or row.get("repair_type") or "body").strip().lower(),
+                "hours": _to_float(inserted.get("hours"), _to_float(row.get("hours"), 0.0)),
+                "tech_id": inserted.get("tech_id"),
+                "tech_name": (inserted.get("tech_name") or "").strip(),
+            }
         )
 
-        for pool in (
-            old_locked_by_signature.get(signature, []),
-            old_locked_by_description.get(description.lower(), []),
-            old_locked_by_line_number.get(line_number, []),
-        ):
-            for candidate in pool:
-                candidate_id = candidate.get("id")
-                if candidate_id in used_locked_ids:
-                    continue
-                used_locked_ids.add(candidate_id)
-                return candidate
-        return None
-
-    def _insert_role_lines(items, repair_type: str) -> None:
-        if not isinstance(items, list):
-            return
-        for index, item in enumerate(items):
-            if not isinstance(item, dict):
-                continue
-
-            line_key = _line_key_for_item(item, index)
-            line_number = str(item.get("line") or line_key)
-            description = _normalize_text(item.get("description"))
-            hours = _to_float(item.get("value"), 0.0)
-
-            locked_match = _take_locked_match(item, index)
-            if locked_match:
-                db_repair_type = (locked_match.get("repair_type") or repair_type).strip().lower()
-                db_source_type = (locked_match.get("source_repair_type") or db_repair_type).strip().lower()
-                db_line_key = line_key
-                db_line_number = line_number
-                db_description = description
-                db_hours = hours
-                tech_id = locked_match.get("tech_id")
-                tech_name = (locked_match.get("tech_name") or "").strip() or None
-                is_pending = bool(locked_match.get("is_pending"))
-                ready_to_flag = bool(locked_match.get("ready_to_flag"))
-                flagged_at = locked_match.get("flagged_at")
-            else:
-                db_repair_type = repair_type
-                db_source_type = repair_type
-                db_line_key = line_key
-                db_line_number = line_number
-                db_description = description
-                db_hours = hours
-                tech_id = None
-                tech_name = None
-                is_pending = False
-                ready_to_flag = False
-                flagged_at = None
-
-            db_line_key = _unique_line_key_for_type(db_repair_type, db_line_key)
-
-            cur.execute(
-                """
-                INSERT INTO ro_line_assignments (
-                    ro,
-                    repair_type,
-                    source_repair_type,
-                    line_key,
-                    line_number,
-                    description,
-                    hours,
-                    tech_id,
-                    tech_name,
-                    is_pending,
-                    ready_to_flag,
-                    flagged_at,
-                    domain
-                )
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-                RETURNING line_key, repair_type, hours, tech_id, tech_name
-                """,
-                (
-                    ro_value,
-                    db_repair_type,
-                    db_source_type,
-                    db_line_key,
-                    db_line_number,
-                    db_description,
-                    db_hours,
-                    tech_id,
-                    tech_name,
-                    is_pending,
-                    ready_to_flag,
-                    flagged_at,
-                    domain,
-                ),
-            )
-            inserted = cur.fetchone() or {}
-            inserted_rows.append(
-                {
-                    "line_key": str(inserted.get("line_key") or db_line_key),
-                    "repair_type": (inserted.get("repair_type") or db_repair_type).strip().lower(),
-                    "hours": _to_float(inserted.get("hours"), db_hours),
-                    "tech_id": inserted.get("tech_id"),
-                    "tech_name": (inserted.get("tech_name") or "").strip(),
-                }
-            )
-
-    _insert_role_lines(labor_repairs, "body")
-    _insert_role_lines(paint_repairs, "paint")
     return inserted_rows
 
 
