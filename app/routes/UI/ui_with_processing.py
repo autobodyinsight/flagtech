@@ -403,6 +403,26 @@ def _sync_ro_line_assignments_for_estimate_update(cur, domain: str, ro_value: st
 
     inserted_rows = []
     used_locked_ids = set()
+    used_keys_by_type = {"body": set(), "paint": set()}
+
+    def _unique_line_key_for_type(repair_type: str, preferred_key: str) -> str:
+        key_base = str(preferred_key or "").strip() or "1"
+        repair_key = (repair_type or "body").strip().lower()
+        if repair_key not in used_keys_by_type:
+            used_keys_by_type[repair_key] = set()
+
+        existing = used_keys_by_type[repair_key]
+        if key_base not in existing:
+            existing.add(key_base)
+            return key_base
+
+        suffix = 2
+        while True:
+            candidate = f"{key_base}-{suffix}"
+            if candidate not in existing:
+                existing.add(candidate)
+                return candidate
+            suffix += 1
 
     def _take_locked_match(item: dict, index: int):
         description = _normalize_text(item.get("description"))
@@ -463,6 +483,8 @@ def _sync_ro_line_assignments_for_estimate_update(cur, domain: str, ro_value: st
                 is_pending = False
                 ready_to_flag = False
                 flagged_at = None
+
+            db_line_key = _unique_line_key_for_type(db_repair_type, db_line_key)
 
             cur.execute(
                 """
