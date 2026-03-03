@@ -3280,6 +3280,149 @@ async def save_ro_assignment_lines(request: Request):
         cur.close()
 
 
+@router.post("/ro-assignment-unassign")
+async def unassign_ro_assignment_lines(request: Request):
+    domain = get_user_domain(request)
+    if not domain:
+        return JSONResponse(status_code=401, content={"error": "Not authenticated"})
+
+    data = await request.json()
+    ro_value = (data.get("ro") or "").strip()
+    selected_sources = data.get("selected_sources") or []
+
+    if not ro_value:
+        return JSONResponse(status_code=400, content={"error": "ro is required"})
+    if not isinstance(selected_sources, list) or not selected_sources:
+        return JSONResponse(status_code=400, content={"error": "selected_sources is required"})
+
+    conn = get_conn()
+    cur = conn.cursor()
+    try:
+        _ensure_saved_estimates_table(cur)
+        _ensure_ro_line_assignments_table(cur)
+        _ensure_ro_activity_log_table(cur)
+        _ensure_ro_line_assignments_for_ro(cur, domain, ro_value)
+
+        cur.execute(
+            """
+            SELECT repair_type, COALESCE(SUM(hours), 0) AS total_hours
+            FROM ro_line_assignments
+            WHERE domain = %s
+              AND ro = %s
+              AND tech_name IS NOT NULL
+            GROUP BY repair_type
+            """,
+            (domain, ro_value),
+        )
+        before_rows = cur.fetchall() or []
+        before_by_type = {
+            _normalize_repair_type(row.get("repair_type")): _parse_float_value(row.get("total_hours"))
+            for row in before_rows
+        }
+        before_total_assigned = sum(before_by_type.values())
+
+        target_ids = set()
+        touched_tech_labels = set()
+        for source in selected_sources:
+            if not isinstance(source, dict):
+                continue
+            source_mode = (source.get("mode") or "").strip().lower()
+            if source_mode not in {"tech", "pending", "unassigned"}:
+                continue
+
+            rows = _get_scope_rows(cur, domain, ro_value, source)
+            for row in rows:
+                row_id = row.get("id")
+                if row_id is None:
+                    continue
+                target_ids.add(int(row_id))
+
+            if source_mode == "tech":
+                tech_label = (source.get("tech_name") or "").strip()
+                if tech_label:
+                    touched_tech_labels.add(tech_label)
+
+        if target_ids:
+            cur.execute(
+                """
+                UPDATE ro_line_assignments
+                SET tech_id = NULL,
+                    tech_name = NULL,
+                    is_pending = FALSE,
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE id = ANY(%s)
+                """,
+                (list(target_ids),),
+            )
+
+        cur.execute(
+            """
+            SELECT repair_type, COALESCE(SUM(hours), 0) AS total_hours
+            FROM ro_line_assignments
+            WHERE domain = %s
+              AND ro = %s
+              AND tech_name IS NOT NULL
+            GROUP BY repair_type
+            """,
+            (domain, ro_value),
+        )
+        after_rows = cur.fetchall() or []
+        after_by_type = {
+            _normalize_repair_type(row.get("repair_type")): _parse_float_value(row.get("total_hours"))
+            for row in after_rows
+        }
+        after_total_assigned = sum(after_by_type.values())
+
+        type_label_map = {
+            "body": "Body",
+            "paint": "Paint",
+            "mech": "Mechanical",
+            "frame": "Frame",
+        }
+
+        if target_ids:
+            if touched_tech_labels:
+                label = ", ".join(sorted(touched_tech_labels))
+                detail = f"Tech unassigned → {label}"
+            else:
+                detail = "Selected repair lines reset to unassigned"
+            _log_ro_activity(cur, domain, ro_value, "tech_assignment", detail)
+
+        for repair_type in sorted(set(before_by_type.keys()) | set(after_by_type.keys())):
+            before_hours = before_by_type.get(repair_type, 0.0)
+            after_hours = after_by_type.get(repair_type, 0.0)
+            if abs(before_hours - after_hours) < 1e-6:
+                continue
+            role_label = type_label_map.get(repair_type, repair_type.title())
+            _log_ro_activity(
+                cur,
+                domain,
+                ro_value,
+                "assigned_hours_changed",
+                f"Assigned hours changed ({role_label}): {before_hours:.1f} → {after_hours:.1f}",
+            )
+
+        if abs(before_total_assigned - after_total_assigned) >= 1e-6:
+            _log_ro_activity(
+                cur,
+                domain,
+                ro_value,
+                "total_assigned_hours_changed",
+                f"Total assigned hours changed: {before_total_assigned:.1f} → {after_total_assigned:.1f}",
+            )
+
+        conn.commit()
+        return {
+            "status": "ok",
+            "updated_count": len(target_ids),
+        }
+    except Exception as exc:
+        conn.rollback()
+        return JSONResponse(status_code=500, content={"error": str(exc)})
+    finally:
+        cur.close()
+
+
 @router.post("/ro-assignments")
 async def save_ro_assignments(request: Request):
     domain = get_user_domain(request)

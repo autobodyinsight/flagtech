@@ -497,6 +497,7 @@ def get_dashboard_screen_html():
             const popupState = {
                 activeView: '',
                 techLineItems: [],
+                techSelectedIndices: [],
                 techAssignContext: null,
                 techAssignLines: [],
                 techAssignManualLines: [],
@@ -1897,9 +1898,13 @@ def get_dashboard_screen_html():
 
             async function renderTechView() {
                 if (!roWindowContentEl) return;
+                popupState.techSelectedIndices = [];
                 roWindowContentEl.innerHTML = `
                     <div class="ro-window-card">
-                        <div style="font-weight:700; font-size:18px; margin-bottom:10px; color:#333;">Tech Hours Assignment</div>
+                        <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; margin-bottom:10px;">
+                            <div style="font-weight:700; font-size:18px; color:#333;">Tech Hours Assignment</div>
+                            <button id="roPopupTechUnassignBtn" type="button" style="padding:8px 12px; background:#d32f2f; color:#fff; border:none; border-radius:6px; cursor:pointer; font-weight:700;" disabled>Unassign</button>
+                        </div>
                         <div id="roPopupTechList"><div style="color:#777;">Loading...</div></div>
                     </div>
                     <div id="roPopupTechModal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.45); z-index:6000; align-items:center; justify-content:center;">
@@ -1934,13 +1939,87 @@ def get_dashboard_screen_html():
 
                 bindTechModalActions();
                 const listEl = roWindowDoc.getElementById('roPopupTechList');
+                const unassignBtn = roWindowDoc.getElementById('roPopupTechUnassignBtn');
+
+                function syncTechSelectionState() {
+                    const selected = popupState.techSelectedIndices || [];
+                    if (unassignBtn) {
+                        unassignBtn.disabled = selected.length === 0;
+                        unassignBtn.style.opacity = selected.length === 0 ? '0.6' : '1';
+                        unassignBtn.style.cursor = selected.length === 0 ? 'not-allowed' : 'pointer';
+                    }
+                }
+
+                function bindTechRowSelection() {
+                    roWindowDoc.querySelectorAll('.roPopupTechRowCheckbox').forEach((checkbox) => {
+                        checkbox.addEventListener('change', () => {
+                            const idx = parseInt(checkbox.getAttribute('data-tech-index') || '-1', 10);
+                            if (!Number.isFinite(idx) || idx < 0) return;
+                            const selected = Array.isArray(popupState.techSelectedIndices) ? popupState.techSelectedIndices.slice() : [];
+                            const existingIndex = selected.indexOf(idx);
+                            if (checkbox.checked && existingIndex === -1) selected.push(idx);
+                            if (!checkbox.checked && existingIndex >= 0) selected.splice(existingIndex, 1);
+                            popupState.techSelectedIndices = selected;
+                            syncTechSelectionState();
+                        });
+                    });
+                }
+
+                async function unassignSelectedTechRows() {
+                    const selectedIndices = Array.isArray(popupState.techSelectedIndices) ? popupState.techSelectedIndices.slice() : [];
+                    if (!selectedIndices.length) {
+                        alert('Select at least one row to unassign.');
+                        return;
+                    }
+
+                    const selectedSources = selectedIndices
+                        .map((idx) => popupState.techLineItems[idx])
+                        .filter((item) => !!item)
+                        .map((item) => ({
+                            mode: item.mode,
+                            repair_type: item.repair_type || item.type,
+                            tech_name: item.tech_name || item.tech || '',
+                        }));
+
+                    if (!selectedSources.length) {
+                        alert('No valid rows selected.');
+                        return;
+                    }
+
+                    await popupFetchJson('/api/ro-assignment-unassign', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            ro: ro.ro,
+                            selected_sources: selectedSources,
+                        }),
+                    });
+
+                    await renderTechView();
+                    loadDashboardData();
+                }
+
+                if (unassignBtn) {
+                    unassignBtn.onclick = async () => {
+                        try {
+                            await unassignSelectedTechRows();
+                        } catch (error) {
+                            console.error('Error unassigning selected tech rows:', error);
+                            alert('Error unassigning selected rows.');
+                        }
+                    };
+                }
+
+                syncTechSelectionState();
                 try {
                     const data = await popupFetchJson(`/api/ro-tech-lines?ro=${encodeURIComponent(ro.ro)}`);
                     const displayList = Array.isArray(data.tech_lines) ? data.tech_lines : [];
                     popupState.techLineItems = displayList;
+                    popupState.techSelectedIndices = [];
 
                     if (!displayList.length) {
                         listEl.innerHTML = '<div style="color:#999; padding:8px;">No repair data found.</div>';
+                        syncTechSelectionState();
                         return;
                     }
 
@@ -1948,6 +2027,7 @@ def get_dashboard_screen_html():
                         <table style="width:100%; border-collapse:collapse;">
                             <thead>
                                 <tr style="background:#3c4142; border-bottom:2px solid #999;">
+                                    <th style="padding:8px 10px; text-align:center; font-weight:700; color:#fff; width:44px;">Sel</th>
                                     <th style="padding:8px 12px; text-align:left; font-weight:700; color:#fff;">TECH</th>
                                     <th style="padding:8px 12px; text-align:left; font-weight:700; color:#fff;">TYPE</th>
                                     <th style="padding:8px 12px; text-align:right; font-weight:700; color:#fff;">HRS</th>
@@ -1961,6 +2041,7 @@ def get_dashboard_screen_html():
                                     const hrs = Number(item.hours || 0).toFixed(1);
                                     return `
                                         <tr style="background:${index % 2 === 0 ? '#f2f0ef' : '#ffffff'}; border-bottom:1px solid #ddd;">
+                                            <td style="padding:8px 10px; text-align:center;"><input type="checkbox" class="roPopupTechRowCheckbox" data-tech-index="${index}" style="width:16px; height:16px; cursor:pointer;" /></td>
                                             <td style="padding:8px 12px; color:${textColor}; font-weight:700;"><button type="button" data-tech-index="${index}" class="roPopupTechAssignBtn" style="background:none; border:none; color:${textColor}; text-decoration:underline; cursor:pointer; padding:0; font:inherit; font-weight:700;">${techLabel}</button></td>
                                             <td style="padding:8px 12px; color:#333;">${typeLabel}</td>
                                             <td style="padding:8px 12px; text-align:right; color:#333; font-weight:700;">${hrs}</td>
@@ -1979,9 +2060,12 @@ def get_dashboard_screen_html():
                             await openTechAssignModalPopup(item);
                         });
                     });
+                    bindTechRowSelection();
+                    syncTechSelectionState();
                 } catch (error) {
                     console.error('Error loading repair data:', error);
                     listEl.innerHTML = '<div style="color:#c62828;">Error loading data.</div>';
+                    syncTechSelectionState();
                 }
             }
 
