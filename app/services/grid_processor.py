@@ -1,15 +1,5 @@
-import logging
 import re
 from typing import List, Dict, Any, Tuple, Optional
-
-
-logger = logging.getLogger("flagtech.grid_processor")
-
-
-def _trace(message: str, *args) -> None:
-    rendered = message % args if args else message
-    logger.warning("[PARSE_TRACE] %s", rendered)
-    print(f"[PARSE_TRACE] {rendered}", flush=True)
 
 
 def kmeans_1d(values: List[float], k: int, iters: int = 40) -> List[float]:
@@ -151,10 +141,6 @@ def detect_anchors_and_vehicle_info(
     header_started = False
     header_ended = False
 
-    def _short(text: str, size: int = 180) -> str:
-        normalized = re.sub(r"\s+", " ", str(text or "")).strip()
-        return normalized[:size]
-
     for pi, page in enumerate(pages, start=1):
         rows = group_rows(page.get("words", []), y_thresh=6.0)
         for idx, r in enumerate(rows):
@@ -169,8 +155,6 @@ def detect_anchors_and_vehicle_info(
             if header_started and not header_ended and not claim_number:
                 if re.search(r"\bCLAIM\b", row_text, re.IGNORECASE):
                     claim_number = _extract_claim_number_from_text(row_text)
-                    if claim_number:
-                        _trace("claim_number=%s source=page:%s row:%s", claim_number, pi, _short(row_text))
 
             # Extract first RO
             if re.search(r"\bRO\b", row_text):
@@ -179,7 +163,6 @@ def detect_anchors_and_vehicle_info(
                     anchor_page = pi
                     anchor_ymid = r["ymid"]
                     first_ro_line = row_text
-                    _trace("anchor_ro source=page:%s ymid:%.2f row:%s", pi, anchor_ymid or 0.0, _short(row_text))
 
             # Extract owner info (look for "owner:" or "customer:" and extract name/phone in the same x column)
             if re.search(r"\b(owner|customer)\s*:", row_text, re.IGNORECASE):
@@ -249,7 +232,6 @@ def detect_anchors_and_vehicle_info(
                     if phone:
                         owner_info_parts.append(phone)
                     owner_info = "\n".join(owner_info_parts)
-                    _trace("owner_info=%s source=page:%s header_row:%s", owner_info.replace("\n", " | "), pi, _short(row_text))
 
             # Extract insurance company (look for "insurance:" or "insurance company:" and take next line)
             if re.search(r"\binsurance(?:\s+company)?\s*:", row_text, re.IGNORECASE):
@@ -281,7 +263,6 @@ def detect_anchors_and_vehicle_info(
                     # Drop leading owner name if it appears at the start of the line.
                     cleaned_company = re.sub(r"^[A-Za-z][A-Za-z\-]*,\s*[A-Za-z][A-Za-z\-]*\s+", "", cleaned_company)
                     insurance_company = cleaned_company
-                    _trace("insurance_company=%s source=page:%s header_row:%s", insurance_company, pi, _short(row_text))
 
             # Extract VIN (look for "VIN:" and capture the 17-character value)
             if re.search(r"\bVIN\b", row_text, re.IGNORECASE):
@@ -296,14 +277,12 @@ def detect_anchors_and_vehicle_info(
                             continue
                         if year_pattern.search(text):
                             vehicle_info_line = text
-                            _trace("vehicle_info_line source=page:%s row:%s", pi, _short(vehicle_info_line))
                             break
                 
                 # Look for 17-character alphanumeric value after VIN
                 vin_match = re.search(r"VIN\s*[:#-]*\s*([A-Za-z0-9]{17})", row_text, re.IGNORECASE)
                 if vin_match:
                     vin = vin_match.group(1)
-                    _trace("vin=%s source=page:%s row:%s", vin, pi, _short(row_text))
                 else:
                     # Try next line if not on same line
                     for j in range(idx + 1, min(idx + 2, len(rows))):
@@ -311,14 +290,12 @@ def detect_anchors_and_vehicle_info(
                         vin_match = re.search(r"([A-Za-z0-9]{17})", next_line)
                         if vin_match:
                             vin = vin_match.group(1)
-                            _trace("vin=%s source=page:%s row:%s", vin, pi, _short(next_line))
                             break
 
             if not subtotals_page:
                 if re.search(r"\bESTIMATE\s+TOTALS\b", row_text, re.IGNORECASE):
                     subtotals_page = pi
                     subtotals_ymid = r["ymid"]
-                    _trace("subtotals_anchor source=page:%s ymid:%.2f row:%s", pi, subtotals_ymid or 0.0, _short(row_text))
                 else:
                     upper = row_text.upper()
                     if "ESTIMATE" in upper and idx + 1 < len(rows):
@@ -326,7 +303,6 @@ def detect_anchors_and_vehicle_info(
                         if re.search(r"\bTOTALS\b", next_text, re.IGNORECASE):
                             subtotals_page = pi
                             subtotals_ymid = rows[idx + 1]["ymid"]
-                            _trace("subtotals_anchor source=page:%s ymid:%.2f row:%s", pi, subtotals_ymid or 0.0, _short(next_text))
 
         if anchor_page and subtotals_page:
             break
@@ -669,7 +645,6 @@ def extract_parts_items(
 
 def process_pdf_grid(pages: List[Dict]) -> Dict[str, Any]:
     """Main entry point."""
-    _trace("process_pdf_grid start pages=%s", len(pages))
     for pi, page in enumerate(pages, start=1):
         for w in page.get("words", []):
             w["page_index"] = pi
@@ -679,18 +654,9 @@ def process_pdf_grid(pages: List[Dict]) -> Dict[str, Any]:
     anchor_page, anchor_ymid, subtotals_page, subtotals_ymid, first_ro_line, vehicle_info_line, owner_info, insurance_company, vin, claim_number = \
         detect_anchors_and_vehicle_info(pages)
 
-    _trace(
-        "process_pdf_grid anchors anchor_page=%s anchor_ymid=%s subtotals_page=%s subtotals_ymid=%s",
-        anchor_page,
-        anchor_ymid,
-        subtotals_page,
-        subtotals_ymid,
-    )
-
     all_words = collect_words_in_range(pages, anchor_page, anchor_ymid, subtotals_page, subtotals_ymid)
 
     columns = detect_header_columns(pages, anchor_page, anchor_ymid, subtotals_page, subtotals_ymid)
-    _trace("header_columns=%s", columns)
 
     labor_items, paint_items = extract_labor_paint_items(
         pages, columns, anchor_page, anchor_ymid, subtotals_page, subtotals_ymid
@@ -699,7 +665,6 @@ def process_pdf_grid(pages: List[Dict]) -> Dict[str, Any]:
     parts_items = extract_parts_items(
         pages, columns, anchor_page, anchor_ymid, subtotals_page, subtotals_ymid
     )
-    _trace("line_items labor=%s paint=%s parts=%s", len(labor_items), len(paint_items), len(parts_items))
 
     full_text_lines: List[str] = []
     for page in pages:
@@ -777,12 +742,9 @@ def process_pdf_grid(pages: List[Dict]) -> Dict[str, Any]:
         except Exception:
             return raw
 
-    def _apply_totals_from_row(text: str, row: Dict, next_upper: str, prev_upper: str, page_number: int, row_index: int) -> None:
+    def _apply_totals_from_row(text: str, row: Dict, next_upper: str, prev_upper: str) -> None:
         upper = text.upper()
         rightmost_value = _extract_rightmost_numeric(row)
-
-        def _log_total_source(key: str, value) -> None:
-            _trace("total.%s=%s source=page:%s row_index:%s row:%s", key, value, page_number, row_index, re.sub(r"\s+", " ", text).strip()[:180])
 
         def _matches_any(patterns: List[str]) -> bool:
             return any(re.search(pattern, upper) for pattern in patterns)
@@ -796,62 +758,52 @@ def process_pdf_grid(pages: List[Dict]) -> Dict[str, Any]:
         )
         if totals["parts_total"] is None and parts_row:
             totals["parts_total"] = rightmost_value or _extract_last_numeric(text)
-            _log_total_source("parts_total", totals["parts_total"])
         if totals["grand_total"] is None and re.search(r"\bGRAND TOTAL\b", upper):
             totals["grand_total"] = rightmost_value or _extract_last_numeric(text)
-            _log_total_source("grand_total", totals["grand_total"])
         if totals["deductible"] is None and re.search(r"\bDEDUCTIBLE\b", upper):
             totals["deductible"] = rightmost_value or _extract_last_numeric(text)
-            _log_total_source("deductible", totals["deductible"])
         if totals["customer_pay"] is None and (
             re.search(r"\bCUSTOMER\s+PAY\b", upper)
             or re.search(r"\bCUSTOMER\b.*\bPAY\b", upper)
             or re.search(r"\bCUSTOMER\s+TOTAL\b", upper)
         ):
             totals["customer_pay"] = rightmost_value or _extract_last_numeric(text)
-            _log_total_source("customer_pay", totals["customer_pay"])
         if totals["insurance_pay"] is None and (
             re.search(r"\bINSURANCE\s+PAY\b", upper)
             or re.search(r"\bINSURANCE\b.*\bPAY\b", upper)
             or re.search(r"\bINSURANCE\s+TOTAL\b", upper)
         ):
             totals["insurance_pay"] = rightmost_value or _extract_last_numeric(text)
-            _log_total_source("insurance_pay", totals["insurance_pay"])
 
         if totals["body_labor"] is None and _matches_any([
             r"\bBODY\s+LABOR\b",
             r"\bLABOR\s*,?\s*BODY\b",
         ]):
             totals["body_labor"] = rightmost_value or _extract_last_numeric(text)
-            _log_total_source("body_labor", totals["body_labor"])
 
         if totals["paint_labor"] is None and _matches_any([
             r"\bPAINT\s+LABOR\b",
             r"\bLABOR\s*,?\s*REFINISH\b",
         ]):
             totals["paint_labor"] = rightmost_value or _extract_last_numeric(text)
-            _log_total_source("paint_labor", totals["paint_labor"])
 
         if totals["frame_labor"] is None and _matches_any([
             r"\bFRAME\s+LABOR\b",
             r"\bLABOR\s*,?\s*FRAME\b",
         ]):
             totals["frame_labor"] = rightmost_value or _extract_last_numeric(text)
-            _log_total_source("frame_labor", totals["frame_labor"])
 
         if totals["mechanical_labor"] is None and _matches_any([
             r"\bMECHANICAL\s+LABOR\b",
             r"\bLABOR\s*,?\s*MECHANICAL\b",
         ]):
             totals["mechanical_labor"] = rightmost_value or _extract_last_numeric(text)
-            _log_total_source("mechanical_labor", totals["mechanical_labor"])
 
         if totals["glass_labor"] is None and _matches_any([
             r"\bGLASS\s+LABOR\b",
             r"\bLABOR\s*,?\s*GLASS\b",
         ]):
             totals["glass_labor"] = rightmost_value or _extract_last_numeric(text)
-            _log_total_source("glass_labor", totals["glass_labor"])
 
     if subtotals_page:
         for pi, page in enumerate(pages, start=1):
@@ -873,13 +825,13 @@ def process_pdf_grid(pages: List[Dict]) -> Dict[str, Any]:
                         if follow_idx - 1 >= 0:
                             prev_text = " ".join(w.get("text", "") for w in rows[follow_idx - 1]["words"]).strip()
                             prev_upper = prev_text.upper()
-                        _apply_totals_from_row(follow_text, follow_row, next_upper, prev_upper, pi, follow_idx)
+                        _apply_totals_from_row(follow_text, follow_row, next_upper, prev_upper)
                     break
             if any(value is not None for value in totals.values()):
                 break
 
     if not any(value is not None for value in totals.values()):
-        for pi, page in enumerate(pages, start=1):
+        for page in pages:
             rows = group_rows(page.get("words", []), y_thresh=6.0)
             for idx, r in enumerate(rows):
                 text = " ".join(w.get("text", "") for w in r["words"]).strip()
@@ -891,7 +843,7 @@ def process_pdf_grid(pages: List[Dict]) -> Dict[str, Any]:
                 if idx - 1 >= 0:
                     prev_text = " ".join(w.get("text", "") for w in rows[idx - 1]["words"]).strip()
                     prev_upper = prev_text.upper()
-                _apply_totals_from_row(text, r, next_upper, prev_upper, pi, idx)
+                _apply_totals_from_row(text, r, next_upper, prev_upper)
             if any(value is not None for value in totals.values()):
                 break
 
@@ -916,18 +868,6 @@ def process_pdf_grid(pages: List[Dict]) -> Dict[str, Any]:
         insurance_pay_val = _to_float(totals["insurance_pay"])
         if grand_total_val is not None and insurance_pay_val is not None:
             totals["customer_pay"] = round(grand_total_val - insurance_pay_val, 2)
-            _trace("total.customer_pay=%s source=derived(grand_total-insurance_pay)", totals["customer_pay"])
-
-    _trace(
-        "process_pdf_grid summary ro_line=%s vehicle=%s owner=%s insurance=%s vin=%s claim=%s totals=%s",
-        re.sub(r"\s+", " ", first_ro_line or "").strip()[:120],
-        re.sub(r"\s+", " ", vehicle_info_line or "").strip()[:120],
-        re.sub(r"\s+", " ", owner_info or "").strip().replace("\n", " | ")[:120],
-        re.sub(r"\s+", " ", insurance_company or "").strip()[:120],
-        vin,
-        claim_number,
-        totals,
-    )
 
     return {
         "labor_items": labor_items,
