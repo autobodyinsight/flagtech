@@ -1,5 +1,9 @@
+import logging
 import re
 from typing import List, Dict, Any, Tuple, Optional
+
+
+logger = logging.getLogger("flagtech.grid_processor")
 
 
 def kmeans_1d(values: List[float], k: int, iters: int = 40) -> List[float]:
@@ -645,6 +649,7 @@ def extract_parts_items(
 
 def process_pdf_grid(pages: List[Dict]) -> Dict[str, Any]:
     """Main entry point."""
+    logger.info("Starting PDF grid processing pages=%s", len(pages))
     for pi, page in enumerate(pages, start=1):
         for w in page.get("words", []):
             w["page_index"] = pi
@@ -654,9 +659,18 @@ def process_pdf_grid(pages: List[Dict]) -> Dict[str, Any]:
     anchor_page, anchor_ymid, subtotals_page, subtotals_ymid, first_ro_line, vehicle_info_line, owner_info, insurance_company, vin, claim_number = \
         detect_anchors_and_vehicle_info(pages)
 
+    logger.info(
+        "Detected anchors anchor_page=%s subtotals_page=%s ro_line_present=%s vin_present=%s",
+        anchor_page,
+        subtotals_page,
+        bool(first_ro_line),
+        bool(vin),
+    )
+
     all_words = collect_words_in_range(pages, anchor_page, anchor_ymid, subtotals_page, subtotals_ymid)
 
     columns = detect_header_columns(pages, anchor_page, anchor_ymid, subtotals_page, subtotals_ymid)
+    logger.info("Detected columns count=%s labels=%s", len(columns), list(columns.keys()))
 
     labor_items, paint_items = extract_labor_paint_items(
         pages, columns, anchor_page, anchor_ymid, subtotals_page, subtotals_ymid
@@ -664,6 +678,13 @@ def process_pdf_grid(pages: List[Dict]) -> Dict[str, Any]:
 
     parts_items = extract_parts_items(
         pages, columns, anchor_page, anchor_ymid, subtotals_page, subtotals_ymid
+    )
+
+    logger.info(
+        "Extracted line items labor=%s paint=%s parts=%s",
+        len(labor_items),
+        len(paint_items),
+        len(parts_items),
     )
 
     full_text_lines: List[str] = []
@@ -868,6 +889,16 @@ def process_pdf_grid(pages: List[Dict]) -> Dict[str, Any]:
         insurance_pay_val = _to_float(totals["insurance_pay"])
         if grand_total_val is not None and insurance_pay_val is not None:
             totals["customer_pay"] = round(grand_total_val - insurance_pay_val, 2)
+
+    logger.info(
+        "Completed PDF grid processing total_labor=%s total_paint=%s grand_total=%s deductible=%s customer_pay=%s insurance_pay=%s",
+        round(total_labor, 2),
+        round(total_paint, 2),
+        totals["grand_total"],
+        totals["deductible"],
+        totals["customer_pay"],
+        totals["insurance_pay"],
+    )
 
     return {
         "labor_items": labor_items,

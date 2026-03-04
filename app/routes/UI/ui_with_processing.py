@@ -1,3 +1,4 @@
+import logging
 from fastapi import APIRouter, UploadFile, File, Request
 from fastapi.responses import HTMLResponse
 from app.services.extractor import extract_text_from_pdf, extract_words_from_pdf
@@ -35,6 +36,7 @@ import hashlib
 from datetime import date, timedelta
 
 router = APIRouter()
+logger = logging.getLogger("flagtech.ui_processing")
 
 
 def _ensure_estimate_uploads_table(cur) -> None:
@@ -965,17 +967,13 @@ async def upload_form():
 
 @router.post("/parse", response_class=HTMLResponse)
 async def parse_ui(file: UploadFile = File(...)):
+    file_name = getattr(file, "filename", "unknown")
+    logger.info("UI parse request received file=%s", file_name)
     text = extract_text_from_pdf(file)
-    # Debug logging: show a truncated preview of extracted text
-    try:
-        print("===EXTRACTED TEXT PREVIEW (truncated)===")
-        print(text[:4000])
-        print("===END PREVIEW===")
-    except Exception:
-        print("[extractor] could not print text preview")
+    logger.info("UI parse extracted text file=%s chars=%s", file_name, len(text))
 
     items = parse_estimate_text(text)
-    print(f"[parser] parsed {len(items)} items")
+    logger.info("UI parse completed file=%s items=%s", file_name, len(items))
 
     rows = ""
     for item in items:
@@ -1016,8 +1014,12 @@ async def parse_ui(file: UploadFile = File(...)):
 
 @router.post("/grid", response_class=HTMLResponse)
 async def grid_ui(request: Request, file: UploadFile = File(...), ajax: str = None):
+    file_name = getattr(file, "filename", "unknown")
+    domain = get_user_domain(request)
+    logger.info("Grid parse request received file=%s domain=%s ajax=%s", file_name, domain, bool(ajax))
     pages = extract_words_from_pdf(file)
     if not pages:
+        logger.warning("Grid parse found no words file=%s domain=%s", file_name, domain)
         return "<html><body><p>No words found in PDF.</p><a href='/ui'>Back</a></body></html>"
 
     # Process PDF using service layer
@@ -1047,11 +1049,20 @@ async def grid_ui(request: Request, file: UploadFile = File(...), ajax: str = No
     subtotals_page = result["subtotals_page"]
     subtotals_ymid = result["subtotals_ymid"]
 
-    domain = get_user_domain(request)
     ro_number = None
     if domain:
         ro_match = re.search(r"\bRO\b.*?(\d+)", second_ro_line)
         ro_number = ro_match.group(1) if ro_match else None
+
+    logger.info(
+        "Grid parse completed file=%s domain=%s ro=%s labor_items=%s paint_items=%s parts_items=%s",
+        file_name,
+        domain,
+        ro_number,
+        len(labor_items),
+        len(paint_items),
+        len(parts_items),
+    )
 
     # Generate pages HTML visualization
     pages_html = generate_pages_html(pages, anchor_page, anchor_ymid, subtotals_page, subtotals_ymid)

@@ -1,3 +1,4 @@
+import logging
 import re
 from typing import List
 from app.models.estimate import LineItem
@@ -9,6 +10,8 @@ EXPECTED_HEADERS = [
 
 LABOR_PATTERN = re.compile(r"^\d+(\.\d+)?$|^incl$", re.IGNORECASE)
 PAINT_PATTERN = re.compile(r"^\d+(\.\d+)?$|^incl$", re.IGNORECASE)
+
+logger = logging.getLogger("flagtech.parser")
 
 
 def find_headers(page):
@@ -90,6 +93,14 @@ def parse_estimate_pdf(doc):
     repair_lines = extract_repair_lines(page, headers)
     labor_lines = filter_labor_lines(repair_lines)
     paint_lines = filter_paint_lines(repair_lines)
+
+    logger.info(
+        "Parsed estimate PDF headers=%s repair_lines=%s labor_lines=%s paint_lines=%s",
+        list(headers.keys()),
+        len(repair_lines),
+        len(labor_lines),
+        len(paint_lines),
+    )
 
     return {"labor": labor_lines, "paint": paint_lines}
 
