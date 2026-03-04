@@ -1,5 +1,5 @@
-from fastapi import APIRouter, UploadFile, File, Request
 import logging
+from fastapi import APIRouter, UploadFile, File, Request
 import os
 import json
 import math
@@ -16,6 +16,12 @@ from psycopg2 import sql
 
 router = APIRouter()
 logger = logging.getLogger("flagtech.estimate_routes")
+
+
+def _trace(message: str, *args) -> None:
+    rendered = message % args if args else message
+    logger.warning("[PARSE_TRACE] %s", rendered)
+    print(f"[PARSE_TRACE] {rendered}", flush=True)
 
 
 def _to_local_business_date(value) -> date | None:
@@ -951,26 +957,26 @@ def _sum_assigned_hours(items, excluded_lines) -> float:
 @router.post("/parse-labor", response_model=EstimateResponse)
 async def parse_labor(file: UploadFile = File(...)):
     file_name = getattr(file, "filename", "unknown")
-    logger.info("API parse-labor request file=%s", file_name)
+    _trace("api_parse_labor start file=%s", file_name)
     doc = load_pdf(file)
     try:
         parsed = parse_estimate_pdf(doc)
     finally:
         doc.close()
-    logger.info("API parse-labor completed file=%s labor_items=%s", file_name, len(parsed["labor"]))
+    _trace("api_parse_labor completed file=%s labor_items=%s", file_name, len(parsed["labor"]))
     return {"line_items": parsed["labor"]}
 
 
 @router.post("/parse-paint", response_model=EstimateResponse)
 async def parse_paint(file: UploadFile = File(...)):
     file_name = getattr(file, "filename", "unknown")
-    logger.info("API parse-paint request file=%s", file_name)
+    _trace("api_parse_paint start file=%s", file_name)
     doc = load_pdf(file)
     try:
         parsed = parse_estimate_pdf(doc)
     finally:
         doc.close()
-    logger.info("API parse-paint completed file=%s paint_items=%s", file_name, len(parsed["paint"]))
+    _trace("api_parse_paint completed file=%s paint_items=%s", file_name, len(parsed["paint"]))
     return {"line_items": parsed["paint"]}
 
 

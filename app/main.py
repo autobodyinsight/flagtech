@@ -1,8 +1,6 @@
-import logging
 from fastapi import FastAPI
 from fastapi.responses import RedirectResponse
 from fastapi.middleware.cors import CORSMiddleware
-from app.services.logging_config import configure_logging
 
 # Routers
 from app.routes.estimate import router as estimate_router
@@ -12,9 +10,6 @@ from app.routes.UI.upload_ui.routes import router as ui_routes_router
 from app.routes.UI.reports import router as reports_router
 from app.routes.payments import router as payments_router
 
-
-configure_logging()
-logger = logging.getLogger("flagtech.app")
 
 app = FastAPI(title="FlagTech Estimate Parser")
 
@@ -65,8 +60,6 @@ app.include_router(processing_router, prefix="/ui")
 
 # Save routes (labor + refinish)
 app.include_router(ui_routes_router, prefix="/ui")
-
-logger.info("Application startup complete; routes registered")
 
 # ---------------------------------------------------------
 # ROOT REDIRECT

@@ -14,6 +14,12 @@ PAINT_PATTERN = re.compile(r"^\d+(\.\d+)?$|^incl$", re.IGNORECASE)
 logger = logging.getLogger("flagtech.parser")
 
 
+def _trace(message: str, *args) -> None:
+    rendered = message % args if args else message
+    logger.warning("[PARSE_TRACE] %s", rendered)
+    print(f"[PARSE_TRACE] {rendered}", flush=True)
+
+
 def find_headers(page):
     header_positions = {}
 
@@ -94,13 +100,17 @@ def parse_estimate_pdf(doc):
     labor_lines = filter_labor_lines(repair_lines)
     paint_lines = filter_paint_lines(repair_lines)
 
-    logger.info(
-        "Parsed estimate PDF headers=%s repair_lines=%s labor_lines=%s paint_lines=%s",
+    _trace(
+        "parse_estimate_pdf headers=%s repair_lines=%s labor_lines=%s paint_lines=%s",
         list(headers.keys()),
         len(repair_lines),
         len(labor_lines),
         len(paint_lines),
     )
+    if labor_lines:
+        _trace("parse_estimate_pdf sample_labor_row=%s", labor_lines[0])
+    if paint_lines:
+        _trace("parse_estimate_pdf sample_paint_row=%s", paint_lines[0])
 
     return {"labor": labor_lines, "paint": paint_lines}
 

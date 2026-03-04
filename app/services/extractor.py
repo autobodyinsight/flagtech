@@ -4,12 +4,18 @@ import fitz
 
 logger = logging.getLogger("flagtech.extractor")
 
+
+def _trace(message: str, *args) -> None:
+    rendered = message % args if args else message
+    logger.warning("[PARSE_TRACE] %s", rendered)
+    print(f"[PARSE_TRACE] {rendered}", flush=True)
+
 def load_pdf(file):
     file_name = getattr(file, "filename", "unknown")
     file.file.seek(0)
     pdf_bytes = file.file.read()
     doc = fitz.open(stream=pdf_bytes, filetype="pdf")
-    logger.info("Loaded PDF file=%s bytes=%s pages=%s", file_name, len(pdf_bytes), len(doc))
+    _trace("load_pdf file=%s bytes=%s pages=%s", file_name, len(pdf_bytes), len(doc))
     return doc
 
 def extract_text_from_pdf(file):
@@ -20,7 +26,7 @@ def extract_text_from_pdf(file):
     for page in doc:
         text += page.get_text()
     doc.close()
-    logger.info("Extracted text file=%s chars=%s", file_name, len(text))
+    _trace("extract_text_from_pdf file=%s chars=%s", file_name, len(text))
     return text
 
 def extract_words_from_pdf(file):
@@ -47,5 +53,5 @@ def extract_words_from_pdf(file):
         })
     doc.close()
     word_count = sum(len(page.get("words", [])) for page in pages)
-    logger.info("Extracted words file=%s pages=%s words=%s", file_name, len(pages), word_count)
+    _trace("extract_words_from_pdf file=%s pages=%s words=%s", file_name, len(pages), word_count)
     return pages
