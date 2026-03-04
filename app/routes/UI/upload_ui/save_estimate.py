@@ -566,8 +566,44 @@ function openSaveEstimateModal(estimateTotals) {{
 }}
 
 function closeSaveEstimateModal() {{
-  document.getElementById('saveEstimateModal').style.display = 'none';
+  const modal = document.getElementById('saveEstimateModal');
+  if (modal) {{
+    modal.style.display = 'none';
+  }}
+  resetUploadWindowState();
   closeMissingRoModal();
+}}
+
+function resetUploadWindowState() {{
+  const uploadStatus = document.getElementById('uploadStatus');
+  if (uploadStatus) {{
+    uploadStatus.innerHTML = '';
+  }}
+
+  const estimateSummary = document.getElementById('estimateSummary');
+  if (estimateSummary) {{
+    estimateSummary.style.display = 'none';
+  }}
+
+  const fileInput = document.getElementById('fileInput');
+  if (fileInput) {{
+    fileInput.value = '';
+  }}
+
+  const importButtonWrap = document.getElementById('importButtonWrap');
+  if (importButtonWrap) {{
+    importButtonWrap.style.display = 'flex';
+  }}
+
+  const saveBtn = document.getElementById('executeSaveBtn');
+  if (saveBtn) {{
+    saveBtn.disabled = false;
+  }}
+
+  const statusDiv = document.getElementById('saveEstimateStatus');
+  if (statusDiv) {{
+    statusDiv.textContent = '';
+  }}
 }}
 
 function closeMissingRoModal() {{
@@ -794,24 +830,6 @@ function executeSaveEstimateInternal() {{
         statusDiv.textContent = 'Saved successfully!';
         statusDiv.style.color = 'green';
         closeSaveEstimateModal();
-        const uploadStatus = document.getElementById('uploadStatus');
-        if (uploadStatus) {{
-          uploadStatus.innerHTML = '';
-        }}
-        const estimateSummary = document.getElementById('estimateSummary');
-        if (estimateSummary) {{
-          estimateSummary.style.display = 'none';
-        }}
-        const fileInput = document.getElementById('fileInput');
-        if (fileInput) {{
-          fileInput.value = '';
-        }}
-        const importButtonWrap = document.getElementById('importButtonWrap');
-        if (importButtonWrap) {{
-          importButtonWrap.style.display = 'flex';
-        }}
-        statusDiv.textContent = '';
-        saveBtn.disabled = false;
       }} else {{
         statusDiv.textContent = 'Error: ' + (data.message || data.error || 'Failed to save');
         statusDiv.style.color = 'red';
