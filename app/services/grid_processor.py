@@ -138,26 +138,16 @@ def detect_anchors_and_vehicle_info(
             return match.group(1)
         return ""
 
-    header_started = False
-    header_ended = False
-
     for pi, page in enumerate(pages, start=1):
         rows = group_rows(page.get("words", []), y_thresh=6.0)
         for idx, r in enumerate(rows):
             row_text = " ".join(w.get("text", "") for w in r["words"]).strip()
 
-            if not header_started and _is_ro_number_row(row_text):
-                header_started = True
-
-            if header_started and not header_ended and _is_vin_or_vehicle_row(row_text):
-                header_ended = True
-
-            if header_started and not header_ended and not claim_number:
-                if re.search(r"\bCLAIM\b", row_text, re.IGNORECASE):
-                    claim_number = _extract_claim_number_from_text(row_text)
+            if not claim_number and re.search(r"\bCLAIM\b", row_text, re.IGNORECASE):
+                claim_number = _extract_claim_number_from_text(row_text)
 
             # Extract first RO
-            if re.search(r"\bRO\b", row_text):
+            if _is_ro_number_row(row_text) or re.search(r"\bRO\b\s*[:#-]*\s*[A-Za-z0-9-]+", row_text, re.IGNORECASE):
                 ro_count += 1
                 if ro_count == 1 and not anchor_page:
                     anchor_page = pi
@@ -695,6 +685,33 @@ def process_pdf_grid(pages: List[Dict]) -> Dict[str, Any]:
     if not estimator:
         estimator = _sanitize_name_only(_extract_line_value(full_text_lines, r"\bestimator\b\s*:\s*(.*)$"))
 
+    owner_name = ""
+    owner_phone = ""
+    if owner_info:
+        owner_lines = [line.strip() for line in str(owner_info).splitlines() if line.strip()]
+        if owner_lines:
+            owner_name = owner_lines[0]
+        for line in owner_lines[1:]:
+            if re.search(r"\(?\d{3}\)?\s*\d{3}-\d{4}", line):
+                owner_phone = line
+                break
+        if not owner_phone and len(owner_lines) > 1:
+            owner_phone = owner_lines[1]
+
+    vehicle_year = ""
+    vehicle_make = ""
+    vehicle_model = ""
+    if vehicle_info_line:
+        year_match = re.search(r"\b(19\d{2}|20\d{2})\b", vehicle_info_line)
+        if year_match:
+            vehicle_year = year_match.group(1)
+            remaining = vehicle_info_line[year_match.end():].strip()
+            tokens = [tok for tok in remaining.split() if tok]
+            if tokens:
+                vehicle_make = tokens[0]
+            if len(tokens) > 1:
+                vehicle_model = " ".join(tokens[1:3])
+
     total_labor = sum(item["value"] for item in labor_items)
     total_paint = sum(item["value"] for item in paint_items)
 
@@ -878,7 +895,12 @@ def process_pdf_grid(pages: List[Dict]) -> Dict[str, Any]:
         "first_ro_line": first_ro_line,
         "second_ro_line": first_ro_line,  # Keep for backward compatibility
         "vehicle_info_line": vehicle_info_line,
+        "vehicle_year": vehicle_year,
+        "vehicle_make": vehicle_make,
+        "vehicle_model": vehicle_model,
         "owner_info": owner_info,
+        "owner_name": owner_name,
+        "owner_phone": owner_phone,
         "insurance_company": insurance_company,
         "written_by": written_by,
         "estimator": estimator,
