@@ -1874,201 +1874,10 @@ def get_dashboard_screen_html():
                 loadDashboardData();
             }
 
-                        function printTechAssignLinesPopup() {
-                                const modalLines = roWindowDoc.getElementById('roPopupTechModalLines');
-                                const techSelect = roWindowDoc.getElementById('roPopupTechSelect');
-                                const typeSelect = roWindowDoc.getElementById('roPopupTechType');
-                                if (!modalLines || !techSelect || !typeSelect) return;
-
-                                const selectedTech = techSelect.options[techSelect.selectedIndex]?.dataset?.name || techSelect.options[techSelect.selectedIndex]?.text || 'Unassigned';
-                                const selectedType = String(typeSelect.value || '').toUpperCase() || '-';
-                                const roNumber = escapePopupHtml(ro?.ro || '-');
-
-                                const checkedBoxes = Array.from(modalLines.querySelectorAll('.roPopupTechLineCheckbox:checked'));
-                                if (!checkedBoxes.length) {
-                                        alert('Select at least one repair line to print.');
-                                        return;
-                                }
-
-                                const printRows = checkedBoxes.map((checkbox, index) => {
-                                        const lineKey = String(checkbox.getAttribute('data-line-key') || '').trim();
-                                        const isManual = checkbox.getAttribute('data-is-manual') === '1';
-                                        let description = '';
-                                        let hoursText = '';
-
-                                        if (isManual) {
-                                                const descInput = modalLines.querySelector(`.roPopupTechManualDescription[data-line-key="${lineKey}"]`);
-                                                const hoursInput = modalLines.querySelector(`.roPopupTechManualHours[data-line-key="${lineKey}"]`);
-                                                description = String(descInput?.value || '').trim() || 'Manual line';
-                                                const parsedHours = Number(hoursInput?.value || 0);
-                                                hoursText = Number.isFinite(parsedHours) ? `${parsedHours.toFixed(1)} hrs` : '0.0 hrs';
-                                        } else {
-                                                const row = checkbox.closest('div');
-                                                const descriptionEl = row?.querySelector('div[style*="flex:1"]');
-                                                const hoursEl = row?.querySelector('div[style*="min-width:70px"]');
-                                                description = String(descriptionEl?.textContent || '').trim();
-                                                hoursText = String(hoursEl?.textContent || '').trim() || '0.0 hrs';
-                                        }
-
-                                        return `
-                                                <tr>
-                                                        <td>${index + 1}</td>
-                                                        <td>${escapePopupHtml(description || '-')}</td>
-                                                        <td>${escapePopupHtml(hoursText)}</td>
-                                                </tr>
-                                        `;
-                                }).join('');
-
-                                const printWin = window.open('', '_blank', 'width=980,height=760');
-                                if (!printWin) {
-                                        alert('Unable to open print window. Please allow popups and try again.');
-                                        return;
-                                }
-
-                                const titleText = `RO ${String(ro?.ro || '').trim()} - ${selectedTech} Repair Lines`;
-                                printWin.document.write(`
-<!DOCTYPE html>
-<html>
-<head>
-    <meta charset="utf-8" />
-    <title>${escapePopupHtml(titleText)}</title>
-    <style>
-        :root {
-            --brand-red: #b22222;
-            --brand-dark: #2f3437;
-            --brand-soft: #f2f0ef;
-            --brand-ink: #1f2326;
-        }
-        * { box-sizing: border-box; }
-        body {
-            margin: 0;
-            font-family: 'Segoe UI', Tahoma, Arial, sans-serif;
-            color: var(--brand-ink);
-            background: #fff;
-            padding: 24px;
-        }
-        .sheet {
-            border: 1px solid #ddd;
-            border-radius: 12px;
-            overflow: hidden;
-        }
-        .head {
-            background: linear-gradient(135deg, var(--brand-dark), #444b4f);
-            color: #fff;
-            padding: 18px 20px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            gap: 16px;
-        }
-        .head h1 {
-            margin: 0;
-            font-size: 20px;
-            letter-spacing: 0.2px;
-        }
-        .badge {
-            background: var(--brand-red);
-            color: #fff;
-            padding: 8px 12px;
-            border-radius: 999px;
-            font-weight: 700;
-            font-size: 12px;
-            text-transform: uppercase;
-            letter-spacing: 0.4px;
-        }
-        .meta {
-            padding: 14px 20px;
-            background: var(--brand-soft);
-            display: grid;
-            grid-template-columns: repeat(3, minmax(140px, 1fr));
-            gap: 12px;
-            font-size: 13px;
-        }
-        .meta strong { color: #111; }
-        table {
-            width: 100%;
-            border-collapse: collapse;
-        }
-        thead th {
-            background: #3c4142;
-            color: #fff;
-            text-align: left;
-            padding: 10px 12px;
-            font-size: 13px;
-            letter-spacing: 0.2px;
-        }
-        tbody td {
-            padding: 10px 12px;
-            border-bottom: 1px solid #ececec;
-            font-size: 13px;
-            vertical-align: top;
-        }
-        tbody tr:nth-child(even) td {
-            background: #fafafa;
-        }
-        tbody td:last-child {
-            text-align: right;
-            font-weight: 700;
-        }
-        .foot {
-            padding: 12px 20px;
-            font-size: 12px;
-            color: #666;
-            display: flex;
-            justify-content: space-between;
-            border-top: 1px solid #eee;
-        }
-        @media print {
-            body { padding: 0; }
-            .sheet { border-radius: 0; border: none; }
-        }
-    </style>
-</head>
-<body>
-    <div class="sheet">
-        <div class="head">
-            <h1>Repair Lines Assignment</h1>
-            <span class="badge">FlagTech</span>
-        </div>
-        <div class="meta">
-            <div><strong>RO:</strong> ${roNumber}</div>
-            <div><strong>Tech:</strong> ${escapePopupHtml(selectedTech)}</div>
-            <div><strong>Type:</strong> ${escapePopupHtml(selectedType)}</div>
-        </div>
-        <table>
-            <thead>
-                <tr>
-                    <th style="width:70px;">#</th>
-                    <th>Repair Line</th>
-                    <th style="width:120px; text-align:right;">Hours</th>
-                </tr>
-            </thead>
-            <tbody>
-                ${printRows}
-            </tbody>
-        </table>
-        <div class="foot">
-            <span>Generated from RO Window Tech Assignment</span>
-            <span>${new Date().toLocaleString()}</span>
-        </div>
-    </div>
-    <script>
-        window.addEventListener('load', () => {
-            window.print();
-            window.setTimeout(() => window.close(), 200);
-        });
-    </script>
-</body>
-</html>
-                                `);
-                                printWin.document.close();
-                        }
-
             function bindTechModalActions() {
                 const closeBtn = roWindowDoc.getElementById('roPopupTechModalClose');
                 const saveBtn = roWindowDoc.getElementById('roPopupTechModalSave');
                 const addLineBtn = roWindowDoc.getElementById('roPopupTechModalAddLine');
-                                const printBtn = roWindowDoc.getElementById('roPopupTechModalPrint');
                 const modal = roWindowDoc.getElementById('roPopupTechModal');
                 if (closeBtn && modal) closeBtn.onclick = () => { modal.style.display = 'none'; };
                 if (addLineBtn) {
@@ -2076,11 +1885,6 @@ def get_dashboard_screen_html():
                         addTechAssignManualLinePopup();
                     };
                 }
-                                if (printBtn) {
-                                        printBtn.onclick = () => {
-                                                printTechAssignLinesPopup();
-                                        };
-                                }
                 if (saveBtn) {
                     saveBtn.onclick = async () => {
                         try {
@@ -2128,7 +1932,6 @@ def get_dashboard_screen_html():
                             <div id="roPopupTechModalLines" style="border:1px solid #e2e2e2; border-radius:6px; max-height:52vh; overflow:auto;"></div>
                             <div style="display:flex; justify-content:flex-end; gap:8px; margin-top:12px;">
                                 <button id="roPopupTechModalAddLine" type="button" style="padding:9px 14px; background:#f5f5f5; color:#333; border:1px solid #ccc; border-radius:6px; cursor:pointer;">+ Add Line</button>
-                                <button id="roPopupTechModalPrint" type="button" style="padding:9px 14px; background:linear-gradient(135deg, #3c4142, #2f3437); color:#fff; border:none; border-radius:6px; cursor:pointer; font-weight:700; box-shadow:0 2px 8px rgba(0,0,0,0.2);">Print</button>
                                 <button id="roPopupTechModalSave" type="button" style="padding:9px 14px; background:#d32f2f; color:#fff; border:none; border-radius:6px; cursor:pointer; font-weight:700;">Save</button>
                             </div>
                         </div>
