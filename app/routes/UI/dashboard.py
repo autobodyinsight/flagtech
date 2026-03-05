@@ -2410,9 +2410,18 @@ def get_dashboard_screen_html():
                     const insurancePaid = Number(row.insurance_paid || 0);
                     const customerPaid = Number(row.customer_paid || 0);
                     const roGrandTotal = insuranceTotal + customerTotal;
+                    const insuranceDue = Math.max(0, insuranceTotal - insurancePaid);
+                    const customerDue = Math.max(0, customerTotal - customerPaid);
+                    const roDue = Math.max(0, roGrandTotal - (insurancePaid + customerPaid));
 
-                    const insuranceBalance = formatBalance(Math.max(0, insuranceTotal - insurancePaid));
-                    const customerBalance = formatBalance(Math.max(0, customerTotal - customerPaid));
+                    const pendingGrandTotalColor = '#fbc02d';
+                    const paidGrandTotalColor = '#2e7d32';
+                    const insuranceGrandTotalColor = insuranceDue <= 0.009 ? paidGrandTotalColor : pendingGrandTotalColor;
+                    const customerGrandTotalColor = customerDue <= 0.009 ? paidGrandTotalColor : pendingGrandTotalColor;
+                    const roGrandTotalColor = roDue <= 0.009 ? paidGrandTotalColor : pendingGrandTotalColor;
+
+                    const insuranceBalance = formatBalance(insuranceDue);
+                    const customerBalance = formatBalance(customerDue);
                     const insuranceGrandTotal = formatGrandTotal(insuranceTotal);
                     const customerGrandTotal = formatGrandTotal(customerTotal);
                     const roGrandTotalText = formatGrandTotal(roGrandTotal);
@@ -2421,7 +2430,7 @@ def get_dashboard_screen_html():
                     const customerName = String(row.customer || '').trim() || '-';
 
                     if (titleEl) {
-                        titleEl.textContent = `Payments - GRAND TOTAL: ${roGrandTotalText}`;
+                        titleEl.innerHTML = `Payments - GRAND TOTAL: <span style="color:${roGrandTotalColor}; font-weight:800;">${escapePopupHtml(roGrandTotalText)}</span>`;
                     }
 
                     logEl.innerHTML = `
@@ -2429,7 +2438,7 @@ def get_dashboard_screen_html():
                             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; color:#333; font-weight:700;">
                                 <div>INSURANCE: ${escapePopupHtml(insuranceName)}</div>
                                 <div style="text-align:right; line-height:1.35;">
-                                    <div>GRAND TOTAL: ${escapePopupHtml(insuranceGrandTotal)}</div>
+                                    <div>GRAND TOTAL: <span style="color:${insuranceGrandTotalColor}; font-weight:800;">${escapePopupHtml(insuranceGrandTotal)}</span></div>
                                     <div>BALANCE: ${escapePopupHtml(insuranceBalance)}</div>
                                 </div>
                             </div>
@@ -2449,7 +2458,7 @@ def get_dashboard_screen_html():
                             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; color:#333; font-weight:700;">
                                 <div>CUSTOMER: ${escapePopupHtml(customerName)}</div>
                                 <div style="text-align:right; line-height:1.35;">
-                                    <div>GRAND TOTAL: ${escapePopupHtml(customerGrandTotal)}</div>
+                                    <div>GRAND TOTAL: <span style="color:${customerGrandTotalColor}; font-weight:800;">${escapePopupHtml(customerGrandTotal)}</span></div>
                                     <div>BALANCE: ${escapePopupHtml(customerBalance)}</div>
                                 </div>
                             </div>
