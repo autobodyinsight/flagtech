@@ -334,7 +334,7 @@ def get_dashboard_screen_html():
                 notepad: `<svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="5" y="6" width="18" height="16" rx="2" stroke="white" stroke-width="2"/><line x1="9" y1="10" x2="19" y2="10" stroke="white" stroke-width="2"/><line x1="9" y1="14" x2="19" y2="14" stroke="white" stroke-width="2"/><line x1="9" y1="18" x2="15" y2="18" stroke="white" stroke-width="2"/></svg>`,
                 estimate: `<svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="6" y="3" width="16" height="22" rx="2" stroke="white" stroke-width="2"/><line x1="9" y1="8" x2="19" y2="8" stroke="white" stroke-width="2"/><rect x="9" y="11" width="4" height="3" rx="0.8" stroke="white" stroke-width="1.8"/><rect x="15" y="11" width="4" height="3" rx="0.8" stroke="white" stroke-width="1.8"/><rect x="9" y="16" width="4" height="3" rx="0.8" stroke="white" stroke-width="1.8"/><rect x="15" y="16" width="4" height="3" rx="0.8" stroke="white" stroke-width="1.8"/><line x1="9" y1="22" x2="19" y2="22" stroke="white" stroke-width="2"/></svg>`,
                 tech: `<svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="14" cy="9" r="4" stroke="white" stroke-width="2"/><rect x="7" y="17" width="14" height="6" rx="3" stroke="white" stroke-width="2"/><path d="M21 21l2.5 2.5" stroke="white" stroke-width="2" stroke-linecap="round"/><path d="M7 21l-2.5 2.5" stroke="white" stroke-width="2" stroke-linecap="round"/></svg>`,
-                cart: `<svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="10" cy="23" r="2" stroke="white" stroke-width="2"/><circle cx="20" cy="23" r="2" stroke="white" stroke-width="2"/><rect x="5" y="7" width="18" height="10" rx="2" stroke="white" stroke-width="2"/><path d="M7 7V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v2" stroke="white" stroke-width="2"/></svg>`,
+                cart: `<svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="14" cy="14" r="9" stroke="white" stroke-width="2"/><circle cx="14" cy="14" r="4" stroke="white" stroke-width="2"/><circle cx="14" cy="5.5" r="1" fill="white"/><circle cx="22.5" cy="14" r="1" fill="white"/><circle cx="14" cy="22.5" r="1" fill="white"/><circle cx="5.5" cy="14" r="1" fill="white"/><path d="M8 9.5h4" stroke="white" stroke-width="1.8" stroke-linecap="round"/><path d="M16 18.5h4" stroke="white" stroke-width="1.8" stroke-linecap="round"/></svg>`,
                 credit: `<svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="4" y="7" width="20" height="14" rx="3" stroke="white" stroke-width="2"/><rect x="7" y="17" width="6" height="3" rx="1.5" stroke="white" stroke-width="2"/><line x1="4" y1="12" x2="24" y2="12" stroke="white" stroke-width="2"/></svg>`
             };
 
@@ -591,6 +591,7 @@ def get_dashboard_screen_html():
             async function popupFetchJson(url, options = {}) {
                 const response = await fetch(url, {
                     credentials: 'include',
+                    cache: 'no-store',
                     ...options,
                 });
                 const payload = await response.json();
@@ -2243,6 +2244,8 @@ def get_dashboard_screen_html():
                                     <thead>
                                         <tr style="background:#3c4142; color:#fff; text-align:left;">
                                             <th style="padding:8px;">Invoice #</th>
+                                            <th style="padding:8px;">Vendor</th>
+                                            <th style="padding:8px;">Received</th>
                                             <th style="padding:8px; text-align:right;">Total</th>
                                             <th style="padding:8px;">Status</th>
                                         </tr>
@@ -2251,15 +2254,26 @@ def get_dashboard_screen_html():
                                         ${invoiceNumbers.map((invoice, idx) => {
                                             const group = receivedByInvoice[invoice] || [];
                                             const total = group.reduce((sum, item) => sum + Number(item.invoice_total || item.cost || 0), 0);
+                                            const vendorNames = Array.from(new Set(group
+                                                .map((item) => String(item.vendor || '').trim())
+                                                .filter(Boolean)));
+                                            const receivedDates = group
+                                                .map((item) => String(item.received_date || item.received_at || '').trim())
+                                                .filter(Boolean);
+                                            const latestReceivedRaw = receivedDates.length ? receivedDates.sort().slice(-1)[0] : '';
+                                            const receivedDisplay = latestReceivedRaw ? popupFormatDate(latestReceivedRaw) : '—';
+                                            const vendorDisplay = escapePopupHtml(vendorNames.join(', ') || '—');
                                             const key = escapePopupHtml(invoice);
                                             return `
                                                 <tr data-invoice-key="${key}" class="roPopupInvoiceRow" style="background:${idx % 2 === 0 ? '#f2f0ef' : '#fff'}; border-bottom:1px solid #eee; cursor:pointer;">
                                                     <td style="padding:8px; color:#0066cc; text-decoration:underline;">${key}</td>
+                                                    <td style="padding:8px;">${vendorDisplay}</td>
+                                                    <td style="padding:8px;">${escapePopupHtml(receivedDisplay)}</td>
                                                     <td style="padding:8px; text-align:right;">${popupFormatMoney(total)}</td>
                                                     <td style="padding:8px;">Open details</td>
                                                 </tr>
                                                 <tr id="roPopupInvoiceDetail-${key}" style="display:none; background:#fff;">
-                                                    <td colspan="3" style="padding:8px 10px; border-bottom:1px solid #eee;"></td>
+                                                    <td colspan="5" style="padding:8px 10px; border-bottom:1px solid #eee;"></td>
                                                 </tr>
                                             `;
                                         }).join('')}

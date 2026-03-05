@@ -4990,10 +4990,11 @@ async def list_parts_received(request: Request, ro: str):
         _ensure_parts_received_table(cur)
         cur.execute(
             """
-            SELECT line_id, vendor, part_number, list_price, cost, eta, invoice_number, invoice_total, returned, received_at
+            SELECT line_id, vendor, part_number, list_price, cost, eta, invoice_number, invoice_total,
+                   returned, received_business_date, received_at
             FROM parts_received
             WHERE ro = %s AND domain = %s
-            ORDER BY received_at DESC
+            ORDER BY COALESCE(received_business_date, received_at::date) DESC, received_at DESC
             """,
             (ro, domain),
         )
@@ -5009,6 +5010,11 @@ async def list_parts_received(request: Request, ro: str):
                 "invoice_number": row.get("invoice_number"),
                 "invoice_total": float(row.get("invoice_total") or 0),
                 "returned": bool(row.get("returned")),
+                "received_date": (
+                    row.get("received_business_date").isoformat()
+                    if row.get("received_business_date")
+                    else (row.get("received_at").date().isoformat() if row.get("received_at") else None)
+                ),
                 "received_at": row.get("received_at"),
             }
             for row in rows
