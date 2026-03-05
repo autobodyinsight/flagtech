@@ -2265,8 +2265,12 @@ def get_dashboard_screen_html():
                                             const vendorDisplay = escapePopupHtml(vendorNames.join(', ') || '—');
                                             const key = escapePopupHtml(invoice);
                                             return `
-                                                <tr data-invoice-key="${key}" class="roPopupInvoiceRow" style="background:${idx % 2 === 0 ? '#f2f0ef' : '#fff'}; border-bottom:1px solid #eee; cursor:pointer;">
-                                                    <td style="padding:8px; color:#0066cc; text-decoration:underline;">${key}</td>
+                                                <tr style="background:${idx % 2 === 0 ? '#f2f0ef' : '#fff'}; border-bottom:1px solid #eee; pointer-events:none;">
+                                                    <td style="padding:8px;">
+                                                        <button type="button" class="roPopupInvoiceToggle" data-invoice-key="${key}" style="background:none; border:none; color:#0066cc; text-decoration:underline; cursor:pointer; padding:0; font:inherit; pointer-events:auto;">
+                                                            ${key}
+                                                        </button>
+                                                    </td>
                                                     <td style="padding:8px;">${vendorDisplay}</td>
                                                     <td style="padding:8px;">${escapePopupHtml(receivedDisplay)}</td>
                                                     <td style="padding:8px; text-align:right;">${popupFormatMoney(total)}</td>
@@ -2281,9 +2285,9 @@ def get_dashboard_screen_html():
                             </div>
                         `;
 
-                        roWindowDoc.querySelectorAll('.roPopupInvoiceRow').forEach((rowEl) => {
-                            rowEl.addEventListener('click', () => {
-                                const key = rowEl.getAttribute('data-invoice-key') || '';
+                        roWindowDoc.querySelectorAll('.roPopupInvoiceToggle').forEach((toggleEl) => {
+                            toggleEl.addEventListener('click', () => {
+                                const key = toggleEl.getAttribute('data-invoice-key') || '';
                                 const detailRow = roWindowDoc.getElementById(`roPopupInvoiceDetail-${key}`);
                                 if (!detailRow) return;
                                 const isOpen = detailRow.style.display === 'table-row';
