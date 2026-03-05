@@ -2370,7 +2370,7 @@ def get_dashboard_screen_html():
 
                 function formatBalance(value) {
                     const numeric = Number(value || 0);
-                    if (!Number.isFinite(numeric) || numeric <= 0) return '-';
+                    if (!Number.isFinite(numeric) || numeric <= 0) return '$0';
                     return popupFormatMoney(numeric);
                 }
 
