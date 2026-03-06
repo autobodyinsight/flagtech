@@ -1876,10 +1876,16 @@ def get_dashboard_screen_html():
 
             function bindTechModalActions() {
                 const closeBtn = roWindowDoc.getElementById('roPopupTechModalClose');
+                const printBtn = roWindowDoc.getElementById('roPopupTechModalPrint');
                 const saveBtn = roWindowDoc.getElementById('roPopupTechModalSave');
                 const addLineBtn = roWindowDoc.getElementById('roPopupTechModalAddLine');
                 const modal = roWindowDoc.getElementById('roPopupTechModal');
                 if (closeBtn && modal) closeBtn.onclick = () => { modal.style.display = 'none'; };
+                if (printBtn) {
+                    printBtn.onclick = () => {
+                        printTechAssignModalPopup();
+                    };
+                }
                 if (addLineBtn) {
                     addLineBtn.onclick = () => {
                         addTechAssignManualLinePopup();
@@ -1998,6 +2004,150 @@ def get_dashboard_screen_html():
 
                     await renderTechView();
                     loadDashboardData();
+                }
+
+                function printTechAssignModalPopup() {
+                    const context = popupState.techAssignContext;
+                    if (!context?.ro) return;
+
+                    const techSelect = roWindowDoc.getElementById('roPopupTechSelect');
+                    const typeSelect = roWindowDoc.getElementById('roPopupTechType');
+                    const selectedRows = Array.from(roWindowDoc.querySelectorAll('.roPopupTechLineCheckbox:checked'));
+                    if (!selectedRows.length) {
+                        alert('Select at least one repair line to print.');
+                        return;
+                    }
+
+                    const techName = techSelect?.options?.[techSelect.selectedIndex]?.dataset?.name || 'Unassigned';
+                    const typeName = normalizeTypeLabelLocal(typeSelect?.value || 'body');
+                    const roNumber = context.ro;
+                    const printedAt = new Date().toLocaleString();
+
+                    const selectedLines = selectedRows.map((checkbox) => {
+                        const lineKey = checkbox.getAttribute('data-line-key') || '';
+                        const isManual = checkbox.getAttribute('data-is-manual') === '1';
+                        let lineNumber = lineKey;
+                        let description = '';
+                        let repairType = checkbox.getAttribute('data-repair-type') || typeName;
+                        let hours = Number(checkbox.getAttribute('data-hours') || 0);
+
+                        if (isManual) {
+                            lineNumber = 'Manual';
+                            const descInput = roWindowDoc.querySelector(`.roPopupTechManualDescription[data-line-key="${lineKey}"]`);
+                            const hoursInput = roWindowDoc.querySelector(`.roPopupTechManualHours[data-line-key="${lineKey}"]`);
+                            description = String(descInput?.value || '').trim();
+                            const parsedHours = Number(hoursInput?.value || 0);
+                            hours = Number.isFinite(parsedHours) ? parsedHours : 0;
+                        } else {
+                            const sourceLine = (popupState.techAssignLines || []).find((line) => String(line?.line_key || '') === String(lineKey));
+                            lineNumber = sourceLine?.line_number || sourceLine?.line_key || lineKey || '—';
+                            description = String(sourceLine?.description || '').trim();
+                            repairType = normalizeTypeLabelLocal(sourceLine?.repair_type || repairType || typeName);
+                            const parsedHours = Number(sourceLine?.hours ?? hours);
+                            hours = Number.isFinite(parsedHours) ? parsedHours : 0;
+                        }
+
+                        return {
+                            lineNumber,
+                            description,
+                            repairType,
+                            hours,
+                        };
+                    }).sort((a, b) => {
+                        const aLine = parseInt(String(a.lineNumber || '').match(/\d+/)?.[0] || '0', 10);
+                        const bLine = parseInt(String(b.lineNumber || '').match(/\d+/)?.[0] || '0', 10);
+                        if (aLine !== bLine) return aLine - bLine;
+                        return String(a.description || '').localeCompare(String(b.description || ''));
+                    });
+
+                    const totalHours = selectedLines.reduce((sum, line) => sum + (Number.isFinite(line.hours) ? line.hours : 0), 0);
+                    const rowsHtml = selectedLines.map((line, idx) => {
+                        const bg = idx % 2 === 0 ? '#ffffff' : '#fafafa';
+                        return `
+                            <tr style="background:${bg};">
+                                <td style="padding:11px 12px; border-bottom:1px solid #ececec; font-weight:600;">${escapePopupHtml(String(line.lineNumber || '—'))}</td>
+                                <td style="padding:11px 12px; border-bottom:1px solid #ececec;">${escapePopupHtml(line.description || '—')}</td>
+                                <td style="padding:11px 12px; border-bottom:1px solid #ececec; text-transform:capitalize;">${escapePopupHtml(line.repairType || typeName)}</td>
+                                <td style="padding:11px 12px; border-bottom:1px solid #ececec; text-align:right; font-weight:700;">${escapePopupHtml(line.hours.toFixed(1))}</td>
+                            </tr>
+                        `;
+                    }).join('');
+
+                    const printWindow = window.open('', '_blank', 'width=1040,height=820');
+                    if (!printWindow) {
+                        alert('Unable to open print preview. Please allow pop-ups and try again.');
+                        return;
+                    }
+
+                    printWindow.document.write(`
+                        <!DOCTYPE html>
+                        <html>
+                            <head>
+                                <meta charset="utf-8" />
+                                <title>Tech Repair Lines - RO ${escapePopupHtml(roNumber)}</title>
+                                <style>
+                                    :root {
+                                        --brand-red: #d32f2f;
+                                        --ink: #1f1f1f;
+                                        --muted: #666;
+                                        --line: #e5e5e5;
+                                    }
+                                    * { box-sizing: border-box; }
+                                    body { margin: 0; font-family: "Segoe UI", Tahoma, Arial, sans-serif; color: var(--ink); background: #fff; }
+                                    .sheet { max-width: 980px; margin: 0 auto; padding: 28px 30px 36px; }
+                                    .header { display: flex; justify-content: space-between; align-items: flex-start; gap: 18px; margin-bottom: 18px; }
+                                    .title { font-size: 26px; font-weight: 800; letter-spacing: 0.2px; margin: 0 0 6px; }
+                                    .accent { width: 68px; height: 5px; border-radius: 999px; background: var(--brand-red); margin-bottom: 8px; }
+                                    .meta { color: var(--muted); font-size: 13px; line-height: 1.45; }
+                                    .summary { border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; min-width: 240px; }
+                                    .summary-row { display: flex; justify-content: space-between; gap: 10px; padding: 4px 0; font-size: 13px; }
+                                    .summary-row .label { color: var(--muted); }
+                                    table { width: 100%; border-collapse: collapse; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+                                    thead th { text-align: left; padding: 11px 12px; background: #f4f5f7; border-bottom: 1px solid var(--line); font-size: 12px; letter-spacing: 0.04em; text-transform: uppercase; color: #444; }
+                                    .tfoot { margin-top: 12px; display: flex; justify-content: flex-end; }
+                                    .total-pill { background: #111; color: #fff; padding: 8px 12px; border-radius: 999px; font-weight: 700; font-size: 13px; }
+                                    @media print {
+                                        @page { margin: 0.4in; }
+                                        body { background: #fff; }
+                                        .sheet { max-width: none; padding: 0; }
+                                    }
+                                </style>
+                            </head>
+                            <body>
+                                <main class="sheet">
+                                    <header class="header">
+                                        <div>
+                                            <div class="accent"></div>
+                                            <h1 class="title">Tech Repair Lines</h1>
+                                            <div class="meta">RO #${escapePopupHtml(roNumber)} | Printed ${escapePopupHtml(printedAt)}</div>
+                                        </div>
+                                        <div class="summary">
+                                            <div class="summary-row"><span class="label">Tech</span><strong>${escapePopupHtml(techName)}</strong></div>
+                                            <div class="summary-row"><span class="label">Type</span><strong style="text-transform:capitalize;">${escapePopupHtml(typeName)}</strong></div>
+                                            <div class="summary-row"><span class="label">Lines</span><strong>${escapePopupHtml(String(selectedLines.length))}</strong></div>
+                                        </div>
+                                    </header>
+                                    <table>
+                                        <thead>
+                                            <tr>
+                                                <th style="width:14%;">Line</th>
+                                                <th>Description</th>
+                                                <th style="width:16%;">Type</th>
+                                                <th style="width:12%; text-align:right;">Hours</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>${rowsHtml}</tbody>
+                                    </table>
+                                    <div class="tfoot">
+                                        <div class="total-pill">Total Hours: ${escapePopupHtml(totalHours.toFixed(1))}</div>
+                                    </div>
+                                </main>
+                            </body>
+                        </html>
+                    `);
+                    printWindow.document.close();
+                    printWindow.focus();
+                    setTimeout(() => printWindow.print(), 250);
                 }
 
                 if (unassignBtn) {
@@ -2342,7 +2492,10 @@ def get_dashboard_screen_html():
                     <div class="ro-window-card">
                         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
                             <div id="roPopupPaymentsTitle" style="font-weight:700; font-size:18px; color:#333;">Payments - GRAND TOTAL: -</div>
-                            <button id="roPopupPaymentsSave" type="button" style="padding:9px 14px; background:#d32f2f; color:#fff; border:none; border-radius:6px; cursor:pointer; font-weight:700;">SAVE</button>
+                                <div style="display:flex; align-items:center; gap:8px;">
+                                    <button id="roPopupTechModalPrint" type="button" style="padding:7px 12px; background:#d32f2f; color:#fff; border:none; border-radius:6px; cursor:pointer; font-size:12px; font-weight:700; letter-spacing:0.02em; text-transform:uppercase;">Print</button>
+                                    <button id="roPopupTechModalClose" type="button" style="background:none; border:none; font-size:20px; cursor:pointer;">×</button>
+                                </div>
                         </div>
                         <div id="roPopupPaymentsLog"><div style="color:#777;">Loading...</div></div>
                     </div>
