@@ -2133,6 +2133,77 @@ async def list_records_closed_ros(request: Request):
         cur.close()
 
 
+@router.get("/records/tech-payouts")
+async def list_records_tech_payouts(request: Request):
+    """Return per-tech payout totals from paid Flagout entries."""
+    domain = get_user_domain(request) or "default"
+
+    conn = get_conn()
+    cur = conn.cursor()
+    try:
+        _ensure_ro_flagout_lines_table(cur)
+
+        cur.execute(
+            """
+            WITH paid_lines AS (
+                SELECT
+                    f.id,
+                    f.tech_id,
+                    f.tech_name,
+                    f.pay_rate,
+                    f.ro,
+                    f.hours,
+                    f.paid_at,
+                    ROW_NUMBER() OVER (
+                        PARTITION BY f.tech_id
+                        ORDER BY f.paid_at DESC NULLS LAST, f.id DESC
+                    ) AS row_rank
+                FROM ro_flagout_lines f
+                WHERE f.domain = %s
+                  AND f.tech_id IS NOT NULL
+                  AND f.paid_at IS NOT NULL
+            ),
+            aggregates AS (
+                SELECT
+                    tech_id,
+                    COALESCE(SUM(hours), 0) AS total_hours,
+                    COUNT(DISTINCT NULLIF(TRIM(ro), '')) AS total_ros
+                FROM paid_lines
+                GROUP BY tech_id
+            )
+            SELECT
+                a.tech_id,
+                COALESCE(NULLIF(TRIM(p.tech_name), ''), CONCAT('Tech #', a.tech_id::text)) AS tech_name,
+                COALESCE(p.pay_rate, 0) AS pay_rate,
+                a.total_hours,
+                a.total_ros
+            FROM aggregates a
+            LEFT JOIN paid_lines p
+              ON p.tech_id = a.tech_id
+             AND p.row_rank = 1
+            ORDER BY tech_name ASC
+            """,
+            (domain,),
+        )
+        rows = cur.fetchall() or []
+
+        payout_rows = []
+        for row in rows:
+            payout_rows.append(
+                {
+                    "tech_id": int(row.get("tech_id") or 0),
+                    "tech_name": str(row.get("tech_name") or "").strip(),
+                    "pay_rate": _parse_float_value(row.get("pay_rate")),
+                    "total_hours": _parse_float_value(row.get("total_hours")),
+                    "total_ros": int(row.get("total_ros") or 0),
+                }
+            )
+
+        return {"rows": payout_rows}
+    finally:
+        cur.close()
+
+
 @router.post("/payments/save")
 async def save_ro_payments(request: Request):
     domain = get_user_domain(request)
