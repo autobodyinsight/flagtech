@@ -1694,6 +1694,7 @@ def get_parts_script():
         function partsOpenPrintOrderView(options) {
             const ro = String(options?.ro || '').trim();
             const vendorName = String(options?.vendorName || '').trim();
+            const arrivalDate = String(options?.arrivalDate || '').trim();
             const orderedLines = Array.isArray(options?.orderedLines) ? options.orderedLines : [];
             const vendorRecord = options?.vendorRecord || {};
 
@@ -1721,14 +1722,19 @@ def get_parts_script():
                 return Number.isInteger(qty) ? String(qty) : qty.toFixed(2).replace(/\.00$/, '');
             };
 
+            const formatDate = (isoDate) => {
+                if (!isoDate) return '—';
+                const dt = new Date(`${isoDate}T00:00:00`);
+                if (Number.isNaN(dt.getTime())) return isoDate;
+                return dt.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: '2-digit' });
+            };
+
             const vendorContact = String(vendorRecord.contact_person || '').trim();
             const vendorPhone = String(vendorRecord.phone || '').trim();
             const vendorStreet = String(vendorRecord.street || '').trim();
             const vendorCity = String(vendorRecord.city || '').trim();
             const vendorState = String(vendorRecord.state || '').trim();
             const vendorZip = String(vendorRecord.zip || '').trim();
-            const vendorEmail = String(vendorRecord.email || vendorRecord.email_address || '').trim();
-            const shopName = String(vendorName || vendorRecord.name || '').trim();
             const vendorAddress = [vendorStreet, [vendorCity, vendorState].filter(Boolean).join(', '), vendorZip]
                 .filter(Boolean)
                 .join(' ')
@@ -1795,6 +1801,7 @@ def get_parts_script():
                                 <div class="title">Parts Order</div>
                                 <div class="sub">RO #${safe(ro)} • Generated ${safe(generatedAt)}</div>
                             </div>
+                            <div class="sub">Arrival Date: <strong>${safe(formatDate(arrivalDate))}</strong></div>
                         </div>
 
                         <div class="cards">
@@ -1806,11 +1813,9 @@ def get_parts_script():
                                 ${vendorAddress ? `<div class="line">Address: ${safe(vendorAddress)}</div>` : ''}
                             </div>
                             <div class="card">
-                                <h4>Shop Name: <strong>${safe(shopName)}</strong></h4>
-                                <div class="line">Contact Person: <strong>${safe(vendorContact)}</strong></div>
-                                <div class="line">Address: <strong>${safe(vendorAddress)}</strong></div>
-                                <div class="line">Phone Number: <strong>${safe(vendorPhone)}</strong></div>
-                                <div class="line">Email: <strong>${safe(vendorEmail)}</strong></div>
+                                <h4>Order Details</h4>
+                                <div class="line">Line Count: <strong>${orderedLines.length}</strong></div>
+                                <div class="line">Expected Arrival: <strong>${safe(formatDate(arrivalDate))}</strong></div>
                             </div>
                         </div>
 
