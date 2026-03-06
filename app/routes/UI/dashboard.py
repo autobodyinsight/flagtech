@@ -203,7 +203,10 @@ def get_dashboard_screen_html():
 
         <div id="techAssignModal" class="modal" style="display:none;">
             <div class="modal-content" style="max-width:980px; max-height:85vh; overflow-y:auto;">
-                <span class="close" onclick="closeTechAssignModal()">&times;</span>
+                <div style="display:flex; justify-content:flex-end; align-items:center; gap:10px; margin-bottom:8px;">
+                    <button onclick="printTechAssignModal()" style="padding:8px 16px; background:#d32f2f; color:#fff; border:none; border-radius:4px; cursor:pointer; font-weight:bold;">Print</button>
+                    <span class="close" onclick="closeTechAssignModal()" style="float:none; line-height:1;">&times;</span>
+                </div>
                 <h2 id="techAssignTitle" style="margin-bottom:18px;">Assign Repair Lines</h2>
                 <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:12px;">
                     <div>
@@ -230,7 +233,6 @@ def get_dashboard_screen_html():
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-top:12px;">
                     <div id="techAssignTotal" style="font-weight:bold;">Selected Total: 0.0 hrs</div>
                     <div style="display:flex; gap:10px;">
-                        <button onclick="printTechAssignModal()" style="padding:9px 18px; background:#333; color:#fff; border:none; border-radius:4px; cursor:pointer;">Print</button>
                         <button onclick="saveTechAssignModal()" style="padding:9px 18px; background:#d32f2f; color:#fff; border:none; border-radius:4px; cursor:pointer; font-weight:bold;">Save</button>
                     </div>
                 </div>
@@ -4392,6 +4394,23 @@ def get_dashboard_screen_html():
                 const techName = techSelect?.options?.[techSelect.selectedIndex]?.dataset?.name || 'Unassigned';
                 const typeName = typeSelect?.value || '?';
                 const roNumber = currentTechAssignContext.ro;
+                const roDetails = (dashboardData?.roList || []).find((row) => String(row?.ro || '') === String(roNumber)) || {};
+
+                const escapeForPrint = (value) => String(value ?? '')
+                    .replace(/&/g, '&amp;')
+                    .replace(/</g, '&lt;')
+                    .replace(/>/g, '&gt;')
+                    .replace(/"/g, '&quot;')
+                    .replace(/'/g, '&#39;');
+
+                const estimatorDisplay = String(getRoEstimatorDisplay(roDetails) || '-').replace(/\s*\(estimator\s*\/\s*written by\)\s*$/i, '') || '-';
+                const insuranceDisplay = roDetails?.insurance || '-';
+                const vehicleDisplay = roDetails?.vehicle || '-';
+                const vinDisplay = roDetails?.vin || '-';
+
+                const rawGrandTotal = Number(roDetails?.total);
+                const hasGrandTotal = Number.isFinite(rawGrandTotal);
+                const grandTotalDisplay = hasGrandTotal ? `$${rawGrandTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '-';
 
                 let total = 0;
                 const sortedRows = [...selectedRows].sort((a, b) => {
@@ -4411,8 +4430,9 @@ def get_dashboard_screen_html():
                     total += Number.isFinite(hours) ? hours : 0;
                     return `
                         <tr>
-                            <td style="padding:10px; border-bottom:1px solid #eee;">Line ${lineNumber} ${desc}</td>
-                            <td style="padding:10px; border-bottom:1px solid #eee; text-transform:lowercase;">${type}</td>
+                            <td style="padding:10px; border-bottom:1px solid #eee; font-weight:600;">${escapeForPrint(lineNumber)}</td>
+                            <td style="padding:10px; border-bottom:1px solid #eee;">${escapeForPrint(desc)}</td>
+                            <td style="padding:10px; border-bottom:1px solid #eee; text-transform:lowercase;">${escapeForPrint(type)}</td>
                             <td style="padding:10px; border-bottom:1px solid #eee; text-align:right; font-weight:bold;">${hours.toFixed(1)} hrs</td>
                         </tr>
                     `;
@@ -4427,27 +4447,60 @@ def get_dashboard_screen_html():
                         <head>
                             <title>Tech Assignment Print</title>
                             <style>
-                                body { font-family: Arial, sans-serif; padding: 28px; color:#222; }
-                                .header { display:flex; justify-content:space-between; margin-bottom:20px; }
-                                .title { font-size:24px; font-weight:bold; color:#d32f2f; }
-                                .meta { font-size:14px; line-height:1.7; }
+                                body { font-family: "Segoe UI", Arial, sans-serif; padding: 28px; color:#222; }
+                                .title { font-size:24px; font-weight:800; color:#d32f2f; margin-bottom:14px; letter-spacing:0.2px; }
+                                .header-grid { display:grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px 18px; align-items:start; margin-bottom:18px; padding:12px; border:1px solid #e5e5e5; border-radius:8px; background:#fafafa; }
+                                .label { font-size:11px; color:#666; text-transform:uppercase; letter-spacing:0.5px; font-weight:700; margin-bottom:3px; }
+                                .value { font-size:16px; font-weight:700; color:#222; }
+                                .value-small { font-size:14px; font-weight:600; color:#333; }
+                                .center-cell { text-align:center; }
+                                .right-cell { text-align:right; }
                                 table { width:100%; border-collapse:collapse; margin-top:16px; }
-                                thead th { text-align:left; background:#f5f5f5; padding:10px; border-bottom:2px solid #ddd; }
-                                .total { margin-top:18px; font-size:18px; font-weight:bold; text-align:right; }
+                                thead th { text-align:left; background:#f5f5f5; padding:10px; border-bottom:2px solid #ddd; font-size:13px; text-transform:uppercase; letter-spacing:0.4px; }
+                                .total-wrap { margin-top:18px; display:flex; flex-direction:column; align-items:flex-end; gap:6px; }
+                                .total-main { font-size:18px; font-weight:800; color:#111; }
+                                .total-sub { font-size:14px; color:#444; font-weight:700; }
                             </style>
                         </head>
                         <body>
-                            <div class="header">
-                                <div class="title">Assigned Repair Lines</div>
-                                <div class="meta">RO: ${roNumber}<br/>Tech: ${techName}<br/>Type: ${typeName}</div>
+                            <div class="title">Assigned Repair Lines</div>
+                            <div class="header-grid">
+                                <div>
+                                    <div class="label">RO</div>
+                                    <div class="value">${escapeForPrint(roNumber)}</div>
+                                </div>
+                                <div class="center-cell">
+                                    <div class="label">Estimator</div>
+                                    <div class="value-small">${escapeForPrint(estimatorDisplay)}</div>
+                                </div>
+                                <div class="right-cell">
+                                    <div class="label">Tech</div>
+                                    <div class="value">${escapeForPrint(techName)}</div>
+                                </div>
+                                <div>
+                                    <div class="label">Vehicle</div>
+                                    <div class="value-small">${escapeForPrint(vehicleDisplay)}</div>
+                                    <div class="value-small" style="margin-top:2px;">VIN: ${escapeForPrint(vinDisplay)}</div>
+                                </div>
+                                <div class="center-cell">
+                                    <div class="label">Insurance</div>
+                                    <div class="value-small">${escapeForPrint(insuranceDisplay)}</div>
+                                </div>
+                                <div class="right-cell">
+                                    <div class="label">Type</div>
+                                    <div class="value-small" style="text-transform:lowercase;">${escapeForPrint(typeName)}</div>
+                                </div>
                             </div>
                             <table>
                                 <thead>
-                                    <tr><th>Repair Line</th><th>Type</th><th style="text-align:right;">HRS</th></tr>
+                                    <tr><th style="width:90px;">Line</th><th>Description</th><th style="width:120px;">Type</th><th style="text-align:right; width:130px;">HRS</th></tr>
                                 </thead>
                                 <tbody>${linesHtml}</tbody>
                             </table>
-                            <div class="total">Total Hours: ${total.toFixed(1)}</div>
+                            <div class="total-wrap">
+                                <div class="total-main">Grand Total: ${escapeForPrint(grandTotalDisplay)}</div>
+                                <div class="total-sub">Assigned Hours Total: ${total.toFixed(1)} hrs</div>
+                            </div>
                         </body>
                     </html>
                 `);
