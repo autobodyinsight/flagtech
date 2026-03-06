@@ -4472,26 +4472,31 @@ def get_dashboard_screen_html():
                     alert('No repair orders to print');
                     return;
                 }
-                
-                // Sort the data
-                const sortedList = [...dashboardData.roList].sort((a, b) => {
-                    let valA = a[sortBy];
-                    let valB = b[sortBy];
-                    
-                    if (sortBy === 'ro' || sortBy === 'insurance') {
-                        valA = String(valA || '').toLowerCase();
-                        valB = String(valB || '').toLowerCase();
-                        return valA.localeCompare(valB);
-                    }
-                    
-                    if (sortBy === 'in_date' || sortBy === 'ecd_date') {
-                        valA = valA || '';
-                        valB = valB || '';
-                        return valA.localeCompare(valB);
-                    }
-                    
-                    return 0;
-                });
+
+                const groupedModes = new Set(['insurance', 'in_date', 'ecd_date']);
+                const isGroupedMode = groupedModes.has(sortBy);
+
+                // Keep existing behavior for non-grouped print mode(s).
+                const sortedList = isGroupedMode
+                    ? [...dashboardData.roList]
+                    : [...dashboardData.roList].sort((a, b) => {
+                        let valA = a[sortBy];
+                        let valB = b[sortBy];
+
+                        if (sortBy === 'ro' || sortBy === 'insurance') {
+                            valA = String(valA || '').toLowerCase();
+                            valB = String(valB || '').toLowerCase();
+                            return valA.localeCompare(valB);
+                        }
+
+                        if (sortBy === 'in_date' || sortBy === 'ecd_date') {
+                            valA = valA || '';
+                            valB = valB || '';
+                            return valA.localeCompare(valB);
+                        }
+
+                        return 0;
+                    });
                 
                 // Get sort label
                 const sortLabels = {
@@ -4501,32 +4506,101 @@ def get_dashboard_screen_html():
                     'ecd_date': 'ECD'
                 };
                 const sortLabel = sortLabels[sortBy] || sortBy;
-                
-                // Build table rows
-                let rowsHtml = '';
-                sortedList.forEach((ro, index) => {
-                    const rowBg = index % 2 === 0 ? '#f2f0ef' : 'var(--list-row-white, #ffffff)';
-                    const inDisplay = ro.in_date ? formatShortDate(ro.in_date) : '-';
-                    const ecdDisplay = ro.ecd_date ? formatShortDate(ro.ecd_date) : '-';
-                    const daysSinceIn = calculateDaysSince(ro.in_date || '');
-                    const daysDisplay = daysSinceIn !== null ? daysSinceIn : '-';
-                    
-                    rowsHtml += `
-                        <tr style="background:${rowBg};">
-                            <td style="padding:10px; border-bottom:1px solid #eee;">${ro.ro}</td>
-                            <td style="padding:10px; border-bottom:1px solid #eee;">${ro.vehicle || 'N/A'}</td>
-                            <td style="padding:10px; border-bottom:1px solid #eee;">${ro.customer || '-'}</td>
-                            <td style="padding:10px; border-bottom:1px solid #eee;">${ro.phone || '-'}</td>
-                            <td style="padding:10px; border-bottom:1px solid #eee;">${ro.insurance || '-'}</td>
-                            <td style="padding:10px; border-bottom:1px solid #eee;">${ro.claim_number || '-'}</td>
-                            <td style="padding:10px; border-bottom:1px solid #eee;">${inDisplay}</td>
-                            <td style="padding:10px; border-bottom:1px solid #eee; text-align:center; font-weight:bold;">${daysDisplay}</td>
-                            <td style="padding:10px; border-bottom:1px solid #eee;">${ecdDisplay}</td>
-                            <td style="padding:10px; border-bottom:1px solid #eee; text-align:right;">${ro.hours.toFixed(1)}</td>
-                            <td style="padding:10px; border-bottom:1px solid #eee; text-align:right;">$${ro.total.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+
+                function buildRowsHtml(list) {
+                    let rowsHtml = '';
+                    list.forEach((ro, index) => {
+                        const rowBg = index % 2 === 0 ? '#f2f0ef' : 'var(--list-row-white, #ffffff)';
+                        const inDisplay = ro.in_date ? formatShortDate(ro.in_date) : '-';
+                        const ecdDisplay = ro.ecd_date ? formatShortDate(ro.ecd_date) : '-';
+                        const daysSinceIn = calculateDaysSince(ro.in_date || '');
+                        const daysDisplay = daysSinceIn !== null ? daysSinceIn : '-';
+
+                        rowsHtml += `
+                            <tr style="background:${rowBg};">
+                                <td style="padding:10px; border-bottom:1px solid #eee;">${ro.ro}</td>
+                                <td style="padding:10px; border-bottom:1px solid #eee;">${ro.vehicle || 'N/A'}</td>
+                                <td style="padding:10px; border-bottom:1px solid #eee;">${ro.customer || '-'}</td>
+                                <td style="padding:10px; border-bottom:1px solid #eee;">${ro.phone || '-'}</td>
+                                <td style="padding:10px; border-bottom:1px solid #eee;">${ro.insurance || '-'}</td>
+                                <td style="padding:10px; border-bottom:1px solid #eee;">${ro.claim_number || '-'}</td>
+                                <td style="padding:10px; border-bottom:1px solid #eee;">${inDisplay}</td>
+                                <td style="padding:10px; border-bottom:1px solid #eee; text-align:center; font-weight:bold;">${daysDisplay}</td>
+                                <td style="padding:10px; border-bottom:1px solid #eee;">${ecdDisplay}</td>
+                                <td style="padding:10px; border-bottom:1px solid #eee; text-align:right;">${ro.hours.toFixed(1)}</td>
+                                <td style="padding:10px; border-bottom:1px solid #eee; text-align:right;">$${ro.total.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                            </tr>
+                        `;
+                    });
+                    return rowsHtml;
+                }
+
+                const headerRowHtml = `
+                    <thead>
+                        <tr>
+                            <th>RO #</th>
+                            <th>Vehicle</th>
+                            <th>Customer</th>
+                            <th>Phone</th>
+                            <th>Insurance</th>
+                            <th>Claim #</th>
+                            <th>In</th>
+                            <th style="text-align:center;">⏳</th>
+                            <th>ECD</th>
+                            <th style="text-align:right;">HRS</th>
+                            <th style="text-align:right;">Total</th>
                         </tr>
+                    </thead>
+                `;
+
+                let contentHtml = '';
+                if (!isGroupedMode) {
+                    contentHtml = `
+                        <table>
+                            ${headerRowHtml}
+                            <tbody>
+                                ${buildRowsHtml(sortedList)}
+                            </tbody>
+                        </table>
                     `;
-                });
+                } else {
+                    const groups = new Map();
+                    sortedList.forEach((ro) => {
+                        const rawValue = ro[sortBy];
+                        const key = String(rawValue || '').trim();
+                        if (!groups.has(key)) groups.set(key, []);
+                        groups.get(key).push(ro);
+                    });
+
+                    const sortedKeys = Array.from(groups.keys()).sort((a, b) => {
+                        if (sortBy === 'insurance') {
+                            return a.toLowerCase().localeCompare(b.toLowerCase());
+                        }
+                        // Date groups in chronological order; blank values last.
+                        if (!a) return 1;
+                        if (!b) return -1;
+                        return a.localeCompare(b);
+                    });
+
+                    contentHtml = sortedKeys.map((key) => {
+                        const groupRows = groups.get(key) || [];
+                        if (!groupRows.length) return '';
+                        const headerValue = sortBy === 'insurance'
+                            ? (key || 'Unspecified')
+                            : (key ? formatShortDate(key) : 'Unspecified');
+                        return `
+                            <div class="print-group">
+                                <div class="group-header">${headerValue}</div>
+                                <table>
+                                    ${headerRowHtml}
+                                    <tbody>
+                                        ${buildRowsHtml(groupRows)}
+                                    </tbody>
+                                </table>
+                            </div>
+                        `;
+                    }).join('');
+                }
                 
                 // Calculate totals
                 const totalHours = sortedList.reduce((sum, ro) => sum + ro.hours, 0);
@@ -4570,6 +4644,22 @@ def get_dashboard_screen_html():
                                     border-collapse: collapse;
                                     margin-top: 20px;
                                 }
+                                .print-group {
+                                    margin-top: 18px;
+                                }
+                                .print-group:first-of-type {
+                                    margin-top: 0;
+                                }
+                                .group-header {
+                                    width: 100%;
+                                    padding: 10px 12px;
+                                    margin: 0 0 8px 0;
+                                    font-weight: bold;
+                                    font-size: 15px;
+                                    color: #333;
+                                    background: #f5f5f5;
+                                    border-left: 4px solid #b22222;
+                                }
                                 thead th {
                                     text-align: left;
                                     background: #f5f5f5;
@@ -4605,26 +4695,7 @@ def get_dashboard_screen_html():
                                 <h1>Repair Orders</h1>
                                 <p class="subtitle">Print by: ${sortLabel}</p>
                             </div>
-                            <table>
-                                <thead>
-                                    <tr>
-                                        <th>RO #</th>
-                                        <th>Vehicle</th>
-                                        <th>Customer</th>
-                                        <th>Phone</th>
-                                        <th>Insurance</th>
-                                        <th>Claim #</th>
-                                        <th>In</th>
-                                        <th style="text-align:center;">⏳</th>
-                                        <th>ECD</th>
-                                        <th style="text-align:right;">HRS</th>
-                                        <th style="text-align:right;">Total</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    ${rowsHtml}
-                                </tbody>
-                            </table>
+                            ${contentHtml}
                             <div class="totals">
                                 <div>Total ROs: ${sortedList.length}</div>
                                 <div>Total Hours: ${totalHours.toFixed(1)}</div>
