@@ -169,19 +169,6 @@ def get_records_screen_html():
             return `${mm}/${dd}/${yy}`;
         }
 
-        function recordsDaysSinceIn(value) {
-            const source = String(value || '').trim();
-            if (!source) return '-';
-            const dt = new Date(source);
-            if (Number.isNaN(dt.getTime())) return '-';
-            const today = new Date();
-            const start = new Date(dt.getFullYear(), dt.getMonth(), dt.getDate());
-            const now = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-            const diffMs = now.getTime() - start.getTime();
-            const days = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-            return Number.isFinite(days) ? Math.max(0, days) : '-';
-        }
-
         async function openRecordsTechDetailWindow(techId, techName) {
             const win = window.open('', `Records_Tech_${techId}`, 'width=1220,height=760,scrollbars=yes,resizable=yes');
             if (!win) {
@@ -205,15 +192,12 @@ def get_records_screen_html():
                                         <th class="dashboard-header-cell" style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold;">RO#</th>
                                         <th class="dashboard-header-cell" style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold;">Vehicle</th>
                                         <th class="dashboard-header-cell" style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold;">Insurance</th>
-                                        <th class="dashboard-header-cell" style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold;">In</th>
-                                        <th class="dashboard-header-cell" style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold; text-align:center;" title="Days Since In Date">⏳</th>
-                                        <th class="dashboard-header-cell" style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold;">ECD</th>
-                                        <th class="dashboard-header-cell" style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold; text-align:right;">HRS</th>
+                                        <th class="dashboard-header-cell" style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold;">PAID</th>
                                         <th class="dashboard-header-cell" style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold; text-align:right;">Total</th>
                                     </tr>
                                 </thead>
                                 <tbody id="recordsTechDetailBody">
-                                    <tr><td colspan="8" style="padding:20px; text-align:center; color:#999;">Loading...</td></tr>
+                                    <tr><td colspan="5" style="padding:20px; text-align:center; color:#999;">Loading...</td></tr>
                                 </tbody>
                             </table>
                         </div>
@@ -231,15 +215,6 @@ def get_records_screen_html():
                     background: #23272a;
                     color: #fff;
                 }
-                button.ro-link {
-                    background:none;
-                    border:none;
-                    color:#0066cc;
-                    text-decoration:underline;
-                    cursor:pointer;
-                    padding:0;
-                    font:inherit;
-                }
             `;
             win.document.head.appendChild(style);
 
@@ -251,7 +226,7 @@ def get_records_screen_html():
                 if (!body) return;
 
                 if (!rows.length) {
-                    body.innerHTML = `<tr><td colspan='8' style='padding:20px; text-align:center; color:#999;'>No paid RO records found for this tech.</td></tr>`;
+                    body.innerHTML = `<tr><td colspan='5' style='padding:20px; text-align:center; color:#999;'>No paid RO records found for this tech.</td></tr>`;
                     return;
                 }
 
@@ -262,67 +237,25 @@ def get_records_screen_html():
                     const roEscaped = escapeRecordsHtml(roValue);
                     const vehicle = escapeRecordsHtml(row.vehicle || 'N/A');
                     const insurance = escapeRecordsHtml(row.insurance || '-');
-                    const inDate = formatRecordsShortDate(row.in_date);
-                    const ecdDate = formatRecordsShortDate(row.ecd_date);
-                    const daysSinceIn = recordsDaysSinceIn(row.in_date);
-                    const hours = Number(row.hours || 0).toFixed(1);
+                    const paidDate = formatRecordsShortDate(row.paid_at);
                     const total = formatRecordsMoney(row.total || 0);
 
                     body.innerHTML += `
                         <tr>
                             <td style='padding:12px; border-bottom:1px solid #eee; background:${rowBg};'>
-                                <button type='button' class='ro-link' data-ro='${roEscaped}'>${roEscaped}</button>
+                                ${roEscaped}
                             </td>
                             <td style='padding:12px; border-bottom:1px solid #eee; background:${rowBg}; color:#333;'>${vehicle}</td>
                             <td style='padding:12px; border-bottom:1px solid #eee; background:${rowBg}; color:#333;'>${insurance}</td>
-                            <td style='padding:12px; border-bottom:1px solid #eee; background:${rowBg}; color:#333;'>${inDate}</td>
-                            <td style='padding:12px; border-bottom:1px solid #eee; background:${rowBg}; text-align:center; color:#333;'>${daysSinceIn}</td>
-                            <td style='padding:12px; border-bottom:1px solid #eee; background:${rowBg}; color:#333;'>${ecdDate}</td>
-                            <td style='padding:12px; border-bottom:1px solid #eee; background:${rowBg}; text-align:right; color:#333;'>${hours}</td>
+                            <td style='padding:12px; border-bottom:1px solid #eee; background:${rowBg}; color:#333;'>${paidDate}</td>
                             <td style='padding:12px; border-bottom:1px solid #eee; background:${rowBg}; text-align:right; color:#333;'>${total}</td>
                         </tr>
                     `;
                 });
-
-                Array.from(win.document.querySelectorAll('button.ro-link')).forEach((button) => {
-                    button.addEventListener('click', async () => {
-                        const roNumber = String(button.getAttribute('data-ro') || '').trim();
-                        if (!roNumber) return;
-
-                        const openerWindow = win.opener;
-                        if (!openerWindow || openerWindow.closed) {
-                            alert('Main window is not available.');
-                            return;
-                        }
-
-                        if (typeof openerWindow.openRoWindowFromDashboard !== 'function') {
-                            alert('RO window function is unavailable.');
-                            return;
-                        }
-
-                        const hasRoInMemory = Array.isArray(openerWindow.dashboardData?.roList)
-                            && openerWindow.dashboardData.roList.some((item) => String(item?.ro || '') === roNumber);
-
-                        if (!hasRoInMemory) {
-                            try {
-                                const dashResp = await openerWindow.fetch('/api/dashboard-data', { credentials: 'include' });
-                                const dashData = await dashResp.json();
-                                if (dashData && Array.isArray(dashData.roList)) {
-                                    openerWindow.dashboardData = dashData;
-                                }
-                            } catch (err) {
-                                console.error('Unable to refresh dashboard data for RO window open:', err);
-                            }
-                        }
-
-                        openerWindow.openRoWindowFromDashboard(null, roNumber);
-                        openerWindow.focus();
-                    });
-                });
             } catch (error) {
                 const body = win.document.getElementById('recordsTechDetailBody');
                 if (body) {
-                    body.innerHTML = `<tr><td colspan='8' style='padding:20px; text-align:center; color:#c00;'>Error loading paid RO records</td></tr>`;
+                    body.innerHTML = `<tr><td colspan='5' style='padding:20px; text-align:center; color:#c00;'>Error loading paid RO records</td></tr>`;
                 }
             }
         }

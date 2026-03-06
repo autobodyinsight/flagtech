@@ -2221,7 +2221,8 @@ async def list_records_tech_paid_ros(request: Request, tech_id: int):
                 SELECT
                     f.tech_id,
                     f.ro,
-                    COALESCE(SUM(f.hours), 0) AS total_hours
+                    COALESCE(SUM(f.hours), 0) AS total_hours,
+                    MAX(f.paid_at) AS paid_at
                 FROM ro_flagout_lines f
                 WHERE f.domain = %s
                   AND f.paid_at IS NOT NULL
@@ -2250,6 +2251,7 @@ async def list_records_tech_paid_ros(request: Request, tech_id: int):
                 p.tech_id,
                 p.ro,
                 p.total_hours,
+                p.paid_at,
                 le.vehicle,
                 le.year,
                 le.make,
@@ -2290,6 +2292,7 @@ async def list_records_tech_paid_ros(request: Request, tech_id: int):
                     "ro": ro_value,
                     "vehicle": str(vehicle_display or "").strip(),
                     "insurance": str(row.get("insurance_company") or "").strip(),
+                    "paid_at": row.get("paid_at").isoformat() if row.get("paid_at") else None,
                     "in_date": in_date_value.isoformat() if in_date_value else None,
                     "ecd_date": ecd_date_value.isoformat() if ecd_date_value else None,
                     "hours": _parse_float_value(row.get("total_hours")),
