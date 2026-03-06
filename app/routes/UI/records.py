@@ -149,6 +149,184 @@ def get_records_screen_html():
             return '$' + amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
         }
 
+        function escapeRecordsHtml(value) {
+            return String(value || '')
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
+
+        function formatRecordsShortDate(value) {
+            const source = String(value || '').trim();
+            if (!source) return '-';
+            const dt = new Date(source);
+            if (Number.isNaN(dt.getTime())) return source;
+            const mm = String(dt.getMonth() + 1).padStart(2, '0');
+            const dd = String(dt.getDate()).padStart(2, '0');
+            const yy = String(dt.getFullYear()).slice(-2);
+            return `${mm}/${dd}/${yy}`;
+        }
+
+        function recordsDaysSinceIn(value) {
+            const source = String(value || '').trim();
+            if (!source) return '-';
+            const dt = new Date(source);
+            if (Number.isNaN(dt.getTime())) return '-';
+            const today = new Date();
+            const start = new Date(dt.getFullYear(), dt.getMonth(), dt.getDate());
+            const now = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+            const diffMs = now.getTime() - start.getTime();
+            const days = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+            return Number.isFinite(days) ? Math.max(0, days) : '-';
+        }
+
+        async function openRecordsTechDetailWindow(techId, techName) {
+            const win = window.open('', `Records_Tech_${techId}`, 'width=1220,height=760,scrollbars=yes,resizable=yes');
+            if (!win) {
+                alert('Popup blocked. Please allow popups for this site.');
+                return;
+            }
+
+            const safeTechName = escapeRecordsHtml(techName || `Tech #${techId}`);
+            win.document.title = `Tech Detail - ${safeTechName}`;
+            win.document.body.innerHTML = `
+                <div style="padding:20px; background:#d3d3d3; min-height:100vh; font-family:Arial,sans-serif;">
+                    <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:20px;">
+                        <h2 style="margin:0; color:#333;">Paid RO's - ${safeTechName}</h2>
+                        <button onclick="window.close()" style="padding:8px 14px; background:#505050; color:#fff; border:none; border-radius:4px; cursor:pointer; font-weight:bold;">Close</button>
+                    </div>
+                    <div style="background:#fff; padding:20px; border-radius:8px; box-shadow:0 2px 4px rgba(0,0,0,0.1);">
+                        <div style="overflow-x:auto;">
+                            <table id="recordsTechDetailTable" style="width:100%; border-collapse:collapse;">
+                                <thead>
+                                    <tr class="dashboard-header-row">
+                                        <th class="dashboard-header-cell" style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold;">RO#</th>
+                                        <th class="dashboard-header-cell" style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold;">Vehicle</th>
+                                        <th class="dashboard-header-cell" style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold;">Insurance</th>
+                                        <th class="dashboard-header-cell" style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold;">In</th>
+                                        <th class="dashboard-header-cell" style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold; text-align:center;" title="Days Since In Date">⏳</th>
+                                        <th class="dashboard-header-cell" style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold;">ECD</th>
+                                        <th class="dashboard-header-cell" style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold; text-align:right;">HRS</th>
+                                        <th class="dashboard-header-cell" style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold; text-align:right;">Total</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="recordsTechDetailBody">
+                                    <tr><td colspan="8" style="padding:20px; text-align:center; color:#999;">Loading...</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            const style = win.document.createElement('style');
+            style.textContent = `
+                body { margin:0; }
+                .dashboard-header-row th, .dashboard-header-cell {
+                    font-family: inherit;
+                    font-size: 16px;
+                    font-weight: bold;
+                    background: #23272a;
+                    color: #fff;
+                }
+                button.ro-link {
+                    background:none;
+                    border:none;
+                    color:#0066cc;
+                    text-decoration:underline;
+                    cursor:pointer;
+                    padding:0;
+                    font:inherit;
+                }
+            `;
+            win.document.head.appendChild(style);
+
+            try {
+                const resp = await fetch(`/api/records/tech-paid-ros?tech_id=${encodeURIComponent(String(techId))}`, { credentials: 'include' });
+                const data = await resp.json();
+                const rows = Array.isArray(data.rows) ? data.rows : [];
+                const body = win.document.getElementById('recordsTechDetailBody');
+                if (!body) return;
+
+                if (!rows.length) {
+                    body.innerHTML = `<tr><td colspan='8' style='padding:20px; text-align:center; color:#999;'>No paid RO records found for this tech.</td></tr>`;
+                    return;
+                }
+
+                body.innerHTML = '';
+                rows.forEach((row, index) => {
+                    const rowBg = index % 2 === 0 ? '#f2f0ef' : '#ffffff';
+                    const roValue = String(row.ro || '').trim();
+                    const roEscaped = escapeRecordsHtml(roValue);
+                    const vehicle = escapeRecordsHtml(row.vehicle || 'N/A');
+                    const insurance = escapeRecordsHtml(row.insurance || '-');
+                    const inDate = formatRecordsShortDate(row.in_date);
+                    const ecdDate = formatRecordsShortDate(row.ecd_date);
+                    const daysSinceIn = recordsDaysSinceIn(row.in_date);
+                    const hours = Number(row.hours || 0).toFixed(1);
+                    const total = formatRecordsMoney(row.total || 0);
+
+                    body.innerHTML += `
+                        <tr>
+                            <td style='padding:12px; border-bottom:1px solid #eee; background:${rowBg};'>
+                                <button type='button' class='ro-link' data-ro='${roEscaped}'>${roEscaped}</button>
+                            </td>
+                            <td style='padding:12px; border-bottom:1px solid #eee; background:${rowBg}; color:#333;'>${vehicle}</td>
+                            <td style='padding:12px; border-bottom:1px solid #eee; background:${rowBg}; color:#333;'>${insurance}</td>
+                            <td style='padding:12px; border-bottom:1px solid #eee; background:${rowBg}; color:#333;'>${inDate}</td>
+                            <td style='padding:12px; border-bottom:1px solid #eee; background:${rowBg}; text-align:center; color:#333;'>${daysSinceIn}</td>
+                            <td style='padding:12px; border-bottom:1px solid #eee; background:${rowBg}; color:#333;'>${ecdDate}</td>
+                            <td style='padding:12px; border-bottom:1px solid #eee; background:${rowBg}; text-align:right; color:#333;'>${hours}</td>
+                            <td style='padding:12px; border-bottom:1px solid #eee; background:${rowBg}; text-align:right; color:#333;'>${total}</td>
+                        </tr>
+                    `;
+                });
+
+                Array.from(win.document.querySelectorAll('button.ro-link')).forEach((button) => {
+                    button.addEventListener('click', async () => {
+                        const roNumber = String(button.getAttribute('data-ro') || '').trim();
+                        if (!roNumber) return;
+
+                        const openerWindow = win.opener;
+                        if (!openerWindow || openerWindow.closed) {
+                            alert('Main window is not available.');
+                            return;
+                        }
+
+                        if (typeof openerWindow.openRoWindowFromDashboard !== 'function') {
+                            alert('RO window function is unavailable.');
+                            return;
+                        }
+
+                        const hasRoInMemory = Array.isArray(openerWindow.dashboardData?.roList)
+                            && openerWindow.dashboardData.roList.some((item) => String(item?.ro || '') === roNumber);
+
+                        if (!hasRoInMemory) {
+                            try {
+                                const dashResp = await openerWindow.fetch('/api/dashboard-data', { credentials: 'include' });
+                                const dashData = await dashResp.json();
+                                if (dashData && Array.isArray(dashData.roList)) {
+                                    openerWindow.dashboardData = dashData;
+                                }
+                            } catch (err) {
+                                console.error('Unable to refresh dashboard data for RO window open:', err);
+                            }
+                        }
+
+                        openerWindow.openRoWindowFromDashboard(null, roNumber);
+                        openerWindow.focus();
+                    });
+                });
+            } catch (error) {
+                const body = win.document.getElementById('recordsTechDetailBody');
+                if (body) {
+                    body.innerHTML = `<tr><td colspan='8' style='padding:20px; text-align:center; color:#c00;'>Error loading paid RO records</td></tr>`;
+                }
+            }
+        }
+
         async function loadRecordsData() {
             recordsSetActiveSidebar('ros');
             const body = document.getElementById('recordsRoListBody');
@@ -203,11 +381,20 @@ def get_records_screen_html():
                     const totalRos = Number(row.total_ros || 0);
 
                     body.innerHTML += `<tr>
-                        <td style='padding:12px; background:${rowBg};'>${techName}</td>
+                        <td style='padding:12px; background:${rowBg};'><button type='button' class='tech-link' data-tech-id='${Number(row.tech_id || 0)}' data-tech-name='${escapeRecordsHtml(techName)}' style='background:none; border:none; color:#0066cc; text-decoration:underline; cursor:pointer; padding:0; font:inherit; font-weight:bold;'>${escapeRecordsHtml(techName)}</button></td>
                         <td style='padding:12px; text-align:right; background:${rowBg};'>${formatRecordsMoney(row.pay_rate || 0)}</td>
                         <td style='padding:12px; text-align:right; background:${rowBg};'>${Number(row.total_hours || 0).toFixed(1)}</td>
                         <td style='padding:12px; text-align:center; background:${rowBg};'>${totalRos}</td>
                     </tr>`;
+                });
+
+                body.querySelectorAll('button.tech-link').forEach((button) => {
+                    button.addEventListener('click', () => {
+                        const techId = Number(button.getAttribute('data-tech-id') || 0);
+                        const techName = String(button.getAttribute('data-tech-name') || '').trim();
+                        if (!techId) return;
+                        openRecordsTechDetailWindow(techId, techName);
+                    });
                 });
             } catch (error) {
                 body.innerHTML = `<tr><td colspan='4' style='padding:20px; text-align:center; color:#c00;'>Error loading tech payouts</td></tr>`;

@@ -2204,6 +2204,104 @@ async def list_records_tech_payouts(request: Request):
         cur.close()
 
 
+@router.get("/records/tech-paid-ros")
+async def list_records_tech_paid_ros(request: Request, tech_id: int):
+    """Return unique ROs paid to a tech, sourced only from Flagout payout records."""
+    domain = get_user_domain(request) or "default"
+
+    conn = get_conn()
+    cur = conn.cursor()
+    try:
+        _ensure_ro_flagout_lines_table(cur)
+        _ensure_saved_estimates_table(cur)
+
+        cur.execute(
+            """
+            WITH paid_ro_hours AS (
+                SELECT
+                    f.tech_id,
+                    f.ro,
+                    COALESCE(SUM(f.hours), 0) AS total_hours
+                FROM ro_flagout_lines f
+                WHERE f.domain = %s
+                  AND f.paid_at IS NOT NULL
+                  AND f.tech_id = %s
+                  AND f.ro IS NOT NULL
+                  AND TRIM(f.ro) <> ''
+                GROUP BY f.tech_id, f.ro
+            ),
+            latest_estimates AS (
+                SELECT DISTINCT ON (se.ro)
+                    se.ro,
+                    se.vehicle,
+                    se.year,
+                    se.make,
+                    se.model,
+                    se.insurance_company,
+                    se.in_date,
+                    se.ecd_date,
+                    se.grand_total,
+                    se.saved_at
+                FROM saved_estimates se
+                WHERE se.domain = %s
+                ORDER BY se.ro, se.saved_at DESC, se.id DESC
+            )
+            SELECT
+                p.tech_id,
+                p.ro,
+                p.total_hours,
+                le.vehicle,
+                le.year,
+                le.make,
+                le.model,
+                le.insurance_company,
+                le.in_date,
+                le.ecd_date,
+                le.grand_total,
+                le.saved_at
+            FROM paid_ro_hours p
+            LEFT JOIN latest_estimates le ON le.ro = p.ro
+            ORDER BY p.ro ASC
+            """,
+            (domain, tech_id, domain),
+        )
+        rows = cur.fetchall() or []
+
+        ros = []
+        for row in rows:
+            ro_value = str(row.get("ro") or "").strip()
+            if not ro_value:
+                continue
+
+            year = (row.get("year") or "").strip()
+            make = (row.get("make") or "").strip()
+            model = (row.get("model") or "").strip()
+            vehicle_display = " ".join(part for part in (year, make, model) if part) or (row.get("vehicle") or "")
+
+            in_date_value = _coerce_date(row.get("in_date")) or _to_local_business_date(row.get("saved_at"))
+            ecd_date_value = _coerce_date(row.get("ecd_date")) or _calculate_ecd_date(
+                in_date_value,
+                _parse_float_value(row.get("total_hours")),
+            )
+
+            ros.append(
+                {
+                    "tech_id": int(row.get("tech_id") or 0),
+                    "ro": ro_value,
+                    "vehicle": str(vehicle_display or "").strip(),
+                    "insurance": str(row.get("insurance_company") or "").strip(),
+                    "in_date": in_date_value.isoformat() if in_date_value else None,
+                    "ecd_date": ecd_date_value.isoformat() if ecd_date_value else None,
+                    "hours": _parse_float_value(row.get("total_hours")),
+                    "total": _parse_float_value(row.get("grand_total")),
+                }
+            )
+
+        return {"rows": ros}
+    finally:
+        cur.close()
+
+
 @router.post("/payments/save")
 async def save_ro_payments(request: Request):
     domain = get_user_domain(request)
