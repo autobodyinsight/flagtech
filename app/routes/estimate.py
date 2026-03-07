@@ -2055,6 +2055,8 @@ async def list_setup_users(request: Request):
         return JSONResponse(status_code=401, content={"error": "Not authenticated", "users": []})
 
     selected_domain = _resolve_setup_scope_domain(request, domain, request.query_params.get("shop_domain"))
+    requester_email = _resolve_request_user_email(request)
+    requester_is_architect = _request_is_architect(request)
 
     conn = get_conn()
     cur = conn.cursor()
@@ -2074,13 +2076,21 @@ async def list_setup_users(request: Request):
         users = []
         for row in rows:
             created_at = row.get("created_at")
+            row_email = str(row.get("email") or "").strip().lower()
+            row_is_architect_user = _is_architect_email(row_email)
+            display_role = str(row.get("role") or "").strip()
+            role_locked = False
+            if requester_is_architect and _is_architect_email(requester_email) and row_is_architect_user:
+                display_role = "ARCHITECT"
+                role_locked = True
             users.append(
                 {
                     "id": int(row.get("id") or 0),
                     "first_name": str(row.get("first_name") or "").strip(),
                     "last_name": str(row.get("last_name") or "").strip(),
                     "email": str(row.get("email") or "").strip(),
-                    "role": str(row.get("role") or "").strip(),
+                    "role": display_role,
+                    "role_locked": role_locked,
                     "created_at": created_at.isoformat() if isinstance(created_at, datetime) else None,
                 }
             )

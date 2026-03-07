@@ -4,18 +4,95 @@
 def get_setup_screen_html():
     return """
     <div id="setup" class="screen" style="padding:20px;">
-        <div id="setupLayout" style="width:80vw; margin:0 auto; display:flex; align-items:flex-start; gap:16px;">
-            <div id="setupShopsPane" style="display:none; width:320px; background:#fff; padding:14px; border-radius:8px; box-shadow:0 2px 4px rgba(0,0,0,0.1);">
+        <style>
+            #setup #setupLayout {
+                width: min(96vw, 1520px);
+                margin: 0 auto;
+                display: flex;
+                align-items: flex-start;
+                gap: 20px;
+            }
+            #setup #setupShopsPane,
+            #setup #setupMainPane {
+                background: #fbfaf9;
+                border: 1px solid #ddd6d2;
+                border-radius: 14px;
+                box-shadow: 0 10px 26px rgba(20, 20, 20, 0.08);
+            }
+            #setup #setupShopsPane {
+                display: none;
+                width: 330px;
+                padding: 16px;
+            }
+            #setup #setupMainPane {
+                flex: 1;
+                min-width: 0;
+                padding: 26px;
+            }
+            #setup #setupShopsCards {
+                display: flex;
+                flex-direction: column;
+                gap: 10px;
+                max-height: 74vh;
+                overflow-y: auto;
+                padding-right: 4px;
+            }
+            #setup #setupUsersBody td,
+            #setup #setupUsersBody span,
+            #setup #setupUsersBody input,
+            #setup #setupUsersBody select {
+                font-size: 24px;
+            }
+            #setup #setupUsersBody tr:hover td {
+                background: #ece7e4 !important;
+            }
+            #setup .setup-action-btn {
+                padding: 10px 16px;
+                border: none;
+                border-radius: 8px;
+                cursor: pointer;
+                font-weight: 700;
+                letter-spacing: 0.2px;
+            }
+            #setup #setupUsersTable {
+                width: 100%;
+                border-collapse: separate;
+                border-spacing: 0;
+                overflow: hidden;
+                border-radius: 10px;
+            }
+            #setup #setupUsersTable thead tr {
+                background: #1f2326;
+                color: #fff;
+                text-align: left;
+            }
+            #setup #setupUsersTable thead th {
+                padding: 12px;
+                border-bottom: 2px solid #ddd;
+                font-size: 24px;
+            }
+            @media (max-width: 980px) {
+                #setup #setupLayout {
+                    flex-direction: column;
+                }
+                #setup #setupShopsPane {
+                    width: 100%;
+                }
+            }
+        </style>
+
+        <div id="setupLayout">
+            <div id="setupShopsPane">
                 <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; margin:0 0 10px 0;">
                     <h4 style="margin:0; color:#333;">Shops</h4>
-                    <button id="setupAddShopBtn" type="button" onclick="openSetupAddShopModal()" style="display:none; padding:8px 12px; background:#b22222; color:#fff; border:none; border-radius:4px; cursor:pointer; font-weight:bold;">+ SHOP</button>
+                    <button id="setupAddShopBtn" type="button" onclick="openSetupAddShopModal()" class="setup-action-btn" style="display:none; background:#b22222; color:#fff; padding:8px 12px;">+ SHOP</button>
                 </div>
-                <div id="setupShopsCards" style="display:flex; flex-direction:column; gap:10px; max-height:74vh; overflow-y:auto;">
+                <div id="setupShopsCards">
                     <div style="color:#999; padding:8px;">Loading shops...</div>
                 </div>
             </div>
 
-            <div id="setupMainPane" style="flex:1; min-width:0; background:#fff; padding:24px; border-radius:8px; box-shadow:0 2px 4px rgba(0,0,0,0.1);">
+            <div id="setupMainPane">
                 <h3 style="margin:0 0 18px 0; color:#333;">Setup</h3>
 
                 <div id="setupShopDisplay" style="text-align:center; margin-bottom:18px; color:#333;">
@@ -25,25 +102,25 @@ def get_setup_screen_html():
                 <hr style="margin:24px 0; border:none; border-top:2px solid #d2d2d2;" />
 
                 <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px; gap:10px;">
-                    <button type="button" onclick="openSetupShopModal()" style="padding:10px 16px; background:#b22222; color:#fff; border:none; border-radius:4px; cursor:pointer; font-weight:bold;">SHOP INFO</button>
+                    <button type="button" onclick="openSetupShopModal()" class="setup-action-btn" style="background:#b22222; color:#fff;">SHOP INFO</button>
                     <div style="display:flex; align-items:center; gap:8px;">
-                        <button type="button" onclick="openSetupUserModal()" style="padding:10px 16px; background:#b22222; color:#fff; border:none; border-radius:4px; cursor:pointer; font-weight:bold;">+ USER</button>
-                        <button type="button" onclick="setupResetSelectedUsers()" style="padding:10px 16px; background:#b22222; color:#fff; border:none; border-radius:4px; cursor:pointer; font-weight:bold;">RESET</button>
-                        <button id="setupEditBtn" type="button" onclick="setupToggleEditUsers()" style="padding:10px 16px; background:#b22222; color:#fff; border:none; border-radius:4px; cursor:pointer; font-weight:bold;">EDIT</button>
+                        <button type="button" onclick="openSetupUserModal()" class="setup-action-btn" style="background:#b22222; color:#fff;">+ USER</button>
+                        <button type="button" onclick="setupResetSelectedUsers()" class="setup-action-btn" style="background:#b22222; color:#fff;">RESET</button>
+                        <button id="setupEditBtn" type="button" onclick="setupToggleEditUsers()" class="setup-action-btn" style="background:#b22222; color:#fff;">EDIT</button>
                     </div>
                 </div>
 
                 <h4 style="margin:0 0 14px 0; color:#333; font-size:28px;">Users</h4>
 
                 <div style="overflow-x:auto;">
-                    <table style="width:100%; border-collapse:collapse;">
+                    <table id="setupUsersTable">
                         <thead>
-                            <tr style="background:#23272a; color:#fff; text-align:left;">
-                                <th style="padding:12px; border-bottom:2px solid #ddd; width:50px; text-align:center; font-size:24px;">SEL</th>
-                                <th style="padding:12px; border-bottom:2px solid #ddd; font-size:24px;">FIRST</th>
-                                <th style="padding:12px; border-bottom:2px solid #ddd; font-size:24px;">LAST</th>
-                                <th style="padding:12px; border-bottom:2px solid #ddd; font-size:24px;">EMAIL</th>
-                                <th style="padding:12px; border-bottom:2px solid #ddd; font-size:24px;">ROLE</th>
+                            <tr>
+                                <th style="width:50px; text-align:center;">SEL</th>
+                                <th>FIRST</th>
+                                <th>LAST</th>
+                                <th>EMAIL</th>
+                                <th>ROLE</th>
                             </tr>
                         </thead>
                         <tbody id="setupUsersBody">
@@ -270,13 +347,13 @@ def get_setup_script():
                 const email = setupEscape(shop.email || '');
                 const cityStateZip = [city, state, zip].filter(Boolean).join(', ').replace(/,\s([^,]+)$/, ' $1');
                 return `
-                    <button type="button" onclick="setupSelectShopCard('${setupEscape(domain)}')" style="width:100%; text-align:left; background:${bg}; border:${border}; border-radius:6px; padding:10px; cursor:pointer; color:#000;">
+                    <div onclick="setupSelectShopCard('${setupEscape(domain)}')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();setupSelectShopCard('${setupEscape(domain)}');}" tabindex="0" role="button" style="width:100%; text-align:left; background:${bg}; border:${border}; border-radius:6px; padding:10px; cursor:pointer; color:#000;">
                         <div style="font-weight:700; margin-bottom:4px; color:#000;">${shopName}</div>
                         ${address ? `<div style="font-size:12px; color:#000;">${address}</div>` : ''}
                         ${cityStateZip ? `<div style="font-size:12px; color:#000;">${cityStateZip}</div>` : ''}
                         ${phone ? `<div style="font-size:12px; color:#000;">${phone}</div>` : ''}
                         ${email ? `<div style="font-size:12px; color:#000;">${email}</div>` : ''}
-                    </button>
+                    </div>
                 `;
             }).join('');
         }
@@ -488,7 +565,13 @@ def get_setup_script():
                 const resp = await fetch(`/api/setup/users${setupBuildScopeQuery()}`, { credentials: 'include' });
                 const data = await resp.json();
                 const users = Array.isArray(data.users) ? data.users : [];
-                setupUsersData = users;
+                if (setupIsArchitect) {
+                    const architectRows = users.filter((user) => !!user.role_locked);
+                    const normalRows = users.filter((user) => !user.role_locked);
+                    setupUsersData = [...architectRows, ...normalRows];
+                } else {
+                    setupUsersData = users;
+                }
                 if (!users.length) {
                     body.innerHTML = '<tr><td colspan="5" style="padding:18px; text-align:center; color:#999;">No users found.</td></tr>';
                     return;
@@ -513,6 +596,8 @@ def get_setup_script():
             body.innerHTML = users.map((user, idx) => {
                     const rowBg = idx % 2 === 0 ? '#f2f0ef' : '#ffffff';
                     const userId = Number(user.id || 0);
+                    const roleLocked = !!user.role_locked;
+                    const rowWeight = roleLocked && setupIsArchitect ? '800' : '400';
                     const roleText = setupEscape(user.role || '');
                     const roleOptions = ['Manager', 'Estimator', 'Tech', 'Receptionist', 'HR', 'Support']
                         .map((role) => `<option value="${role}" ${String(user.role || '') === role ? 'selected' : ''}>${role}</option>`)
@@ -520,18 +605,18 @@ def get_setup_script():
                     const firstText = setupEscape(user.first_name || '');
                     const lastText = setupEscape(user.last_name || '');
                     const emailText = setupEscape(user.email || '');
-                    const firstCell = setupEditMode
+                    const firstCell = (setupEditMode && !roleLocked)
                         ? `<input class="setup-user-first" data-user-id="${userId}" value="${firstText}" style="width:100%; padding:8px; font-size:24px;" />`
-                        : `<span style="font-size:24px; color:#111;">${firstText}</span>`;
-                    const lastCell = setupEditMode
+                        : `<span style="font-size:24px; color:#111; font-weight:${rowWeight};">${firstText}</span>`;
+                    const lastCell = (setupEditMode && !roleLocked)
                         ? `<input class="setup-user-last" data-user-id="${userId}" value="${lastText}" style="width:100%; padding:8px; font-size:24px;" />`
-                        : `<span style="font-size:24px; color:#111;">${lastText}</span>`;
-                    const emailCell = setupEditMode
+                        : `<span style="font-size:24px; color:#111; font-weight:${rowWeight};">${lastText}</span>`;
+                    const emailCell = (setupEditMode && !roleLocked)
                         ? `<input class="setup-user-email" data-user-id="${userId}" value="${emailText}" style="width:100%; padding:8px; font-size:24px;" />`
-                        : `<span style="font-size:24px; color:#111;">${emailText}</span>`;
-                    const roleCell = setupEditMode
+                        : `<span style="font-size:24px; color:#111; font-weight:${rowWeight};">${emailText}</span>`;
+                    const roleCell = (setupEditMode && !roleLocked)
                         ? `<select class="setup-user-role" data-user-id="${userId}" style="width:100%; padding:8px; font-size:24px;">${roleOptions}</select>`
-                        : `<span style="font-size:24px; color:#111;">${roleText}</span>`;
+                        : `<span style="font-size:24px; color:#111; font-weight:${rowWeight};">${roleText}</span>`;
                     return `
                         <tr>
                             <td style="padding:12px; border-bottom:1px solid #eee; background:${rowBg}; text-align:center;">
@@ -574,6 +659,9 @@ def get_setup_script():
             const changes = [];
             (setupUsersData || []).forEach((user) => {
                 const userId = Number(user.id || 0);
+                if (user.role_locked) {
+                    return;
+                }
                 const next = {
                     first_name: getValue('.setup-user-first', userId),
                     last_name: getValue('.setup-user-last', userId),
