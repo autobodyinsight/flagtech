@@ -8,7 +8,7 @@ def get_setup_screen_html():
             <div id="setupShopsPane" style="display:none; width:320px; background:#fff; padding:14px; border-radius:8px; box-shadow:0 2px 4px rgba(0,0,0,0.1);">
                 <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; margin:0 0 10px 0;">
                     <h4 style="margin:0; color:#333;">Shops</h4>
-                    <button id="setupAddShopBtn" type="button" onclick="setupStartAddShop()" style="display:none; padding:8px 12px; background:#b22222; color:#fff; border:none; border-radius:4px; cursor:pointer; font-weight:bold;">+ SHOP</button>
+                    <button id="setupAddShopBtn" type="button" onclick="openSetupAddShopModal()" style="display:none; padding:8px 12px; background:#b22222; color:#fff; border:none; border-radius:4px; cursor:pointer; font-weight:bold;">+ SHOP</button>
                 </div>
                 <div id="setupShopsCards" style="display:flex; flex-direction:column; gap:10px; max-height:74vh; overflow-y:auto;">
                     <div style="color:#999; padding:8px;">Loading shops...</div>
@@ -33,17 +33,17 @@ def get_setup_screen_html():
                     </div>
                 </div>
 
-                <h4 style="margin:0 0 14px 0; color:#333;">Users</h4>
+                <h4 style="margin:0 0 14px 0; color:#333; font-size:28px;">Users</h4>
 
                 <div style="overflow-x:auto;">
                     <table style="width:100%; border-collapse:collapse;">
                         <thead>
                             <tr style="background:#23272a; color:#fff; text-align:left;">
-                                <th style="padding:12px; border-bottom:2px solid #ddd; width:50px; text-align:center;">SEL</th>
-                                <th style="padding:12px; border-bottom:2px solid #ddd;">FIRST</th>
-                                <th style="padding:12px; border-bottom:2px solid #ddd;">LAST</th>
-                                <th style="padding:12px; border-bottom:2px solid #ddd;">EMAIL</th>
-                                <th style="padding:12px; border-bottom:2px solid #ddd;">ROLE</th>
+                                <th style="padding:12px; border-bottom:2px solid #ddd; width:50px; text-align:center; font-size:24px;">SEL</th>
+                                <th style="padding:12px; border-bottom:2px solid #ddd; font-size:24px;">FIRST</th>
+                                <th style="padding:12px; border-bottom:2px solid #ddd; font-size:24px;">LAST</th>
+                                <th style="padding:12px; border-bottom:2px solid #ddd; font-size:24px;">EMAIL</th>
+                                <th style="padding:12px; border-bottom:2px solid #ddd; font-size:24px;">ROLE</th>
                             </tr>
                         </thead>
                         <tbody id="setupUsersBody">
@@ -138,6 +138,52 @@ def get_setup_screen_html():
                 </div>
             </div>
         </div>
+
+        <div id="setupAddShopModal" class="modal" style="display:none;">
+            <div class="modal-content" style="max-width:760px; max-height:88vh; overflow-y:auto;">
+                <h3 style="margin:0 0 14px 0; color:#333;">Add Shop</h3>
+
+                <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+                    <div style="grid-column:1 / span 2;">
+                        <label for="setupAddShopDomain" style="font-weight:bold; color:#333;">Shop Domain</label>
+                        <input id="setupAddShopDomain" type="text" placeholder="example: newshop.com" style="width:100%; padding:10px; margin-top:6px;" />
+                    </div>
+                    <div style="grid-column:1 / span 2;">
+                        <label for="setupAddShopName" style="font-weight:bold; color:#333;">Shop Name</label>
+                        <input id="setupAddShopName" type="text" style="width:100%; padding:10px; margin-top:6px;" />
+                    </div>
+                    <div style="grid-column:1 / span 2;">
+                        <label for="setupAddShopAddress" style="font-weight:bold; color:#333;">Address</label>
+                        <input id="setupAddShopAddress" type="text" style="width:100%; padding:10px; margin-top:6px;" />
+                    </div>
+                    <div>
+                        <label for="setupAddShopCity" style="font-weight:bold; color:#333;">City</label>
+                        <input id="setupAddShopCity" type="text" style="width:100%; padding:10px; margin-top:6px;" />
+                    </div>
+                    <div>
+                        <label for="setupAddShopState" style="font-weight:bold; color:#333;">State</label>
+                        <input id="setupAddShopState" type="text" style="width:100%; padding:10px; margin-top:6px;" />
+                    </div>
+                    <div>
+                        <label for="setupAddShopZip" style="font-weight:bold; color:#333;">Zip Code</label>
+                        <input id="setupAddShopZip" type="text" style="width:100%; padding:10px; margin-top:6px;" />
+                    </div>
+                    <div>
+                        <label for="setupAddShopPhone" style="font-weight:bold; color:#333;">Phone</label>
+                        <input id="setupAddShopPhone" type="text" style="width:100%; padding:10px; margin-top:6px;" />
+                    </div>
+                    <div style="grid-column:1 / span 2;">
+                        <label for="setupAddShopEmail" style="font-weight:bold; color:#333;">Email</label>
+                        <input id="setupAddShopEmail" type="email" style="width:100%; padding:10px; margin-top:6px;" />
+                    </div>
+                </div>
+
+                <div style="margin-top:14px; text-align:right; display:flex; justify-content:flex-end; gap:8px;">
+                    <button type="button" onclick="closeSetupAddShopModal()" style="padding:10px 14px; background:#505050; color:#fff; border:none; border-radius:4px; cursor:pointer;">Close</button>
+                    <button id="setupAddShopSaveBtn" type="button" onclick="setupSaveNewShop()" style="padding:10px 16px; background:#b22222; color:#fff; border:none; border-radius:4px; cursor:pointer; font-weight:bold;">Save</button>
+                </div>
+            </div>
+        </div>
     </div>
     """
 
@@ -150,7 +196,6 @@ def get_setup_script():
         let setupIsArchitect = false;
         let setupSelectedShopDomain = '';
         let setupDefaultDomain = '';
-        let setupCreatingShop = false;
         let setupEditMode = false;
 
         function setupEscape(value) {
@@ -195,7 +240,6 @@ def get_setup_script():
         }
 
         async function setupLoadData() {
-            setupCreatingShop = false;
             await setupLoadContext();
             if (setupIsArchitect) {
                 await setupLoadShops();
@@ -203,60 +247,9 @@ def get_setup_script():
             await Promise.all([setupLoadShop(), setupLoadUsers()]);
         }
 
-        function setupSetScopeForNewShop(domain) {
-            const normalized = String(domain || '').trim().toLowerCase();
-            if (!normalized) return false;
-            setupSelectedShopDomain = normalized;
-            setupCreatingShop = true;
-            return true;
-        }
-
-        function setupStartAddShop() {
-            if (!setupIsArchitect) return;
-            const input = window.prompt('Enter new shop domain (example: newshop.com):');
-            if (!input) return;
-            if (!setupSetScopeForNewShop(input)) {
-                alert('A valid shop domain is required.');
-                return;
-            }
-
-            const set = (id, value) => {
-                const el = document.getElementById(id);
-                if (el) el.value = String(value || '');
-            };
-            set('setupShopName', '');
-            set('setupShopAddress', '');
-            set('setupShopCity', '');
-            set('setupShopState', '');
-            set('setupShopZip', '');
-            set('setupShopPhone', '');
-            set('setupShopEmail', '');
-            setupShopData = {};
-            setupRenderShops();
-            openSetupShopModal();
-        }
-
         function setupRenderShops() {
             const cardsWrap = document.getElementById('setupShopsCards');
             if (!cardsWrap || !setupIsArchitect) return;
-
-            const selectedDomainMissing =
-                !!setupSelectedShopDomain &&
-                !(setupShopsData || []).some((shop) => String(shop.domain || '').trim().toLowerCase() === setupSelectedShopDomain);
-
-            if (selectedDomainMissing) {
-                const pending = {
-                    domain: setupSelectedShopDomain,
-                    shop_name: setupCreatingShop ? '(New Shop)' : setupSelectedShopDomain,
-                    address: '',
-                    city: '',
-                    state: '',
-                    zip_code: '',
-                    phone: '',
-                    email: '',
-                };
-                setupShopsData = [pending, ...(setupShopsData || [])];
-            }
 
             if (!setupShopsData.length) {
                 cardsWrap.innerHTML = '<div style="color:#999; padding:8px;">No shops found.</div>';
@@ -267,7 +260,7 @@ def get_setup_script():
                 const domain = String(shop.domain || '').trim().toLowerCase();
                 const isActive = domain && domain === setupSelectedShopDomain;
                 const border = isActive ? '2px solid #b22222' : '1px solid #ddd';
-                const bg = isActive ? '#f7ecec' : '#fff';
+                const bg = isActive ? '#ece9e7' : '#f2f0ef';
                 const shopName = setupEscape(shop.shop_name || domain || 'Shop');
                 const address = setupEscape(shop.address || '');
                 const city = setupEscape(shop.city || '');
@@ -277,12 +270,12 @@ def get_setup_script():
                 const email = setupEscape(shop.email || '');
                 const cityStateZip = [city, state, zip].filter(Boolean).join(', ').replace(/,\s([^,]+)$/, ' $1');
                 return `
-                    <button type="button" onclick="setupSelectShopCard('${setupEscape(domain)}')" style="width:100%; text-align:left; background:${bg}; border:${border}; border-radius:6px; padding:10px; cursor:pointer; color:#222;">
-                        <div style="font-weight:700; margin-bottom:4px;">${shopName}</div>
-                        ${address ? `<div style="font-size:12px; color:#444;">${address}</div>` : ''}
-                        ${cityStateZip ? `<div style="font-size:12px; color:#444;">${cityStateZip}</div>` : ''}
-                        ${phone ? `<div style="font-size:12px; color:#444;">${phone}</div>` : ''}
-                        ${email ? `<div style="font-size:12px; color:#444;">${email}</div>` : ''}
+                    <button type="button" onclick="setupSelectShopCard('${setupEscape(domain)}')" style="width:100%; text-align:left; background:${bg}; border:${border}; border-radius:6px; padding:10px; cursor:pointer; color:#000;">
+                        <div style="font-weight:700; margin-bottom:4px; color:#000;">${shopName}</div>
+                        ${address ? `<div style="font-size:12px; color:#000;">${address}</div>` : ''}
+                        ${cityStateZip ? `<div style="font-size:12px; color:#000;">${cityStateZip}</div>` : ''}
+                        ${phone ? `<div style="font-size:12px; color:#000;">${phone}</div>` : ''}
+                        ${email ? `<div style="font-size:12px; color:#000;">${email}</div>` : ''}
                     </button>
                 `;
             }).join('');
@@ -311,9 +304,76 @@ def get_setup_script():
             const nextDomain = String(domain || '').trim().toLowerCase();
             if (!nextDomain || nextDomain === setupSelectedShopDomain) return;
             setupSelectedShopDomain = nextDomain;
-            setupCreatingShop = false;
             setupRenderShops();
             await Promise.all([setupLoadShop(), setupLoadUsers()]);
+        }
+
+        function openSetupAddShopModal() {
+            if (!setupIsArchitect) return;
+            const modal = document.getElementById('setupAddShopModal');
+            if (!modal) return;
+            const ids = [
+                'setupAddShopDomain',
+                'setupAddShopName',
+                'setupAddShopAddress',
+                'setupAddShopCity',
+                'setupAddShopState',
+                'setupAddShopZip',
+                'setupAddShopPhone',
+                'setupAddShopEmail',
+            ];
+            ids.forEach((id) => {
+                const el = document.getElementById(id);
+                if (el) el.value = '';
+            });
+            modal.style.display = 'block';
+        }
+
+        function closeSetupAddShopModal() {
+            const modal = document.getElementById('setupAddShopModal');
+            if (modal) modal.style.display = 'none';
+        }
+
+        async function setupSaveNewShop() {
+            const saveBtn = document.getElementById('setupAddShopSaveBtn');
+            if (saveBtn) saveBtn.disabled = true;
+            try {
+                const domain = String(document.getElementById('setupAddShopDomain')?.value || '').trim().toLowerCase();
+                if (!domain) {
+                    alert('Shop domain is required.');
+                    return;
+                }
+
+                const payload = {
+                    shop_domain: domain,
+                    shop_name: (document.getElementById('setupAddShopName')?.value || '').trim(),
+                    address: (document.getElementById('setupAddShopAddress')?.value || '').trim(),
+                    city: (document.getElementById('setupAddShopCity')?.value || '').trim(),
+                    state: (document.getElementById('setupAddShopState')?.value || '').trim(),
+                    zip_code: (document.getElementById('setupAddShopZip')?.value || '').trim(),
+                    phone: (document.getElementById('setupAddShopPhone')?.value || '').trim(),
+                    email: (document.getElementById('setupAddShopEmail')?.value || '').trim(),
+                };
+
+                const resp = await fetch('/api/setup/shop', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'include',
+                    body: JSON.stringify(payload),
+                });
+                const data = await resp.json();
+                if (data.error) throw new Error(data.error);
+
+                setupSelectedShopDomain = domain;
+                closeSetupAddShopModal();
+                await setupLoadShops();
+                await Promise.all([setupLoadShop(), setupLoadUsers()]);
+            } catch (error) {
+                console.error('Error saving new shop:', error);
+                alert('Error saving new shop.');
+            } finally {
+                if (saveBtn) saveBtn.disabled = false;
+            }
         }
 
         function setupRenderShopDisplay() {
@@ -393,7 +453,6 @@ def get_setup_script():
                 const data = await resp.json();
                 if (data.error) throw new Error(data.error);
                 closeSetupShopModal();
-                setupCreatingShop = false;
                 await setupLoadShop();
                 if (setupIsArchitect) {
                     await setupLoadShops();
@@ -454,26 +513,41 @@ def get_setup_script():
             body.innerHTML = users.map((user, idx) => {
                     const rowBg = idx % 2 === 0 ? '#f2f0ef' : '#ffffff';
                     const userId = Number(user.id || 0);
+                    const roleText = setupEscape(user.role || '');
                     const roleOptions = ['Manager', 'Estimator', 'Tech', 'Receptionist', 'HR', 'Support']
                         .map((role) => `<option value="${role}" ${String(user.role || '') === role ? 'selected' : ''}>${role}</option>`)
                         .join('');
-                    const disabledAttr = setupEditMode ? '' : 'disabled';
+                    const firstText = setupEscape(user.first_name || '');
+                    const lastText = setupEscape(user.last_name || '');
+                    const emailText = setupEscape(user.email || '');
+                    const firstCell = setupEditMode
+                        ? `<input class="setup-user-first" data-user-id="${userId}" value="${firstText}" style="width:100%; padding:8px; font-size:24px;" />`
+                        : `<span style="font-size:24px; color:#111;">${firstText}</span>`;
+                    const lastCell = setupEditMode
+                        ? `<input class="setup-user-last" data-user-id="${userId}" value="${lastText}" style="width:100%; padding:8px; font-size:24px;" />`
+                        : `<span style="font-size:24px; color:#111;">${lastText}</span>`;
+                    const emailCell = setupEditMode
+                        ? `<input class="setup-user-email" data-user-id="${userId}" value="${emailText}" style="width:100%; padding:8px; font-size:24px;" />`
+                        : `<span style="font-size:24px; color:#111;">${emailText}</span>`;
+                    const roleCell = setupEditMode
+                        ? `<select class="setup-user-role" data-user-id="${userId}" style="width:100%; padding:8px; font-size:24px;">${roleOptions}</select>`
+                        : `<span style="font-size:24px; color:#111;">${roleText}</span>`;
                     return `
                         <tr>
                             <td style="padding:12px; border-bottom:1px solid #eee; background:${rowBg}; text-align:center;">
                                 <input type="checkbox" class="setup-user-select" data-user-id="${userId}" />
                             </td>
                             <td style="padding:12px; border-bottom:1px solid #eee; background:${rowBg};">
-                                <input ${disabledAttr} class="setup-user-first" data-user-id="${userId}" value="${setupEscape(user.first_name)}" style="width:100%; padding:8px;" />
+                                ${firstCell}
                             </td>
                             <td style="padding:12px; border-bottom:1px solid #eee; background:${rowBg};">
-                                <input ${disabledAttr} class="setup-user-last" data-user-id="${userId}" value="${setupEscape(user.last_name)}" style="width:100%; padding:8px;" />
+                                ${lastCell}
                             </td>
                             <td style="padding:12px; border-bottom:1px solid #eee; background:${rowBg};">
-                                <input ${disabledAttr} class="setup-user-email" data-user-id="${userId}" value="${setupEscape(user.email)}" style="width:100%; padding:8px;" />
+                                ${emailCell}
                             </td>
                             <td style="padding:12px; border-bottom:1px solid #eee; background:${rowBg};">
-                                <select ${disabledAttr} class="setup-user-role" data-user-id="${userId}" style="width:100%; padding:8px;">${roleOptions}</select>
+                                ${roleCell}
                             </td>
                         </tr>
                     `;
@@ -635,6 +709,12 @@ def get_setup_script():
             const shopModal = document.getElementById('setupShopModal');
             if (shopModal && shopModal.style.display === 'block' && event.target === shopModal) {
                 closeSetupShopModal();
+                return;
+            }
+
+            const addShopModal = document.getElementById('setupAddShopModal');
+            if (addShopModal && addShopModal.style.display === 'block' && event.target === addShopModal) {
+                closeSetupAddShopModal();
                 return;
             }
 
