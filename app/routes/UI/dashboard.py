@@ -784,9 +784,13 @@ def get_dashboard_screen_html():
                     roOpenPrintWindow(
                         `RO ${ro.ro} Bill`,
                         `
-                            <div class="header">
-                                <h1>Invoice</h1>
-                                <p>RO #${escapePopupHtml(ro.ro || '-')}</p>
+                            <div class="header" style="text-align:left;">
+                                <div style="font-size:72px; font-weight:800; line-height:1; margin-bottom:8px;">RO #${escapePopupHtml(ro.ro || '-')}</div>
+                                <div style="display:flex; justify-content:space-between; align-items:flex-end; gap:18px; margin-bottom:6px;">
+                                    <div style="font-size:24px; font-weight:600;">Vehicle: ${escapePopupHtml(ro.vehicle || '-')}</div>
+                                    <div style="font-size:32px; font-weight:800; letter-spacing:1px;">INVOICE</div>
+                                </div>
+                                <div style="font-size:24px; font-weight:600;">VIN: ${escapePopupHtml(ro.vin || '-')}</div>
                             </div>
                             <div style="display:grid; grid-template-columns:1fr 1fr; gap:14px; font-size:13px;">
                                 <div>
@@ -941,9 +945,27 @@ def get_dashboard_screen_html():
                         </div>
                     `;
 
+                    const estimatorText = escapePopupHtml(getRoEstimatorDisplay(ro) || '-');
+                    const insuranceText = escapePopupHtml(ro.insurance || '-');
+                    const vehicleText = escapePopupHtml(ro.vehicle || '-');
+                    const vinText = escapePopupHtml(ro.vin || '-');
+
                     roOpenPrintWindow(
                         `RO ${ro.ro} Service Order`,
-                        `<div class="header"><h1>Service Order</h1><p>RO #${escapePopupHtml(ro.ro || '-')}</p></div>${sections.join('')}${totalFooterHtml}`
+                        `
+                            <div class="header" style="text-align:left;">
+                                <div style="font-size:72px; font-weight:800; line-height:1; margin-bottom:8px;">RO #${escapePopupHtml(ro.ro || '-')}</div>
+                                <div style="display:flex; justify-content:space-between; align-items:flex-end; gap:18px; margin-bottom:6px;">
+                                    <div style="font-size:24px; font-weight:600;">Vehicle: ${vehicleText}</div>
+                                    <div style="font-size:32px; font-weight:800; letter-spacing:1px;">SERVICE ORDER</div>
+                                </div>
+                                <div style="font-size:24px; font-weight:600; margin-bottom:4px;">VIN: ${vinText}</div>
+                                <div style="font-size:22px; font-weight:600; margin-bottom:4px;">Estimator: ${estimatorText}</div>
+                                <div style="font-size:22px; font-weight:600;">Insurance: ${insuranceText}</div>
+                            </div>
+                            ${sections.join('')}
+                            ${totalFooterHtml}
+                        `
                     );
                 } catch (error) {
                     console.error('Error printing service order:', error);
