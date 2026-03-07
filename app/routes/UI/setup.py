@@ -4,41 +4,50 @@
 def get_setup_screen_html():
     return """
     <div id="setup" class="screen" style="padding:20px;">
-        <div style="width:80vw; margin:0 auto; background:#fff; padding:24px; border-radius:8px; box-shadow:0 2px 4px rgba(0,0,0,0.1);">
-            <h3 style="margin:0 0 18px 0; color:#333;">Setup</h3>
-
-            <div id="setupShopDisplay" style="text-align:center; margin-bottom:18px; color:#333;">
-                <div style="color:#999;">Loading shop information...</div>
-            </div>
-
-            <hr style="margin:24px 0; border:none; border-top:2px solid #d2d2d2;" />
-
-            <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px; gap:10px;">
-                <button type="button" onclick="openSetupShopModal()" style="padding:10px 16px; background:#b22222; color:#fff; border:none; border-radius:4px; cursor:pointer; font-weight:bold;">SHOP INFO</button>
-                <div style="display:flex; align-items:center; gap:8px;">
-                    <button type="button" onclick="openSetupUserModal()" style="padding:10px 16px; background:#b22222; color:#fff; border:none; border-radius:4px; cursor:pointer; font-weight:bold;">+ USER</button>
-                    <button type="button" onclick="setupResetSelectedUsers()" style="padding:10px 16px; background:#b22222; color:#fff; border:none; border-radius:4px; cursor:pointer; font-weight:bold;">RESET</button>
-                    <button id="setupEditBtn" type="button" onclick="setupToggleEditUsers()" style="padding:10px 16px; background:#b22222; color:#fff; border:none; border-radius:4px; cursor:pointer; font-weight:bold;">EDIT</button>
+        <div id="setupLayout" style="width:80vw; margin:0 auto; display:flex; align-items:flex-start; gap:16px;">
+            <div id="setupShopsPane" style="display:none; width:320px; background:#fff; padding:14px; border-radius:8px; box-shadow:0 2px 4px rgba(0,0,0,0.1);">
+                <h4 style="margin:0 0 10px 0; color:#333;">Shops</h4>
+                <div id="setupShopsCards" style="display:flex; flex-direction:column; gap:10px; max-height:74vh; overflow-y:auto;">
+                    <div style="color:#999; padding:8px;">Loading shops...</div>
                 </div>
             </div>
 
-            <h4 style="margin:0 0 14px 0; color:#333;">Users</h4>
+            <div id="setupMainPane" style="flex:1; min-width:0; background:#fff; padding:24px; border-radius:8px; box-shadow:0 2px 4px rgba(0,0,0,0.1);">
+                <h3 style="margin:0 0 18px 0; color:#333;">Setup</h3>
 
-            <div style="overflow-x:auto;">
-                <table style="width:100%; border-collapse:collapse;">
-                    <thead>
-                        <tr style="background:#23272a; color:#fff; text-align:left;">
-                            <th style="padding:12px; border-bottom:2px solid #ddd; width:50px; text-align:center;">SEL</th>
-                            <th style="padding:12px; border-bottom:2px solid #ddd;">FIRST</th>
-                            <th style="padding:12px; border-bottom:2px solid #ddd;">LAST</th>
-                            <th style="padding:12px; border-bottom:2px solid #ddd;">EMAIL</th>
-                            <th style="padding:12px; border-bottom:2px solid #ddd;">ROLE</th>
-                        </tr>
-                    </thead>
-                    <tbody id="setupUsersBody">
-                        <tr><td colspan="5" style="padding:18px; text-align:center; color:#999;">Loading...</td></tr>
-                    </tbody>
-                </table>
+                <div id="setupShopDisplay" style="text-align:center; margin-bottom:18px; color:#333;">
+                    <div style="color:#999;">Loading shop information...</div>
+                </div>
+
+                <hr style="margin:24px 0; border:none; border-top:2px solid #d2d2d2;" />
+
+                <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px; gap:10px;">
+                    <button type="button" onclick="openSetupShopModal()" style="padding:10px 16px; background:#b22222; color:#fff; border:none; border-radius:4px; cursor:pointer; font-weight:bold;">SHOP INFO</button>
+                    <div style="display:flex; align-items:center; gap:8px;">
+                        <button type="button" onclick="openSetupUserModal()" style="padding:10px 16px; background:#b22222; color:#fff; border:none; border-radius:4px; cursor:pointer; font-weight:bold;">+ USER</button>
+                        <button type="button" onclick="setupResetSelectedUsers()" style="padding:10px 16px; background:#b22222; color:#fff; border:none; border-radius:4px; cursor:pointer; font-weight:bold;">RESET</button>
+                        <button id="setupEditBtn" type="button" onclick="setupToggleEditUsers()" style="padding:10px 16px; background:#b22222; color:#fff; border:none; border-radius:4px; cursor:pointer; font-weight:bold;">EDIT</button>
+                    </div>
+                </div>
+
+                <h4 style="margin:0 0 14px 0; color:#333;">Users</h4>
+
+                <div style="overflow-x:auto;">
+                    <table style="width:100%; border-collapse:collapse;">
+                        <thead>
+                            <tr style="background:#23272a; color:#fff; text-align:left;">
+                                <th style="padding:12px; border-bottom:2px solid #ddd; width:50px; text-align:center;">SEL</th>
+                                <th style="padding:12px; border-bottom:2px solid #ddd;">FIRST</th>
+                                <th style="padding:12px; border-bottom:2px solid #ddd;">LAST</th>
+                                <th style="padding:12px; border-bottom:2px solid #ddd;">EMAIL</th>
+                                <th style="padding:12px; border-bottom:2px solid #ddd;">ROLE</th>
+                            </tr>
+                        </thead>
+                        <tbody id="setupUsersBody">
+                            <tr><td colspan="5" style="padding:18px; text-align:center; color:#999;">Loading...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
             </div>
         </div>
 
@@ -134,6 +143,10 @@ def get_setup_script():
     return """
         let setupShopData = null;
         let setupUsersData = [];
+        let setupShopsData = [];
+        let setupIsArchitect = false;
+        let setupSelectedShopDomain = '';
+        let setupDefaultDomain = '';
         let setupEditMode = false;
 
         function setupEscape(value) {
@@ -145,8 +158,102 @@ def get_setup_script():
                 .replace(/'/g, '&#39;');
         }
 
+        async function setupLoadContext() {
+            const pane = document.getElementById('setupShopsPane');
+            try {
+                const resp = await fetch('/api/setup/context', { credentials: 'include' });
+                const data = await resp.json();
+                setupIsArchitect = !!data.is_architect;
+                setupDefaultDomain = String(data.default_domain || '').trim().toLowerCase();
+                if (!setupSelectedShopDomain) {
+                    setupSelectedShopDomain = setupDefaultDomain;
+                }
+                if (pane) pane.style.display = setupIsArchitect ? 'block' : 'none';
+            } catch (error) {
+                console.error('Error loading setup context:', error);
+                setupIsArchitect = false;
+                if (pane) pane.style.display = 'none';
+            }
+        }
+
+        function setupBuildScopeQuery() {
+            if (!setupIsArchitect || !setupSelectedShopDomain) return '';
+            const scope = encodeURIComponent(setupSelectedShopDomain);
+            return `?shop_domain=${scope}`;
+        }
+
+        function setupBuildScopePayload() {
+            if (!setupIsArchitect || !setupSelectedShopDomain) return {};
+            return { shop_domain: setupSelectedShopDomain };
+        }
+
         async function setupLoadData() {
+            await setupLoadContext();
+            if (setupIsArchitect) {
+                await setupLoadShops();
+            }
             await Promise.all([setupLoadShop(), setupLoadUsers()]);
+        }
+
+        function setupRenderShops() {
+            const cardsWrap = document.getElementById('setupShopsCards');
+            if (!cardsWrap || !setupIsArchitect) return;
+
+            if (!setupShopsData.length) {
+                cardsWrap.innerHTML = '<div style="color:#999; padding:8px;">No shops found.</div>';
+                return;
+            }
+
+            cardsWrap.innerHTML = setupShopsData.map((shop) => {
+                const domain = String(shop.domain || '').trim().toLowerCase();
+                const isActive = domain && domain === setupSelectedShopDomain;
+                const border = isActive ? '2px solid #b22222' : '1px solid #ddd';
+                const bg = isActive ? '#f7ecec' : '#fff';
+                const shopName = setupEscape(shop.shop_name || domain || 'Shop');
+                const address = setupEscape(shop.address || '');
+                const city = setupEscape(shop.city || '');
+                const state = setupEscape(shop.state || '');
+                const zip = setupEscape(shop.zip_code || '');
+                const phone = setupEscape(shop.phone || '');
+                const email = setupEscape(shop.email || '');
+                const cityStateZip = [city, state, zip].filter(Boolean).join(', ').replace(/,\s([^,]+)$/, ' $1');
+                return `
+                    <button type="button" onclick="setupSelectShopCard('${setupEscape(domain)}')" style="width:100%; text-align:left; background:${bg}; border:${border}; border-radius:6px; padding:10px; cursor:pointer; color:#222;">
+                        <div style="font-weight:700; margin-bottom:4px;">${shopName}</div>
+                        ${address ? `<div style="font-size:12px; color:#444;">${address}</div>` : ''}
+                        ${cityStateZip ? `<div style="font-size:12px; color:#444;">${cityStateZip}</div>` : ''}
+                        ${phone ? `<div style="font-size:12px; color:#444;">${phone}</div>` : ''}
+                        ${email ? `<div style="font-size:12px; color:#444;">${email}</div>` : ''}
+                    </button>
+                `;
+            }).join('');
+        }
+
+        async function setupLoadShops() {
+            const cardsWrap = document.getElementById('setupShopsCards');
+            if (!setupIsArchitect) return;
+            if (cardsWrap) cardsWrap.innerHTML = '<div style="color:#999; padding:8px;">Loading shops...</div>';
+            try {
+                const resp = await fetch('/api/setup/shops', { credentials: 'include' });
+                const data = await resp.json();
+                const shops = Array.isArray(data.shops) ? data.shops : [];
+                setupShopsData = shops;
+                if (!setupSelectedShopDomain || !shops.some((s) => String(s.domain || '').trim().toLowerCase() === setupSelectedShopDomain)) {
+                    setupSelectedShopDomain = String((shops[0] || {}).domain || setupDefaultDomain || '').trim().toLowerCase();
+                }
+                setupRenderShops();
+            } catch (error) {
+                console.error('Error loading shops:', error);
+                if (cardsWrap) cardsWrap.innerHTML = '<div style="color:#c00; padding:8px;">Error loading shops.</div>';
+            }
+        }
+
+        async function setupSelectShopCard(domain) {
+            const nextDomain = String(domain || '').trim().toLowerCase();
+            if (!nextDomain || nextDomain === setupSelectedShopDomain) return;
+            setupSelectedShopDomain = nextDomain;
+            setupRenderShops();
+            await setupLoadUsers();
         }
 
         function setupRenderShopDisplay() {
@@ -177,7 +284,7 @@ def get_setup_script():
 
         async function setupLoadShop() {
             try {
-                const resp = await fetch('/api/setup/shop', { credentials: 'include' });
+                const resp = await fetch(`/api/setup/shop${setupBuildScopeQuery()}`, { credentials: 'include' });
                 const data = await resp.json();
                 const shop = data.shop || {};
                 setupShopData = shop;
@@ -210,6 +317,7 @@ def get_setup_script():
                     zip_code: (document.getElementById('setupShopZip')?.value || '').trim(),
                     phone: (document.getElementById('setupShopPhone')?.value || '').trim(),
                     email: (document.getElementById('setupShopEmail')?.value || '').trim(),
+                    ...setupBuildScopePayload(),
                 };
 
                 const resp = await fetch('/api/setup/shop', {
@@ -222,6 +330,9 @@ def get_setup_script():
                 if (data.error) throw new Error(data.error);
                 closeSetupShopModal();
                 await setupLoadShop();
+                if (setupIsArchitect) {
+                    await setupLoadShops();
+                }
             } catch (error) {
                 console.error('Error saving shop setup:', error);
                 alert('Error saving shop information.');
@@ -246,7 +357,7 @@ def get_setup_script():
             if (!body) return;
             body.innerHTML = '<tr><td colspan="5" style="padding:18px; text-align:center; color:#999;">Loading...</td></tr>';
             try {
-                const resp = await fetch('/api/setup/users', { credentials: 'include' });
+                const resp = await fetch(`/api/setup/users${setupBuildScopeQuery()}`, { credentials: 'include' });
                 const data = await resp.json();
                 const users = Array.isArray(data.users) ? data.users : [];
                 setupUsersData = users;
@@ -344,11 +455,15 @@ def get_setup_script():
 
             try {
                 for (const payload of changes) {
+                    const scopedPayload = {
+                        ...payload,
+                        ...setupBuildScopePayload(),
+                    };
                     const resp = await fetch('/api/setup/users/update', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         credentials: 'include',
-                        body: JSON.stringify(payload),
+                        body: JSON.stringify(scopedPayload),
                     });
                     const data = await resp.json();
                     if (data.error) throw new Error(data.error);
@@ -379,7 +494,7 @@ def get_setup_script():
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     credentials: 'include',
-                    body: JSON.stringify({ user_ids: selected, new_password: newPassword }),
+                    body: JSON.stringify({ user_ids: selected, new_password: newPassword, ...setupBuildScopePayload() }),
                 });
                 const data = await resp.json();
                 if (data.error) throw new Error(data.error);
@@ -416,6 +531,7 @@ def get_setup_script():
                     email: (document.getElementById('setupUserEmail')?.value || '').trim(),
                     role: (document.getElementById('setupUserRole')?.value || '').trim(),
                     password: (document.getElementById('setupUserPassword')?.value || ''),
+                    ...setupBuildScopePayload(),
                 };
 
                 if (!payload.first_name || !payload.last_name || !payload.email || !payload.role || !payload.password) {

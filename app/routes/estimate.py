@@ -16,6 +16,42 @@ from psycopg2 import sql
 
 router = APIRouter()
 
+_ARCHITECT_EMAIL = "jorge@autobodyinsight.com"
+
+
+def _resolve_request_user_email(request: Request) -> str:
+    candidates = (
+        request.headers.get("x-user-email"),
+        request.headers.get("x-auth-request-email"),
+        request.headers.get("x-ms-client-principal-name"),
+        request.headers.get("remote-user"),
+        request.query_params.get("user_email"),
+        request.cookies.get("user_email"),
+    )
+    for value in candidates:
+        email = str(value or "").strip().lower()
+        if email:
+            return email
+    return ""
+
+
+def _resolve_internal_access_level(request: Request) -> str:
+    # Internal-only access level mapping. ARCHITECT is never user-selectable.
+    if _resolve_request_user_email(request) == _ARCHITECT_EMAIL:
+        return "ARCHITECT"
+    return "STANDARD"
+
+
+def _request_is_architect(request: Request) -> bool:
+    return _resolve_internal_access_level(request) == "ARCHITECT"
+
+
+def _resolve_setup_scope_domain(request: Request, fallback_domain: str, requested_domain: str | None) -> str:
+    requested = str(requested_domain or "").strip().lower()
+    if requested and _request_is_architect(request):
+        return requested
+    return str(fallback_domain or "").strip().lower()
+
 
 def _to_local_business_date(value) -> date | None:
     if isinstance(value, date) and not isinstance(value, datetime):
@@ -1632,6 +1668,8 @@ async def get_setup_shop(request: Request):
     if not domain:
         return JSONResponse(status_code=401, content={"error": "Not authenticated"})
 
+    selected_domain = _resolve_setup_scope_domain(request, domain, request.query_params.get("shop_domain"))
+
     conn = get_conn()
     cur = conn.cursor()
     try:
@@ -1643,7 +1681,7 @@ async def get_setup_shop(request: Request):
             WHERE domain = %s
             LIMIT 1
             """,
-            (domain,),
+            (selected_domain,),
         )
         row = cur.fetchone() or {}
         return {
@@ -1668,6 +1706,7 @@ async def save_setup_shop(request: Request):
         return JSONResponse(status_code=401, content={"error": "Not authenticated"})
 
     data = await request.json()
+    selected_domain = _resolve_setup_scope_domain(request, domain, data.get("shop_domain"))
     shop_name = str(data.get("shop_name") or "").strip()
     address = str(data.get("address") or "").strip()
     city = str(data.get("city") or "").strip()
@@ -1696,7 +1735,7 @@ async def save_setup_shop(request: Request):
                 updated_at = CURRENT_TIMESTAMP
             """,
             (
-                domain,
+                selected_domain,
                 shop_name or None,
                 address or None,
                 city or None,
@@ -1712,6 +1751,72 @@ async def save_setup_shop(request: Request):
         cur.close()
 
 
+@router.get("/setup/context")
+async def get_setup_context(request: Request):
+    domain = get_user_domain(request)
+    if not domain:
+        return JSONResponse(status_code=401, content={"error": "Not authenticated"})
+
+    return {
+        "is_architect": _request_is_architect(request),
+        "default_domain": str(domain or "").strip().lower(),
+    }
+
+
+@router.get("/setup/shops")
+async def list_setup_shops(request: Request):
+    domain = get_user_domain(request)
+    if not domain:
+        return JSONResponse(status_code=401, content={"error": "Not authenticated", "shops": []})
+    if not _request_is_architect(request):
+        return JSONResponse(status_code=403, content={"error": "Forbidden", "shops": []})
+
+    conn = get_conn()
+    cur = conn.cursor()
+    try:
+        _ensure_shop_settings_table(cur)
+        _ensure_shop_users_table(cur)
+        cur.execute(
+            """
+            WITH all_domains AS (
+                SELECT DISTINCT domain FROM shop_settings
+                UNION
+                SELECT DISTINCT domain FROM shop_users
+            )
+            SELECT
+                d.domain,
+                s.shop_name,
+                s.address,
+                s.city,
+                s.state,
+                s.zip_code,
+                s.phone,
+                s.email
+            FROM all_domains d
+            LEFT JOIN shop_settings s ON s.domain = d.domain
+            ORDER BY LOWER(COALESCE(NULLIF(s.shop_name, ''), d.domain)) ASC
+            """
+        )
+        rows = cur.fetchall() or []
+        shops = []
+        for row in rows:
+            shops.append(
+                {
+                    "domain": str(row.get("domain") or "").strip().lower(),
+                    "shop_name": str(row.get("shop_name") or "").strip(),
+                    "address": str(row.get("address") or "").strip(),
+                    "city": str(row.get("city") or "").strip(),
+                    "state": str(row.get("state") or "").strip(),
+                    "zip_code": str(row.get("zip_code") or "").strip(),
+                    "phone": str(row.get("phone") or "").strip(),
+                    "email": str(row.get("email") or "").strip(),
+                }
+            )
+        return {"shops": shops}
+    finally:
+        cur.close()
+
+
 @router.post("/setup/users/update")
 async def update_setup_user(request: Request):
     domain = get_user_domain(request)
@@ -1719,6 +1824,7 @@ async def update_setup_user(request: Request):
         return JSONResponse(status_code=401, content={"error": "Not authenticated"})
 
     data = await request.json()
+    selected_domain = _resolve_setup_scope_domain(request, domain, data.get("shop_domain"))
     user_id = data.get("id")
     try:
         user_id = int(user_id)
@@ -1735,6 +1841,8 @@ async def update_setup_user(request: Request):
         return JSONResponse(status_code=400, content={"error": "first_name, last_name, email, and role are required"})
     if role not in allowed_roles:
         return JSONResponse(status_code=400, content={"error": "Invalid role"})
+    if email == _ARCHITECT_EMAIL:
+        return JSONResponse(status_code=400, content={"error": "This email cannot be assigned from Setup"})
 
     conn = get_conn()
     cur = conn.cursor()
@@ -1752,7 +1860,7 @@ async def update_setup_user(request: Request):
               AND active = TRUE
             RETURNING id, first_name, last_name, email, role, created_at
             """,
-            (first_name, last_name, email, role, user_id, domain),
+                        (first_name, last_name, email, role, user_id, selected_domain),
         )
         row = cur.fetchone() or {}
         conn.commit()
@@ -1783,6 +1891,7 @@ async def reset_setup_user_password(request: Request):
         return JSONResponse(status_code=401, content={"error": "Not authenticated"})
 
     data = await request.json()
+    selected_domain = _resolve_setup_scope_domain(request, domain, data.get("shop_domain"))
     user_ids_raw = data.get("user_ids") or []
     new_password = str(data.get("new_password") or "")
 
@@ -1817,7 +1926,7 @@ async def reset_setup_user_password(request: Request):
               AND active = TRUE
               AND id = ANY(%s)
             """,
-            (password_hash, domain, user_ids),
+                        (password_hash, selected_domain, user_ids),
         )
         updated_count = int(cur.rowcount or 0)
         conn.commit()
@@ -1832,6 +1941,8 @@ async def list_setup_users(request: Request):
     if not domain:
         return JSONResponse(status_code=401, content={"error": "Not authenticated", "users": []})
 
+    selected_domain = _resolve_setup_scope_domain(request, domain, request.query_params.get("shop_domain"))
+
     conn = get_conn()
     cur = conn.cursor()
     try:
@@ -1844,7 +1955,7 @@ async def list_setup_users(request: Request):
               AND active = TRUE
             ORDER BY created_at DESC, id DESC
             """,
-            (domain,),
+                        (selected_domain,),
         )
         rows = cur.fetchall() or []
         users = []
@@ -1872,6 +1983,7 @@ async def create_setup_user(request: Request):
         return JSONResponse(status_code=401, content={"error": "Not authenticated"})
 
     data = await request.json()
+    selected_domain = _resolve_setup_scope_domain(request, domain, data.get("shop_domain"))
     first_name = str(data.get("first_name") or "").strip()
     last_name = str(data.get("last_name") or "").strip()
     email = str(data.get("email") or "").strip().lower()
@@ -1883,6 +1995,8 @@ async def create_setup_user(request: Request):
         return JSONResponse(status_code=400, content={"error": "first_name, last_name, email, role, and password are required"})
     if role not in allowed_roles:
         return JSONResponse(status_code=400, content={"error": "Invalid role"})
+    if email == _ARCHITECT_EMAIL:
+        return JSONResponse(status_code=400, content={"error": "This email cannot be created from Setup"})
 
     password_hash = hashlib.sha256(password.encode("utf-8")).hexdigest()
 
@@ -1903,7 +2017,7 @@ async def create_setup_user(request: Request):
                 active = TRUE
             RETURNING id, first_name, last_name, email, role, created_at
             """,
-            (first_name, last_name, email, role, password_hash, domain),
+            (first_name, last_name, email, role, password_hash, selected_domain),
         )
         row = cur.fetchone() or {}
         conn.commit()
