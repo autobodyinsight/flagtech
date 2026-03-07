@@ -42,76 +42,129 @@ async def login_screen(request: Request):
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body {
-            font-family: Arial, sans-serif;
+            font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
             min-height: 100vh;
-            display: grid;
-            place-items: center;
-            background: linear-gradient(135deg, #d9d9d9 0%, #c6c6c6 50%, #bdbdbd 100%);
-            padding: 20px;
+            background: linear-gradient(135deg, #000000 0%, #b22222 100%);
+            color: #ffffff;
+            overflow: hidden;
         }
-        .login-card {
-            width: 100%;
-            max-width: 420px;
-            background: #ffffff;
-            border-radius: 10px;
-            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.16);
-            padding: 26px;
+        .login-shell {
+            min-height: 100vh;
+            width: min(92vw, 560px);
+            margin: 0 auto;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            gap: 20px;
         }
         .title {
-            color: #222;
-            margin-bottom: 4px;
-            font-size: 26px;
+            color: #ffffff;
+            font-size: clamp(34px, 5.2vw, 52px);
+            letter-spacing: 1px;
+            font-weight: 700;
+            line-height: 1;
         }
         .subtitle {
-            color: #666;
-            margin-bottom: 18px;
-            font-size: 14px;
+            color: rgba(255, 255, 255, 0.86);
+            font-size: 15px;
+            letter-spacing: 0.5px;
         }
-        label {
-            display: block;
-            margin-bottom: 6px;
-            color: #333;
-            font-weight: bold;
-            font-size: 13px;
+        .login-form {
+            display: flex;
+            flex-direction: column;
+            gap: 22px;
+            margin-top: 10px;
         }
-        input {
+        .field {
+            position: relative;
             width: 100%;
-            border: 1px solid #c9c9c9;
-            border-radius: 6px;
-            padding: 11px;
-            margin-bottom: 14px;
-            font-size: 14px;
+        }
+        .field input {
+            width: 100%;
+            border: none;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.6);
+            background: transparent;
+            color: #ffffff;
+            font-size: 18px;
+            padding: 18px 2px 10px;
+            outline: none;
+            transition: border-color 0.2s ease;
+        }
+        .field input:focus {
+            border-bottom-color: #ffffff;
+        }
+        .field label {
+            position: absolute;
+            left: 2px;
+            top: 16px;
+            color: rgba(255, 255, 255, 0.72);
+            pointer-events: none;
+            transition: all 0.18s ease;
+            letter-spacing: 0.3px;
+        }
+        .field input:focus + label,
+        .field input:not(:placeholder-shown) + label {
+            top: -2px;
+            font-size: 12px;
+            color: rgba(255, 255, 255, 0.92);
         }
         .btn {
-            width: 100%;
-            border: 0;
-            border-radius: 6px;
-            padding: 12px;
-            background: #b22222;
-            color: #fff;
+            display: block;
+            width: fit-content;
+            min-width: 170px;
+            border: 1px solid rgba(255, 255, 255, 0.55);
+            border-radius: 999px;
+            padding: 11px 24px;
+            background: rgba(255, 255, 255, 0.08);
+            color: #ffffff;
             font-weight: bold;
-            cursor: pointer;
             font-size: 14px;
+            cursor: pointer;
+            letter-spacing: 0.5px;
+            transition: transform 0.16s ease, background 0.16s ease, border-color 0.16s ease;
+        }
+        .btn:hover {
+            background: rgba(255, 255, 255, 0.16);
+            border-color: #ffffff;
+            transform: translateY(-1px);
+        }
+        .btn:disabled {
+            opacity: 0.7;
+            cursor: default;
+            transform: none;
         }
         .error {
-            min-height: 20px;
-            color: #b00020;
-            margin-bottom: 10px;
+            min-height: 22px;
+            color: #ffd5d5;
             font-size: 13px;
+            letter-spacing: 0.2px;
+        }
+        @media (max-width: 640px) {
+            .login-shell {
+                width: min(92vw, 480px);
+                padding-bottom: 30px;
+            }
+            .field input {
+                font-size: 17px;
+            }
         }
     </style>
 </head>
 <body>
-    <div class="login-card">
+    <div class="login-shell">
         <h1 class="title">FlagTech</h1>
         <div class="subtitle">Sign in to continue</div>
         <div id="loginError" class="error"></div>
-        <form id="loginForm">
-            <label for="loginEmail">Email</label>
-            <input id="loginEmail" name="loginEmail" type="email" autocomplete="username" required />
+        <form id="loginForm" class="login-form">
+            <div class="field">
+                <input id="loginEmail" name="loginEmail" type="email" autocomplete="username" placeholder=" " required />
+                <label for="loginEmail">Email</label>
+            </div>
 
-            <label for="loginPassword">Password</label>
-            <input id="loginPassword" name="loginPassword" type="password" autocomplete="current-password" required />
+            <div class="field">
+                <input id="loginPassword" name="loginPassword" type="password" autocomplete="current-password" placeholder=" " required />
+                <label for="loginPassword">Password</label>
+            </div>
 
             <button id="loginBtn" class="btn" type="submit">Sign In</button>
         </form>
