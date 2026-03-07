@@ -71,7 +71,53 @@ def get_records_screen_html():
 
         <div id="recordsPanel-parts" class="records-content-panel" style="display:none; background:#fff; padding:20px; border-radius:8px; box-shadow:0 2px 4px rgba(0,0,0,0.1);">
             <h3 style="margin:0 0 18px 0; color:#333;">Parts</h3>
-            <div style="color:#666;">Parts screen</div>
+            <div style="overflow-x:auto;">
+                <table id="recordsPartsVendorTable" style="width:100%; border-collapse:collapse;">
+                    <thead>
+                        <tr class="dashboard-header-row">
+                            <th class="dashboard-header-cell" style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold;">VENDOR</th>
+                            <th class="dashboard-header-cell" style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold;">TYPE</th>
+                            <th class="dashboard-header-cell" style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold; text-align:right;">INVOICES</th>
+                            <th class="dashboard-header-cell" style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold; text-align:right;">TOTAL</th>
+                        </tr>
+                    </thead>
+                    <tbody id="recordsPartsVendorBody">
+                        <tr><td colspan="4" style="padding:20px; text-align:center; color:#999;">Loading...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div id="recordsPartsVendorModal" style="display:none; position:fixed; z-index:1200; left:0; top:0; width:100%; height:100%; background:rgba(0,0,0,0.45);">
+                <div style="background:#f2f2f2; margin:3% auto; width:95%; max-width:1180px; max-height:90vh; overflow:auto; border-radius:8px; border:1px solid #888; padding:18px;">
+                    <div style="display:flex; align-items:center; justify-content:space-between; gap:16px; margin-bottom:12px;">
+                        <h2 id="recordsPartsVendorModalTitle" style="margin:0; color:#333;">Vendor</h2>
+                        <div style="display:flex; align-items:center; gap:8px;">
+                            <label for="recordsPartsVendorDateStart" style="font-weight:bold; color:#333;">Date Range:</label>
+                            <input id="recordsPartsVendorDateStart" type="date" style="padding:6px;" />
+                            <span style="color:#555;">to</span>
+                            <input id="recordsPartsVendorDateEnd" type="date" style="padding:6px;" />
+                        </div>
+                        <button type="button" onclick="closeRecordsPartsVendorModal()" style="padding:8px 14px; background:#505050; color:#fff; border:none; border-radius:4px; cursor:pointer; font-weight:bold;">Close</button>
+                    </div>
+
+                    <div style="overflow-x:auto;">
+                        <table id="recordsPartsVendorInvoiceTable" style="width:100%; border-collapse:collapse;">
+                            <thead>
+                                <tr class="dashboard-header-row">
+                                    <th class="dashboard-header-cell" style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold;">DATE</th>
+                                    <th class="dashboard-header-cell" style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold;">RO#</th>
+                                    <th class="dashboard-header-cell" style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold;">INVOICE</th>
+                                    <th class="dashboard-header-cell" style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold; text-align:right;">PARTS</th>
+                                    <th class="dashboard-header-cell" style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold; text-align:right;">TOTAL</th>
+                                </tr>
+                            </thead>
+                            <tbody id="recordsPartsVendorInvoiceBody">
+                                <tr><td colspan="5" style="padding:20px; text-align:center; color:#999;">Loading...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
         </div>
 
         <div id="recordsPanel-vendors" class="records-content-panel" style="display:none; background:#fff; padding:20px; border-radius:8px; box-shadow:0 2px 4px rgba(0,0,0,0.1);">
@@ -99,6 +145,11 @@ def get_records_screen_html():
             }
         </style>
         <script>
+        const recordsPartsState = {
+            activeVendorId: null,
+            activeVendorName: '',
+        };
+
         function recordsSetActiveSidebar(view) {
             document.querySelectorAll('#recordsSidebar .records-sidebar-btn').forEach((button) => {
                 const btnView = String(button.getAttribute('data-view') || '').toLowerCase();
@@ -125,6 +176,8 @@ def get_records_screen_html():
                 loadRecordsData();
             } else if (normalizedView === 'tech') {
                 loadRecordsTechPayouts();
+            } else if (normalizedView === 'parts') {
+                loadRecordsPartsVendors();
             }
         }
 
@@ -147,6 +200,12 @@ def get_records_screen_html():
         function formatRecordsMoney(value) {
             const amount = Number(value || 0);
             return '$' + amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        }
+
+        function formatRecordsQty(value) {
+            const qty = Number(value || 0);
+            if (!Number.isFinite(qty)) return '0';
+            return Number.isInteger(qty) ? String(qty) : qty.toFixed(2).replace(/\.00$/, '');
         }
 
         function escapeRecordsHtml(value) {
@@ -333,6 +392,223 @@ def get_records_screen_html():
                 body.innerHTML = `<tr><td colspan='4' style='padding:20px; text-align:center; color:#c00;'>Error loading tech payouts</td></tr>`;
             }
         }
+
+        async function loadRecordsPartsVendors() {
+            const body = document.getElementById('recordsPartsVendorBody');
+            if (!body) return;
+
+            body.innerHTML = `<tr><td colspan='4' style='padding:20px; text-align:center; color:#999;'>Loading...</td></tr>`;
+            try {
+                const resp = await fetch('/api/records/parts/vendors-summary', { credentials: 'include' });
+                const data = await resp.json();
+                const rows = Array.isArray(data.rows) ? data.rows : [];
+
+                if (!rows.length) {
+                    body.innerHTML = `<tr><td colspan='4' style='padding:20px; text-align:center; color:#999;'>No vendors found.</td></tr>`;
+                    return;
+                }
+
+                body.innerHTML = rows.map((row, index) => {
+                    const rowBg = (index % 2 === 0) ? '#d3d3d3' : '#f2f0ef';
+                    const vendorName = escapeRecordsHtml(row.vendor || '—');
+                    const vendorType = escapeRecordsHtml(row.type || '—');
+                    const invoices = Number(row.invoices || 0);
+                    const total = formatRecordsMoney(row.total || 0);
+                    const vendorId = Number(row.vendor_id || 0);
+                    const buttonHtml = `<button type='button' class='records-parts-vendor-link' data-vendor-id='${vendorId}' data-vendor-name='${vendorName}' style='background:none; border:none; color:#0066cc; text-decoration:underline; cursor:pointer; padding:0; font:inherit; font-weight:bold;'>${vendorName}</button>`;
+                    return `
+                        <tr>
+                            <td style='padding:12px; background:${rowBg};'>${buttonHtml}</td>
+                            <td style='padding:12px; background:${rowBg};'>${vendorType}</td>
+                            <td style='padding:12px; text-align:right; background:${rowBg};'>${invoices}</td>
+                            <td style='padding:12px; text-align:right; background:${rowBg};'>${total}</td>
+                        </tr>
+                    `;
+                }).join('');
+
+                body.querySelectorAll('button.records-parts-vendor-link').forEach((button) => {
+                    button.addEventListener('click', () => {
+                        const vendorId = Number(button.getAttribute('data-vendor-id') || 0);
+                        const vendorName = String(button.getAttribute('data-vendor-name') || '').trim();
+                        if (!vendorId) return;
+                        openRecordsPartsVendorModal(vendorId, vendorName);
+                    });
+                });
+            } catch (error) {
+                body.innerHTML = `<tr><td colspan='4' style='padding:20px; text-align:center; color:#c00;'>Error loading vendor data.</td></tr>`;
+            }
+        }
+
+        function closeRecordsPartsVendorModal() {
+            const modal = document.getElementById('recordsPartsVendorModal');
+            if (modal) modal.style.display = 'none';
+            recordsPartsState.activeVendorId = null;
+            recordsPartsState.activeVendorName = '';
+        }
+
+        async function openRecordsPartsVendorModal(vendorId, vendorName) {
+            const modal = document.getElementById('recordsPartsVendorModal');
+            const title = document.getElementById('recordsPartsVendorModalTitle');
+            const startInput = document.getElementById('recordsPartsVendorDateStart');
+            const endInput = document.getElementById('recordsPartsVendorDateEnd');
+            if (!modal || !title || !startInput || !endInput) return;
+
+            recordsPartsState.activeVendorId = Number(vendorId || 0);
+            recordsPartsState.activeVendorName = String(vendorName || '').trim();
+            title.textContent = recordsPartsState.activeVendorName || 'Vendor';
+
+            if (!startInput.dataset.bound) {
+                startInput.addEventListener('change', () => loadRecordsPartsVendorInvoices());
+                startInput.dataset.bound = '1';
+            }
+            if (!endInput.dataset.bound) {
+                endInput.addEventListener('change', () => loadRecordsPartsVendorInvoices());
+                endInput.dataset.bound = '1';
+            }
+
+            modal.style.display = 'block';
+            await loadRecordsPartsVendorInvoices();
+        }
+
+        async function loadRecordsPartsVendorInvoices() {
+            const vendorId = Number(recordsPartsState.activeVendorId || 0);
+            const body = document.getElementById('recordsPartsVendorInvoiceBody');
+            const startInput = document.getElementById('recordsPartsVendorDateStart');
+            const endInput = document.getElementById('recordsPartsVendorDateEnd');
+            if (!vendorId || !body || !startInput || !endInput) return;
+
+            const query = new URLSearchParams({ vendor_id: String(vendorId) });
+            const startDate = String(startInput.value || '').trim();
+            const endDate = String(endInput.value || '').trim();
+            if (startDate) query.set('start_date', startDate);
+            if (endDate) query.set('end_date', endDate);
+
+            body.innerHTML = `<tr><td colspan='5' style='padding:20px; text-align:center; color:#999;'>Loading...</td></tr>`;
+            try {
+                const resp = await fetch(`/api/records/parts/vendor-invoices?${query.toString()}`, { credentials: 'include' });
+                const data = await resp.json();
+                const rows = Array.isArray(data.rows) ? data.rows : [];
+
+                if (!rows.length) {
+                    body.innerHTML = `<tr><td colspan='5' style='padding:20px; text-align:center; color:#999;'>No invoices found for selected range.</td></tr>`;
+                    return;
+                }
+
+                body.innerHTML = rows.map((row, index) => {
+                    const rowBg = index % 2 === 0 ? '#f2f0ef' : '#ffffff';
+                    const ro = escapeRecordsHtml(row.ro || '');
+                    const invoice = String(row.invoice || '').trim();
+                    const invoiceEscaped = escapeRecordsHtml(invoice || '—');
+                    const safeKey = `${String(row.ro || '').trim()}__${invoice}`.replace(/[^a-zA-Z0-9_-]/g, '_');
+                    const detailRowId = `records-parts-invoice-detail-row-${safeKey}`;
+                    const detailWrapId = `records-parts-invoice-detail-wrap-${safeKey}`;
+                    const dateDisplay = formatRecordsShortDate(row.date);
+                    const partsCount = Number(row.parts || 0);
+                    const total = formatRecordsMoney(row.total || 0);
+
+                    return `
+                        <tr>
+                            <td style='padding:12px; border-bottom:1px solid #eee; background:${rowBg};'>${dateDisplay}</td>
+                            <td style='padding:12px; border-bottom:1px solid #eee; background:${rowBg};'>${ro}</td>
+                            <td style='padding:12px; border-bottom:1px solid #eee; background:${rowBg};'>
+                                <button type='button' onclick='toggleRecordsPartsInvoiceRow(${vendorId}, ${JSON.stringify(String(row.ro || '').trim())}, ${JSON.stringify(invoice)}, ${JSON.stringify(safeKey)})' style='background:none; border:none; color:#0066cc; text-decoration:underline; cursor:pointer; padding:0;'>${invoiceEscaped}</button>
+                            </td>
+                            <td style='padding:12px; border-bottom:1px solid #eee; text-align:right; background:${rowBg};'>${partsCount}</td>
+                            <td style='padding:12px; border-bottom:1px solid #eee; text-align:right; background:${rowBg};'>${total}</td>
+                        </tr>
+                        <tr id='${detailRowId}' style='display:none;'>
+                            <td colspan='5' style='padding:10px 12px; border-bottom:1px solid #eee; background:${rowBg};'>
+                                <div id='${detailWrapId}' style='background:#fafafa; border:1px solid #ddd; border-radius:6px; padding:10px;'>Loading...</div>
+                            </td>
+                        </tr>
+                    `;
+                }).join('');
+            } catch (error) {
+                body.innerHTML = `<tr><td colspan='5' style='padding:20px; text-align:center; color:#c00;'>Error loading invoices.</td></tr>`;
+            }
+        }
+
+        function toggleRecordsPartsInvoiceRow(vendorId, roValue, invoiceNumber, safeKey) {
+            const body = document.getElementById('recordsPartsVendorInvoiceBody');
+            const detailRow = document.getElementById(`records-parts-invoice-detail-row-${safeKey}`);
+            const detailWrap = document.getElementById(`records-parts-invoice-detail-wrap-${safeKey}`);
+            if (!body || !detailRow || !detailWrap) return;
+
+            const isOpening = detailRow.style.display === 'none' || detailRow.style.display === '';
+            Array.from(body.querySelectorAll('tr[id^="records-parts-invoice-detail-row-"]')).forEach((row) => {
+                if (row.id !== `records-parts-invoice-detail-row-${safeKey}`) {
+                    row.style.display = 'none';
+                }
+            });
+
+            detailRow.style.display = isOpening ? 'table-row' : 'none';
+            if (!isOpening) return;
+
+            detailWrap.innerHTML = '<div style="color:#777;">Loading invoice parts...</div>';
+            loadRecordsPartsInvoiceParts(vendorId, roValue, invoiceNumber, detailWrap);
+        }
+
+        async function loadRecordsPartsInvoiceParts(vendorId, roValue, invoiceNumber, container) {
+            if (!container) return;
+            const query = new URLSearchParams({
+                vendor_id: String(vendorId),
+                ro: String(roValue || ''),
+                invoice: String(invoiceNumber || ''),
+            });
+
+            try {
+                const resp = await fetch(`/api/records/parts/vendor-invoice-parts?${query.toString()}`, { credentials: 'include' });
+                const data = await resp.json();
+                const rows = Array.isArray(data.parts) ? data.parts : [];
+
+                if (!rows.length) {
+                    container.innerHTML = '<div style="color:#777;">No parts lines found for this invoice.</div>';
+                    return;
+                }
+
+                const bodyRows = rows.map((item, idx) => {
+                    const rowBg = idx % 2 === 0 ? '#f2f0ef' : 'var(--list-row-white, #ffffff)';
+                    return `
+                        <tr style="background:${rowBg};">
+                            <td style="padding:10px; border-bottom:1px solid #eee; width:80px;">${escapeRecordsHtml(item.line || '—')}</td>
+                            <td style="padding:10px; border-bottom:1px solid #eee;">${escapeRecordsHtml(item.description || '')}</td>
+                            <td style="padding:10px; border-bottom:1px solid #eee; text-align:right; width:80px;">${formatRecordsQty(item.qty || 0)}</td>
+                            <td style="padding:10px; border-bottom:1px solid #eee; width:170px;">${escapeRecordsHtml(item.part_number || '—')}</td>
+                            <td style="padding:10px; border-bottom:1px solid #eee; width:110px; text-align:right;">${formatRecordsMoney(item.list || 0)}</td>
+                            <td style="padding:10px; border-bottom:1px solid #eee; width:110px; text-align:right;">${formatRecordsMoney(item.cost || 0)}</td>
+                        </tr>
+                    `;
+                }).join('');
+
+                container.innerHTML = `
+                    <div style="overflow-x:auto;">
+                        <table style="width:100%; border-collapse:collapse;">
+                            <thead>
+                                <tr class="parts-header-row" style="background:#3c4142; text-align:left;">
+                                    <th style="padding:10px; border-bottom:2px solid #ddd; width:80px; color:#fff;">Line</th>
+                                    <th style="padding:10px; border-bottom:2px solid #ddd; color:#fff;">Description</th>
+                                    <th style="padding:10px; border-bottom:2px solid #ddd; width:80px; text-align:right; color:#fff;">QTY</th>
+                                    <th style="padding:10px; border-bottom:2px solid #ddd; width:170px; color:#fff;">Part #</th>
+                                    <th style="padding:10px; border-bottom:2px solid #ddd; width:110px; text-align:right; color:#fff;">List</th>
+                                    <th style="padding:10px; border-bottom:2px solid #ddd; width:110px; text-align:right; color:#fff;">Cost</th>
+                                </tr>
+                            </thead>
+                            <tbody>${bodyRows}</tbody>
+                        </table>
+                    </div>
+                `;
+            } catch (error) {
+                container.innerHTML = '<div style="color:#c00;">Error loading invoice parts.</div>';
+            }
+        }
+
+        window.addEventListener('click', (event) => {
+            const modal = document.getElementById('recordsPartsVendorModal');
+            if (!modal || modal.style.display !== 'block') return;
+            if (event.target === modal) {
+                closeRecordsPartsVendorModal();
+            }
+        });
 
         document.addEventListener('DOMContentLoaded', function() {
             recordsSwitchView('ros');

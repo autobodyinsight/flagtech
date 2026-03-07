@@ -2305,6 +2305,262 @@ async def list_records_tech_paid_ros(request: Request, tech_id: int):
         cur.close()
 
 
+@router.get("/records/parts/vendors-summary")
+async def list_records_parts_vendors_summary(request: Request):
+    domain = get_user_domain(request) or "default"
+
+    conn = get_conn()
+    cur = conn.cursor()
+    try:
+        _ensure_parts_vendors_table(cur)
+        _ensure_parts_received_table(cur)
+
+        cur.execute(
+            """
+            SELECT
+                v.id,
+                v.name,
+                v.vendor_type,
+                COALESCE(
+                    COUNT(
+                        DISTINCT CASE
+                            WHEN pr.invoice_number IS NOT NULL AND TRIM(pr.invoice_number) <> ''
+                            THEN CONCAT(COALESCE(pr.ro, ''), '|', TRIM(pr.invoice_number))
+                            ELSE NULL
+                        END
+                    ),
+                    0
+                ) AS invoice_count,
+                COALESCE(
+                    SUM(
+                        CASE
+                            WHEN pr.invoice_number IS NOT NULL AND TRIM(pr.invoice_number) <> ''
+                            THEN COALESCE(pr.cost, 0)
+                            ELSE 0
+                        END
+                    ),
+                    0
+                ) AS total_cost
+            FROM parts_vendors v
+            LEFT JOIN parts_received pr
+                   ON pr.domain = v.domain
+                  AND LOWER(TRIM(pr.vendor)) = LOWER(TRIM(v.name))
+            WHERE v.domain = %s
+              AND v.active = TRUE
+            GROUP BY v.id, v.name, v.vendor_type
+            ORDER BY LOWER(TRIM(v.name)) ASC
+            """,
+            (domain,),
+        )
+        rows = cur.fetchall() or []
+
+        data_rows = []
+        for row in rows:
+            data_rows.append(
+                {
+                    "vendor_id": int(row.get("id") or 0),
+                    "vendor": str(row.get("name") or "").strip(),
+                    "type": str(row.get("vendor_type") or "").strip(),
+                    "invoices": int(row.get("invoice_count") or 0),
+                    "total": _parse_float_value(row.get("total_cost")),
+                }
+            )
+
+        return {"rows": data_rows}
+    finally:
+        cur.close()
+
+
+@router.get("/records/parts/vendor-invoices")
+async def list_records_parts_vendor_invoices(
+    request: Request,
+    vendor_id: int,
+    start_date: str | None = None,
+    end_date: str | None = None,
+):
+    domain = get_user_domain(request) or "default"
+
+    start_date_value = None
+    if start_date:
+        try:
+            start_date_value = date.fromisoformat(str(start_date).strip()[:10])
+        except ValueError:
+            return JSONResponse(status_code=400, content={"error": "start_date must be YYYY-MM-DD", "rows": []})
+
+    end_date_value = None
+    if end_date:
+        try:
+            end_date_value = date.fromisoformat(str(end_date).strip()[:10])
+        except ValueError:
+            return JSONResponse(status_code=400, content={"error": "end_date must be YYYY-MM-DD", "rows": []})
+
+    conn = get_conn()
+    cur = conn.cursor()
+    try:
+        _ensure_parts_vendors_table(cur)
+        _ensure_parts_received_table(cur)
+
+        cur.execute(
+            """
+            SELECT name
+            FROM parts_vendors
+            WHERE id = %s AND domain = %s AND active = TRUE
+            LIMIT 1
+            """,
+            (vendor_id, domain),
+        )
+        vendor_row = cur.fetchone()
+        if not vendor_row:
+            return JSONResponse(status_code=404, content={"error": "Vendor not found", "rows": []})
+
+        vendor_name = str(vendor_row.get("name") or "").strip()
+        if not vendor_name:
+            return {"rows": []}
+
+        cur.execute(
+            """
+            SELECT
+                pr.ro,
+                TRIM(pr.invoice_number) AS invoice_number,
+                MAX(COALESCE(pr.received_business_date, pr.received_at::date)) AS invoice_date,
+                COUNT(*) AS parts_count,
+                COALESCE(SUM(pr.cost), 0) AS total_cost
+            FROM parts_received pr
+            WHERE pr.domain = %s
+              AND LOWER(TRIM(pr.vendor)) = LOWER(TRIM(%s))
+              AND pr.invoice_number IS NOT NULL
+              AND TRIM(pr.invoice_number) <> ''
+              AND (%s IS NULL OR COALESCE(pr.received_business_date, pr.received_at::date) >= %s)
+              AND (%s IS NULL OR COALESCE(pr.received_business_date, pr.received_at::date) <= %s)
+            GROUP BY pr.ro, TRIM(pr.invoice_number)
+            ORDER BY MAX(COALESCE(pr.received_business_date, pr.received_at::date)) DESC, pr.ro ASC, TRIM(pr.invoice_number) ASC
+            """,
+            (domain, vendor_name, start_date_value, start_date_value, end_date_value, end_date_value),
+        )
+        rows = cur.fetchall() or []
+
+        data_rows = []
+        for row in rows:
+            invoice_date = row.get("invoice_date")
+            data_rows.append(
+                {
+                    "date": invoice_date.isoformat() if invoice_date else None,
+                    "ro": str(row.get("ro") or "").strip(),
+                    "invoice": str(row.get("invoice_number") or "").strip(),
+                    "parts": int(row.get("parts_count") or 0),
+                    "total": _parse_float_value(row.get("total_cost")),
+                }
+            )
+
+        return {"rows": data_rows}
+    finally:
+        cur.close()
+
+
+@router.get("/records/parts/vendor-invoice-parts")
+async def list_records_parts_vendor_invoice_parts(request: Request, vendor_id: int, ro: str, invoice: str):
+    domain = get_user_domain(request) or "default"
+    ro_value = str(ro or "").strip()
+    invoice_value = str(invoice or "").strip()
+
+    if not ro_value or not invoice_value:
+        return JSONResponse(status_code=400, content={"error": "ro and invoice are required", "parts": []})
+
+    conn = get_conn()
+    cur = conn.cursor()
+    try:
+        _ensure_parts_vendors_table(cur)
+        _ensure_parts_received_table(cur)
+        _ensure_saved_estimates_table(cur)
+
+        cur.execute(
+            """
+            SELECT name
+            FROM parts_vendors
+            WHERE id = %s AND domain = %s AND active = TRUE
+            LIMIT 1
+            """,
+            (vendor_id, domain),
+        )
+        vendor_row = cur.fetchone()
+        if not vendor_row:
+            return JSONResponse(status_code=404, content={"error": "Vendor not found", "parts": []})
+
+        vendor_name = str(vendor_row.get("name") or "").strip()
+        if not vendor_name:
+            return {"parts": []}
+
+        cur.execute(
+            """
+            SELECT parts_repairs
+            FROM saved_estimates
+            WHERE domain = %s AND ro = %s
+            ORDER BY saved_at DESC, id DESC
+            LIMIT 1
+            """,
+            (domain, ro_value),
+        )
+        estimate_row = cur.fetchone() or {}
+        parts_repairs = _parse_json_field(estimate_row.get("parts_repairs"))
+        if not isinstance(parts_repairs, list):
+            parts_repairs = []
+
+        line_lookup = {}
+        for idx, item in enumerate(parts_repairs, start=1):
+            if not isinstance(item, dict):
+                continue
+            parsed_description, parsed_part_number = _parse_part_description_and_number(item)
+            line_lookup[idx] = {
+                "line": item.get("line") or idx,
+                "description": parsed_description,
+                "part_number": parsed_part_number or "",
+                "qty": _parse_float_value(item.get("qty")),
+                "list": _parse_float_value(item.get("price")),
+            }
+
+        cur.execute(
+            """
+            SELECT
+                line_id,
+                description,
+                part_number,
+                qty_received,
+                list_price,
+                cost
+            FROM parts_received
+            WHERE domain = %s
+              AND ro = %s
+              AND TRIM(invoice_number) = %s
+              AND LOWER(TRIM(vendor)) = LOWER(TRIM(%s))
+            ORDER BY line_id
+            """,
+            (domain, ro_value, invoice_value, vendor_name),
+        )
+        rows = cur.fetchall() or []
+
+        parts = []
+        for row in rows:
+            try:
+                line_id = int(row.get("line_id") or 0)
+            except Exception:
+                line_id = 0
+            lookup = line_lookup.get(line_id, {})
+            parts.append(
+                {
+                    "line": lookup.get("line") or line_id,
+                    "description": (row.get("description") or lookup.get("description") or "").strip(),
+                    "qty": _parse_float_value(row.get("qty_received")) or _parse_float_value(lookup.get("qty")) or 0.0,
+                    "part_number": (row.get("part_number") or lookup.get("part_number") or "").strip(),
+                    "list": _parse_float_value(row.get("list_price")) or _parse_float_value(lookup.get("list")),
+                    "cost": _parse_float_value(row.get("cost")),
+                }
+            )
+
+        return {"parts": parts}
+    finally:
+        cur.close()
+
+
 @router.post("/payments/save")
 async def save_ro_payments(request: Request):
     domain = get_user_domain(request)
