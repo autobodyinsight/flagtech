@@ -3,6 +3,7 @@ import os
 import json
 import math
 import re
+import hashlib
 from decimal import Decimal
 from datetime import date, datetime, timedelta, timezone
 from app.services.extractor import load_pdf
@@ -276,6 +277,56 @@ def _ensure_parts_vendors_table(cur) -> None:
         CREATE INDEX IF NOT EXISTS idx_parts_vendors_domain ON parts_vendors(domain)
         """
     )
+
+
+def _ensure_shop_settings_table(cur) -> None:
+    cur.execute(
+        """
+        CREATE TABLE IF NOT EXISTS shop_settings (
+            id SERIAL PRIMARY KEY,
+            domain VARCHAR(255) NOT NULL,
+            shop_name VARCHAR(255),
+            address TEXT,
+            phone VARCHAR(64),
+            email VARCHAR(255),
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+        """
+    )
+    cur.execute("ALTER TABLE shop_settings ADD COLUMN IF NOT EXISTS shop_name VARCHAR(255)")
+    cur.execute("ALTER TABLE shop_settings ADD COLUMN IF NOT EXISTS address TEXT")
+    cur.execute("ALTER TABLE shop_settings ADD COLUMN IF NOT EXISTS phone VARCHAR(64)")
+    cur.execute("ALTER TABLE shop_settings ADD COLUMN IF NOT EXISTS email VARCHAR(255)")
+    cur.execute("ALTER TABLE shop_settings ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP")
+    cur.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_shop_settings_domain_unique ON shop_settings(domain)")
+
+
+def _ensure_shop_users_table(cur) -> None:
+    cur.execute(
+        """
+        CREATE TABLE IF NOT EXISTS shop_users (
+            id SERIAL PRIMARY KEY,
+            first_name VARCHAR(100) NOT NULL,
+            last_name VARCHAR(100) NOT NULL,
+            email VARCHAR(255) NOT NULL,
+            role VARCHAR(64) NOT NULL,
+            password_hash VARCHAR(255) NOT NULL,
+            domain VARCHAR(255) NOT NULL,
+            active BOOLEAN DEFAULT TRUE,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+        """
+    )
+    cur.execute("ALTER TABLE shop_users ADD COLUMN IF NOT EXISTS first_name VARCHAR(100)")
+    cur.execute("ALTER TABLE shop_users ADD COLUMN IF NOT EXISTS last_name VARCHAR(100)")
+    cur.execute("ALTER TABLE shop_users ADD COLUMN IF NOT EXISTS email VARCHAR(255)")
+    cur.execute("ALTER TABLE shop_users ADD COLUMN IF NOT EXISTS role VARCHAR(64)")
+    cur.execute("ALTER TABLE shop_users ADD COLUMN IF NOT EXISTS password_hash VARCHAR(255)")
+    cur.execute("ALTER TABLE shop_users ADD COLUMN IF NOT EXISTS domain VARCHAR(255)")
+    cur.execute("ALTER TABLE shop_users ADD COLUMN IF NOT EXISTS active BOOLEAN DEFAULT TRUE")
+    cur.execute("ALTER TABLE shop_users ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP")
+    cur.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_shop_users_domain_email_unique ON shop_users(domain, email)")
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_shop_users_domain_active ON shop_users(domain, active)")
 
 
 def _ensure_saved_estimates_table(cur) -> None:
@@ -1564,6 +1615,178 @@ async def update_vendor(request: Request):
                 "zip": row["zip"],
                 "active": row["active"],
             }
+        }
+    finally:
+        cur.close()
+
+
+@router.get("/setup/shop")
+async def get_setup_shop(request: Request):
+    domain = get_user_domain(request)
+    if not domain:
+        return JSONResponse(status_code=401, content={"error": "Not authenticated"})
+
+    conn = get_conn()
+    cur = conn.cursor()
+    try:
+        _ensure_shop_settings_table(cur)
+        cur.execute(
+            """
+            SELECT shop_name, address, phone, email
+            FROM shop_settings
+            WHERE domain = %s
+            LIMIT 1
+            """,
+            (domain,),
+        )
+        row = cur.fetchone() or {}
+        return {
+            "shop": {
+                "shop_name": str(row.get("shop_name") or "").strip(),
+                "address": str(row.get("address") or "").strip(),
+                "phone": str(row.get("phone") or "").strip(),
+                "email": str(row.get("email") or "").strip(),
+            }
+        }
+    finally:
+        cur.close()
+
+
+@router.post("/setup/shop")
+async def save_setup_shop(request: Request):
+    domain = get_user_domain(request)
+    if not domain:
+        return JSONResponse(status_code=401, content={"error": "Not authenticated"})
+
+    data = await request.json()
+    shop_name = str(data.get("shop_name") or "").strip()
+    address = str(data.get("address") or "").strip()
+    phone = str(data.get("phone") or "").strip()
+    email = str(data.get("email") or "").strip()
+
+    conn = get_conn()
+    cur = conn.cursor()
+    try:
+        _ensure_shop_settings_table(cur)
+        cur.execute(
+            """
+            INSERT INTO shop_settings (domain, shop_name, address, phone, email, updated_at)
+            VALUES (%s, %s, %s, %s, %s, CURRENT_TIMESTAMP)
+            ON CONFLICT (domain)
+            DO UPDATE SET
+                shop_name = EXCLUDED.shop_name,
+                address = EXCLUDED.address,
+                phone = EXCLUDED.phone,
+                email = EXCLUDED.email,
+                updated_at = CURRENT_TIMESTAMP
+            """,
+            (
+                domain,
+                shop_name or None,
+                address or None,
+                phone or None,
+                email or None,
+            ),
+        )
+        conn.commit()
+        return {"status": "ok"}
+    finally:
+        cur.close()
+
+
+@router.get("/setup/users")
+async def list_setup_users(request: Request):
+    domain = get_user_domain(request)
+    if not domain:
+        return JSONResponse(status_code=401, content={"error": "Not authenticated", "users": []})
+
+    conn = get_conn()
+    cur = conn.cursor()
+    try:
+        _ensure_shop_users_table(cur)
+        cur.execute(
+            """
+            SELECT id, first_name, last_name, email, role, created_at
+            FROM shop_users
+            WHERE domain = %s
+              AND active = TRUE
+            ORDER BY created_at DESC, id DESC
+            """,
+            (domain,),
+        )
+        rows = cur.fetchall() or []
+        users = []
+        for row in rows:
+            created_at = row.get("created_at")
+            users.append(
+                {
+                    "id": int(row.get("id") or 0),
+                    "first_name": str(row.get("first_name") or "").strip(),
+                    "last_name": str(row.get("last_name") or "").strip(),
+                    "email": str(row.get("email") or "").strip(),
+                    "role": str(row.get("role") or "").strip(),
+                    "created_at": created_at.isoformat() if isinstance(created_at, datetime) else None,
+                }
+            )
+        return {"users": users}
+    finally:
+        cur.close()
+
+
+@router.post("/setup/users")
+async def create_setup_user(request: Request):
+    domain = get_user_domain(request)
+    if not domain:
+        return JSONResponse(status_code=401, content={"error": "Not authenticated"})
+
+    data = await request.json()
+    first_name = str(data.get("first_name") or "").strip()
+    last_name = str(data.get("last_name") or "").strip()
+    email = str(data.get("email") or "").strip().lower()
+    role = str(data.get("role") or "").strip()
+    password = str(data.get("password") or "")
+
+    allowed_roles = {"Manager", "Estimator", "Tech", "Receptionist", "HR", "Support"}
+    if not first_name or not last_name or not email or not role or not password:
+        return JSONResponse(status_code=400, content={"error": "first_name, last_name, email, role, and password are required"})
+    if role not in allowed_roles:
+        return JSONResponse(status_code=400, content={"error": "Invalid role"})
+
+    password_hash = hashlib.sha256(password.encode("utf-8")).hexdigest()
+
+    conn = get_conn()
+    cur = conn.cursor()
+    try:
+        _ensure_shop_users_table(cur)
+        cur.execute(
+            """
+            INSERT INTO shop_users (first_name, last_name, email, role, password_hash, domain, active)
+            VALUES (%s, %s, %s, %s, %s, %s, TRUE)
+            ON CONFLICT (domain, email)
+            DO UPDATE SET
+                first_name = EXCLUDED.first_name,
+                last_name = EXCLUDED.last_name,
+                role = EXCLUDED.role,
+                password_hash = EXCLUDED.password_hash,
+                active = TRUE
+            RETURNING id, first_name, last_name, email, role, created_at
+            """,
+            (first_name, last_name, email, role, password_hash, domain),
+        )
+        row = cur.fetchone() or {}
+        conn.commit()
+
+        created_at = row.get("created_at")
+        return {
+            "status": "ok",
+            "user": {
+                "id": int(row.get("id") or 0),
+                "first_name": str(row.get("first_name") or "").strip(),
+                "last_name": str(row.get("last_name") or "").strip(),
+                "email": str(row.get("email") or "").strip(),
+                "role": str(row.get("role") or "").strip(),
+                "created_at": created_at.isoformat() if isinstance(created_at, datetime) else None,
+            },
         }
     finally:
         cur.close()

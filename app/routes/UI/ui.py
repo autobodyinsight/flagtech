@@ -10,6 +10,7 @@ from .techs import get_techs_screen_html
 from .phase import get_phase_screen_html
 from .reports import get_reports_screen_html
 from .records import get_records_screen_html
+from .setup import get_setup_screen_html, get_setup_script
 
 try:
     from .upload_ui.upload import get_upload_screen_html, get_upload_script, get_estimate_summary_html
@@ -226,24 +227,26 @@ async def home_screen(request: Request):
     <div class="tab-bar">
         <div class="nav-tab active" onclick="switchScreen('dashboard')">DASHBOARD</div>
         <div class="nav-tab" onclick="switchScreen('upload')">UPLOAD</div>
+        <div class="nav-tab" onclick="switchScreen('parts')">PARTS</div>
         <div class="nav-tab" onclick="switchScreen('tech')">TECHS</div>
         <div class="nav-tab" onclick="switchScreen('phase')">ROADMAP</div>
         <div class="nav-tab" onclick="switchScreen('flagtech')">FLAGOUT</div>
-        <div class="nav-tab" onclick="switchScreen('parts')">PARTS</div>
         <div class="nav-tab" onclick="switchScreen('reports')">REPORTS</div>
         <div class="nav-tab" onclick="switchScreen('records')">RECORDS</div>
+        <div class="nav-tab" onclick="switchScreen('setup')">SETUP</div>
     </div>
     
     <div class="content-area">
         {get_dashboard_screen_html()}
         {get_upload_screen_html()}
         {get_estimate_summary_html()}
+        {get_parts_screen_html()}
         {get_techs_screen_html()}
         {get_phase_screen_html()}
-        {get_parts_screen_html()}
         {get_flagtech_screen_html()}
         {get_reports_screen_html()}
         {get_records_screen_html()}
+        {get_setup_screen_html()}
     </div>
     
     <script>
@@ -323,10 +326,15 @@ async def home_screen(request: Request):
             if (screenName === 'records' && typeof loadRecordsData === 'function') {{
                 loadRecordsData();
             }}
+
+            if (screenName === 'setup' && typeof setupLoadData === 'function') {{
+                setupLoadData();
+            }}
         }}
         
         {get_upload_script()}
         {get_parts_script()}
+        {get_setup_script()}
     </script>
 </body>
 </html>
