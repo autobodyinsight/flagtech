@@ -16,7 +16,7 @@ from psycopg2 import sql
 
 router = APIRouter()
 
-_ARCHITECT_EMAIL_SHA256 = "185f5ecad35f2e95eceddd91d8046139b4f9f866dcff1058d165d4604f31af03"
+_ARCHITECT_EMAIL_SHA256 = "917f190f8d76d0c809735eb80cea65722f95098cbb972441ec301a6de54e2664"
 
 
 def _resolve_request_user_email(request: Request) -> str:

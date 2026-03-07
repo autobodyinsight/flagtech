@@ -6,7 +6,10 @@ def get_setup_screen_html():
     <div id="setup" class="screen" style="padding:20px;">
         <div id="setupLayout" style="width:80vw; margin:0 auto; display:flex; align-items:flex-start; gap:16px;">
             <div id="setupShopsPane" style="display:none; width:320px; background:#fff; padding:14px; border-radius:8px; box-shadow:0 2px 4px rgba(0,0,0,0.1);">
-                <h4 style="margin:0 0 10px 0; color:#333;">Shops</h4>
+                <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; margin:0 0 10px 0;">
+                    <h4 style="margin:0; color:#333;">Shops</h4>
+                    <button id="setupAddShopBtn" type="button" onclick="setupStartAddShop()" style="display:none; padding:8px 12px; background:#b22222; color:#fff; border:none; border-radius:4px; cursor:pointer; font-weight:bold;">+ SHOP</button>
+                </div>
                 <div id="setupShopsCards" style="display:flex; flex-direction:column; gap:10px; max-height:74vh; overflow-y:auto;">
                     <div style="color:#999; padding:8px;">Loading shops...</div>
                 </div>
@@ -147,6 +150,7 @@ def get_setup_script():
         let setupIsArchitect = false;
         let setupSelectedShopDomain = '';
         let setupDefaultDomain = '';
+        let setupCreatingShop = false;
         let setupEditMode = false;
 
         function setupEscape(value) {
@@ -160,6 +164,7 @@ def get_setup_script():
 
         async function setupLoadContext() {
             const pane = document.getElementById('setupShopsPane');
+            const addShopBtn = document.getElementById('setupAddShopBtn');
             try {
                 const resp = await fetch('/api/setup/context', { credentials: 'include' });
                 const data = await resp.json();
@@ -169,10 +174,12 @@ def get_setup_script():
                     setupSelectedShopDomain = setupDefaultDomain;
                 }
                 if (pane) pane.style.display = setupIsArchitect ? 'block' : 'none';
+                if (addShopBtn) addShopBtn.style.display = setupIsArchitect ? 'inline-block' : 'none';
             } catch (error) {
                 console.error('Error loading setup context:', error);
                 setupIsArchitect = false;
                 if (pane) pane.style.display = 'none';
+                if (addShopBtn) addShopBtn.style.display = 'none';
             }
         }
 
@@ -188,6 +195,7 @@ def get_setup_script():
         }
 
         async function setupLoadData() {
+            setupCreatingShop = false;
             await setupLoadContext();
             if (setupIsArchitect) {
                 await setupLoadShops();
@@ -195,9 +203,60 @@ def get_setup_script():
             await Promise.all([setupLoadShop(), setupLoadUsers()]);
         }
 
+        function setupSetScopeForNewShop(domain) {
+            const normalized = String(domain || '').trim().toLowerCase();
+            if (!normalized) return false;
+            setupSelectedShopDomain = normalized;
+            setupCreatingShop = true;
+            return true;
+        }
+
+        function setupStartAddShop() {
+            if (!setupIsArchitect) return;
+            const input = window.prompt('Enter new shop domain (example: newshop.com):');
+            if (!input) return;
+            if (!setupSetScopeForNewShop(input)) {
+                alert('A valid shop domain is required.');
+                return;
+            }
+
+            const set = (id, value) => {
+                const el = document.getElementById(id);
+                if (el) el.value = String(value || '');
+            };
+            set('setupShopName', '');
+            set('setupShopAddress', '');
+            set('setupShopCity', '');
+            set('setupShopState', '');
+            set('setupShopZip', '');
+            set('setupShopPhone', '');
+            set('setupShopEmail', '');
+            setupShopData = {};
+            setupRenderShops();
+            openSetupShopModal();
+        }
+
         function setupRenderShops() {
             const cardsWrap = document.getElementById('setupShopsCards');
             if (!cardsWrap || !setupIsArchitect) return;
+
+            const selectedDomainMissing =
+                !!setupSelectedShopDomain &&
+                !(setupShopsData || []).some((shop) => String(shop.domain || '').trim().toLowerCase() === setupSelectedShopDomain);
+
+            if (selectedDomainMissing) {
+                const pending = {
+                    domain: setupSelectedShopDomain,
+                    shop_name: setupCreatingShop ? '(New Shop)' : setupSelectedShopDomain,
+                    address: '',
+                    city: '',
+                    state: '',
+                    zip_code: '',
+                    phone: '',
+                    email: '',
+                };
+                setupShopsData = [pending, ...(setupShopsData || [])];
+            }
 
             if (!setupShopsData.length) {
                 cardsWrap.innerHTML = '<div style="color:#999; padding:8px;">No shops found.</div>';
@@ -252,8 +311,9 @@ def get_setup_script():
             const nextDomain = String(domain || '').trim().toLowerCase();
             if (!nextDomain || nextDomain === setupSelectedShopDomain) return;
             setupSelectedShopDomain = nextDomain;
+            setupCreatingShop = false;
             setupRenderShops();
-            await setupLoadUsers();
+            await Promise.all([setupLoadShop(), setupLoadUsers()]);
         }
 
         function setupRenderShopDisplay() {
@@ -309,6 +369,10 @@ def get_setup_script():
             const btn = document.getElementById('setupShopSaveBtn');
             if (btn) btn.disabled = true;
             try {
+                if (setupIsArchitect && !setupSelectedShopDomain) {
+                    alert('Select a shop first or create one with + SHOP.');
+                    return;
+                }
                 const payload = {
                     shop_name: (document.getElementById('setupShopName')?.value || '').trim(),
                     address: (document.getElementById('setupShopAddress')?.value || '').trim(),
@@ -329,6 +393,7 @@ def get_setup_script():
                 const data = await resp.json();
                 if (data.error) throw new Error(data.error);
                 closeSetupShopModal();
+                setupCreatingShop = false;
                 await setupLoadShop();
                 if (setupIsArchitect) {
                     await setupLoadShops();
@@ -355,6 +420,10 @@ def get_setup_script():
         async function setupLoadUsers() {
             const body = document.getElementById('setupUsersBody');
             if (!body) return;
+            if (setupIsArchitect && !setupSelectedShopDomain) {
+                body.innerHTML = '<tr><td colspan="5" style="padding:18px; text-align:center; color:#999;">Select a shop card to load users.</td></tr>';
+                return;
+            }
             body.innerHTML = '<tr><td colspan="5" style="padding:18px; text-align:center; color:#999;">Loading...</td></tr>';
             try {
                 const resp = await fetch(`/api/setup/users${setupBuildScopeQuery()}`, { credentials: 'include' });
@@ -506,6 +575,10 @@ def get_setup_script():
         }
 
         function openSetupUserModal() {
+            if (setupIsArchitect && !setupSelectedShopDomain) {
+                alert('Select a shop card first.');
+                return;
+            }
             const modal = document.getElementById('setupUserModal');
             if (!modal) return;
             modal.style.display = 'block';
