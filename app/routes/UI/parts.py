@@ -1848,31 +1848,8 @@ def get_parts_script():
                 </html>
             `);
             popup.document.close();
-            let didPrint = false;
-            const runPrint = () => {
-                if (didPrint) return;
-                didPrint = true;
-                try {
-                    popup.focus();
-                    popup.print();
-                } catch (err) {
-                    console.error('Unable to open print dialog:', err);
-                }
-            };
-            const scheduleAfterRender = () => {
-                if (didPrint) return;
-                if (typeof popup.requestAnimationFrame === 'function') {
-                    popup.requestAnimationFrame(() => popup.requestAnimationFrame(runPrint));
-                } else {
-                    setTimeout(runPrint, 0);
-                }
-            };
-            if (popup.document?.readyState === 'complete') {
-                scheduleAfterRender();
-            } else {
-                popup.addEventListener('load', scheduleAfterRender, { once: true });
-            }
-            setTimeout(scheduleAfterRender, 120);
+            popup.focus();
+            setTimeout(() => popup.print(), 300);
         }
 
         function savePartsOrder() {

@@ -784,31 +784,8 @@ def get_techs_screen_html():
                     </html>
                 `);
                 printWindow.document.close();
-                let didPrint = false;
-                const runPrint = () => {
-                    if (didPrint) return;
-                    didPrint = true;
-                    try {
-                        printWindow.focus();
-                        printWindow.print();
-                    } catch (err) {
-                        console.error('Unable to open print dialog:', err);
-                    }
-                };
-                const scheduleAfterRender = () => {
-                    if (didPrint) return;
-                    if (typeof printWindow.requestAnimationFrame === 'function') {
-                        printWindow.requestAnimationFrame(() => printWindow.requestAnimationFrame(runPrint));
-                    } else {
-                        setTimeout(runPrint, 0);
-                    }
-                };
-                if (printWindow.document?.readyState === 'complete') {
-                    scheduleAfterRender();
-                } else {
-                    printWindow.addEventListener('load', scheduleAfterRender, { once: true });
-                }
-                setTimeout(scheduleAfterRender, 120);
+                printWindow.focus();
+                printWindow.print();
             } catch (err) {
                 console.error('Error printing selected ROs:', err);
                 alert(err.message || 'Unable to print selected ROs.');

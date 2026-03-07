@@ -712,43 +712,7 @@ def get_dashboard_screen_html():
                 if (wrap) wrap.style.display = 'none';
             }
 
-            function schedulePrintDialog(printWindow) {
-                if (!printWindow) return;
-                let didPrint = false;
-
-                const runPrint = () => {
-                    if (didPrint) return;
-                    didPrint = true;
-                    try {
-                        printWindow.focus();
-                        printWindow.print();
-                    } catch (err) {
-                        console.error('Unable to open print dialog:', err);
-                    }
-                };
-
-                const scheduleAfterRender = () => {
-                    if (didPrint) return;
-                    if (typeof printWindow.requestAnimationFrame === 'function') {
-                        printWindow.requestAnimationFrame(() => {
-                            printWindow.requestAnimationFrame(runPrint);
-                        });
-                    } else {
-                        setTimeout(runPrint, 0);
-                    }
-                };
-
-                if (printWindow.document?.readyState === 'complete') {
-                    scheduleAfterRender();
-                } else {
-                    printWindow.addEventListener('load', scheduleAfterRender, { once: true });
-                }
-
-                // Fallback in case load events are skipped in some popup contexts.
-                setTimeout(scheduleAfterRender, 120);
-            }
-
-            function roOpenPrintWindow(title, bodyHtml) {
+            function roOpenPrintWindow(title, bodyHtml, options = {}) {
                 const printWindow = window.open('', '_blank');
                 if (!printWindow) {
                     alert('Unable to open print preview. Please allow pop-ups for this site.');
@@ -776,7 +740,12 @@ def get_dashboard_screen_html():
                     </html>
                 `);
                 printWindow.document.close();
-                schedulePrintDialog(printWindow);
+                printWindow.focus();
+                if (options && options.immediatePrint) {
+                    printWindow.print();
+                    return;
+                }
+                setTimeout(() => printWindow.print(), 250);
             }
 
             async function roPrintBill() {
@@ -4532,7 +4501,8 @@ def get_dashboard_screen_html():
                     </html>
                 `);
                 printWindow.document.close();
-                schedulePrintDialog(printWindow);
+                printWindow.focus();
+                printWindow.print();
             }
             
             // Print Options Modal Functions
@@ -4787,9 +4757,13 @@ def get_dashboard_screen_html():
                     </html>
                 `);
                 printWindow.document.close();
-                schedulePrintDialog(printWindow);
+                printWindow.focus();
+                setTimeout(() => {
+                    printWindow.print();
+                }, 250);
             }
-                        `
+            
+            // RO Print Modal Functions
             let currentRoPrintData = null;
             
             function openRoPrintModal(event, roNumber) {
@@ -5044,7 +5018,8 @@ def get_dashboard_screen_html():
                     </html>
                 `);
                 printWindow.document.close();
-                schedulePrintDialog(printWindow);
+                printWindow.focus();
+                setTimeout(() => printWindow.print(), 250);
             }
             
             function printVehicleTag(data) {
@@ -5298,7 +5273,8 @@ def get_dashboard_screen_html():
                     </html>
                 `);
                 printWindow.document.close();
-                schedulePrintDialog(printWindow);
+                printWindow.focus();
+                setTimeout(() => printWindow.print(), 250);
             }
             
             function printTechBody(data) {
@@ -5421,7 +5397,8 @@ def get_dashboard_screen_html():
                     </html>
                 `);
                 printWindow.document.close();
-                schedulePrintDialog(printWindow);
+                printWindow.focus();
+                setTimeout(() => printWindow.print(), 250);
             }
             
             function escapeHtml(text) {

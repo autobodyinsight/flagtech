@@ -141,38 +141,6 @@ def get_reports_screen_html():
         return '$' + amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     }
 
-    function reportsSchedulePrintDialog(win) {
-        if (!win) return;
-        let didPrint = false;
-
-        const runPrint = () => {
-            if (didPrint) return;
-            didPrint = true;
-            try {
-                win.focus();
-                win.print();
-            } catch (err) {
-                console.error('Unable to open print dialog:', err);
-            }
-        };
-
-        const scheduleAfterRender = () => {
-            if (didPrint) return;
-            if (typeof win.requestAnimationFrame === 'function') {
-                win.requestAnimationFrame(() => win.requestAnimationFrame(runPrint));
-            } else {
-                setTimeout(runPrint, 0);
-            }
-        };
-
-        if (win.document?.readyState === 'complete') {
-            scheduleAfterRender();
-        } else {
-            win.addEventListener('load', scheduleAfterRender, { once: true });
-        }
-        setTimeout(scheduleAfterRender, 120);
-    }
-
     function computeGpValues(sales, cost) {
         const safeSales = Number(sales || 0);
         const safeCost = Number(cost || 0);
@@ -208,7 +176,8 @@ def get_reports_screen_html():
         const normalizedRows = Array.isArray(rows) ? rows : [];
         return normalizedRows.map((ro, index) => {
             const partsSales = Number(ro.parts_sales || 0);
-        reportsSchedulePrintDialog(win);
+            const partsCost = Number(ro.parts_cost || 0);
+            const laborSales = Number(ro.labor_sales || 0);
             const laborCost = Number(ro.labor_cost || 0);
             const totalSales = Number((ro.total_sales ?? ro.total) || 0);
             const totalCost = Number(ro.total_cost || 0);
@@ -404,7 +373,8 @@ def get_reports_screen_html():
             </html>
         `);
         win.document.close();
-        reportsSchedulePrintDialog(win);
+        win.focus();
+        setTimeout(() => win.print(), 250);
     }
 
     function reportsPrintClosedRos(printBy) {
