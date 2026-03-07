@@ -4,43 +4,31 @@
 def get_setup_screen_html():
     return """
     <div id="setup" class="screen" style="padding:20px;">
-        <div style="background:#fff; padding:20px; border-radius:8px; box-shadow:0 2px 4px rgba(0,0,0,0.1); max-width:980px;">
+        <div style="width:80vw; margin:0 auto; background:#fff; padding:24px; border-radius:8px; box-shadow:0 2px 4px rgba(0,0,0,0.1);">
             <h3 style="margin:0 0 18px 0; color:#333;">Setup</h3>
 
-            <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
-                <div style="grid-column:1 / span 2;">
-                    <label for="setupShopName" style="font-weight:bold; color:#333;">Shop Name</label>
-                    <input id="setupShopName" type="text" style="width:100%; padding:10px; margin-top:6px;" />
-                </div>
-                <div style="grid-column:1 / span 2;">
-                    <label for="setupShopAddress" style="font-weight:bold; color:#333;">Address</label>
-                    <input id="setupShopAddress" type="text" style="width:100%; padding:10px; margin-top:6px;" />
-                </div>
-                <div>
-                    <label for="setupShopPhone" style="font-weight:bold; color:#333;">Phone Number</label>
-                    <input id="setupShopPhone" type="text" style="width:100%; padding:10px; margin-top:6px;" />
-                </div>
-                <div>
-                    <label for="setupShopEmail" style="font-weight:bold; color:#333;">Email</label>
-                    <input id="setupShopEmail" type="email" style="width:100%; padding:10px; margin-top:6px;" />
-                </div>
-            </div>
-
-            <div style="margin-top:14px; text-align:right;">
-                <button id="setupShopSaveBtn" type="button" onclick="setupSaveShop()" style="padding:10px 16px; background:#b22222; color:#fff; border:none; border-radius:4px; cursor:pointer; font-weight:bold;">Save</button>
+            <div id="setupShopDisplay" style="text-align:center; margin-bottom:18px; color:#333;">
+                <div style="color:#999;">Loading shop information...</div>
             </div>
 
             <hr style="margin:24px 0; border:none; border-top:2px solid #d2d2d2;" />
 
-            <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:14px;">
-                <h4 style="margin:0; color:#333;">Users</h4>
-                <button type="button" onclick="openSetupUserModal()" style="padding:10px 16px; background:#b22222; color:#fff; border:none; border-radius:4px; cursor:pointer; font-weight:bold;">+ USER</button>
+            <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px; gap:10px;">
+                <button type="button" onclick="openSetupShopModal()" style="padding:10px 16px; background:#b22222; color:#fff; border:none; border-radius:4px; cursor:pointer; font-weight:bold;">SHOP INFO</button>
+                <div style="display:flex; align-items:center; gap:8px;">
+                    <button type="button" onclick="openSetupUserModal()" style="padding:10px 16px; background:#b22222; color:#fff; border:none; border-radius:4px; cursor:pointer; font-weight:bold;">+ USER</button>
+                    <button type="button" onclick="setupResetSelectedUsers()" style="padding:10px 16px; background:#b22222; color:#fff; border:none; border-radius:4px; cursor:pointer; font-weight:bold;">RESET</button>
+                    <button id="setupEditBtn" type="button" onclick="setupToggleEditUsers()" style="padding:10px 16px; background:#b22222; color:#fff; border:none; border-radius:4px; cursor:pointer; font-weight:bold;">EDIT</button>
+                </div>
             </div>
+
+            <h4 style="margin:0 0 14px 0; color:#333;">Users</h4>
 
             <div style="overflow-x:auto;">
                 <table style="width:100%; border-collapse:collapse;">
                     <thead>
                         <tr style="background:#23272a; color:#fff; text-align:left;">
+                            <th style="padding:12px; border-bottom:2px solid #ddd; width:50px; text-align:center;">SEL</th>
                             <th style="padding:12px; border-bottom:2px solid #ddd;">FIRST</th>
                             <th style="padding:12px; border-bottom:2px solid #ddd;">LAST</th>
                             <th style="padding:12px; border-bottom:2px solid #ddd;">EMAIL</th>
@@ -48,9 +36,50 @@ def get_setup_screen_html():
                         </tr>
                     </thead>
                     <tbody id="setupUsersBody">
-                        <tr><td colspan="4" style="padding:18px; text-align:center; color:#999;">Loading...</td></tr>
+                        <tr><td colspan="5" style="padding:18px; text-align:center; color:#999;">Loading...</td></tr>
                     </tbody>
                 </table>
+            </div>
+        </div>
+
+        <div id="setupShopModal" class="modal" style="display:none;">
+            <div class="modal-content" style="max-width:760px; max-height:88vh; overflow-y:auto;">
+                <h3 style="margin:0 0 14px 0; color:#333;">Shop Information</h3>
+
+                <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+                    <div style="grid-column:1 / span 2;">
+                        <label for="setupShopName" style="font-weight:bold; color:#333;">Shop Name</label>
+                        <input id="setupShopName" type="text" style="width:100%; padding:10px; margin-top:6px;" />
+                    </div>
+                    <div style="grid-column:1 / span 2;">
+                        <label for="setupShopAddress" style="font-weight:bold; color:#333;">Address</label>
+                        <input id="setupShopAddress" type="text" style="width:100%; padding:10px; margin-top:6px;" />
+                    </div>
+                    <div>
+                        <label for="setupShopCity" style="font-weight:bold; color:#333;">City</label>
+                        <input id="setupShopCity" type="text" style="width:100%; padding:10px; margin-top:6px;" />
+                    </div>
+                    <div>
+                        <label for="setupShopState" style="font-weight:bold; color:#333;">State</label>
+                        <input id="setupShopState" type="text" style="width:100%; padding:10px; margin-top:6px;" />
+                    </div>
+                    <div>
+                        <label for="setupShopZip" style="font-weight:bold; color:#333;">Zip Code</label>
+                        <input id="setupShopZip" type="text" style="width:100%; padding:10px; margin-top:6px;" />
+                    </div>
+                    <div>
+                        <label for="setupShopPhone" style="font-weight:bold; color:#333;">Phone</label>
+                        <input id="setupShopPhone" type="text" style="width:100%; padding:10px; margin-top:6px;" />
+                    </div>
+                    <div style="grid-column:1 / span 2;">
+                        <label for="setupShopEmail" style="font-weight:bold; color:#333;">Email</label>
+                        <input id="setupShopEmail" type="email" style="width:100%; padding:10px; margin-top:6px;" />
+                    </div>
+                </div>
+
+                <div style="margin-top:14px; text-align:right;">
+                    <button id="setupShopSaveBtn" type="button" onclick="setupSaveShop()" style="padding:10px 16px; background:#b22222; color:#fff; border:none; border-radius:4px; cursor:pointer; font-weight:bold;">Save</button>
+                </div>
             </div>
         </div>
 
@@ -103,8 +132,47 @@ def get_setup_screen_html():
 
 def get_setup_script():
     return """
+        let setupShopData = null;
+        let setupUsersData = [];
+        let setupEditMode = false;
+
+        function setupEscape(value) {
+            return String(value || '')
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/\"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
+
         async function setupLoadData() {
             await Promise.all([setupLoadShop(), setupLoadUsers()]);
+        }
+
+        function setupRenderShopDisplay() {
+            const wrap = document.getElementById('setupShopDisplay');
+            if (!wrap) return;
+            const shop = setupShopData || {};
+            const name = setupEscape(shop.shop_name || '');
+            const address = setupEscape(shop.address || '');
+            const city = setupEscape(shop.city || '');
+            const state = setupEscape(shop.state || '');
+            const zipCode = setupEscape(shop.zip_code || '');
+            const phone = setupEscape(shop.phone || '');
+            const email = setupEscape(shop.email || '');
+
+            if (!name && !address && !city && !state && !zipCode && !phone && !email) {
+                wrap.innerHTML = '<div style="color:#999;">No shop information saved yet.</div>';
+                return;
+            }
+
+            const cityStateZip = [city, state, zipCode].filter(Boolean).join(', ').replace(/,\s([^,]+)$/, ' $1');
+            wrap.innerHTML = `
+                <div style="font-weight:700; font-size:20px; color:#222; margin-bottom:4px;">${name || 'Shop'}</div>
+                ${address ? `<div style="color:#444; margin-bottom:2px;">${address}</div>` : ''}
+                ${cityStateZip ? `<div style="color:#444; margin-bottom:2px;">${cityStateZip}</div>` : ''}
+                <div style="color:#444;">${phone ? `<span>${phone}</span>` : ''}${phone && email ? ' | ' : ''}${email ? `<span>${email}</span>` : ''}</div>
+            `;
         }
 
         async function setupLoadShop() {
@@ -112,14 +180,19 @@ def get_setup_script():
                 const resp = await fetch('/api/setup/shop', { credentials: 'include' });
                 const data = await resp.json();
                 const shop = data.shop || {};
+                setupShopData = shop;
                 const set = (id, value) => {
                     const el = document.getElementById(id);
                     if (el) el.value = String(value || '');
                 };
                 set('setupShopName', shop.shop_name);
                 set('setupShopAddress', shop.address);
+                set('setupShopCity', shop.city);
+                set('setupShopState', shop.state);
+                set('setupShopZip', shop.zip_code);
                 set('setupShopPhone', shop.phone);
                 set('setupShopEmail', shop.email);
+                setupRenderShopDisplay();
             } catch (error) {
                 console.error('Error loading shop setup:', error);
             }
@@ -132,6 +205,9 @@ def get_setup_script():
                 const payload = {
                     shop_name: (document.getElementById('setupShopName')?.value || '').trim(),
                     address: (document.getElementById('setupShopAddress')?.value || '').trim(),
+                    city: (document.getElementById('setupShopCity')?.value || '').trim(),
+                    state: (document.getElementById('setupShopState')?.value || '').trim(),
+                    zip_code: (document.getElementById('setupShopZip')?.value || '').trim(),
                     phone: (document.getElementById('setupShopPhone')?.value || '').trim(),
                     email: (document.getElementById('setupShopEmail')?.value || '').trim(),
                 };
@@ -144,6 +220,8 @@ def get_setup_script():
                 });
                 const data = await resp.json();
                 if (data.error) throw new Error(data.error);
+                closeSetupShopModal();
+                await setupLoadShop();
             } catch (error) {
                 console.error('Error saving shop setup:', error);
                 alert('Error saving shop information.');
@@ -152,39 +230,163 @@ def get_setup_script():
             }
         }
 
+        function openSetupShopModal() {
+            const modal = document.getElementById('setupShopModal');
+            if (!modal) return;
+            modal.style.display = 'block';
+        }
+
+        function closeSetupShopModal() {
+            const modal = document.getElementById('setupShopModal');
+            if (modal) modal.style.display = 'none';
+        }
+
         async function setupLoadUsers() {
             const body = document.getElementById('setupUsersBody');
             if (!body) return;
-            body.innerHTML = '<tr><td colspan="4" style="padding:18px; text-align:center; color:#999;">Loading...</td></tr>';
+            body.innerHTML = '<tr><td colspan="5" style="padding:18px; text-align:center; color:#999;">Loading...</td></tr>';
             try {
                 const resp = await fetch('/api/setup/users', { credentials: 'include' });
                 const data = await resp.json();
                 const users = Array.isArray(data.users) ? data.users : [];
+                setupUsersData = users;
                 if (!users.length) {
-                    body.innerHTML = '<tr><td colspan="4" style="padding:18px; text-align:center; color:#999;">No users found.</td></tr>';
+                    body.innerHTML = '<tr><td colspan="5" style="padding:18px; text-align:center; color:#999;">No users found.</td></tr>';
                     return;
                 }
 
-                body.innerHTML = users.map((user, idx) => {
+                setupRenderUsers();
+            } catch (error) {
+                console.error('Error loading setup users:', error);
+                body.innerHTML = '<tr><td colspan="5" style="padding:18px; text-align:center; color:#c00;">Error loading users.</td></tr>';
+            }
+        }
+
+        function setupRenderUsers() {
+            const body = document.getElementById('setupUsersBody');
+            if (!body) return;
+            const users = setupUsersData || [];
+            if (!users.length) {
+                body.innerHTML = '<tr><td colspan="5" style="padding:18px; text-align:center; color:#999;">No users found.</td></tr>';
+                return;
+            }
+
+            body.innerHTML = users.map((user, idx) => {
                     const rowBg = idx % 2 === 0 ? '#f2f0ef' : '#ffffff';
-                    const esc = (val) => String(val || '')
-                        .replace(/&/g, '&amp;')
-                        .replace(/</g, '&lt;')
-                        .replace(/>/g, '&gt;')
-                        .replace(/\"/g, '&quot;')
-                        .replace(/'/g, '&#39;');
+                    const userId = Number(user.id || 0);
+                    const roleOptions = ['Manager', 'Estimator', 'Tech', 'Receptionist', 'HR', 'Support']
+                        .map((role) => `<option value="${role}" ${String(user.role || '') === role ? 'selected' : ''}>${role}</option>`)
+                        .join('');
+                    const disabledAttr = setupEditMode ? '' : 'disabled';
                     return `
                         <tr>
-                            <td style="padding:12px; border-bottom:1px solid #eee; background:${rowBg};">${esc(user.first_name)}</td>
-                            <td style="padding:12px; border-bottom:1px solid #eee; background:${rowBg};">${esc(user.last_name)}</td>
-                            <td style="padding:12px; border-bottom:1px solid #eee; background:${rowBg};">${esc(user.email)}</td>
-                            <td style="padding:12px; border-bottom:1px solid #eee; background:${rowBg};">${esc(user.role)}</td>
+                            <td style="padding:12px; border-bottom:1px solid #eee; background:${rowBg}; text-align:center;">
+                                <input type="checkbox" class="setup-user-select" data-user-id="${userId}" />
+                            </td>
+                            <td style="padding:12px; border-bottom:1px solid #eee; background:${rowBg};">
+                                <input ${disabledAttr} class="setup-user-first" data-user-id="${userId}" value="${setupEscape(user.first_name)}" style="width:100%; padding:8px;" />
+                            </td>
+                            <td style="padding:12px; border-bottom:1px solid #eee; background:${rowBg};">
+                                <input ${disabledAttr} class="setup-user-last" data-user-id="${userId}" value="${setupEscape(user.last_name)}" style="width:100%; padding:8px;" />
+                            </td>
+                            <td style="padding:12px; border-bottom:1px solid #eee; background:${rowBg};">
+                                <input ${disabledAttr} class="setup-user-email" data-user-id="${userId}" value="${setupEscape(user.email)}" style="width:100%; padding:8px;" />
+                            </td>
+                            <td style="padding:12px; border-bottom:1px solid #eee; background:${rowBg};">
+                                <select ${disabledAttr} class="setup-user-role" data-user-id="${userId}" style="width:100%; padding:8px;">${roleOptions}</select>
+                            </td>
                         </tr>
                     `;
                 }).join('');
+
+            const editBtn = document.getElementById('setupEditBtn');
+            if (editBtn) {
+                editBtn.textContent = setupEditMode ? 'EDIT (SAVE)' : 'EDIT';
+            }
+        }
+
+        async function setupToggleEditUsers() {
+            if (!setupEditMode) {
+                setupEditMode = true;
+                setupRenderUsers();
+                return;
+            }
+
+            const getValue = (selector, userId) => {
+                const el = document.querySelector(`${selector}[data-user-id="${userId}"]`);
+                return String(el?.value || '').trim();
+            };
+
+            const changes = [];
+            (setupUsersData || []).forEach((user) => {
+                const userId = Number(user.id || 0);
+                const next = {
+                    first_name: getValue('.setup-user-first', userId),
+                    last_name: getValue('.setup-user-last', userId),
+                    email: getValue('.setup-user-email', userId),
+                    role: getValue('.setup-user-role', userId),
+                };
+                const changed =
+                    next.first_name !== String(user.first_name || '') ||
+                    next.last_name !== String(user.last_name || '') ||
+                    next.email !== String(user.email || '') ||
+                    next.role !== String(user.role || '');
+                if (changed) {
+                    changes.push({ id: userId, ...next });
+                }
+            });
+
+            if (!changes.length) {
+                setupEditMode = false;
+                setupRenderUsers();
+                return;
+            }
+
+            try {
+                for (const payload of changes) {
+                    const resp = await fetch('/api/setup/users/update', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        credentials: 'include',
+                        body: JSON.stringify(payload),
+                    });
+                    const data = await resp.json();
+                    if (data.error) throw new Error(data.error);
+                }
+                setupEditMode = false;
+                await setupLoadUsers();
             } catch (error) {
-                console.error('Error loading setup users:', error);
-                body.innerHTML = '<tr><td colspan="4" style="padding:18px; text-align:center; color:#c00;">Error loading users.</td></tr>';
+                console.error('Error saving user edits:', error);
+                alert('Error saving user edits.');
+            }
+        }
+
+        async function setupResetSelectedUsers() {
+            const selected = Array.from(document.querySelectorAll('.setup-user-select:checked'))
+                .map((el) => Number(el.getAttribute('data-user-id') || 0))
+                .filter((val) => Number.isFinite(val) && val > 0);
+
+            if (!selected.length) {
+                alert('Select at least one user to reset password.');
+                return;
+            }
+
+            const newPassword = window.prompt('Enter new password for selected user(s):');
+            if (!newPassword) return;
+
+            try {
+                const resp = await fetch('/api/setup/users/reset-password', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'include',
+                    body: JSON.stringify({ user_ids: selected, new_password: newPassword }),
+                });
+                const data = await resp.json();
+                if (data.error) throw new Error(data.error);
+                alert('Password reset complete.');
+            } catch (error) {
+                console.error('Error resetting passwords:', error);
+                alert('Error resetting password.');
             }
         }
 
@@ -241,6 +443,12 @@ def get_setup_script():
         }
 
         window.addEventListener('click', (event) => {
+            const shopModal = document.getElementById('setupShopModal');
+            if (shopModal && shopModal.style.display === 'block' && event.target === shopModal) {
+                closeSetupShopModal();
+                return;
+            }
+
             const modal = document.getElementById('setupUserModal');
             if (!modal || modal.style.display !== 'block') return;
             if (event.target === modal) {

@@ -287,6 +287,9 @@ def _ensure_shop_settings_table(cur) -> None:
             domain VARCHAR(255) NOT NULL,
             shop_name VARCHAR(255),
             address TEXT,
+            city VARCHAR(120),
+            state VARCHAR(120),
+            zip_code VARCHAR(20),
             phone VARCHAR(64),
             email VARCHAR(255),
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -295,6 +298,9 @@ def _ensure_shop_settings_table(cur) -> None:
     )
     cur.execute("ALTER TABLE shop_settings ADD COLUMN IF NOT EXISTS shop_name VARCHAR(255)")
     cur.execute("ALTER TABLE shop_settings ADD COLUMN IF NOT EXISTS address TEXT")
+    cur.execute("ALTER TABLE shop_settings ADD COLUMN IF NOT EXISTS city VARCHAR(120)")
+    cur.execute("ALTER TABLE shop_settings ADD COLUMN IF NOT EXISTS state VARCHAR(120)")
+    cur.execute("ALTER TABLE shop_settings ADD COLUMN IF NOT EXISTS zip_code VARCHAR(20)")
     cur.execute("ALTER TABLE shop_settings ADD COLUMN IF NOT EXISTS phone VARCHAR(64)")
     cur.execute("ALTER TABLE shop_settings ADD COLUMN IF NOT EXISTS email VARCHAR(255)")
     cur.execute("ALTER TABLE shop_settings ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP")
@@ -1632,7 +1638,7 @@ async def get_setup_shop(request: Request):
         _ensure_shop_settings_table(cur)
         cur.execute(
             """
-            SELECT shop_name, address, phone, email
+            SELECT shop_name, address, city, state, zip_code, phone, email
             FROM shop_settings
             WHERE domain = %s
             LIMIT 1
@@ -1644,6 +1650,9 @@ async def get_setup_shop(request: Request):
             "shop": {
                 "shop_name": str(row.get("shop_name") or "").strip(),
                 "address": str(row.get("address") or "").strip(),
+                "city": str(row.get("city") or "").strip(),
+                "state": str(row.get("state") or "").strip(),
+                "zip_code": str(row.get("zip_code") or "").strip(),
                 "phone": str(row.get("phone") or "").strip(),
                 "email": str(row.get("email") or "").strip(),
             }
@@ -1661,6 +1670,9 @@ async def save_setup_shop(request: Request):
     data = await request.json()
     shop_name = str(data.get("shop_name") or "").strip()
     address = str(data.get("address") or "").strip()
+    city = str(data.get("city") or "").strip()
+    state = str(data.get("state") or "").strip()
+    zip_code = str(data.get("zip_code") or "").strip()
     phone = str(data.get("phone") or "").strip()
     email = str(data.get("email") or "").strip()
 
@@ -1670,12 +1682,15 @@ async def save_setup_shop(request: Request):
         _ensure_shop_settings_table(cur)
         cur.execute(
             """
-            INSERT INTO shop_settings (domain, shop_name, address, phone, email, updated_at)
-            VALUES (%s, %s, %s, %s, %s, CURRENT_TIMESTAMP)
+            INSERT INTO shop_settings (domain, shop_name, address, city, state, zip_code, phone, email, updated_at)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, CURRENT_TIMESTAMP)
             ON CONFLICT (domain)
             DO UPDATE SET
                 shop_name = EXCLUDED.shop_name,
                 address = EXCLUDED.address,
+                city = EXCLUDED.city,
+                state = EXCLUDED.state,
+                zip_code = EXCLUDED.zip_code,
                 phone = EXCLUDED.phone,
                 email = EXCLUDED.email,
                 updated_at = CURRENT_TIMESTAMP
@@ -1684,12 +1699,129 @@ async def save_setup_shop(request: Request):
                 domain,
                 shop_name or None,
                 address or None,
+                city or None,
+                state or None,
+                zip_code or None,
                 phone or None,
                 email or None,
             ),
         )
         conn.commit()
         return {"status": "ok"}
+    finally:
+        cur.close()
+
+
+@router.post("/setup/users/update")
+async def update_setup_user(request: Request):
+    domain = get_user_domain(request)
+    if not domain:
+        return JSONResponse(status_code=401, content={"error": "Not authenticated"})
+
+    data = await request.json()
+    user_id = data.get("id")
+    try:
+        user_id = int(user_id)
+    except (TypeError, ValueError):
+        return JSONResponse(status_code=400, content={"error": "id is required"})
+
+    first_name = str(data.get("first_name") or "").strip()
+    last_name = str(data.get("last_name") or "").strip()
+    email = str(data.get("email") or "").strip().lower()
+    role = str(data.get("role") or "").strip()
+
+    allowed_roles = {"Manager", "Estimator", "Tech", "Receptionist", "HR", "Support"}
+    if not first_name or not last_name or not email or not role:
+        return JSONResponse(status_code=400, content={"error": "first_name, last_name, email, and role are required"})
+    if role not in allowed_roles:
+        return JSONResponse(status_code=400, content={"error": "Invalid role"})
+
+    conn = get_conn()
+    cur = conn.cursor()
+    try:
+        _ensure_shop_users_table(cur)
+        cur.execute(
+            """
+            UPDATE shop_users
+            SET first_name = %s,
+                last_name = %s,
+                email = %s,
+                role = %s
+            WHERE id = %s
+              AND domain = %s
+              AND active = TRUE
+            RETURNING id, first_name, last_name, email, role, created_at
+            """,
+            (first_name, last_name, email, role, user_id, domain),
+        )
+        row = cur.fetchone() or {}
+        conn.commit()
+
+        if not row:
+            return JSONResponse(status_code=404, content={"error": "User not found"})
+
+        created_at = row.get("created_at")
+        return {
+            "status": "ok",
+            "user": {
+                "id": int(row.get("id") or 0),
+                "first_name": str(row.get("first_name") or "").strip(),
+                "last_name": str(row.get("last_name") or "").strip(),
+                "email": str(row.get("email") or "").strip(),
+                "role": str(row.get("role") or "").strip(),
+                "created_at": created_at.isoformat() if isinstance(created_at, datetime) else None,
+            },
+        }
+    finally:
+        cur.close()
+
+
+@router.post("/setup/users/reset-password")
+async def reset_setup_user_password(request: Request):
+    domain = get_user_domain(request)
+    if not domain:
+        return JSONResponse(status_code=401, content={"error": "Not authenticated"})
+
+    data = await request.json()
+    user_ids_raw = data.get("user_ids") or []
+    new_password = str(data.get("new_password") or "")
+
+    if not isinstance(user_ids_raw, list) or not user_ids_raw:
+        return JSONResponse(status_code=400, content={"error": "user_ids is required"})
+    if not new_password:
+        return JSONResponse(status_code=400, content={"error": "new_password is required"})
+
+    user_ids = []
+    for value in user_ids_raw:
+        try:
+            parsed = int(value)
+        except (TypeError, ValueError):
+            continue
+        if parsed not in user_ids:
+            user_ids.append(parsed)
+
+    if not user_ids:
+        return JSONResponse(status_code=400, content={"error": "No valid user ids provided"})
+
+    password_hash = hashlib.sha256(new_password.encode("utf-8")).hexdigest()
+
+    conn = get_conn()
+    cur = conn.cursor()
+    try:
+        _ensure_shop_users_table(cur)
+        cur.execute(
+            """
+            UPDATE shop_users
+            SET password_hash = %s
+            WHERE domain = %s
+              AND active = TRUE
+              AND id = ANY(%s)
+            """,
+            (password_hash, domain, user_ids),
+        )
+        updated_count = int(cur.rowcount or 0)
+        conn.commit()
+        return {"status": "ok", "updated": updated_count}
     finally:
         cur.close()
 
