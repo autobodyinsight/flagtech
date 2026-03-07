@@ -16,9 +16,6 @@ def get_records_screen_html():
                 <button id="recordsSidebarBtn-parts" class="records-sidebar-btn" data-view="parts" title="Parts" onclick="recordsSwitchView('parts')" style="background:none; border:none; padding:0; cursor:pointer;">
                     <svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="10" cy="23" r="2" stroke="white" stroke-width="2"/><circle cx="20" cy="23" r="2" stroke="white" stroke-width="2"/><rect x="5" y="7" width="18" height="10" rx="2" stroke="white" stroke-width="2"/><path d="M7 7V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v2" stroke="white" stroke-width="2"/></svg>
                 </button>
-                <button id="recordsSidebarBtn-vendors" class="records-sidebar-btn" data-view="vendors" title="Vendors" onclick="recordsSwitchView('vendors')" style="background:none; border:none; padding:0; cursor:pointer;">
-                    <svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="5" y="10" width="18" height="13" rx="1.8" stroke="white" stroke-width="2"/><path d="M4 10h20" stroke="white" stroke-width="2"/><path d="M8 10V6h12v4" stroke="white" stroke-width="2"/><path d="M10 14v9" stroke="white" stroke-width="2"/><path d="M14 14v9" stroke="white" stroke-width="2"/><path d="M18 14v9" stroke="white" stroke-width="2"/></svg>
-                </button>
             </div>
         </div>
 
@@ -120,10 +117,6 @@ def get_records_screen_html():
             </div>
         </div>
 
-        <div id="recordsPanel-vendors" class="records-content-panel" style="display:none; background:#fff; padding:20px; border-radius:8px; box-shadow:0 2px 4px rgba(0,0,0,0.1);">
-            <h3 style="margin:0 0 18px 0; color:#333;">Vendors</h3>
-            <div style="color:#666;">Vendors screen</div>
-        </div>
         </div>
         <style>
             .dashboard-header-row th, .dashboard-header-cell {
