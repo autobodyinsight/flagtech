@@ -526,6 +526,17 @@ def get_dashboard_screen_html():
                 return parsed.toLocaleString();
             }
 
+            function popupLocalDateTimeValue(dateObj = new Date()) {
+                const pad = (num) => String(num).padStart(2, '0');
+                const year = dateObj.getFullYear();
+                const month = pad(dateObj.getMonth() + 1);
+                const day = pad(dateObj.getDate());
+                const hours = pad(dateObj.getHours());
+                const minutes = pad(dateObj.getMinutes());
+                const seconds = pad(dateObj.getSeconds());
+                return `${year}-${month}-${day}T${hours}:${minutes}:${seconds}`;
+            }
+
             function popupFormatDate(value) {
                 if (!value) return '-';
                 if (/^\d{4}-\d{2}-\d{2}$/.test(String(value))) {
@@ -1507,7 +1518,11 @@ def get_dashboard_screen_html():
                             await popupFetchJson('/api/ro-notes', {
                                 method: 'POST',
                                 headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({ ro: ro.ro, note: noteText }),
+                                body: JSON.stringify({
+                                    ro: ro.ro,
+                                    note: noteText,
+                                    created_at_local: popupLocalDateTimeValue(),
+                                }),
                             });
                             inputEl.value = '';
                             await loadNotes();
@@ -3057,7 +3072,11 @@ def get_dashboard_screen_html():
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     credentials: 'include',
-                    body: JSON.stringify({ ro: roNumber, note: text })
+                    body: JSON.stringify({
+                        ro: roNumber,
+                        note: text,
+                        created_at_local: popupLocalDateTimeValue()
+                    })
                 })
                 .then(r => r.json())
                 .then(res => {

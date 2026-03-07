@@ -476,7 +476,27 @@ def _ensure_ro_notes_table(cur) -> None:
         """
     )
     cur.execute("ALTER TABLE ro_notes ADD COLUMN IF NOT EXISTS created_by VARCHAR(255)")
+    cur.execute("ALTER TABLE ro_notes ADD COLUMN IF NOT EXISTS created_at_local TIMESTAMP")
     cur.execute("CREATE INDEX IF NOT EXISTS idx_ro_notes_ro_domain ON ro_notes(ro, domain)")
+
+
+def _parse_client_local_datetime(value) -> datetime | None:
+    if value is None:
+        return None
+    if isinstance(value, datetime):
+        return value.replace(tzinfo=None)
+    text = str(value).strip()
+    if not text:
+        return None
+    # Accept local wall-clock timestamps from the browser (no timezone conversion).
+    normalized = text.replace("Z", "+00:00")
+    try:
+        parsed = datetime.fromisoformat(normalized)
+    except Exception:
+        return None
+    if parsed.tzinfo is not None:
+        parsed = parsed.astimezone().replace(tzinfo=None)
+    return parsed
 
 
 def _ensure_ro_activity_log_table(cur) -> None:
@@ -4545,10 +4565,10 @@ async def list_ro_notes(request: Request, ro: str):
         _ensure_ro_notes_table(cur)
         cur.execute(
             """
-            SELECT note, created_at, created_by
+            SELECT note, COALESCE(created_at_local, created_at) AS created_at, created_by
             FROM ro_notes
             WHERE ro = %s AND domain = %s
-            ORDER BY created_at DESC
+            ORDER BY COALESCE(created_at_local, created_at) DESC
             """,
             (ro, domain),
         )
@@ -4703,6 +4723,7 @@ async def add_ro_note(request: Request):
     data = await request.json()
     ro = (data.get("ro") or "").strip()
     note = (data.get("note") or "").strip()
+    created_at_local = _parse_client_local_datetime(data.get("created_at_local"))
     if not ro or not note:
         return JSONResponse(status_code=400, content={"error": "ro and note are required"})
 
@@ -4712,10 +4733,10 @@ async def add_ro_note(request: Request):
         _ensure_ro_notes_table(cur)
         cur.execute(
             """
-            INSERT INTO ro_notes (ro, note, domain, created_by)
-            VALUES (%s, %s, %s, %s)
+            INSERT INTO ro_notes (ro, note, domain, created_by, created_at, created_at_local)
+            VALUES (%s, %s, %s, %s, COALESCE(%s, CURRENT_TIMESTAMP), %s)
             """,
-            (ro, note, domain, created_by),
+            (ro, note, domain, created_by, created_at_local, created_at_local),
         )
         conn.commit()
         return {"status": "ok"}
