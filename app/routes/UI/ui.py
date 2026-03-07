@@ -38,7 +38,7 @@ async def login_screen(request: Request):
 <!DOCTYPE html>
 <html>
 <head>
-    <title>FlagTech Login</title>
+    <title>AutobodyOS Login</title>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body {
@@ -58,7 +58,7 @@ async def login_screen(request: Request):
             gap: 20px;
         }
         .title {
-            color: #ffffff;
+            color: #b22222;
             font-size: clamp(34px, 5.2vw, 52px);
             letter-spacing: 1px;
             font-weight: 700;
@@ -152,7 +152,7 @@ async def login_screen(request: Request):
 </head>
 <body>
     <div class="login-shell">
-        <h1 class="title">FlagTech</h1>
+        <h1 class="title">AutobodyOS</h1>
         <div class="subtitle">Sign in to continue</div>
         <div id="loginError" class="error"></div>
         <form id="loginForm" class="login-form">
@@ -220,7 +220,7 @@ async def home_screen(request: Request):
 <!DOCTYPE html>
 <html>
 <head>
-    <title>FlagTech</title>
+    <title>AutobodyOS</title>
     <style>
         * {{
             margin: 0;
