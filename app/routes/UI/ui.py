@@ -26,9 +26,142 @@ except ImportError:
 router = APIRouter()
 
 
+def _is_authenticated(request: Request) -> bool:
+    email = str(request.cookies.get("user_email") or "").strip()
+    domain = str(request.cookies.get("user_domain") or "").strip()
+    return bool(email and domain)
+
+
+@router.get("/login", response_class=HTMLResponse)
+async def login_screen(request: Request):
+    return """
+<!DOCTYPE html>
+<html>
+<head>
+    <title>FlagTech Login</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: Arial, sans-serif;
+            min-height: 100vh;
+            display: grid;
+            place-items: center;
+            background: linear-gradient(135deg, #d9d9d9 0%, #c6c6c6 50%, #bdbdbd 100%);
+            padding: 20px;
+        }
+        .login-card {
+            width: 100%;
+            max-width: 420px;
+            background: #ffffff;
+            border-radius: 10px;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.16);
+            padding: 26px;
+        }
+        .title {
+            color: #222;
+            margin-bottom: 4px;
+            font-size: 26px;
+        }
+        .subtitle {
+            color: #666;
+            margin-bottom: 18px;
+            font-size: 14px;
+        }
+        label {
+            display: block;
+            margin-bottom: 6px;
+            color: #333;
+            font-weight: bold;
+            font-size: 13px;
+        }
+        input {
+            width: 100%;
+            border: 1px solid #c9c9c9;
+            border-radius: 6px;
+            padding: 11px;
+            margin-bottom: 14px;
+            font-size: 14px;
+        }
+        .btn {
+            width: 100%;
+            border: 0;
+            border-radius: 6px;
+            padding: 12px;
+            background: #b22222;
+            color: #fff;
+            font-weight: bold;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        .error {
+            min-height: 20px;
+            color: #b00020;
+            margin-bottom: 10px;
+            font-size: 13px;
+        }
+    </style>
+</head>
+<body>
+    <div class="login-card">
+        <h1 class="title">FlagTech</h1>
+        <div class="subtitle">Sign in to continue</div>
+        <div id="loginError" class="error"></div>
+        <form id="loginForm">
+            <label for="loginEmail">Email</label>
+            <input id="loginEmail" name="loginEmail" type="email" autocomplete="username" required />
+
+            <label for="loginPassword">Password</label>
+            <input id="loginPassword" name="loginPassword" type="password" autocomplete="current-password" required />
+
+            <button id="loginBtn" class="btn" type="submit">Sign In</button>
+        </form>
+    </div>
+
+    <script>
+        const form = document.getElementById('loginForm');
+        const errorWrap = document.getElementById('loginError');
+        const loginBtn = document.getElementById('loginBtn');
+
+        form.addEventListener('submit', async (event) => {
+            event.preventDefault();
+            errorWrap.textContent = '';
+            loginBtn.disabled = true;
+            try {
+                const payload = {
+                    email: (document.getElementById('loginEmail').value || '').trim(),
+                    password: (document.getElementById('loginPassword').value || ''),
+                };
+
+                const resp = await fetch('/api/auth/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'include',
+                    body: JSON.stringify(payload),
+                });
+                const data = await resp.json();
+                if (!resp.ok || data.error) {
+                    throw new Error(data.error || 'Login failed');
+                }
+
+                window.location.href = '/ui/';
+            } catch (error) {
+                errorWrap.textContent = String(error.message || 'Login failed');
+            } finally {
+                loginBtn.disabled = false;
+            }
+        });
+    </script>
+</body>
+</html>
+"""
+
+
 @router.get("/", response_class=HTMLResponse)
 async def home_screen(request: Request):
     """Main UI screen with sidebar navigation."""
+
+    if not _is_authenticated(request):
+        return RedirectResponse(url="/ui/login")
 
     return f"""
 <!DOCTYPE html>
@@ -234,6 +367,7 @@ async def home_screen(request: Request):
         <div class="nav-tab" onclick="switchScreen('reports')">REPORTS</div>
         <div class="nav-tab" onclick="switchScreen('records')">RECORDS</div>
         <div class="nav-tab" onclick="switchScreen('setup')">SETUP</div>
+        <div class="nav-tab" onclick="logoutApp()">LOGOUT</div>
     </div>
     
     <div class="content-area">
@@ -329,6 +463,19 @@ async def home_screen(request: Request):
 
             if (screenName === 'setup' && typeof setupLoadData === 'function') {{
                 setupLoadData();
+            }}
+        }}
+
+        async function logoutApp() {{
+            try {{
+                await fetch('/api/auth/logout', {{
+                    method: 'POST',
+                    credentials: 'include',
+                }});
+            }} catch (e) {{
+                console.error('Logout error:', e);
+            }} finally {{
+                window.location.href = '/ui/login';
             }}
         }}
         

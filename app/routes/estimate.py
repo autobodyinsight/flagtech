@@ -1,4 +1,4 @@
-from fastapi import APIRouter, UploadFile, File, Request
+from fastapi import APIRouter, UploadFile, File, Request, Response
 import os
 import json
 import math
@@ -16,7 +16,7 @@ from psycopg2 import sql
 
 router = APIRouter()
 
-_ARCHITECT_EMAIL = "jorge@autobodyinsight.com"
+_ARCHITECT_EMAIL_SHA256 = "185f5ecad35f2e95eceddd91d8046139b4f9f866dcff1058d165d4604f31af03"
 
 
 def _resolve_request_user_email(request: Request) -> str:
@@ -35,9 +35,22 @@ def _resolve_request_user_email(request: Request) -> str:
     return ""
 
 
+def _is_architect_email(email: str) -> bool:
+    normalized = str(email or "").strip().lower()
+    if not normalized:
+        return False
+    digest = hashlib.sha256(normalized.encode("utf-8")).hexdigest()
+    return digest == _ARCHITECT_EMAIL_SHA256
+
+
+def _build_cookie_secure_flag(request: Request) -> bool:
+    proto = str(request.headers.get("x-forwarded-proto") or "").strip().lower()
+    return proto == "https"
+
+
 def _resolve_internal_access_level(request: Request) -> str:
     # Internal-only access level mapping. ARCHITECT is never user-selectable.
-    if _resolve_request_user_email(request) == _ARCHITECT_EMAIL:
+    if _is_architect_email(_resolve_request_user_email(request)):
         return "ARCHITECT"
     return "STANDARD"
 
@@ -51,6 +64,106 @@ def _resolve_setup_scope_domain(request: Request, fallback_domain: str, requeste
     if requested and _request_is_architect(request):
         return requested
     return str(fallback_domain or "").strip().lower()
+
+
+@router.post("/auth/login")
+async def auth_login(request: Request):
+    data = await request.json()
+    email = str(data.get("email") or "").strip().lower()
+    password = str(data.get("password") or "")
+
+    if not email or not password:
+        return JSONResponse(status_code=400, content={"error": "email and password are required"})
+
+    password_hash = hashlib.sha256(password.encode("utf-8")).hexdigest()
+
+    conn = get_conn()
+    cur = conn.cursor()
+    try:
+        _ensure_shop_users_table(cur)
+        cur.execute(
+            """
+            SELECT id, first_name, last_name, email, role, domain
+            FROM shop_users
+            WHERE LOWER(email) = %s
+              AND password_hash = %s
+              AND active = TRUE
+            ORDER BY created_at DESC, id DESC
+            LIMIT 1
+            """,
+            (email, password_hash),
+        )
+        row = cur.fetchone() or {}
+        if not row:
+            return JSONResponse(status_code=401, content={"error": "Invalid credentials"})
+
+        user_email = str(row.get("email") or "").strip().lower()
+        user_domain = str(row.get("domain") or "").strip().lower()
+        first_name = str(row.get("first_name") or "").strip()
+        last_name = str(row.get("last_name") or "").strip()
+
+        if not user_email or not user_domain:
+            return JSONResponse(status_code=401, content={"error": "Invalid user record"})
+
+        secure = _build_cookie_secure_flag(request)
+        response = JSONResponse(
+            content={
+                "status": "ok",
+                "user": {
+                    "email": user_email,
+                    "first_name": first_name,
+                    "last_name": last_name,
+                    "domain": user_domain,
+                },
+            }
+        )
+        response.set_cookie(
+            key="user_email",
+            value=user_email,
+            httponly=True,
+            secure=secure,
+            samesite="lax",
+            max_age=60 * 60 * 12,
+            path="/",
+        )
+        response.set_cookie(
+            key="user_domain",
+            value=user_domain,
+            httponly=True,
+            secure=secure,
+            samesite="lax",
+            max_age=60 * 60 * 12,
+            path="/",
+        )
+        return response
+    finally:
+        cur.close()
+
+
+@router.post("/auth/logout")
+async def auth_logout(request: Request):
+    secure = _build_cookie_secure_flag(request)
+    response = JSONResponse(content={"status": "ok"})
+    response.delete_cookie("user_email", path="/", secure=secure, samesite="lax")
+    response.delete_cookie("user_domain", path="/", secure=secure, samesite="lax")
+    return response
+
+
+@router.get("/auth/session")
+async def auth_session(request: Request):
+    email = _resolve_request_user_email(request)
+    domain = get_user_domain(request)
+    if not email or not domain:
+        return JSONResponse(status_code=401, content={"authenticated": False})
+
+    return {
+        "authenticated": True,
+        "user": {
+            "email": email,
+            "domain": domain,
+            "access_level": _resolve_internal_access_level(request),
+        },
+    }
 
 
 def _to_local_business_date(value) -> date | None:
@@ -1841,7 +1954,7 @@ async def update_setup_user(request: Request):
         return JSONResponse(status_code=400, content={"error": "first_name, last_name, email, and role are required"})
     if role not in allowed_roles:
         return JSONResponse(status_code=400, content={"error": "Invalid role"})
-    if email == _ARCHITECT_EMAIL:
+    if _is_architect_email(email):
         return JSONResponse(status_code=400, content={"error": "This email cannot be assigned from Setup"})
 
     conn = get_conn()
@@ -1995,7 +2108,7 @@ async def create_setup_user(request: Request):
         return JSONResponse(status_code=400, content={"error": "first_name, last_name, email, role, and password are required"})
     if role not in allowed_roles:
         return JSONResponse(status_code=400, content={"error": "Invalid role"})
-    if email == _ARCHITECT_EMAIL:
+    if _is_architect_email(email):
         return JSONResponse(status_code=400, content={"error": "This email cannot be created from Setup"})
 
     password_hash = hashlib.sha256(password.encode("utf-8")).hexdigest()

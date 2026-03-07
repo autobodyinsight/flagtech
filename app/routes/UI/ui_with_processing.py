@@ -696,7 +696,7 @@ def _estimate_hours_for_ecd(payload: dict) -> float:
             total += _to_float(item.get("value") or 0)
     return total
 
-@router.get("/", response_class=HTMLResponse)
+@router.get("/legacy", response_class=HTMLResponse)
 async def home_screen():
     return f"""
 <!DOCTYPE html>

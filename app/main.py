@@ -67,4 +67,4 @@ app.include_router(ui_routes_router, prefix="/ui")
 
 @app.get("/", include_in_schema=False)
 def root():
-    return RedirectResponse(url="/ui/")
+    return RedirectResponse(url="/ui/login")

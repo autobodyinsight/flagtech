@@ -29,5 +29,12 @@ def _build_scope_key(domain: str | None) -> str:
 
 
 def get_user_domain(request: Request) -> Optional[str]:
-    """Resolve the active tenant domain scope for anonymous access."""
-    return _build_scope_key(DEFAULT_SCOPE_DOMAIN)
+    """Resolve the active tenant domain scope for authenticated requests."""
+    cookie_domain = _clean(request.cookies.get("user_domain"))
+    header_domain = _clean(request.headers.get("x-user-domain"))
+
+    candidate_domain = header_domain or cookie_domain
+    if not candidate_domain:
+        return None
+
+    return _build_scope_key(candidate_domain)
