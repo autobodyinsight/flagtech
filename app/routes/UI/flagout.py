@@ -303,8 +303,31 @@ def get_flagtech_screen_html():
                     </html>
                 `);
                 printWindow.document.close();
-                printWindow.focus();
-                printWindow.print();
+                let didPrint = false;
+                const runPrint = () => {
+                    if (didPrint) return;
+                    didPrint = true;
+                    try {
+                        printWindow.focus();
+                        printWindow.print();
+                    } catch (err) {
+                        console.error('Unable to open print dialog:', err);
+                    }
+                };
+                const scheduleAfterRender = () => {
+                    if (didPrint) return;
+                    if (typeof printWindow.requestAnimationFrame === 'function') {
+                        printWindow.requestAnimationFrame(() => printWindow.requestAnimationFrame(runPrint));
+                    } else {
+                        setTimeout(runPrint, 0);
+                    }
+                };
+                if (printWindow.document?.readyState === 'complete') {
+                    scheduleAfterRender();
+                } else {
+                    printWindow.addEventListener('load', scheduleAfterRender, { once: true });
+                }
+                setTimeout(scheduleAfterRender, 120);
             }
 
             function submitFlagoutPayout() {
