@@ -1030,10 +1030,18 @@ def get_dashboard_screen_html():
                         `;
                     }).join('');
 
+                    const vehicleText = escapePopupHtml(ro.vehicle || '-');
+                    const vinText = escapePopupHtml(ro.vin || '-');
+
                     roOpenPrintWindow(
                         `RO ${ro.ro} Parts`,
                         `
-                            <div class="header"><h1>Parts</h1><p>RO #${escapePopupHtml(ro.ro || '-')}</p></div>
+                            <div class="header">
+                                <h1>Parts</h1>
+                                <p>RO #${escapePopupHtml(ro.ro || '-')}</p>
+                                <p>Vehicle: ${vehicleText}</p>
+                                <p>VIN: ${vinText}</p>
+                            </div>
                             <table>
                                 <thead>
                                     <tr>
@@ -1099,53 +1107,59 @@ def get_dashboard_screen_html():
                 );
             }
 
-            function roPrintServiceCover() {
+            async function roPrintServiceCover() {
                 roClosePrintOptionsModal();
-                const inDateText = escapePopupHtml(popupFormatDate(ro.in_date));
-                const outDateText = escapePopupHtml(popupFormatDate(ro.picked_up));
-                const customerText = escapePopupHtml(ro.customer || '-');
-                const insuranceText = escapePopupHtml(ro.insurance || '-');
-                const vehicleText = escapePopupHtml(ro.vehicle || '-');
-                const vinText = escapePopupHtml(ro.vin || '-');
-                const insuranceTotal = popupToNumber(ro.insurance_pay || 0);
-                const customerTotal = popupToNumber(ro.customer_pay || 0);
+                try {
+                    const printData = await popupFetchJson(`/api/ro-print-data?ro=${encodeURIComponent(ro.ro)}`);
+                    const inDateText = escapePopupHtml(popupFormatDate(printData?.in_date || ro.in_date));
+                    const outDateText = escapePopupHtml(popupFormatDate(ro.picked_up));
+                    const customerText = escapePopupHtml(printData?.customer || ro.customer || '-');
+                    const insuranceText = escapePopupHtml(printData?.insurance || ro.insurance || '-');
+                    const vehicleText = escapePopupHtml(printData?.vehicle || ro.vehicle || '-');
+                    const vinText = escapePopupHtml(printData?.vin || ro.vin || '-');
+                    const insuranceTotal = popupToNumber(printData?.totals?.insurance_total, popupToNumber(ro.insurance_pay || 0));
+                    const customerTotal = popupToNumber(printData?.totals?.customer_total, popupToNumber(ro.customer_pay || 0));
 
-                const noteLinesHtml = Array.from({ length: 6 }).map(() => `
-                    <div style="font-size:18px; margin-bottom:18px; letter-spacing:0.2px;">
-                        _____/_____/_______&nbsp;&nbsp;&nbsp;&nbsp;______________________________________________________
-                    </div>
-                `).join('');
+                    const noteLinesHtml = Array.from({ length: 6 }).map(() => `
+                        <div style="font-size:18px; margin-bottom:18px; letter-spacing:0.2px;">
+                            _____/_____/_______&nbsp;&nbsp;&nbsp;&nbsp;______________________________________________________
+                        </div>
+                    `).join('');
 
-                roOpenPrintWindow(
-                    `RO ${ro.ro} Service Cover`,
-                    `
-                        <div style="height:50vh; display:flex; flex-direction:column; justify-content:center; gap:14px;">
-                            <div style="display:flex; justify-content:space-between; align-items:flex-end;">
-                                <div style="font-size:108px; font-weight:800; line-height:1;">RO ${escapePopupHtml(ro.ro || '-')}</div>
-                                <div style="font-size:32px; font-weight:700;">IN DATE: ${inDateText}</div>
+                    roOpenPrintWindow(
+                        `RO ${ro.ro} Service Cover`,
+                        `
+                            <div style="height:50vh; display:flex; flex-direction:column; justify-content:center; gap:14px;">
+                                <div style="display:flex; justify-content:space-between; align-items:flex-end;">
+                                    <div style="font-size:108px; font-weight:800; line-height:1;">RO ${escapePopupHtml(ro.ro || '-')}</div>
+                                    <div style="font-size:32px; font-weight:700;">IN DATE: ${inDateText}</div>
+                                </div>
+                                <div style="display:flex; justify-content:space-between; align-items:flex-end; font-size:36px; font-weight:600; line-height:1.1;">
+                                    <div>${customerText}</div>
+                                    <div>OUT DATE: ${outDateText}</div>
+                                </div>
+                                <div style="display:flex; justify-content:space-between; align-items:flex-end; font-size:34px; font-weight:600; line-height:1.1;">
+                                    <div>${vehicleText}</div>
+                                    <div>${insuranceText}</div>
+                                </div>
+                                <div style="font-size:32px; font-weight:600; line-height:1.1;">${vinText}</div>
                             </div>
-                            <div style="display:flex; justify-content:space-between; align-items:flex-end; font-size:36px; font-weight:600; line-height:1.1;">
-                                <div>${customerText}</div>
-                                <div>OUT DATE: ${outDateText}</div>
+                            <div class="line-break"></div>
+                            <div style="height:45vh; display:flex; flex-direction:column; justify-content:flex-start; margin-top:8px;">
+                                <div style="display:grid; grid-template-columns:1fr 1fr 1fr 1fr; gap:16px; margin-bottom:18px; font-size:18px;">
+                                    <div><strong>Insurance Total:</strong> ${popupFormatMoney(insuranceTotal)}</div>
+                                    <div><strong>Customer Total:</strong> ${popupFormatMoney(customerTotal)}</div>
+                                    <div><strong>In Date:</strong> ${inDateText}</div>
+                                    <div><strong>Out Date:</strong> ${outDateText}</div>
+                                </div>
+                                ${noteLinesHtml}
                             </div>
-                            <div style="display:flex; justify-content:space-between; align-items:flex-end; font-size:34px; font-weight:600; line-height:1.1;">
-                                <div>${vehicleText}</div>
-                                <div>${insuranceText}</div>
-                            </div>
-                            <div style="font-size:32px; font-weight:600; line-height:1.1;">${vinText}</div>
-                        </div>
-                        <div class="line-break"></div>
-                        <div style="height:45vh; display:flex; flex-direction:column; justify-content:flex-start; margin-top:8px;">
-                            <div style="display:grid; grid-template-columns:1fr 1fr 1fr 1fr; gap:16px; margin-bottom:18px; font-size:18px;">
-                                <div><strong>Insurance Total:</strong> ${popupFormatMoney(insuranceTotal)}</div>
-                                <div><strong>Customer Total:</strong> ${popupFormatMoney(customerTotal)}</div>
-                                <div><strong>In Date:</strong> ${inDateText}</div>
-                                <div><strong>Out Date:</strong> ${outDateText}</div>
-                            </div>
-                            ${noteLinesHtml}
-                        </div>
-                    `
-                );
+                        `
+                    );
+                } catch (error) {
+                    console.error('Error printing service cover:', error);
+                    alert('Unable to generate Service Cover print.');
+                }
             }
 
             function bindRoPrintActions() {
