@@ -1036,11 +1036,13 @@ def get_dashboard_screen_html():
                     roOpenPrintWindow(
                         `RO ${ro.ro} Parts`,
                         `
-                            <div class="header">
-                                <h1>Parts</h1>
-                                <p>RO #${escapePopupHtml(ro.ro || '-')}</p>
-                                <p>Vehicle: ${vehicleText}</p>
-                                <p>VIN: ${vinText}</p>
+                            <div class="header" style="text-align:left;">
+                                <div style="font-size:72px; font-weight:800; line-height:1; margin-bottom:8px;">RO #${escapePopupHtml(ro.ro || '-')}</div>
+                                <div style="display:flex; justify-content:space-between; align-items:flex-end; gap:18px; margin-bottom:6px;">
+                                    <div style="font-size:24px; font-weight:600;">Vehicle: ${vehicleText}</div>
+                                    <div style="font-size:32px; font-weight:800; letter-spacing:1px;">PARTS</div>
+                                </div>
+                                <div style="font-size:24px; font-weight:600;">VIN: ${vinText}</div>
                             </div>
                             <table>
                                 <thead>
