@@ -712,7 +712,7 @@ def get_dashboard_screen_html():
                 if (wrap) wrap.style.display = 'none';
             }
 
-            function roOpenPrintWindow(title, bodyHtml) {
+            function roOpenPrintWindow(title, bodyHtml, options = {}) {
                 const printWindow = window.open('', '_blank');
                 if (!printWindow) {
                     alert('Unable to open print preview. Please allow pop-ups for this site.');
@@ -741,6 +741,10 @@ def get_dashboard_screen_html():
                 `);
                 printWindow.document.close();
                 printWindow.focus();
+                if (options && options.immediatePrint) {
+                    printWindow.print();
+                    return;
+                }
                 setTimeout(() => printWindow.print(), 250);
             }
 
@@ -794,14 +798,12 @@ def get_dashboard_screen_html():
                             </div>
                             <div style="display:grid; grid-template-columns:1fr 1fr; gap:14px; font-size:13px;">
                                 <div>
-                                    <div><strong>RO Number:</strong> ${escapePopupHtml(ro.ro || '-')}</div>
-                                    <div><strong>Customer:</strong> ${escapePopupHtml(ro.customer || '-')}</div>
-                                    <div><strong>Phone:</strong> ${escapePopupHtml(ro.phone || '-')}</div>
+                                    <div style="font-size:26px;"><strong>Customer:</strong> ${escapePopupHtml(ro.customer || '-')}</div>
+                                    <div style="font-size:26px;"><strong>Phone:</strong> ${escapePopupHtml(ro.phone || '-')}</div>
                                 </div>
                                 <div>
-                                    <div><strong>Insurance:</strong> ${escapePopupHtml(ro.insurance || '-')}</div>
-                                    <div><strong>Vehicle:</strong> ${escapePopupHtml(ro.vehicle || '-')}</div>
-                                    <div><strong>RO Info:</strong> In ${escapePopupHtml(popupFormatDate(ro.in_date))} | ECD ${escapePopupHtml(popupFormatDate(ro.ecd_date))} | Picked Up ${escapePopupHtml(popupFormatDate(ro.picked_up))}</div>
+                                    <div style="font-size:26px;"><strong>Insurance:</strong> ${escapePopupHtml(ro.insurance || '-')}</div>
+                                    <div style="font-size:26px;"><strong>RO Info:</strong> In ${escapePopupHtml(popupFormatDate(ro.in_date))} | ECD ${escapePopupHtml(popupFormatDate(ro.ecd_date))} | Picked Up ${escapePopupHtml(popupFormatDate(ro.picked_up))}</div>
                                 </div>
                             </div>
                             <div class="line-break"></div>
@@ -945,7 +947,9 @@ def get_dashboard_screen_html():
                         </div>
                     `;
 
-                    const estimatorText = escapePopupHtml(getRoEstimatorDisplay(ro) || '-');
+                    const estimatorRaw = String(getRoEstimatorDisplay(ro) || '-').trim();
+                    const estimatorClean = estimatorRaw.replace(/\s*\(estimator\s*\/\s*written by\)\s*$/i, '').trim() || estimatorRaw;
+                    const estimatorText = escapePopupHtml(estimatorClean || '-');
                     const insuranceText = escapePopupHtml(ro.insurance || '-');
                     const vehicleText = escapePopupHtml(ro.vehicle || '-');
                     const vinText = escapePopupHtml(ro.vin || '-');
@@ -954,14 +958,16 @@ def get_dashboard_screen_html():
                         `RO ${ro.ro} Service Order`,
                         `
                             <div class="header" style="text-align:left;">
-                                <div style="font-size:72px; font-weight:800; line-height:1; margin-bottom:8px;">RO #${escapePopupHtml(ro.ro || '-')}</div>
-                                <div style="display:flex; justify-content:space-between; align-items:flex-end; gap:18px; margin-bottom:6px;">
-                                    <div style="font-size:24px; font-weight:600;">Vehicle: ${vehicleText}</div>
-                                    <div style="font-size:32px; font-weight:800; letter-spacing:1px;">SERVICE ORDER</div>
+                                <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:18px; margin-bottom:6px;">
+                                    <div style="font-size:72px; font-weight:800; line-height:1; margin-bottom:8px;">RO #${escapePopupHtml(ro.ro || '-')}</div>
+                                    <div style="text-align:right;">
+                                        <div style="font-size:32px; font-weight:800; letter-spacing:1px;">SERVICE ORDER</div>
+                                        <div style="font-size:22px; font-weight:600; margin-top:4px;">Estimator: ${estimatorText}</div>
+                                        <div style="font-size:22px; font-weight:600; margin-top:4px;">Insurance: ${insuranceText}</div>
+                                    </div>
                                 </div>
-                                <div style="font-size:24px; font-weight:600; margin-bottom:4px;">VIN: ${vinText}</div>
-                                <div style="font-size:22px; font-weight:600; margin-bottom:4px;">Estimator: ${estimatorText}</div>
-                                <div style="font-size:22px; font-weight:600;">Insurance: ${insuranceText}</div>
+                                <div style="font-size:24px; font-weight:600; margin-bottom:4px;">Vehicle: ${vehicleText}</div>
+                                <div style="font-size:24px; font-weight:600;">VIN: ${vinText}</div>
                             </div>
                             ${sections.join('')}
                             ${totalFooterHtml}
@@ -1054,6 +1060,7 @@ def get_dashboard_screen_html():
 
                     const vehicleText = escapePopupHtml(ro.vehicle || '-');
                     const vinText = escapePopupHtml(ro.vin || '-');
+                    const techAssignedText = escapePopupHtml(ro.tech || '-');
 
                     roOpenPrintWindow(
                         `RO ${ro.ro} Parts`,
@@ -1062,7 +1069,10 @@ def get_dashboard_screen_html():
                                 <div style="font-size:72px; font-weight:800; line-height:1; margin-bottom:8px;">RO #${escapePopupHtml(ro.ro || '-')}</div>
                                 <div style="display:flex; justify-content:space-between; align-items:flex-end; gap:18px; margin-bottom:6px;">
                                     <div style="font-size:24px; font-weight:600;">Vehicle: ${vehicleText}</div>
-                                    <div style="font-size:32px; font-weight:800; letter-spacing:1px;">PARTS</div>
+                                    <div style="text-align:right;">
+                                        <div style="font-size:32px; font-weight:800; letter-spacing:1px;">PARTS</div>
+                                        <div style="font-size:24px; font-weight:600; margin-top:4px;">TECH ASSIGNED: ${techAssignedText}</div>
+                                    </div>
                                 </div>
                                 <div style="font-size:24px; font-weight:600;">VIN: ${vinText}</div>
                             </div>
@@ -1074,7 +1084,8 @@ def get_dashboard_screen_html():
                                 </thead>
                                 <tbody>${rowsHtml || '<tr><td colspan="11" style="text-align:center; color:#777;">No parts lines found.</td></tr>'}</tbody>
                             </table>
-                        `
+                        `,
+                        { immediatePrint: true }
                     );
                 } catch (error) {
                     console.error('Error printing parts:', error);
