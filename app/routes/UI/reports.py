@@ -400,7 +400,7 @@ def get_reports_screen_html():
                 <div style="position:absolute; top:14px; left:50%; transform:translateX(-50%); font-weight:900; letter-spacing:1.5px; font-size:20px; color:#fff;">CLOSED</div>
                 <div style="position:absolute; top:18px; right:24px; display:flex; gap:12px; z-index:10;">
                     <button type="button" id="roPopupPrintButton" class="mini-popup-trigger" style="padding:7px 18px; background:#d32f2f; color:#fff; border:none; border-radius:4px; font-weight:bold; font-size:15px; cursor:pointer;">Print</button>
-                    <div id="roPrintOptionsModal" class="mini-popup-panel" style="display:none; right:0; left:auto; top:100%;">
+                    <div id="roPrintOptionsModal" class="mini-popup-panel" style="display:none; right:24px; top:72px; position:fixed;">
                         <h2 style="margin:0 0 14px 0; color:#333; font-size:18px;">Print RO</h2>
                         <p style="margin:0 0 12px 0; font-weight:bold; color:#555;">Select document:</p>
                         <div style="display:flex; flex-direction:column; gap:8px;">
@@ -460,7 +460,7 @@ def get_reports_screen_html():
             .ro-header-value { color:#fff; font-weight:600; }
             .ro-header-date-text { color:#fff; font-weight:600; min-width:110px; }
             .ro-window-card { background:#fafafa; border:1px solid #ddd; border-radius:8px; padding:14px; }
-            .mini-popup-panel { position:absolute; min-width:240px; background:#fff; border:1px solid #ddd; border-radius:8px; box-shadow:0 10px 24px rgba(0,0,0,0.16); padding:12px; z-index:1500; margin-top:8px; }
+            .mini-popup-panel { position:absolute; min-width:240px; background:#fff; border:1px solid #ddd; border-radius:8px; box-shadow:0 10px 24px rgba(0,0,0,0.16); padding:12px; z-index:10000; margin-top:8px; }
         `;
         win.document.head.appendChild(style);
 
@@ -507,6 +507,17 @@ def get_reports_screen_html():
             if (!match) return null;
             const parsed = Number(match[0]);
             return Number.isFinite(parsed) ? parsed : null;
+        }
+
+        function popupSameRo(a, b) {
+            const left = String(a || '').trim();
+            const right = String(b || '').trim();
+            if (!left || !right) return false;
+            if (left === right) return true;
+            if (/^\d+$/.test(left) && /^\d+$/.test(right)) {
+                return Number(left) === Number(right);
+            }
+            return left.toLowerCase() === right.toLowerCase();
         }
 
         function popupBuildUnifiedLinesFromSections(sections) {
@@ -578,6 +589,7 @@ def get_reports_screen_html():
             });
             if (!isOpen) {
                 panel.style.display = 'block';
+                panel.style.zIndex = '10000';
                 panel.classList.add('open');
             }
         }
@@ -624,9 +636,17 @@ def get_reports_screen_html():
         async function roPrintBill() {
             roClosePrintOptionsModal();
             try {
-                const res = await popupFetchJson(`/api/ro-estimate?ro=${encodeURIComponent(roKey)}`);
+                const [res, paymentsRes] = await Promise.all([
+                    popupFetchJson(`/api/ro-estimate?ro=${encodeURIComponent(roKey)}`),
+                    popupFetchJson('/api/payments/open-ros'),
+                ]);
                 const estimate = res.estimate || {};
                 const lines = popupGetUnifiedEstimateLines(estimate);
+                const paymentRows = Array.isArray(paymentsRes?.rows) ? paymentsRes.rows : [];
+                const paymentRow = paymentRows.find((item) => popupSameRo(item?.ro || item?.ro_number, roKey)) || {};
+                const insuranceTotal = popupToNumber(paymentRow.insurance_total ?? ro.insurance_pay ?? 0, 0);
+                const customerTotal = popupToNumber(paymentRow.customer_total ?? ro.customer_pay ?? 0, 0);
+                const grandTotal = insuranceTotal + customerTotal;
                 const linesHtml = lines.map((line) => {
                     const qty = line?.qty;
                     const qtyDisplay = qty === null || qty === undefined || String(qty).trim() === '' ? '-' : popupNormalizeDisplayNumber(qty);
@@ -664,6 +684,13 @@ def get_reports_screen_html():
                             </thead>
                             <tbody>${linesHtml || '<tr><td colspan="7" style="text-align:center; color:#777;">No repair lines found.</td></tr>'}</tbody>
                         </table>
+                        <div style="display:flex; justify-content:flex-end; margin-top:14px;">
+                            <div style="min-width:320px; font-size:13px;">
+                                <div style="display:flex; justify-content:space-between; padding:3px 0;"><span>Insurance Total</span><span>${popupMoney(insuranceTotal)}</span></div>
+                                <div style="display:flex; justify-content:space-between; padding:3px 0;"><span>Customer Total</span><span>${popupMoney(customerTotal)}</span></div>
+                                <div style="display:flex; justify-content:space-between; padding:5px 0; border-top:1px solid #ccc; margin-top:4px; font-weight:700;"><span>Grand Total</span><span>${popupMoney(grandTotal)}</span></div>
+                            </div>
+                        </div>
                     `
                 );
             } catch (error) {
@@ -703,6 +730,7 @@ def get_reports_screen_html():
                 }
 
                 const sections = Array.from(sectionsByTech.entries()).map(([techName, techLines]) => {
+                    const techTotalHours = techLines.reduce((sum, line) => sum + popupToNumber(line.hours || 0), 0);
                     const rowsHtml = techLines
                         .sort((a, b) => (popupExtractLineNumber(a.line_number) ?? 999999) - (popupExtractLineNumber(b.line_number) ?? 999999))
                         .map((line) => `
@@ -720,6 +748,7 @@ def get_reports_screen_html():
                                 <thead><tr><th>Line</th><th>Description</th><th>Type</th><th class="num">HRS</th></tr></thead>
                                 <tbody>${rowsHtml || '<tr><td colspan="4" style="text-align:center; color:#777;">No lines assigned.</td></tr>'}</tbody>
                             </table>
+                            <div style="display:flex; justify-content:flex-end; margin-top:6px; font-size:13px; font-weight:700;">TOTAL HRS: ${techTotalHours.toFixed(1)}</div>
                         </div>
                     `;
                 });
@@ -747,6 +776,11 @@ def get_reports_screen_html():
             try {
                 const linesRes = await popupFetchJson(`/api/parts/ro-lines?ro=${encodeURIComponent(roKey)}`);
                 const lines = Array.isArray(linesRes.lines) ? linesRes.lines : [];
+                const totalPrice = lines.reduce((sum, line) => {
+                    const qty = popupToNumber(line.qty || 0, 0);
+                    const price = popupToNumber(line.price || line.extended_price || 0, 0);
+                    return sum + (qty > 0 ? (price * qty) : price);
+                }, 0);
                 const rowsHtml = lines.map((line) => `
                     <tr>
                         <td>${popupEsc(line.line || '-')}</td>
@@ -770,6 +804,7 @@ def get_reports_screen_html():
                             <thead><tr><th>Line</th><th>Description</th><th class="num">QTY</th><th class="num">Price</th></tr></thead>
                             <tbody>${rowsHtml || '<tr><td colspan="4" style="text-align:center; color:#777;">No parts lines found.</td></tr>'}</tbody>
                         </table>
+                        <div style="display:flex; justify-content:flex-end; margin-top:10px; font-size:14px; font-weight:700;">TOTAL PRICE: ${popupMoney(totalPrice)}</div>
                     `,
                     { immediatePrint: true }
                 );
@@ -923,12 +958,34 @@ def get_reports_screen_html():
             const saveBtn = roDoc.getElementById('roPopupPaymentsSave');
             const titleEl = roDoc.getElementById('roPopupPaymentsTitle');
 
+            function formatShortPaymentDate(value) {
+                const source = String(value || '').trim();
+                if (!source) return '--/--/--';
+                let dt;
+                if (/^\d{4}-\d{2}-\d{2}$/.test(source)) {
+                    dt = new Date(`${source}T00:00:00`);
+                } else {
+                    dt = new Date(source);
+                }
+                if (Number.isNaN(dt.getTime())) return '--/--/--';
+                const mm = String(dt.getMonth() + 1).padStart(2, '0');
+                const dd = String(dt.getDate()).padStart(2, '0');
+                const yy = String(dt.getFullYear()).slice(-2);
+                return `${mm}/${dd}/${yy}`;
+            }
+
             function renderPaymentLog(entries) {
-                const list = Array.isArray(entries) ? entries : [];
-                if (!list.length) return '<div style="color:#777;">No payments yet.</div>';
-                return list.map((entry) => {
-                    const dt = popupEsc(String(entry.business_date || entry.date || '').trim() || '--/--/--');
-                    const typ = popupEsc(String(entry.payment_type || 'CARD').toUpperCase());
+                const sorted = [...(Array.isArray(entries) ? entries : [])].sort((a, b) => {
+                    const aDate = new Date(a.business_date || a.paid_at || a.date || '').getTime() || 0;
+                    const bDate = new Date(b.business_date || b.paid_at || b.date || '').getTime() || 0;
+                    return bDate - aDate;
+                });
+                if (!sorted.length) return '<div style="color:#777;">No payments yet.</div>';
+                return sorted.map((entry) => {
+                    const dt = popupEsc(formatShortPaymentDate(entry.business_date || entry.paid_at || entry.date));
+                    const typeText = String(entry.payment_type || 'CARD').toUpperCase();
+                    const checkNo = String(entry.check_number || '').trim();
+                    const typ = popupEsc(typeText === 'CHECK' && checkNo ? `CHECK #${checkNo}` : typeText);
                     const who = popupEsc(String(entry.created_by || 'Unknown'));
                     return `<div style="display:flex; justify-content:space-between; align-items:center; padding:6px 0; border-bottom:1px solid #f0f0f0;"><div>${dt} - ${typ} - ${who}</div><div style="font-weight:600;">${popupMoney(entry.amount || 0)}</div></div>`;
                 }).join('');
@@ -936,7 +993,7 @@ def get_reports_screen_html():
 
             const data = await popupFetchJson('/api/payments/open-ros');
             const rows = Array.isArray(data.rows) ? data.rows : [];
-            const row = rows.find((item) => String(item.ro || '') === roKey);
+            const row = rows.find((item) => popupSameRo(item?.ro || item?.ro_number, roKey));
             if (!row) {
                 logEl.innerHTML = '<div style="color:#777;">No payments found for this RO.</div>';
                 return;
