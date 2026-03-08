@@ -33,6 +33,26 @@ def get_reports_screen_html():
     return r'''
     <div id="reports" class="screen" style="padding:20px;">
         <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:30px; gap:20px;">
+            <div style="display:flex; flex-direction:column; align-items:flex-start; gap:10px; min-width:260px;">
+                <label style="display:flex; align-items:center; gap:10px; cursor:pointer; user-select:none;">
+                    <span style="font-weight:700; color:#333;">Status</span>
+                    <span class="reports-toggle-wrap">
+                        <input id="reportsStatusToggle" type="checkbox" class="reports-toggle-input" />
+                        <span class="reports-toggle-slider"></span>
+                    </span>
+                    <span id="reportsStatusLabel" style="font-weight:700; color:#333; min-width:68px;">CLOSED</span>
+                </label>
+                <div style="display:flex; gap:10px; align-items:flex-end; flex-wrap:wrap;">
+                    <label style="display:flex; flex-direction:column; gap:4px; font-size:12px; color:#555; font-weight:600;">
+                        <span>Start Date</span>
+                        <input id="reportsStartDate" type="date" style="padding:7px 8px; border:1px solid #ccc; border-radius:4px; min-width:130px;" />
+                    </label>
+                    <label style="display:flex; flex-direction:column; gap:4px; font-size:12px; color:#555; font-weight:600;">
+                        <span>End Date</span>
+                        <input id="reportsEndDate" type="date" style="padding:7px 8px; border:1px solid #ccc; border-radius:4px; min-width:130px;" />
+                    </label>
+                </div>
+            </div>
             <h1 style="text-align:center; margin:0; flex:1;">REPORTS</h1>
             <div style="position:relative;">
                 <button id="reportsPrintTrigger" class="mini-popup-trigger" onclick="reportsOpenPrintOptionsModal()" style="padding:10px 16px; background:var(--brand-red, #d32f2f); color:#fff; border:none; border-radius:4px; font-weight:bold; cursor:pointer;">Print</button>
@@ -66,7 +86,7 @@ def get_reports_screen_html():
         </div>
         <!-- Closed RO List Section -->
         <div style="background:#fff; padding:20px; border-radius:8px; box-shadow:0 2px 4px rgba(0,0,0,0.1);">
-            <h3 style="margin:0 0 18px 0; color:#333;">Closed Repair Orders</h3>
+            <h3 id="reportsRoSectionHeader" style="margin:0 0 18px 0; color:#333;">Closed Repair Orders</h3>
             <div style="overflow-x:auto;">
                 <table id="reportsRoListTable" style="width:100%; border-collapse:collapse;">
                     <thead>
@@ -127,9 +147,46 @@ def get_reports_screen_html():
             transform: translateY(0);
             pointer-events: auto;
         }
+        .reports-toggle-wrap {
+            position: relative;
+            display: inline-block;
+            width: 46px;
+            height: 24px;
+        }
+        .reports-toggle-input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+        .reports-toggle-slider {
+            position: absolute;
+            cursor: pointer;
+            inset: 0;
+            background-color: #777;
+            border-radius: 999px;
+            transition: background-color 0.2s ease;
+        }
+        .reports-toggle-slider:before {
+            content: "";
+            position: absolute;
+            height: 18px;
+            width: 18px;
+            left: 3px;
+            top: 3px;
+            background-color: #fff;
+            border-radius: 50%;
+            transition: transform 0.2s ease;
+        }
+        .reports-toggle-input:checked + .reports-toggle-slider {
+            background-color: #2e7d32;
+        }
+        .reports-toggle-input:checked + .reports-toggle-slider:before {
+            transform: translateX(22px);
+        }
     </style>
     <script>
-    let reportsDataCache = { summary: [], closed_ros: [] };
+    let reportsDataCache = { summary: [], closed_ros: [], open_ros: [] };
+    let reportsUiState = { status: 'closed', startDate: '', endDate: '' };
 
     function formatReportsPercent(value) {
         const amount = Number(value || 0);
@@ -169,6 +226,118 @@ def get_reports_screen_html():
             return String(source.estimator || source.written_by || source.estimate_by || '').trim();
         }
         return String(source[groupKey] || '').trim();
+    }
+
+    function reportsNormalizeStatus(row, fallbackStatus) {
+        const explicit = String((row || {}).status || '').trim().toLowerCase();
+        if (explicit === 'open' || explicit === 'closed') return explicit;
+
+        const phase = String((row || {}).phase || '').trim().toLowerCase();
+        if (phase === 'complete' || phase === 'complete/finish' || phase === 'closed') return 'closed';
+        if (phase) return 'open';
+
+        return String(fallbackStatus || 'closed').trim().toLowerCase() === 'open' ? 'open' : 'closed';
+    }
+
+    function reportsResolveRowDateIso(row) {
+        const candidates = [row?.in_date, row?.picked_up, row?.closed_at, row?.saved_at, row?.date];
+        for (const value of candidates) {
+            const text = String(value || '').trim();
+            if (!text) continue;
+            if (/^\d{4}-\d{2}-\d{2}$/.test(text)) return text;
+            const parsed = new Date(text);
+            if (!Number.isNaN(parsed.getTime())) {
+                const y = parsed.getFullYear();
+                const m = String(parsed.getMonth() + 1).padStart(2, '0');
+                const d = String(parsed.getDate()).padStart(2, '0');
+                return `${y}-${m}-${d}`;
+            }
+        }
+        return '';
+    }
+
+    function reportsBuildOpenRowsFromDashboardRows(rows) {
+        const list = Array.isArray(rows) ? rows : [];
+        return list.map((row) => {
+            const status = reportsNormalizeStatus(row, 'open');
+            return {
+                ro_number: row.ro || row.ro_number || '',
+                vehicle: row.vehicle || '',
+                insurance: row.insurance || row.insurance_company || '',
+                hours: Number(row.hours || 0),
+                total_sales: Number((row.total_sales ?? row.total) || 0),
+                total_cost: Number(row.total_cost || 0),
+                parts_sales: Number(row.parts_sales || 0),
+                parts_cost: Number(row.parts_cost || 0),
+                labor_sales: Number(row.labor_sales || 0),
+                labor_cost: Number(row.labor_cost || 0),
+                in_date: row.in_date || '',
+                picked_up: row.picked_up || '',
+                closed_at: row.closed_at || '',
+                saved_at: row.saved_at || '',
+                phase: row.phase || '',
+                status,
+            };
+        });
+    }
+
+    function reportsGetFilteredRows() {
+        const targetStatus = reportsUiState.status === 'open' ? 'open' : 'closed';
+        const sourceRows = targetStatus === 'open'
+            ? (Array.isArray(reportsDataCache.open_ros) ? reportsDataCache.open_ros : [])
+            : (Array.isArray(reportsDataCache.closed_ros) ? reportsDataCache.closed_ros : []);
+
+        const startDate = String(reportsUiState.startDate || '').trim();
+        const endDate = String(reportsUiState.endDate || '').trim();
+
+        return sourceRows.filter((row) => {
+            const normalizedStatus = reportsNormalizeStatus(row, targetStatus);
+            if (normalizedStatus !== targetStatus) return false;
+
+            if (!startDate && !endDate) return true;
+            const rowDate = reportsResolveRowDateIso(row);
+            if (!rowDate) return false;
+            if (startDate && rowDate < startDate) return false;
+            if (endDate && rowDate > endDate) return false;
+            return true;
+        });
+    }
+
+    function reportsRenderRoList() {
+        const roBody = document.getElementById('reportsRoListBody');
+        const sectionHeader = document.getElementById('reportsRoSectionHeader');
+        if (!roBody) return;
+
+        const isOpenView = reportsUiState.status === 'open';
+        const rows = reportsGetFilteredRows();
+        if (sectionHeader) {
+            sectionHeader.textContent = isOpenView ? 'Open Repair Orders' : 'Closed Repair Orders';
+        }
+
+        roBody.innerHTML = '';
+        if (!rows.length) {
+            const noneLabel = isOpenView ? 'No open repair orders found.' : 'No closed repair orders found.';
+            roBody.innerHTML = `<tr><td colspan='10' style='padding:20px; text-align:center; color:#999;'>${noneLabel}</td></tr>`;
+            return;
+        }
+        roBody.innerHTML = reportsBuildRoRowsHtml(rows);
+    }
+
+    function reportsApplyFiltersFromControls() {
+        const toggleEl = document.getElementById('reportsStatusToggle');
+        const statusLabelEl = document.getElementById('reportsStatusLabel');
+        const startDateEl = document.getElementById('reportsStartDate');
+        const endDateEl = document.getElementById('reportsEndDate');
+
+        reportsUiState.status = toggleEl && toggleEl.checked ? 'open' : 'closed';
+        reportsUiState.startDate = String(startDateEl?.value || '').trim();
+        reportsUiState.endDate = String(endDateEl?.value || '').trim();
+
+        if (statusLabelEl) {
+            statusLabelEl.textContent = reportsUiState.status === 'open' ? 'OPENED' : 'CLOSED';
+        }
+
+        reportsRenderRoList();
     }
 
     function reportsBuildRoRowsHtml(rows, options = {}) {
@@ -379,9 +548,11 @@ def get_reports_screen_html():
 
     function reportsPrintClosedRos(printBy) {
         reportsClosePrintOptionsModal();
-        const rows = Array.isArray(reportsDataCache.closed_ros) ? reportsDataCache.closed_ros : [];
+        const rows = reportsGetFilteredRows();
+        const isOpenView = reportsUiState.status === 'open';
+        const sectionTitle = isOpenView ? 'Open Repair Orders' : 'Closed Repair Orders';
         if (!rows.length) {
-            alert('No closed repair orders to print.');
+            alert(isOpenView ? 'No open repair orders to print.' : 'No closed repair orders to print.');
             return;
         }
 
@@ -394,8 +565,8 @@ def get_reports_screen_html():
             const roCountHtml = `<div style="margin:6px 0 14px 0; font-weight:bold;">RO Count: ${rows.length}</div>`;
             const tableHtml = reportsClosedRoTableHtml(rows);
             reportsOpenPrintWindow(
-                `Closed Repair Orders - ${printLabel}`,
-                `<div class="header"><h1>Closed Repair Orders</h1><p>Print by: ${printLabel}</p></div>${summaryHtml}${roCountHtml}${tableHtml}`
+                `${sectionTitle} - ${printLabel}`,
+                `<div class="header"><h1>${sectionTitle}</h1><p>Print by: ${printLabel}</p></div>${summaryHtml}${roCountHtml}${tableHtml}`
             );
             return;
         }
@@ -423,18 +594,23 @@ def get_reports_screen_html():
             .join('');
 
         reportsOpenPrintWindow(
-            `Closed Repair Orders - ${printLabel}`,
-            `<div class="header"><h1>Closed Repair Orders</h1><p>Print by: ${printLabel}</p></div>${summaryHtml}${sectionsHtml}`
+            `${sectionTitle} - ${printLabel}`,
+            `<div class="header"><h1>${sectionTitle}</h1><p>Print by: ${printLabel}</p></div>${summaryHtml}${sectionsHtml}`
         );
     }
 
     async function loadReportsData() {
         try {
-            const resp = await fetch('/api/reports_data');
-            const data = await resp.json();
+            const [reportsResp, dashboardResp] = await Promise.all([
+                fetch('/api/reports_data'),
+                fetch('/api/dashboard-data', { credentials: 'include' }),
+            ]);
+            const data = await reportsResp.json();
+            const dashboardData = await dashboardResp.json();
             reportsDataCache = {
                 summary: Array.isArray(data.summary) ? data.summary : [],
                 closed_ros: Array.isArray(data.closed_ros) ? data.closed_ros : [],
+                open_ros: reportsBuildOpenRowsFromDashboardRows(dashboardData?.roList || []),
             };
             // Render summary
             const summaryBody = document.getElementById('reportsSummaryBody');
@@ -450,14 +626,7 @@ def get_reports_screen_html():
                     <td style='padding:12px;'>${formatReportsMoney(row.gp_dollar)}</td>
                 </tr>`;
             }
-            // Render closed RO list
-            const roBody = document.getElementById('reportsRoListBody');
-            roBody.innerHTML = '';
-            if (reportsDataCache.closed_ros.length === 0) {
-                roBody.innerHTML = `<tr><td colspan='10' style='padding:20px; text-align:center; color:#999;'>No closed repair orders found.</td></tr>`;
-            } else {
-                roBody.innerHTML = reportsBuildRoRowsHtml(reportsDataCache.closed_ros);
-            }
+            reportsRenderRoList();
         } catch (e) {
             document.getElementById('reportsSummaryBody').innerHTML = `<tr><td colspan='4' style='padding:20px; text-align:center; color:#c00;'>Error loading data</td></tr>`;
             document.getElementById('reportsRoListBody').innerHTML = `<tr><td colspan='10' style='padding:20px; text-align:center; color:#c00;'>Error loading data</td></tr>`;
@@ -469,6 +638,23 @@ def get_reports_screen_html():
         if (reportsTab) {
             reportsTab.addEventListener('click', loadReportsData);
         }
+
+        const toggleEl = document.getElementById('reportsStatusToggle');
+        const startDateEl = document.getElementById('reportsStartDate');
+        const endDateEl = document.getElementById('reportsEndDate');
+
+        if (toggleEl) {
+            toggleEl.checked = false;
+            toggleEl.addEventListener('change', reportsApplyFiltersFromControls);
+        }
+        if (startDateEl) {
+            startDateEl.addEventListener('change', reportsApplyFiltersFromControls);
+        }
+        if (endDateEl) {
+            endDateEl.addEventListener('change', reportsApplyFiltersFromControls);
+        }
+        reportsApplyFiltersFromControls();
+
         window.addEventListener('click', function(event) {
             const panel = document.getElementById('reportsPrintOptionsModal');
             if (!panel || !panel.classList.contains('open')) return;
