@@ -254,34 +254,9 @@ async def home_screen(request: Request):
         .tab-bar {{
             background-color: #3c4142;
             display: flex;
-            align-items: center;
             gap: 0;
             padding: 0;
             border-bottom: 3px solid #333;
-        }}
-        .tab-brand {{
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            padding: 10px 14px;
-            border-right: 1px solid #555;
-            color: #fff;
-            flex: 0 0 auto;
-            min-width: 210px;
-        }}
-        .tab-brand-logo {{
-            width: 34px;
-            height: 34px;
-            border-radius: 8px;
-            object-fit: contain;
-            background: rgba(255, 255, 255, 0.95);
-            padding: 3px;
-        }}
-        .tab-brand-label {{
-            font-weight: 700;
-            font-size: 18px;
-            letter-spacing: 0.3px;
-            white-space: nowrap;
         }}
         .nav-tab {{
             padding: 18px 35px;
@@ -452,10 +427,6 @@ async def home_screen(request: Request):
 </head>
 <body>
     <div class="tab-bar">
-        <div class="tab-brand">
-            <img class="tab-brand-logo" src="/static/autobodyos.png" alt="AutobodyOS logo" />
-            <span class="tab-brand-label">AutobodyOS</span>
-        </div>
         <div class="nav-tab active" onclick="switchScreen('dashboard')">DASHBOARD</div>
         <div class="nav-tab" onclick="switchScreen('upload')">UPLOAD</div>
         <div class="nav-tab" onclick="switchScreen('parts')">PARTS</div>
