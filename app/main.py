@@ -1,6 +1,8 @@
 from fastapi import FastAPI
 from fastapi.responses import RedirectResponse
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+from pathlib import Path
 
 # Routers
 from app.routes.estimate import router as estimate_router
@@ -12,6 +14,10 @@ from app.routes.payments import router as payments_router
 
 
 app = FastAPI(title="FlagTech Estimate Parser")
+
+static_dir = Path(__file__).parent / "static"
+if static_dir.exists():
+    app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
 
 # ---------------------------------------------------------
 # CORS CONFIGURATION
