@@ -2441,13 +2441,28 @@ def get_dashboard_screen_html():
                     return sorted.map((entry) => {
                         const dateText = formatShortPaymentDate(entry.business_date || entry.paid_at || entry.date);
                         const typeText = String(entry.payment_type || 'CARD').trim().toUpperCase() || 'CARD';
+                        const checkNumberText = String(entry.check_number || '').trim();
+                        const userText = String(entry.created_by || 'Unknown').trim() || 'Unknown';
+                        const typeWithCheck = typeText === 'CHECK' && checkNumberText
+                            ? `CHECK #${checkNumberText}`
+                            : typeText;
                         return `
                             <div style="display:flex; justify-content:space-between; align-items:center; padding:6px 0; border-bottom:1px solid #f0f0f0;">
-                                <div style="color:#333;">${escapePopupHtml(dateText)} – ${escapePopupHtml(typeText)}</div>
+                                <div style="color:#333;">${escapePopupHtml(dateText)} - ${escapePopupHtml(typeWithCheck)} - ${escapePopupHtml(userText)}</div>
                                 <div style="font-weight:600; color:#333;">${popupFormatMoney(entry.amount || 0)}</div>
                             </div>
                         `;
                     }).join('');
+                }
+
+                function syncCheckNumberVisibility(typeSelectEl, checkInputEl) {
+                    if (!typeSelectEl || !checkInputEl) return;
+                    const paymentType = String(typeSelectEl.value || '').toUpperCase();
+                    const isCheck = paymentType === 'CHECK';
+                    checkInputEl.style.display = isCheck ? 'inline-block' : 'none';
+                    if (!isCheck) {
+                        checkInputEl.value = '';
+                    }
                 }
 
                 function renderPaymentsScreenForRow(row) {
@@ -2498,6 +2513,7 @@ def get_dashboard_screen_html():
                                     <option value="CASH">CASH</option>
                                     <option value="CHECK">CHECK</option>
                                 </select>
+                                <input id="roPopupInsuranceCheckNumber" type="text" placeholder="Check #" style="display:none; padding:8px; border:1px solid #ccc; border-radius:4px; width:150px;" />
                             </div>
                             <div style="height:1px; background:#ddd; margin:8px 0 10px 0;"></div>
                             <div id="roPopupInsuranceLog">${renderPaymentLog(insuranceEntries)}</div>
@@ -2518,6 +2534,7 @@ def get_dashboard_screen_html():
                                     <option value="CASH">CASH</option>
                                     <option value="CHECK">CHECK</option>
                                 </select>
+                                <input id="roPopupCustomerCheckNumber" type="text" placeholder="Check #" style="display:none; padding:8px; border:1px solid #ccc; border-radius:4px; width:150px;" />
                             </div>
                             <div style="height:1px; background:#ddd; margin:8px 0 10px 0;"></div>
                             <div id="roPopupCustomerLog">${renderPaymentLog(customerEntries)}</div>
@@ -2536,12 +2553,29 @@ def get_dashboard_screen_html():
 
                     renderPaymentsScreenForRow(row);
 
+                    const insuranceTypeSelect = roWindowDoc.getElementById('roPopupInsurancePaymentType');
+                    const customerTypeSelect = roWindowDoc.getElementById('roPopupCustomerPaymentType');
+                    const insuranceCheckInput = roWindowDoc.getElementById('roPopupInsuranceCheckNumber');
+                    const customerCheckInput = roWindowDoc.getElementById('roPopupCustomerCheckNumber');
+
+                    syncCheckNumberVisibility(insuranceTypeSelect, insuranceCheckInput);
+                    syncCheckNumberVisibility(customerTypeSelect, customerCheckInput);
+
+                    if (insuranceTypeSelect && insuranceCheckInput) {
+                        insuranceTypeSelect.addEventListener('change', () => syncCheckNumberVisibility(insuranceTypeSelect, insuranceCheckInput));
+                    }
+                    if (customerTypeSelect && customerCheckInput) {
+                        customerTypeSelect.addEventListener('change', () => syncCheckNumberVisibility(customerTypeSelect, customerCheckInput));
+                    }
+
                     if (saveBtn) {
                         saveBtn.onclick = async () => {
                             const insuranceInput = roWindowDoc.getElementById('roPopupInsurancePaymentInput');
                             const customerInput = roWindowDoc.getElementById('roPopupCustomerPaymentInput');
                             const insuranceTypeSelect = roWindowDoc.getElementById('roPopupInsurancePaymentType');
                             const customerTypeSelect = roWindowDoc.getElementById('roPopupCustomerPaymentType');
+                            const insuranceCheckInput = roWindowDoc.getElementById('roPopupInsuranceCheckNumber');
+                            const customerCheckInput = roWindowDoc.getElementById('roPopupCustomerCheckNumber');
 
                             const insuranceAmount = parseFloat((insuranceInput?.value || '').trim());
                             const customerAmount = parseFloat((customerInput?.value || '').trim());
@@ -2560,6 +2594,8 @@ def get_dashboard_screen_html():
                                 customer_payment: hasCustomer ? customerAmount : undefined,
                                 insurance_payment_type: String(insuranceTypeSelect?.value || 'CARD').toUpperCase(),
                                 customer_payment_type: String(customerTypeSelect?.value || 'CARD').toUpperCase(),
+                                insurance_check_number: hasInsurance ? String(insuranceCheckInput?.value || '').trim() : '',
+                                customer_check_number: hasCustomer ? String(customerCheckInput?.value || '').trim() : '',
                                 business_date: new Date().toISOString().slice(0, 10),
                             };
 
@@ -2576,6 +2612,8 @@ def get_dashboard_screen_html():
 
                                 if (insuranceInput) insuranceInput.value = '';
                                 if (customerInput) customerInput.value = '';
+                                if (insuranceCheckInput) insuranceCheckInput.value = '';
+                                if (customerCheckInput) customerCheckInput.value = '';
                                 await renderPaymentsView();
                             } catch (saveError) {
                                 console.error('Error saving payment:', saveError);

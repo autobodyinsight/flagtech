@@ -223,6 +223,53 @@ def _resolve_note_created_by(cur, value: str) -> str:
     return created_by
 
 
+def _resolve_request_user_display_name(request: Request, cur, domain: str | None = None) -> str:
+    email = _resolve_request_user_email(request)
+    normalized_email = str(email or "").strip().lower()
+    if not normalized_email:
+        return "System"
+
+    resolved_domain = str(domain or "").strip().lower()
+    if not resolved_domain:
+        resolved_domain = str(get_user_domain(request) or "").strip().lower()
+
+    try:
+        _ensure_shop_users_table(cur)
+        if resolved_domain:
+            cur.execute(
+                """
+                SELECT first_name, last_name
+                FROM shop_users
+                WHERE domain = %s
+                  AND LOWER(email) = %s
+                ORDER BY id DESC
+                LIMIT 1
+                """,
+                (resolved_domain, normalized_email),
+            )
+        else:
+            cur.execute(
+                """
+                SELECT first_name, last_name
+                FROM shop_users
+                WHERE LOWER(email) = %s
+                ORDER BY id DESC
+                LIMIT 1
+                """,
+                (normalized_email,),
+            )
+        row = cur.fetchone() or {}
+    except Exception:
+        row = {}
+
+    first_name = str(row.get("first_name") or "").strip()
+    last_name = str(row.get("last_name") or "").strip()
+    full_name = " ".join(part for part in (first_name, last_name) if part).strip()
+    if full_name:
+        return full_name
+    return normalized_email
+
+
 def _extract_line_number(value) -> int | None:
     if value is None:
         return None
@@ -576,6 +623,8 @@ def _ensure_ro_payment_entries_table(cur) -> None:
             domain VARCHAR(255) NOT NULL,
             payer_type VARCHAR(32) NOT NULL,
             payment_method VARCHAR(16),
+            check_number VARCHAR(64),
+            created_by VARCHAR(255),
             amount NUMERIC NOT NULL,
             business_date DATE,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -586,6 +635,8 @@ def _ensure_ro_payment_entries_table(cur) -> None:
     cur.execute("ALTER TABLE ro_payment_entries ADD COLUMN IF NOT EXISTS domain VARCHAR(255)")
     cur.execute("ALTER TABLE ro_payment_entries ADD COLUMN IF NOT EXISTS payer_type VARCHAR(32)")
     cur.execute("ALTER TABLE ro_payment_entries ADD COLUMN IF NOT EXISTS payment_method VARCHAR(16)")
+    cur.execute("ALTER TABLE ro_payment_entries ADD COLUMN IF NOT EXISTS check_number VARCHAR(64)")
+    cur.execute("ALTER TABLE ro_payment_entries ADD COLUMN IF NOT EXISTS created_by VARCHAR(255)")
     cur.execute("ALTER TABLE ro_payment_entries ADD COLUMN IF NOT EXISTS amount NUMERIC")
     cur.execute("ALTER TABLE ro_payment_entries ADD COLUMN IF NOT EXISTS business_date DATE")
     cur.execute("ALTER TABLE ro_payment_entries ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP")
@@ -2530,7 +2581,7 @@ async def list_open_ros_for_payments(request: Request):
 
         cur.execute(
             """
-            SELECT ro, payer_type, payment_method, amount, business_date
+            SELECT ro, payer_type, payment_method, check_number, created_by, amount, business_date
             FROM ro_payment_entries
             WHERE domain = %s
             ORDER BY business_date DESC NULLS LAST, id DESC
@@ -2559,6 +2610,8 @@ async def list_open_ros_for_payments(request: Request):
                     "amount": _parse_float_value(entry_row.get("amount")),
                     "business_date": business_date_display,
                     "payment_type": str(entry_row.get("payment_method") or "").strip().upper(),
+                    "check_number": str(entry_row.get("check_number") or "").strip(),
+                    "created_by": _resolve_note_created_by(cur, entry_row.get("created_by")),
                 }
             )
 
@@ -3171,6 +3224,8 @@ async def save_ro_payments(request: Request):
     customer_payment_raw = data.get("customer_payment", None)
     insurance_payment_type_raw = str(data.get("insurance_payment_type") or "").strip().upper()
     customer_payment_type_raw = str(data.get("customer_payment_type") or "").strip().upper()
+    insurance_check_number_raw = str(data.get("insurance_check_number") or "").strip()
+    customer_check_number_raw = str(data.get("customer_check_number") or "").strip()
     business_date_raw = str(data.get("business_date") or "").strip()
     has_incremental_values = insurance_payment_raw is not None or customer_payment_raw is not None
 
@@ -3213,6 +3268,7 @@ async def save_ro_payments(request: Request):
         _ensure_saved_estimates_table(cur)
         _ensure_ro_payment_totals_table(cur)
         _ensure_ro_payment_entries_table(cur)
+        created_by = _resolve_request_user_display_name(request, cur, domain)
 
         cur.execute(
             """
@@ -3278,21 +3334,59 @@ async def save_ro_payments(request: Request):
         )
 
         if insurance_entry_amount > 0:
+            insurance_check_number = insurance_check_number_raw if insurance_payment_type == "CHECK" else ""
             cur.execute(
                 """
-                INSERT INTO ro_payment_entries (ro, domain, payer_type, payment_method, amount, business_date, created_at)
-                VALUES (%s, %s, 'insurance', %s, %s, %s, CURRENT_TIMESTAMP)
+                INSERT INTO ro_payment_entries (
+                    ro,
+                    domain,
+                    payer_type,
+                    payment_method,
+                    check_number,
+                    created_by,
+                    amount,
+                    business_date,
+                    created_at
+                )
+                VALUES (%s, %s, 'insurance', %s, %s, %s, %s, %s, CURRENT_TIMESTAMP)
                 """,
-                (ro_value, domain, insurance_payment_type or None, insurance_entry_amount, business_date_value),
+                (
+                    ro_value,
+                    domain,
+                    insurance_payment_type or None,
+                    insurance_check_number or None,
+                    created_by,
+                    insurance_entry_amount,
+                    business_date_value,
+                ),
             )
 
         if customer_entry_amount > 0:
+            customer_check_number = customer_check_number_raw if customer_payment_type == "CHECK" else ""
             cur.execute(
                 """
-                INSERT INTO ro_payment_entries (ro, domain, payer_type, payment_method, amount, business_date, created_at)
-                VALUES (%s, %s, 'customer', %s, %s, %s, CURRENT_TIMESTAMP)
+                INSERT INTO ro_payment_entries (
+                    ro,
+                    domain,
+                    payer_type,
+                    payment_method,
+                    check_number,
+                    created_by,
+                    amount,
+                    business_date,
+                    created_at
+                )
+                VALUES (%s, %s, 'customer', %s, %s, %s, %s, %s, CURRENT_TIMESTAMP)
                 """,
-                (ro_value, domain, customer_payment_type or None, customer_entry_amount, business_date_value),
+                (
+                    ro_value,
+                    domain,
+                    customer_payment_type or None,
+                    customer_check_number or None,
+                    created_by,
+                    customer_entry_amount,
+                    business_date_value,
+                ),
             )
 
         conn.commit()
@@ -5547,7 +5641,6 @@ async def list_ro_activity(request: Request, ro: str):
 @router.post("/ro-notes")
 async def add_ro_note(request: Request):
     domain = get_user_domain(request) or "default"
-    created_by = "System"
     data = await request.json()
     ro = (data.get("ro") or "").strip()
     note = (data.get("note") or "").strip()
@@ -5558,6 +5651,7 @@ async def add_ro_note(request: Request):
     cur = conn.cursor()
     try:
         _ensure_ro_notes_table(cur)
+        created_by = _resolve_request_user_display_name(request, cur, domain)
         cur.execute(
             """
             INSERT INTO ro_notes (ro, note, domain, created_by)
