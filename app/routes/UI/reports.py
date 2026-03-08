@@ -354,6 +354,14 @@ def get_reports_screen_html():
         return match ? match[1] : '';
     }
 
+    function reportsFormatDateMmDdYyyy(value) {
+        const iso = reportsNormalizeIsoDateForInput(value);
+        if (!iso) return '-';
+        const [yyyy, mm, dd] = iso.split('-');
+        if (!yyyy || !mm || !dd) return '-';
+        return `${mm}/${dd}/${yyyy}`;
+    }
+
     function reportsOpenClosedRoWindow(event, roNumber) {
         if (event) event.stopPropagation();
         const roKey = String(roNumber || '').trim();
@@ -363,10 +371,10 @@ def get_reports_screen_html():
             return;
         }
 
-        const closedDateValue = reportsNormalizeIsoDateForInput(ro.closed_at || ro.closed_date || ro.updated_at || ro.picked_up || '');
-        const inDateValue = reportsNormalizeIsoDateForInput(ro.in_date);
-        const ecdDateValue = reportsNormalizeIsoDateForInput(ro.ecd_date);
-        const pickedUpDateValue = reportsNormalizeIsoDateForInput(ro.picked_up);
+        const closedDateText = reportsFormatDateMmDdYyyy(ro.closed_at || ro.closed_date || ro.updated_at || ro.picked_up || '');
+        const inDateText = reportsFormatDateMmDdYyyy(ro.in_date);
+        const ecdDateText = reportsFormatDateMmDdYyyy(ro.ecd_date);
+        const pickedUpDateText = reportsFormatDateMmDdYyyy(ro.picked_up);
 
         const icons = {
             notepad: `<svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="5" y="6" width="18" height="16" rx="2" stroke="white" stroke-width="2"/><line x1="9" y1="10" x2="19" y2="10" stroke="white" stroke-width="2"/><line x1="9" y1="14" x2="19" y2="14" stroke="white" stroke-width="2"/><line x1="9" y1="18" x2="15" y2="18" stroke="white" stroke-width="2"/></svg>`,
@@ -391,16 +399,25 @@ def get_reports_screen_html():
                 <div style="font-size:20px; font-weight:bold; margin-bottom:10px;">RO Window</div>
                 <div style="position:absolute; top:14px; left:50%; transform:translateX(-50%); font-weight:900; letter-spacing:1.5px; font-size:20px; color:#fff;">CLOSED</div>
                 <div style="position:absolute; top:18px; right:24px; display:flex; gap:12px; z-index:10;">
-                    <button type="button" id="roPopupPrintButton" style="padding:7px 18px; background:#d32f2f; color:#fff; border:none; border-radius:4px; font-weight:bold; font-size:15px; cursor:pointer;">Print</button>
+                    <button type="button" id="roPopupPrintButton" class="mini-popup-trigger" style="padding:7px 18px; background:#d32f2f; color:#fff; border:none; border-radius:4px; font-weight:bold; font-size:15px; cursor:pointer;">Print</button>
+                    <div id="roPrintOptionsModal" class="mini-popup-panel" style="display:none; right:0; left:auto; top:100%;">
+                        <h2 style="margin:0 0 14px 0; color:#333; font-size:18px;">Print RO</h2>
+                        <p style="margin:0 0 12px 0; font-weight:bold; color:#555;">Select document:</p>
+                        <div style="display:flex; flex-direction:column; gap:8px;">
+                            <button id="roPrintOptionBill" type="button" style="padding:10px 12px; background:#f5f5f5; color:#333; border:1px solid #ddd; border-radius:4px; cursor:pointer; text-align:left; font-size:14px;">Bill</button>
+                            <button id="roPrintOptionServiceOrder" type="button" style="padding:10px 12px; background:#f5f5f5; color:#333; border:1px solid #ddd; border-radius:4px; cursor:pointer; text-align:left; font-size:14px;">Service Order</button>
+                            <button id="roPrintOptionParts" type="button" style="padding:10px 12px; background:#f5f5f5; color:#333; border:1px solid #ddd; border-radius:4px; cursor:pointer; text-align:left; font-size:14px;">Parts</button>
+                        </div>
+                    </div>
                 </div>
                 <div style="position:absolute; top:58px; right:24px; display:flex; flex-direction:column; align-items:flex-start; gap:6px; z-index:10;">
                     <div style="display:flex; align-items:center; gap:8px;">
                         <span class="ro-header-label" style="margin-right:0;">Picked Up:</span>
-                        <input type="date" id="roHeaderPickedUpDate" class="ro-header-date-input" value="${pickedUpDateValue}" disabled />
+                        <span class="ro-header-date-text">${pickedUpDateText}</span>
                     </div>
                     <div style="display:flex; align-items:center; gap:8px;">
                         <span class="ro-header-label" style="margin-right:0;">Closed:</span>
-                        <span style="color:#fff; font-weight:600;">${closedDateValue || '-'}</span>
+                        <span class="ro-header-date-text">${closedDateText}</span>
                     </div>
                 </div>
                 <div style="display:grid; grid-template-columns:repeat(3, minmax(0, 1fr)); gap:20px 28px; margin-right:260px; align-items:start;">
@@ -415,8 +432,8 @@ def get_reports_screen_html():
                     </div>
                     <div style="display:flex; flex-direction:column; gap:8px;">
                         <div><span class="ro-header-label">Vehicle:</span> <span class="ro-header-value">${reportsEscapeHtml(ro.vehicle || '-')}</span></div>
-                        <div><span class="ro-header-label">IN Date:</span> <input type="date" class="ro-header-date-input" value="${inDateValue}" disabled /></div>
-                        <div><span class="ro-header-label">ECD Date:</span> <input type="date" class="ro-header-date-input" value="${ecdDateValue}" disabled /></div>
+                        <div><span class="ro-header-label">IN Date:</span> <span class="ro-header-date-text">${inDateText}</span></div>
+                        <div><span class="ro-header-label">ECD Date:</span> <span class="ro-header-date-text">${ecdDateText}</span></div>
                     </div>
                 </div>
             </div>
@@ -441,18 +458,17 @@ def get_reports_screen_html():
             .ro-sidebar-btn.active { opacity:1; }
             .ro-header-label { color:#d32f2f; font-weight:700; margin-right:6px; white-space:nowrap; }
             .ro-header-value { color:#fff; font-weight:600; }
-            .ro-header-date-input { height:28px; min-width:140px; border:1px solid #5b636b; border-radius:4px; background:#2d3135; color:#fff; padding:2px 8px; font-size:14px; }
+            .ro-header-date-text { color:#fff; font-weight:600; min-width:110px; }
             .ro-window-card { background:#fafafa; border:1px solid #ddd; border-radius:8px; padding:14px; }
+            .mini-popup-panel { position:absolute; min-width:240px; background:#fff; border:1px solid #ddd; border-radius:8px; box-shadow:0 10px 24px rgba(0,0,0,0.16); padding:12px; z-index:1500; margin-top:8px; }
         `;
         win.document.head.appendChild(style);
 
         const roDoc = win.document;
         const contentEl = roDoc.getElementById('roWindowContent');
         const printBtn = roDoc.getElementById('roPopupPrintButton');
+        const printPanel = roDoc.getElementById('roPrintOptionsModal');
         const headerEl = roDoc.getElementById('roHeaderBar');
-        if (printBtn) {
-            printBtn.addEventListener('click', () => win.print());
-        }
         if (headerEl) {
             const h = Math.ceil(headerEl.getBoundingClientRect().height);
             roDoc.documentElement.style.setProperty('--ro-header-height', `${h}px`);
@@ -468,6 +484,320 @@ def get_reports_screen_html():
             const n = Number(v || 0);
             return '$' + n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
         }
+
+        function popupToNumber(value, fallback = 0) {
+            const parsed = Number(value);
+            return Number.isFinite(parsed) ? parsed : fallback;
+        }
+
+        function popupNormalizeDisplayNumber(value) {
+            const numeric = popupToNumber(value, 0);
+            return Number.isInteger(numeric)
+                ? String(numeric)
+                : numeric.toFixed(2).replace(/\.00$/, '').replace(/(\.\d*[1-9])0+$/, '$1');
+        }
+
+        function popupFormatDate(value) {
+            return reportsFormatDateMmDdYyyy(value);
+        }
+
+        function popupExtractLineNumber(value) {
+            if (value === null || value === undefined) return null;
+            const match = String(value).match(/\d+/);
+            if (!match) return null;
+            const parsed = Number(match[0]);
+            return Number.isFinite(parsed) ? parsed : null;
+        }
+
+        function popupBuildUnifiedLinesFromSections(sections) {
+            const byLine = new Map();
+
+            function getLineRecord(lineNumber) {
+                if (!byLine.has(lineNumber)) {
+                    byLine.set(lineNumber, {
+                        lineNumber,
+                        description: '',
+                        labor: 0,
+                        paint: 0,
+                        qty: null,
+                        partNumber: '',
+                        extendedPrice: null,
+                    });
+                }
+                return byLine.get(lineNumber);
+            }
+
+            (Array.isArray(sections) ? sections : []).forEach((section) => {
+                const sectionKey = String(section?.key || '').toLowerCase();
+                const items = Array.isArray(section?.items) ? section.items : [];
+                items.forEach((item) => {
+                    const lineNumber = popupExtractLineNumber(item?.line ?? item?.lineNumber);
+                    if (lineNumber === null) return;
+                    const record = getLineRecord(lineNumber);
+                    const desc = String(item?.description || '').trim();
+                    if (desc && !record.description) record.description = desc;
+
+                    if (sectionKey === 'labor') {
+                        record.labor = popupToNumber(item?.value, 0);
+                        return;
+                    }
+                    if (sectionKey === 'paint') {
+                        record.paint = popupToNumber(item?.value, 0);
+                        return;
+                    }
+                    if (sectionKey === 'parts') {
+                        const qtyRaw = item?.qty;
+                        if (qtyRaw !== null && qtyRaw !== undefined && String(qtyRaw).trim() !== '') {
+                            record.qty = popupToNumber(qtyRaw, 0);
+                        }
+                        const partNumber = String(item?.partNumber || item?.part_number || item?.part_no || item?.['part#'] || item?.pn || '').trim();
+                        if (partNumber) record.partNumber = partNumber;
+                        const extPriceRaw = item?.extendedPrice ?? item?.price;
+                        if (extPriceRaw !== null && extPriceRaw !== undefined && String(extPriceRaw).trim() !== '') {
+                            record.extendedPrice = popupToNumber(extPriceRaw, 0);
+                        }
+                    }
+                });
+            });
+
+            return Array.from(byLine.values()).sort((a, b) => a.lineNumber - b.lineNumber);
+        }
+
+        function popupGetUnifiedEstimateLines(estimate) {
+            return Array.isArray(estimate?.unified_lines)
+                ? [...estimate.unified_lines].sort((a, b) => popupToNumber(a?.lineNumber, 0) - popupToNumber(b?.lineNumber, 0))
+                : popupBuildUnifiedLinesFromSections(Array.isArray(estimate?.sections) ? estimate.sections : []);
+        }
+
+        function roTogglePrintPopup(panel) {
+            if (!panel) return;
+            const isOpen = panel.classList.contains('open');
+            roDoc.querySelectorAll('.mini-popup-panel.open').forEach((openPanel) => {
+                openPanel.classList.remove('open');
+                openPanel.style.display = 'none';
+            });
+            if (!isOpen) {
+                panel.style.display = 'block';
+                panel.classList.add('open');
+            }
+        }
+
+        function roClosePrintOptionsModal() {
+            if (!printPanel) return;
+            printPanel.classList.remove('open');
+            printPanel.style.display = 'none';
+        }
+
+        function roOpenPrintWindow(title, bodyHtml, options = {}) {
+            const printWindow = window.open('', '_blank');
+            if (!printWindow) {
+                alert('Unable to open print preview. Please allow pop-ups for this site.');
+                return;
+            }
+            printWindow.document.write(`
+                <!DOCTYPE html>
+                <html>
+                    <head>
+                        <title>${popupEsc(title)}</title>
+                        <style>
+                            @media print { @page { margin: 0.5in; } body { margin: 0; } }
+                            body { font-family: Arial, sans-serif; color:#222; padding:20px; }
+                            .header { text-align:center; margin-bottom:16px; border-bottom:2px solid #b22222; padding-bottom:8px; }
+                            table { width:100%; border-collapse:collapse; margin-top:10px; }
+                            thead th { background:#3c4142; color:#fff; text-align:left; padding:8px; font-size:12px; }
+                            tbody td { padding:8px; border-bottom:1px solid #eee; font-size:12px; }
+                            .num { text-align:right; }
+                        </style>
+                    </head>
+                    <body>${bodyHtml}</body>
+                </html>
+            `);
+            printWindow.document.close();
+            printWindow.focus();
+            if (options.immediatePrint) {
+                printWindow.print();
+                return;
+            }
+            setTimeout(() => printWindow.print(), 250);
+        }
+
+        async function roPrintBill() {
+            roClosePrintOptionsModal();
+            try {
+                const res = await popupFetchJson(`/api/ro-estimate?ro=${encodeURIComponent(roKey)}`);
+                const estimate = res.estimate || {};
+                const lines = popupGetUnifiedEstimateLines(estimate);
+                const linesHtml = lines.map((line) => {
+                    const qty = line?.qty;
+                    const qtyDisplay = qty === null || qty === undefined || String(qty).trim() === '' ? '-' : popupNormalizeDisplayNumber(qty);
+                    const priceDisplay = (line?.extendedPrice === null || line?.extendedPrice === undefined || String(line?.extendedPrice).trim() === '')
+                        ? '-'
+                        : popupNormalizeDisplayNumber(line?.extendedPrice);
+                    return `
+                        <tr>
+                            <td>${popupEsc(line?.lineNumber || '-')}</td>
+                            <td>${popupEsc(String(line?.description || '').trim() || '-')}</td>
+                            <td>${popupEsc(String(line?.partNumber || '').trim() || '-')}</td>
+                            <td class="num">${popupEsc(qtyDisplay)}</td>
+                            <td class="num">${popupEsc(popupNormalizeDisplayNumber(line?.labor || 0))}</td>
+                            <td class="num">${popupEsc(popupNormalizeDisplayNumber(line?.paint || 0))}</td>
+                            <td class="num">${popupEsc(priceDisplay)}</td>
+                        </tr>
+                    `;
+                }).join('');
+
+                roOpenPrintWindow(
+                    `RO ${roKey} Bill`,
+                    `
+                        <div class="header" style="text-align:left;">
+                            <div style="font-size:56px; font-weight:800; line-height:1; margin-bottom:8px;">RO #${popupEsc(roKey || '-')}</div>
+                            <div style="display:flex; justify-content:space-between; align-items:flex-end; gap:18px; margin-bottom:6px;">
+                                <div style="font-size:20px; font-weight:600;">Vehicle: ${popupEsc(ro.vehicle || '-')}</div>
+                                <div style="font-size:30px; font-weight:800; letter-spacing:1px;">INVOICE</div>
+                            </div>
+                            <div style="font-size:18px; font-weight:600;">Customer: ${popupEsc(ro.customer || '-')} | Insurance: ${popupEsc(ro.insurance || '-')}</div>
+                            <div style="font-size:16px; font-weight:600; margin-top:4px;">In ${popupEsc(inDateText)} | ECD ${popupEsc(ecdDateText)} | Picked Up ${popupEsc(pickedUpDateText)} | Closed ${popupEsc(closedDateText)}</div>
+                        </div>
+                        <table>
+                            <thead>
+                                <tr><th>Line #</th><th>Description</th><th>Part #</th><th class="num">Qty</th><th class="num">Labor</th><th class="num">Paint</th><th class="num">Price</th></tr>
+                            </thead>
+                            <tbody>${linesHtml || '<tr><td colspan="7" style="text-align:center; color:#777;">No repair lines found.</td></tr>'}</tbody>
+                        </table>
+                    `
+                );
+            } catch (error) {
+                alert('Unable to generate Bill print.');
+            }
+        }
+
+        async function roPrintServiceOrder() {
+            roClosePrintOptionsModal();
+            try {
+                const data = await popupFetchJson(`/api/ro-tech-lines?ro=${encodeURIComponent(roKey)}`);
+                const techTargets = (Array.isArray(data.tech_lines) ? data.tech_lines : [])
+                    .filter((item) => String(item.mode || '').toLowerCase() === 'tech' && String(item.tech_name || item.tech || '').trim());
+
+                if (!techTargets.length) {
+                    alert('No tech lines available for Service Order.');
+                    return;
+                }
+
+                const sectionsByTech = new Map();
+                for (const target of techTargets) {
+                    const techName = String(target.tech_name || target.tech || '').trim();
+                    const repairType = String(target.repair_type || target.type || 'body').trim();
+                    const query = new URLSearchParams({ ro: roKey, mode: 'tech', repair_type: repairType, tech_name: techName });
+                    const details = await popupFetchJson(`/api/ro-assignment-lines?${query.toString()}`);
+                    const lines = Array.isArray(details.lines) ? details.lines : [];
+                    if (!sectionsByTech.has(techName)) sectionsByTech.set(techName, []);
+                    const targetLines = sectionsByTech.get(techName);
+                    lines.forEach((line) => {
+                        targetLines.push({
+                            line_number: line.line_number || line.line_key || '-',
+                            description: line.description || '-',
+                            repair_type: line.repair_type || repairType,
+                            hours: popupToNumber(line.hours || 0),
+                        });
+                    });
+                }
+
+                const sections = Array.from(sectionsByTech.entries()).map(([techName, techLines]) => {
+                    const rowsHtml = techLines
+                        .sort((a, b) => (popupExtractLineNumber(a.line_number) ?? 999999) - (popupExtractLineNumber(b.line_number) ?? 999999))
+                        .map((line) => `
+                            <tr>
+                                <td>${popupEsc(line.line_number || '-')}</td>
+                                <td>${popupEsc(line.description || '-')}</td>
+                                <td>${popupEsc(line.repair_type || '-')}</td>
+                                <td class="num">${popupToNumber(line.hours || 0).toFixed(1)}</td>
+                            </tr>
+                        `).join('');
+                    return `
+                        <div style="margin-top:18px;">
+                            <div style="font-size:16px; font-weight:700; margin-bottom:6px;">${popupEsc(techName)}</div>
+                            <table>
+                                <thead><tr><th>Line</th><th>Description</th><th>Type</th><th class="num">HRS</th></tr></thead>
+                                <tbody>${rowsHtml || '<tr><td colspan="4" style="text-align:center; color:#777;">No lines assigned.</td></tr>'}</tbody>
+                            </table>
+                        </div>
+                    `;
+                });
+
+                roOpenPrintWindow(
+                    `RO ${roKey} Service Order`,
+                    `
+                        <div class="header" style="text-align:left;">
+                            <div style="font-size:56px; font-weight:800; line-height:1; margin-bottom:8px;">RO #${popupEsc(roKey || '-')}</div>
+                            <div style="display:flex; justify-content:space-between; align-items:flex-end; gap:18px; margin-bottom:6px;">
+                                <div style="font-size:20px; font-weight:600;">Vehicle: ${popupEsc(ro.vehicle || '-')}</div>
+                                <div style="font-size:30px; font-weight:800; letter-spacing:1px;">SERVICE ORDER</div>
+                            </div>
+                        </div>
+                        ${sections.join('')}
+                    `
+                );
+            } catch (error) {
+                alert('Unable to generate Service Order print.');
+            }
+        }
+
+        async function roPrintParts() {
+            roClosePrintOptionsModal();
+            try {
+                const linesRes = await popupFetchJson(`/api/parts/ro-lines?ro=${encodeURIComponent(roKey)}`);
+                const lines = Array.isArray(linesRes.lines) ? linesRes.lines : [];
+                const rowsHtml = lines.map((line) => `
+                    <tr>
+                        <td>${popupEsc(line.line || '-')}</td>
+                        <td>${popupEsc(line.description || '-')}</td>
+                        <td class="num">${popupEsc(line.qty || 0)}</td>
+                        <td class="num">${popupMoney(line.price || 0)}</td>
+                    </tr>
+                `).join('');
+
+                roOpenPrintWindow(
+                    `RO ${roKey} Parts`,
+                    `
+                        <div class="header" style="text-align:left;">
+                            <div style="font-size:56px; font-weight:800; line-height:1; margin-bottom:8px;">RO #${popupEsc(roKey || '-')}</div>
+                            <div style="display:flex; justify-content:space-between; align-items:flex-end; gap:18px; margin-bottom:6px;">
+                                <div style="font-size:20px; font-weight:600;">Vehicle: ${popupEsc(ro.vehicle || '-')}</div>
+                                <div style="font-size:30px; font-weight:800; letter-spacing:1px;">PARTS</div>
+                            </div>
+                        </div>
+                        <table>
+                            <thead><tr><th>Line</th><th>Description</th><th class="num">QTY</th><th class="num">Price</th></tr></thead>
+                            <tbody>${rowsHtml || '<tr><td colspan="4" style="text-align:center; color:#777;">No parts lines found.</td></tr>'}</tbody>
+                        </table>
+                    `,
+                    { immediatePrint: true }
+                );
+            } catch (error) {
+                alert('Unable to generate Parts print.');
+            }
+        }
+
+        if (printBtn && printPanel) {
+            printBtn.addEventListener('click', (event) => {
+                event.stopPropagation();
+                roTogglePrintPopup(printPanel);
+            });
+        }
+
+        const printBillBtn = roDoc.getElementById('roPrintOptionBill');
+        const printServiceOrderBtn = roDoc.getElementById('roPrintOptionServiceOrder');
+        const printPartsBtn = roDoc.getElementById('roPrintOptionParts');
+        if (printBillBtn) printBillBtn.addEventListener('click', () => { roPrintBill(); });
+        if (printServiceOrderBtn) printServiceOrderBtn.addEventListener('click', () => { roPrintServiceOrder(); });
+        if (printPartsBtn) printPartsBtn.addEventListener('click', () => { roPrintParts(); });
+
+        roDoc.addEventListener('click', (event) => {
+            if (!printPanel || !printPanel.classList.contains('open')) return;
+            const target = event.target;
+            if ((printBtn && printBtn.contains(target)) || printPanel.contains(target)) return;
+            roClosePrintOptionsModal();
+        });
 
         async function popupFetchJson(url, options = {}) {
             const resp = await fetch(url, { credentials: 'include', cache: 'no-store', ...options });
@@ -893,113 +1223,222 @@ def get_reports_screen_html():
         if (!win) {
             alert('Unable to open print preview. Please allow pop-ups for this site.');
             return;
-        }
-
-        win.document.write(`
-            <!DOCTYPE html>
-            <html>
-                <head>
-                    <title>${reportsEscapeHtml(title)}</title>
-                    <style>
-                        @media print {
+            function formatShortPaymentDate(value) {
+                const source = String(value || '').trim();
+                if (!source) return '--/--/--';
+                let dt;
+                if (/^\d{4}-\d{2}-\d{2}$/.test(source)) {
+                    dt = new Date(`${source}T00:00:00`);
+                } else {
+                    dt = new Date(source);
+                }
+                if (Number.isNaN(dt.getTime())) return '--/--/--';
+                const mm = String(dt.getMonth() + 1).padStart(2, '0');
+                const dd = String(dt.getDate()).padStart(2, '0');
+                const yy = String(dt.getFullYear()).slice(-2);
+                return `${mm}/${dd}/${yy}`;
                             @page { margin: 0.5in; }
                             body { margin: 0; }
-                        }
-                        body { font-family: Arial, sans-serif; padding: 20px; color: #333; }
-                        .header { text-align:center; margin-bottom:20px; border-bottom:2px solid #b22222; padding-bottom:10px; }
-                        .header h1 { margin:0 0 6px 0; color:#b22222; font-size:26px; }
-                        .header p { margin:0; color:#666; }
-                        .group-wrap { margin-top:24px; margin-bottom:8px; }
+            function formatBalance(value) {
+                const numeric = Number(value || 0);
+                if (!Number.isFinite(numeric) || numeric <= 0) return '$0';
+                return popupMoney(numeric);
                         .group-title { font-size:18px; font-weight:bold; color:#333; margin-bottom:4px; }
                         .group-header-line { font-size:12px; line-height:1.4; color:#444; margin-bottom:8px; border-bottom:1px solid #ddd; padding-bottom:6px; }
-                        table { width:100%; border-collapse:collapse; }
-                        thead th { font-size:12px; }
-                        tbody td { font-size:12px; }
-                    </style>
-                </head>
-                <body>
-                    ${bodyHtml}
-                </body>
-            </html>
-        `);
-        win.document.close();
-        win.focus();
-        setTimeout(() => win.print(), 250);
-    }
+            function formatGrandTotal(value) {
+                const numeric = Number(value || 0);
+                if (!Number.isFinite(numeric)) return '-';
+                return popupMoney(Math.max(0, numeric));
 
-    function reportsPrintClosedRos(printBy) {
-        reportsClosePrintOptionsModal();
-        const rows = reportsGetFilteredRows();
-        const isOpenView = reportsUiState.status === 'open';
-        const sectionTitle = isOpenView ? 'Open Repair Orders' : 'Closed Repair Orders';
-        if (!rows.length) {
-            alert(isOpenView ? 'No open repair orders to print.' : 'No closed repair orders to print.');
-            return;
-        }
 
-        const summaryRows = Array.isArray(reportsDataCache.summary) ? reportsDataCache.summary : [];
-        const labelMap = { ro: 'RO', insurance: 'INSURANCE', tech: 'TECH', estimator: 'ESTIMATOR' };
-        const printLabel = labelMap[printBy] || 'RO';
-        const summaryHtml = reportsSummaryTableHtml(summaryRows);
+            function renderPaymentLog(entries) {
+                const sorted = [...(Array.isArray(entries) ? entries : [])].sort((a, b) => {
+                    const aDate = new Date(a.business_date || a.paid_at || a.date || '').getTime() || 0;
+                    const bDate = new Date(b.business_date || b.paid_at || b.date || '').getTime() || 0;
+                    return bDate - aDate;
+                });
+                if (!sorted.length) {
+                    return '<div style="color:#777; padding:6px 0;">No payments yet.</div>';
+        reportsOpenPrintWindow(
+                return sorted.map((entry) => {
+                    const dateText = formatShortPaymentDate(entry.business_date || entry.paid_at || entry.date);
+                    const typeText = String(entry.payment_type || 'CARD').trim().toUpperCase() || 'CARD';
+                    const checkNumberText = String(entry.check_number || '').trim();
+                    const userText = String(entry.created_by || 'Unknown').trim() || 'Unknown';
+                    const typeWithCheck = typeText === 'CHECK' && checkNumberText ? `CHECK #${checkNumberText}` : typeText;
+                    return `
+                        <div style="display:flex; justify-content:space-between; align-items:center; padding:6px 0; border-bottom:1px solid #f0f0f0;">
+                            <div style="color:#333;">${popupEsc(dateText)} - ${popupEsc(typeWithCheck)} - ${popupEsc(userText)}</div>
+                            <div style="font-weight:600; color:#333;">${popupMoney(entry.amount || 0)}</div>
+                        </div>
+                    `;
+                }).join('');
+            }
 
-        if (printBy === 'ro') {
-            const roCountHtml = `<div style="margin:6px 0 14px 0; font-weight:bold;">RO Count: ${rows.length}</div>`;
-            const tableHtml = reportsClosedRoTableHtml(rows);
-            reportsOpenPrintWindow(
-                `${sectionTitle} - ${printLabel}`,
-                `<div class="header"><h1>${sectionTitle}</h1><p>Print by: ${printLabel}</p></div>${summaryHtml}${roCountHtml}${tableHtml}`
-            );
-            return;
-        }
+            function syncCheckNumberVisibility(typeSelectEl, checkInputEl) {
+                if (!typeSelectEl || !checkInputEl) return;
+                const paymentType = String(typeSelectEl.value || '').toUpperCase();
+                const isCheck = paymentType === 'CHECK';
+                checkInputEl.style.display = isCheck ? 'inline-block' : 'none';
+                if (!isCheck) checkInputEl.value = '';
+            }
 
-        const key = printBy;
-        const grouped = new Map();
-        rows.forEach((row) => {
-            const groupName = reportsResolveGroupName(row, key) || 'Unspecified';
-            if (!grouped.has(groupName)) grouped.set(groupName, []);
-            grouped.get(groupName).push(row);
-        });
+            function renderPaymentsScreenForRow(row) {
+                const insuranceEntries = Array.isArray(row.insurance_payment_entries) ? row.insurance_payment_entries : [];
+                const customerEntries = Array.isArray(row.customer_payment_entries) ? row.customer_payment_entries : [];
 
-        const sectionsHtml = Array.from(grouped.entries())
-            .sort((a, b) => a[0].localeCompare(b[0]))
-            .map(([groupName, groupRows]) => {
-                const metrics = reportsComputeMetrics(groupRows);
-                const groupHeaderHtml = `
-                    <div class="group-wrap">
-                        <div class="group-title">${reportsEscapeHtml(groupName)}</div>
-                        <div class="group-header-line">RO Count: ${metrics.roCount} &nbsp;&nbsp;&nbsp;&nbsp; Grand Total Sales: ${formatReportsMoney(metrics.totalSales)} &nbsp;&nbsp;&nbsp;&nbsp; Total GP: ${formatReportsPercent(metrics.total.gpPercent)}% | ${formatReportsMoney(metrics.total.gpDollar)} &nbsp;&nbsp;&nbsp;&nbsp; Parts GP: ${formatReportsPercent(metrics.parts.gpPercent)}% | ${formatReportsMoney(metrics.parts.gpDollar)} &nbsp;&nbsp;&nbsp;&nbsp; Labor GP: ${formatReportsPercent(metrics.labor.gpPercent)}% | ${formatReportsMoney(metrics.labor.gpDollar)}</div>
+                const insuranceTotal = Number(row.insurance_total || 0);
+                const customerTotal = Number(row.customer_total || 0);
+                const insurancePaid = Number(row.insurance_paid || 0);
+                const customerPaid = Number(row.customer_paid || 0);
+                const roGrandTotal = insuranceTotal + customerTotal;
+                const insuranceDue = Math.max(0, insuranceTotal - insurancePaid);
+                const customerDue = Math.max(0, customerTotal - customerPaid);
+                const roDue = Math.max(0, roGrandTotal - (insurancePaid + customerPaid));
+
+                const pendingColor = '#fbc02d';
+                const paidColor = '#2e7d32';
+                const insuranceTotalColor = insuranceDue <= 0.009 ? paidColor : pendingColor;
+                const customerTotalColor = customerDue <= 0.009 ? paidColor : pendingColor;
+                const roGrandTotalColor = roDue <= 0.009 ? paidColor : pendingColor;
+
+                const insuranceBalance = formatBalance(insuranceDue);
+                const customerBalance = formatBalance(customerDue);
+                const insuranceGrandTotal = formatGrandTotal(insuranceTotal);
+                const customerGrandTotal = formatGrandTotal(customerTotal);
+                const roGrandTotalText = formatGrandTotal(roGrandTotal);
+
+                const insuranceName = String(row.insurance_name || '').trim() || '-';
+                const customerName = String(row.customer || '').trim() || '-';
+
+                if (titleEl) {
+                    titleEl.innerHTML = `Payments - GRAND TOTAL: <span style="color:${roGrandTotalColor}; font-weight:800;">${popupEsc(roGrandTotalText)}</span>`;
+                }
+
+                logEl.innerHTML = `
+                    <div style="border:1px solid #e2e2e2; border-radius:6px; padding:12px; margin-bottom:14px; background:#fff;">
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; color:#333; font-weight:700;">
+                            <div>INSURANCE: ${popupEsc(insuranceName)}</div>
+                            <div style="text-align:right; line-height:1.35;">
+                                <div>GRAND TOTAL: <span style="color:${insuranceTotalColor}; font-weight:800;">${popupEsc(insuranceGrandTotal)}</span></div>
+                                <div>BALANCE: ${popupEsc(insuranceBalance)}</div>
+                            </div>
+                        </div>
+                        <div style="display:flex; gap:8px; align-items:center; margin-bottom:10px;">
+                            <input id="roPopupInsurancePaymentInput" type="number" step="0.01" min="0" placeholder="0.00" style="padding:8px; border:1px solid #ccc; border-radius:4px; width:180px;" />
+                            <select id="roPopupInsurancePaymentType" style="padding:8px; border:1px solid #ccc; border-radius:4px; width:120px;">
+                                <option value="CARD">CARD</option>
+                                <option value="CASH">CASH</option>
+                                <option value="CHECK">CHECK</option>
+                            </select>
+                            <input id="roPopupInsuranceCheckNumber" type="text" placeholder="Check #" style="display:none; padding:8px; border:1px solid #ccc; border-radius:4px; width:150px;" />
+                        </div>
+                        <div style="height:1px; background:#ddd; margin:8px 0 10px 0;"></div>
+                        <div id="roPopupInsuranceLog">${renderPaymentLog(insuranceEntries)}</div>
+                    </div>
+
+                    <div style="border:1px solid #e2e2e2; border-radius:6px; padding:12px; background:#fff;">
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; color:#333; font-weight:700;">
+                            <div>CUSTOMER: ${popupEsc(customerName)}</div>
+                            <div style="text-align:right; line-height:1.35;">
+                                <div>GRAND TOTAL: <span style="color:${customerTotalColor}; font-weight:800;">${popupEsc(customerGrandTotal)}</span></div>
+                                <div>BALANCE: ${popupEsc(customerBalance)}</div>
+                            </div>
+                        </div>
+                        <div style="display:flex; gap:8px; align-items:center; margin-bottom:10px;">
+                            <input id="roPopupCustomerPaymentInput" type="number" step="0.01" min="0" placeholder="0.00" style="padding:8px; border:1px solid #ccc; border-radius:4px; width:180px;" />
+                            <select id="roPopupCustomerPaymentType" style="padding:8px; border:1px solid #ccc; border-radius:4px; width:120px;">
+                                <option value="CARD">CARD</option>
+                                <option value="CASH">CASH</option>
+                                <option value="CHECK">CHECK</option>
+                            </select>
+                            <input id="roPopupCustomerCheckNumber" type="text" placeholder="Check #" style="display:none; padding:8px; border:1px solid #ccc; border-radius:4px; width:150px;" />
+                        </div>
+                        <div style="height:1px; background:#ddd; margin:8px 0 10px 0;"></div>
+                        <div id="roPopupCustomerLog">${renderPaymentLog(customerEntries)}</div>
                     </div>
                 `;
-                return `${groupHeaderHtml}${reportsClosedRoTableHtml(groupRows)}`;
-            })
-            .join('');
+            }
 
-        reportsOpenPrintWindow(
+            try {
+                const data = await popupFetchJson('/api/payments/open-ros');
+                const rows = Array.isArray(data.rows) ? data.rows : [];
+                const row = rows.find((item) => String(item.ro || '') === roKey);
+                if (!row) {
+                    logEl.innerHTML = '<div style="color:#777;">No payments found for this RO.</div>';
+                    return;
             `${sectionTitle} - ${printLabel}`,
-            `<div class="header"><h1>${sectionTitle}</h1><p>Print by: ${printLabel}</p></div>${summaryHtml}${sectionsHtml}`
-        );
-    }
 
-    async function loadReportsData() {
-        try {
-            const [reportsResp, dashboardResp] = await Promise.all([
-                fetch('/api/reports_data'),
-                fetch('/api/dashboard-data', { credentials: 'include' }),
-            ]);
-            const data = await reportsResp.json();
-            const dashboardData = await dashboardResp.json();
-            reportsDataCache = {
-                summary: Array.isArray(data.summary) ? data.summary : [],
-                closed_ros: Array.isArray(data.closed_ros) ? data.closed_ros : [],
-                open_ros: reportsBuildOpenRowsFromDashboardRows(dashboardData?.roList || []),
-            };
-            // Render summary
-            const summaryBody = document.getElementById('reportsSummaryBody');
-            summaryBody.innerHTML = '';
-            const rowColors = ['#d3d3d3', '#f2f0ef'];
-            for (let i = 0; i < reportsDataCache.summary.length; i += 1) {
+                renderPaymentsScreenForRow(row);
+
+                const insuranceTypeSelect = roDoc.getElementById('roPopupInsurancePaymentType');
+                const customerTypeSelect = roDoc.getElementById('roPopupCustomerPaymentType');
+                const insuranceCheckInput = roDoc.getElementById('roPopupInsuranceCheckNumber');
+                const customerCheckInput = roDoc.getElementById('roPopupCustomerCheckNumber');
+
+                syncCheckNumberVisibility(insuranceTypeSelect, insuranceCheckInput);
+                syncCheckNumberVisibility(customerTypeSelect, customerCheckInput);
+
+                if (insuranceTypeSelect && insuranceCheckInput) {
+                    insuranceTypeSelect.addEventListener('change', () => syncCheckNumberVisibility(insuranceTypeSelect, insuranceCheckInput));
+                }
+                if (customerTypeSelect && customerCheckInput) {
+                    customerTypeSelect.addEventListener('change', () => syncCheckNumberVisibility(customerTypeSelect, customerCheckInput));
+                }
+            `<div class="header"><h1>${sectionTitle}</h1><p>Print by: ${printLabel}</p></div>${summaryHtml}${sectionsHtml}`
+                if (saveBtn) {
+                    saveBtn.onclick = async () => {
+                        const insuranceInput = roDoc.getElementById('roPopupInsurancePaymentInput');
+                        const customerInput = roDoc.getElementById('roPopupCustomerPaymentInput');
+                        const insuranceTypeSelect = roDoc.getElementById('roPopupInsurancePaymentType');
+                        const customerTypeSelect = roDoc.getElementById('roPopupCustomerPaymentType');
+                        const insuranceCheckInput = roDoc.getElementById('roPopupInsuranceCheckNumber');
+                        const customerCheckInput = roDoc.getElementById('roPopupCustomerCheckNumber');
+
+                        const insuranceAmount = parseFloat((insuranceInput?.value || '').trim());
+                        const customerAmount = parseFloat((customerInput?.value || '').trim());
+                        const hasInsurance = Number.isFinite(insuranceAmount) && insuranceAmount > 0;
+                        const hasCustomer = Number.isFinite(customerAmount) && customerAmount > 0;
+
+                        if (!hasInsurance && !hasCustomer) {
+                            alert('Enter an insurance or customer payment amount.');
+                            return;
+                        }
+
+                        const payload = {
+                            ro: roKey,
+                            insurance_payment: hasInsurance ? insuranceAmount : undefined,
+                            customer_payment: hasCustomer ? customerAmount : undefined,
+                            insurance_payment_type: String(insuranceTypeSelect?.value || 'CARD').toUpperCase(),
+                            customer_payment_type: String(customerTypeSelect?.value || 'CARD').toUpperCase(),
+                            insurance_check_number: hasInsurance ? String(insuranceCheckInput?.value || '').trim() : '',
+                            customer_check_number: hasCustomer ? String(customerCheckInput?.value || '').trim() : '',
+                            business_date: new Date().toISOString().slice(0, 10),
+                        };
+
+                        saveBtn.disabled = true;
+                        try {
+                            await popupFetchJson('/api/payments/save', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify(payload),
+                            });
+
+                            if (insuranceInput) insuranceInput.value = '';
+                            if (customerInput) customerInput.value = '';
+                            if (insuranceCheckInput) insuranceCheckInput.value = '';
+                            if (customerCheckInput) customerCheckInput.value = '';
+                            await renderPaymentsView();
+                        } catch (saveError) {
+                            alert('Error saving payment.');
+                        } finally {
+                            saveBtn.disabled = false;
+                        }
+                    };
                 const row = reportsDataCache.summary[i];
-                const rowBg = rowColors[i % 2];
+            } catch (error) {
+                logEl.innerHTML = '<div style="color:#c62828;">Error loading payments log.</div>';
+            }
                 summaryBody.innerHTML += `<tr style='background:${rowBg};'>
                     <td style='padding:12px;'>${row.category}</td>
                     <td style='padding:12px;'>${formatReportsMoney(row.sales)}</td>
