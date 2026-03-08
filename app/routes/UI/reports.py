@@ -391,7 +391,7 @@ def get_reports_screen_html():
                 <div style="font-size:20px; font-weight:bold; margin-bottom:10px;">RO Window</div>
                 <div style="position:absolute; top:14px; left:50%; transform:translateX(-50%); font-weight:900; letter-spacing:1.5px; font-size:20px; color:#fff;">CLOSED</div>
                 <div style="position:absolute; top:18px; right:24px; display:flex; gap:12px; z-index:10;">
-                    <button type="button" style="padding:7px 18px; background:#505050; color:#fff; border:none; border-radius:4px; font-weight:bold; font-size:15px; cursor:not-allowed; opacity:0.55;" disabled>Close RO</button>
+                    <button type="button" id="roPopupPrintButton" style="padding:7px 18px; background:#d32f2f; color:#fff; border:none; border-radius:4px; font-weight:bold; font-size:15px; cursor:pointer;">Print</button>
                 </div>
                 <div style="position:absolute; top:58px; right:24px; display:flex; flex-direction:column; align-items:flex-start; gap:6px; z-index:10;">
                     <div style="display:flex; align-items:center; gap:8px;">
@@ -448,7 +448,11 @@ def get_reports_screen_html():
 
         const roDoc = win.document;
         const contentEl = roDoc.getElementById('roWindowContent');
+        const printBtn = roDoc.getElementById('roPopupPrintButton');
         const headerEl = roDoc.getElementById('roHeaderBar');
+        if (printBtn) {
+            printBtn.addEventListener('click', () => win.print());
+        }
         if (headerEl) {
             const h = Math.ceil(headerEl.getBoundingClientRect().height);
             roDoc.documentElement.style.setProperty('--ro-header-height', `${h}px`);
