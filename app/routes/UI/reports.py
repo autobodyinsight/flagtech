@@ -187,6 +187,7 @@ def get_reports_screen_html():
     <script>
     let reportsDataCache = { summary: [], closed_ros: [], open_ros: [] };
     let reportsUiState = { status: 'closed', startDate: '', endDate: '' };
+    let reportsRoLookup = {};
 
     function formatReportsPercent(value) {
         const amount = Number(value || 0);
@@ -256,6 +257,140 @@ def get_reports_screen_html():
         return '';
     }
 
+    function reportsResolveClosedDateIso(row) {
+        const candidates = [row?.closed_at, row?.closed_date, row?.updated_at, row?.picked_up, row?.date];
+        for (const value of candidates) {
+            const text = String(value || '').trim();
+            if (!text) continue;
+            if (/^\d{4}-\d{2}-\d{2}$/.test(text)) return text;
+            const parsed = new Date(text);
+            if (!Number.isNaN(parsed.getTime())) {
+                const y = parsed.getFullYear();
+                const m = String(parsed.getMonth() + 1).padStart(2, '0');
+                const d = String(parsed.getDate()).padStart(2, '0');
+                return `${y}-${m}-${d}`;
+            }
+        }
+        return '';
+    }
+
+    function reportsBuildDashboardLikeRoRow(row) {
+        const source = row || {};
+        const roNumber = String(source.ro || source.ro_number || '').trim();
+        return {
+            ro: roNumber,
+            ro_number: roNumber,
+            vehicle: source.vehicle || '',
+            insurance: source.insurance || source.insurance_company || '',
+            customer: source.customer || '',
+            phone: source.phone || '',
+            claim_number: source.claim_number || '',
+            vin: source.vin || '',
+            in_date: source.in_date || '',
+            ecd_date: source.ecd_date || '',
+            picked_up: source.picked_up || source.out_date || '',
+            total: Number((source.total_sales ?? source.total) || 0),
+            grand_total: Number((source.total_sales ?? source.total) || 0),
+            insurance_pay: Number(source.insurance_pay || source.insurance_sales || 0),
+            customer_pay: Number(source.customer_pay || 0),
+            parts_sales: Number(source.parts_sales || 0),
+            parts_cost: Number(source.parts_cost || 0),
+            labor_sales: Number(source.labor_sales || 0),
+            labor_cost: Number(source.labor_cost || 0),
+            phase: 'complete/finish',
+            status: 'closed',
+            tech: source.tech || source.tech_name || '',
+            estimator: source.estimator || source.written_by || '',
+            closed_at: reportsResolveClosedDateIso(source),
+        };
+    }
+
+    function reportsPatchRoWindowReadonly(roNumber, rowData) {
+        const popup = window.open('', `RO_Window_${roNumber}`);
+        if (!popup || popup.closed) return;
+        const roDoc = popup.document;
+
+        const allowedIds = new Set([
+            'roPopupNoteInput',
+            'roPopupNoteSave',
+            'roPopupPaymentsSave',
+            'roPopupInsurancePaymentInput',
+            'roPopupInsurancePaymentType',
+            'roPopupInsuranceCheckNumber',
+            'roPopupCustomerPaymentInput',
+            'roPopupCustomerPaymentType',
+            'roPopupCustomerCheckNumber',
+        ]);
+
+        function applyReadonlyRestrictions() {
+            const closeBtn = roDoc.getElementById('roCloseButton');
+            if (closeBtn) closeBtn.style.display = 'none';
+
+            ['roHeaderInDate', 'roHeaderEcdDate', 'roHeaderPickedUpDate'].forEach((id) => {
+                const input = roDoc.getElementById(id);
+                if (!input) return;
+                input.disabled = true;
+                input.style.opacity = '0.9';
+                input.style.cursor = 'not-allowed';
+            });
+
+            const pickedUpWrap = roDoc.getElementById('roHeaderPickedUpDate')?.parentElement;
+            if (pickedUpWrap && !roDoc.getElementById('reportsClosedDateDisplay')) {
+                const closedDate = reportsResolveClosedDateIso(rowData || {});
+                const closedWrap = roDoc.createElement('div');
+                closedWrap.id = 'reportsClosedDateDisplay';
+                closedWrap.style.marginTop = '6px';
+                closedWrap.style.display = 'flex';
+                closedWrap.style.alignItems = 'center';
+                closedWrap.style.gap = '8px';
+                closedWrap.innerHTML = `<span class="ro-header-label" style="margin-right:0;">Closed:</span><span style="color:#fff; font-weight:600;">${reportsEscapeHtml(closedDate || '-')}</span>`;
+                pickedUpWrap.appendChild(closedWrap);
+            }
+
+            roDoc.querySelectorAll('input, select, textarea, button').forEach((el) => {
+                const id = String(el.id || '');
+                const insideSidebar = !!el.closest('#roSidebar');
+                const isPrintControl = id.startsWith('roPrint');
+                if (allowedIds.has(id) || insideSidebar || isPrintControl) {
+                    return;
+                }
+                el.disabled = true;
+            });
+        }
+
+        if (roDoc && roDoc.body) {
+            applyReadonlyRestrictions();
+            const observer = new MutationObserver(() => applyReadonlyRestrictions());
+            observer.observe(roDoc.body, { childList: true, subtree: true });
+        }
+    }
+
+    function reportsOpenRoWindow(event, roNumber) {
+        if (event) event.stopPropagation();
+        const key = String(roNumber || '').trim();
+        if (!key) return;
+
+        const sourceRow = reportsRoLookup[key];
+        if (!sourceRow) {
+            alert('RO not found.');
+            return;
+        }
+
+        const dashboardLikeRow = reportsBuildDashboardLikeRoRow(sourceRow);
+        const previousDashboardData = window.dashboardData;
+        try {
+            window.dashboardData = { roList: [dashboardLikeRow] };
+            if (typeof openRoWindowFromDashboard === 'function') {
+                openRoWindowFromDashboard(event || null, dashboardLikeRow.ro);
+                setTimeout(() => reportsPatchRoWindowReadonly(dashboardLikeRow.ro, dashboardLikeRow), 120);
+            } else {
+                alert('RO window launcher is unavailable.');
+            }
+        } finally {
+            window.dashboardData = previousDashboardData;
+        }
+    }
+
     function reportsBuildOpenRowsFromDashboardRows(rows) {
         const list = Array.isArray(rows) ? rows : [];
         return list.map((row) => {
@@ -310,6 +445,11 @@ def get_reports_screen_html():
 
         const isOpenView = reportsUiState.status === 'open';
         const rows = reportsGetFilteredRows();
+        reportsRoLookup = {};
+        rows.forEach((row) => {
+            const key = String(row?.ro_number || row?.ro || '').trim();
+            if (key) reportsRoLookup[key] = row;
+        });
         if (sectionHeader) {
             sectionHeader.textContent = isOpenView ? 'Open Repair Orders' : 'Closed Repair Orders';
         }
@@ -367,10 +507,14 @@ def get_reports_screen_html():
             const totalGpDollarHtml = boldGpDollar
                 ? `<strong>${formatReportsMoney(totalGp.gpDollar)}</strong>`
                 : `${formatReportsMoney(totalGp.gpDollar)}`;
+            const roNumberValue = String(ro.ro_number || ro.ro || '').trim();
+            const roNumberHtml = roNumberValue
+                ? `<button type="button" onclick="reportsOpenRoWindow(event, '${reportsEscapeHtml(roNumberValue)}')" style="background:none; border:none; color:#0d47a1; text-decoration:underline; cursor:pointer; padding:0; font:inherit;">${reportsEscapeHtml(roNumberValue)}</button>`
+                : '-';
 
             return `
                 <tr style="background:${rowBg};">
-                    <td style='padding:12px;'>${reportsEscapeHtml(ro.ro_number || '')}</td>
+                    <td style='padding:12px;'>${roNumberHtml}</td>
                     <td style='padding:12px;'>${reportsEscapeHtml(ro.vehicle || '')}</td>
                     <td style='padding:12px;'>${reportsEscapeHtml(ro.insurance || '')}</td>
                     <td style='padding:12px; text-align:right;'>${formatReportsHours(ro.hours)}</td>
