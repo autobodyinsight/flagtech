@@ -257,140 +257,6 @@ def get_reports_screen_html():
         return '';
     }
 
-    function reportsResolveClosedDateIso(row) {
-        const candidates = [row?.closed_at, row?.closed_date, row?.updated_at, row?.picked_up, row?.date];
-        for (const value of candidates) {
-            const text = String(value || '').trim();
-            if (!text) continue;
-            if (/^\d{4}-\d{2}-\d{2}$/.test(text)) return text;
-            const parsed = new Date(text);
-            if (!Number.isNaN(parsed.getTime())) {
-                const y = parsed.getFullYear();
-                const m = String(parsed.getMonth() + 1).padStart(2, '0');
-                const d = String(parsed.getDate()).padStart(2, '0');
-                return `${y}-${m}-${d}`;
-            }
-        }
-        return '';
-    }
-
-    function reportsBuildDashboardLikeRoRow(row) {
-        const source = row || {};
-        const roNumber = String(source.ro || source.ro_number || '').trim();
-        return {
-            ro: roNumber,
-            ro_number: roNumber,
-            vehicle: source.vehicle || '',
-            insurance: source.insurance || source.insurance_company || '',
-            customer: source.customer || '',
-            phone: source.phone || '',
-            claim_number: source.claim_number || '',
-            vin: source.vin || '',
-            in_date: source.in_date || '',
-            ecd_date: source.ecd_date || '',
-            picked_up: source.picked_up || source.out_date || '',
-            total: Number((source.total_sales ?? source.total) || 0),
-            grand_total: Number((source.total_sales ?? source.total) || 0),
-            insurance_pay: Number(source.insurance_pay || source.insurance_sales || 0),
-            customer_pay: Number(source.customer_pay || 0),
-            parts_sales: Number(source.parts_sales || 0),
-            parts_cost: Number(source.parts_cost || 0),
-            labor_sales: Number(source.labor_sales || 0),
-            labor_cost: Number(source.labor_cost || 0),
-            phase: 'complete/finish',
-            status: 'closed',
-            tech: source.tech || source.tech_name || '',
-            estimator: source.estimator || source.written_by || '',
-            closed_at: reportsResolveClosedDateIso(source),
-        };
-    }
-
-    function reportsPatchRoWindowReadonly(roNumber, rowData) {
-        const popup = window.open('', `RO_Window_${roNumber}`);
-        if (!popup || popup.closed) return;
-        const roDoc = popup.document;
-
-        const allowedIds = new Set([
-            'roPopupNoteInput',
-            'roPopupNoteSave',
-            'roPopupPaymentsSave',
-            'roPopupInsurancePaymentInput',
-            'roPopupInsurancePaymentType',
-            'roPopupInsuranceCheckNumber',
-            'roPopupCustomerPaymentInput',
-            'roPopupCustomerPaymentType',
-            'roPopupCustomerCheckNumber',
-        ]);
-
-        function applyReadonlyRestrictions() {
-            const closeBtn = roDoc.getElementById('roCloseButton');
-            if (closeBtn) closeBtn.style.display = 'none';
-
-            ['roHeaderInDate', 'roHeaderEcdDate', 'roHeaderPickedUpDate'].forEach((id) => {
-                const input = roDoc.getElementById(id);
-                if (!input) return;
-                input.disabled = true;
-                input.style.opacity = '0.9';
-                input.style.cursor = 'not-allowed';
-            });
-
-            const pickedUpWrap = roDoc.getElementById('roHeaderPickedUpDate')?.parentElement;
-            if (pickedUpWrap && !roDoc.getElementById('reportsClosedDateDisplay')) {
-                const closedDate = reportsResolveClosedDateIso(rowData || {});
-                const closedWrap = roDoc.createElement('div');
-                closedWrap.id = 'reportsClosedDateDisplay';
-                closedWrap.style.marginTop = '6px';
-                closedWrap.style.display = 'flex';
-                closedWrap.style.alignItems = 'center';
-                closedWrap.style.gap = '8px';
-                closedWrap.innerHTML = `<span class="ro-header-label" style="margin-right:0;">Closed:</span><span style="color:#fff; font-weight:600;">${reportsEscapeHtml(closedDate || '-')}</span>`;
-                pickedUpWrap.appendChild(closedWrap);
-            }
-
-            roDoc.querySelectorAll('input, select, textarea, button').forEach((el) => {
-                const id = String(el.id || '');
-                const insideSidebar = !!el.closest('#roSidebar');
-                const isPrintControl = id.startsWith('roPrint');
-                if (allowedIds.has(id) || insideSidebar || isPrintControl) {
-                    return;
-                }
-                el.disabled = true;
-            });
-        }
-
-        if (roDoc && roDoc.body) {
-            applyReadonlyRestrictions();
-            const observer = new MutationObserver(() => applyReadonlyRestrictions());
-            observer.observe(roDoc.body, { childList: true, subtree: true });
-        }
-    }
-
-    function reportsOpenRoWindow(event, roNumber) {
-        if (event) event.stopPropagation();
-        const key = String(roNumber || '').trim();
-        if (!key) return;
-
-        const sourceRow = reportsRoLookup[key];
-        if (!sourceRow) {
-            alert('RO not found.');
-            return;
-        }
-
-        const dashboardLikeRow = reportsBuildDashboardLikeRoRow(sourceRow);
-        const previousDashboardData = window.dashboardData;
-        try {
-            window.dashboardData = { roList: [dashboardLikeRow] };
-            if (typeof openRoWindowFromDashboard === 'function') {
-                openRoWindowFromDashboard(event || null, dashboardLikeRow.ro);
-                setTimeout(() => reportsPatchRoWindowReadonly(dashboardLikeRow.ro, dashboardLikeRow), 120);
-            } else {
-                alert('RO window launcher is unavailable.');
-            }
-        } finally {
-            window.dashboardData = previousDashboardData;
-        }
-    }
-
     function reportsBuildOpenRowsFromDashboardRows(rows) {
         const list = Array.isArray(rows) ? rows : [];
         return list.map((row) => {
@@ -480,6 +346,375 @@ def get_reports_screen_html():
         reportsRenderRoList();
     }
 
+    function reportsNormalizeIsoDateForInput(value) {
+        if (!value) return '';
+        const text = String(value);
+        if (text.includes('T')) return text.split('T')[0];
+        const match = text.match(/^(\d{4}-\d{2}-\d{2})/);
+        return match ? match[1] : '';
+    }
+
+    function reportsOpenClosedRoWindow(event, roNumber) {
+        if (event) event.stopPropagation();
+        const roKey = String(roNumber || '').trim();
+        const ro = reportsRoLookup[roKey];
+        if (!ro) {
+            alert('RO not found.');
+            return;
+        }
+
+        const closedDateValue = reportsNormalizeIsoDateForInput(ro.closed_at || ro.closed_date || ro.updated_at || ro.picked_up || '');
+        const inDateValue = reportsNormalizeIsoDateForInput(ro.in_date);
+        const ecdDateValue = reportsNormalizeIsoDateForInput(ro.ecd_date);
+        const pickedUpDateValue = reportsNormalizeIsoDateForInput(ro.picked_up);
+
+        const icons = {
+            notepad: `<svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="5" y="6" width="18" height="16" rx="2" stroke="white" stroke-width="2"/><line x1="9" y1="10" x2="19" y2="10" stroke="white" stroke-width="2"/><line x1="9" y1="14" x2="19" y2="14" stroke="white" stroke-width="2"/><line x1="9" y1="18" x2="15" y2="18" stroke="white" stroke-width="2"/></svg>`,
+            estimate: `<svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="6" y="3" width="16" height="22" rx="2" stroke="white" stroke-width="2"/><line x1="9" y1="8" x2="19" y2="8" stroke="white" stroke-width="2"/><rect x="9" y="11" width="4" height="3" rx="0.8" stroke="white" stroke-width="1.8"/><rect x="15" y="11" width="4" height="3" rx="0.8" stroke="white" stroke-width="1.8"/><rect x="9" y="16" width="4" height="3" rx="0.8" stroke="white" stroke-width="1.8"/><rect x="15" y="16" width="4" height="3" rx="0.8" stroke="white" stroke-width="1.8"/><line x1="9" y1="22" x2="19" y2="22" stroke="white" stroke-width="2"/></svg>`,
+            tech: `<svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="14" cy="9" r="4" stroke="white" stroke-width="2"/><rect x="7" y="17" width="14" height="6" rx="3" stroke="white" stroke-width="2"/><path d="M21 21l2.5 2.5" stroke="white" stroke-width="2" stroke-linecap="round"/><path d="M7 21l-2.5 2.5" stroke="white" stroke-width="2" stroke-linecap="round"/></svg>`,
+            cart: `<svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="14" cy="14" r="9" stroke="white" stroke-width="2"/><circle cx="14" cy="14" r="5.2" stroke="white" stroke-width="2"/><circle cx="14" cy="14" r="1.7" fill="white"/><path d="M14 5.8v3.2" stroke="white" stroke-width="1.8" stroke-linecap="round"/><path d="M14 19v3.2" stroke="white" stroke-width="1.8" stroke-linecap="round"/><path d="M5.8 14h3.2" stroke="white" stroke-width="1.8" stroke-linecap="round"/><path d="M19 14h3.2" stroke="white" stroke-width="1.8" stroke-linecap="round"/></svg>`,
+            credit: `<svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="4" y="7" width="20" height="14" rx="3" stroke="white" stroke-width="2"/><rect x="7" y="17" width="6" height="3" rx="1.5" stroke="white" stroke-width="2"/><line x1="4" y1="12" x2="24" y2="12" stroke="white" stroke-width="2"/></svg>`
+        };
+
+        const sidebarHtml = `
+            <div id="roSidebar" style="position:fixed; left:0; top:var(--ro-header-height, 170px); height:calc(100vh - var(--ro-header-height, 170px)); width:64px; background:#23272a; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:38px; z-index:100; box-shadow:2px 0 8px rgba(0,0,0,0.08);">
+                <button class="ro-sidebar-btn active" data-view="notes" style="background:none; border:none; padding:0; cursor:pointer;">${icons.notepad}</button>
+                <button class="ro-sidebar-btn" data-view="estimate" style="background:none; border:none; padding:0; cursor:pointer;">${icons.estimate}</button>
+                <button class="ro-sidebar-btn" data-view="tech" style="background:none; border:none; padding:0; cursor:pointer;">${icons.tech}</button>
+                <button class="ro-sidebar-btn" data-view="parts" style="background:none; border:none; padding:0; cursor:pointer;">${icons.cart}</button>
+                <button class="ro-sidebar-btn" data-view="payments" style="background:none; border:none; padding:0; cursor:pointer;">${icons.credit}</button>
+            </div>
+        `;
+
+        const bannerHtml = `
+            <div id="roHeaderBar" style="background:#23272a; color:#fff; padding:16px 24px 18px 24px; border-bottom:3px solid #d32f2f; position:relative; min-height:132px; z-index:120;">
+                <div style="font-size:20px; font-weight:bold; margin-bottom:10px;">RO Window</div>
+                <div style="position:absolute; top:14px; left:50%; transform:translateX(-50%); font-weight:900; letter-spacing:1.5px; font-size:20px; color:#fff;">CLOSED</div>
+                <div style="position:absolute; top:18px; right:24px; display:flex; gap:12px; z-index:10;">
+                    <button type="button" style="padding:7px 18px; background:#505050; color:#fff; border:none; border-radius:4px; font-weight:bold; font-size:15px; cursor:not-allowed; opacity:0.55;" disabled>Close RO</button>
+                </div>
+                <div style="position:absolute; top:58px; right:24px; display:flex; flex-direction:column; align-items:flex-start; gap:6px; z-index:10;">
+                    <div style="display:flex; align-items:center; gap:8px;">
+                        <span class="ro-header-label" style="margin-right:0;">Picked Up:</span>
+                        <input type="date" id="roHeaderPickedUpDate" class="ro-header-date-input" value="${pickedUpDateValue}" disabled />
+                    </div>
+                    <div style="display:flex; align-items:center; gap:8px;">
+                        <span class="ro-header-label" style="margin-right:0;">Closed:</span>
+                        <span style="color:#fff; font-weight:600;">${closedDateValue || '-'}</span>
+                    </div>
+                </div>
+                <div style="display:grid; grid-template-columns:repeat(3, minmax(0, 1fr)); gap:20px 28px; margin-right:260px; align-items:start;">
+                    <div style="display:flex; flex-direction:column; gap:8px;">
+                        <div><span class="ro-header-label">RO#:</span> <span class="ro-header-value">${reportsEscapeHtml(ro.ro_number || ro.ro || '')}</span></div>
+                        <div><span class="ro-header-label">Customer:</span> <span class="ro-header-value">${reportsEscapeHtml(ro.customer || '-')}</span></div>
+                        <div><span class="ro-header-label">Phone:</span> <span class="ro-header-value">${reportsEscapeHtml(ro.phone || '-')}</span></div>
+                    </div>
+                    <div style="display:flex; flex-direction:column; gap:8px;">
+                        <div><span class="ro-header-label">Insurance:</span> <span class="ro-header-value">${reportsEscapeHtml(ro.insurance || '-')}</span></div>
+                        <div><span class="ro-header-label">Claim#:</span> <span class="ro-header-value">${reportsEscapeHtml(ro.claim_number || '-')}</span></div>
+                    </div>
+                    <div style="display:flex; flex-direction:column; gap:8px;">
+                        <div><span class="ro-header-label">Vehicle:</span> <span class="ro-header-value">${reportsEscapeHtml(ro.vehicle || '-')}</span></div>
+                        <div><span class="ro-header-label">IN Date:</span> <input type="date" class="ro-header-date-input" value="${inDateValue}" disabled /></div>
+                        <div><span class="ro-header-label">ECD Date:</span> <input type="date" class="ro-header-date-input" value="${ecdDateValue}" disabled /></div>
+                    </div>
+                </div>
+            </div>
+            <div id="roWindowContent" style="padding:32px 32px 32px 88px; min-height:180px; background:#fff; color:#23272a; font-size:18px;"></div>
+        `;
+
+        const win = window.open('', `Reports_Closed_RO_${roKey}`, 'width=900,height=640,scrollbars=yes,resizable=yes');
+        if (!win) {
+            alert('Popup blocked. Please allow popups for this site.');
+            return;
+        }
+
+        win.document.title = `Closed RO Window - ${roKey}`;
+        win.document.body.innerHTML = `<div style='display:flex; flex-direction:row; height:100vh; width:100vw; background:#f2f2f2;'>${sidebarHtml}<div style='flex:1; display:flex; flex-direction:column; min-width:0;'>${bannerHtml}</div></div>`;
+
+        const style = win.document.createElement('style');
+        style.textContent = `
+            body { margin:0; font-family:Segoe UI,Arial,sans-serif; background:#f2f2f2; }
+            #roSidebar svg { display:block; margin:0 auto; }
+            .ro-sidebar-btn { opacity:0.72; transition:opacity 0.15s ease, transform 0.15s ease; }
+            .ro-sidebar-btn:hover { opacity:1; transform:translateY(-1px); }
+            .ro-sidebar-btn.active { opacity:1; }
+            .ro-header-label { color:#d32f2f; font-weight:700; margin-right:6px; white-space:nowrap; }
+            .ro-header-value { color:#fff; font-weight:600; }
+            .ro-header-date-input { height:28px; min-width:140px; border:1px solid #5b636b; border-radius:4px; background:#2d3135; color:#fff; padding:2px 8px; font-size:14px; }
+            .ro-window-card { background:#fafafa; border:1px solid #ddd; border-radius:8px; padding:14px; }
+        `;
+        win.document.head.appendChild(style);
+
+        const roDoc = win.document;
+        const contentEl = roDoc.getElementById('roWindowContent');
+        const headerEl = roDoc.getElementById('roHeaderBar');
+        if (headerEl) {
+            const h = Math.ceil(headerEl.getBoundingClientRect().height);
+            roDoc.documentElement.style.setProperty('--ro-header-height', `${h}px`);
+        }
+
+        function popupEsc(v) {
+            return String(v === null || v === undefined ? '' : v)
+                .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+        }
+
+        function popupMoney(v) {
+            const n = Number(v || 0);
+            return '$' + n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        }
+
+        async function popupFetchJson(url, options = {}) {
+            const resp = await fetch(url, { credentials: 'include', cache: 'no-store', ...options });
+            const data = await resp.json();
+            if (!resp.ok || data.error) throw new Error(data.error || 'Request failed');
+            return data;
+        }
+
+        async function renderNotesView() {
+            if (!contentEl) return;
+            contentEl.innerHTML = `
+                <div class="ro-window-card">
+                    <div style="font-weight:700; font-size:18px; margin-bottom:10px; color:#333;">Notes Log</div>
+                    <div style="display:flex; gap:10px; margin-bottom:12px; align-items:flex-start;">
+                        <textarea id="roPopupNoteInput" rows="3" style="flex:1; padding:10px; border:1px solid #ccc; border-radius:6px; resize:vertical;" placeholder="Add note..."></textarea>
+                        <button id="roPopupNoteSave" type="button" style="padding:10px 14px; background:#505050; color:#fff; border:none; border-radius:6px; cursor:pointer;">Save</button>
+                    </div>
+                    <div id="roPopupNotesList" style="max-height:420px; overflow-y:auto;"></div>
+                </div>
+            `;
+
+            const listEl = roDoc.getElementById('roPopupNotesList');
+            const inputEl = roDoc.getElementById('roPopupNoteInput');
+            const saveBtn = roDoc.getElementById('roPopupNoteSave');
+
+            async function loadNotes() {
+                listEl.innerHTML = '<div style="color:#777;">Loading...</div>';
+                const res = await popupFetchJson(`/api/ro-notes?ro=${encodeURIComponent(roKey)}`);
+                const notes = Array.isArray(res.notes) ? res.notes : [];
+                if (!notes.length) {
+                    listEl.innerHTML = '<div style="color:#999;">No notes yet.</div>';
+                    return;
+                }
+                listEl.innerHTML = notes.map((note) => `
+                    <div style="padding:10px 0; border-bottom:1px solid #eee;">
+                        <div style="font-size:12px; color:#666; margin-bottom:4px;">${popupEsc(String(note.created_at || ''))} • ${popupEsc(note.created_by || 'Unknown')}</div>
+                        <div style="white-space:pre-wrap; color:#222;">${popupEsc(note.note || '')}</div>
+                    </div>
+                `).join('');
+            }
+
+            saveBtn.addEventListener('click', async () => {
+                const text = String(inputEl.value || '').trim();
+                if (!text) return;
+                saveBtn.disabled = true;
+                try {
+                    await popupFetchJson('/api/ro-notes', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ ro: roKey, note: text }),
+                    });
+                    inputEl.value = '';
+                    await loadNotes();
+                } finally {
+                    saveBtn.disabled = false;
+                }
+            });
+
+            await loadNotes();
+        }
+
+        async function renderEstimateView() {
+            if (!contentEl) return;
+            contentEl.innerHTML = `<div class="ro-window-card"><div style="font-weight:700; font-size:18px; margin-bottom:10px; color:#333;">Estimate</div><div id="roPopupEstimateContent" style="color:#444;"><div style="color:#777;">Loading...</div></div></div>`;
+            const content = roDoc.getElementById('roPopupEstimateContent');
+            try {
+                const res = await popupFetchJson(`/api/ro-estimate?ro=${encodeURIComponent(roKey)}`);
+                const estimate = res.estimate || {};
+                const lines = Array.isArray(estimate.unified_lines) ? estimate.unified_lines : [];
+                const rowsHtml = lines.map((line) => `
+                    <tr>
+                        <td style="padding:8px; border-bottom:1px solid #eee;">${popupEsc(line.lineNumber || '-')}</td>
+                        <td style="padding:8px; border-bottom:1px solid #eee;">${popupEsc(line.description || '-')}</td>
+                        <td style="padding:8px; border-bottom:1px solid #eee; text-align:right;">${popupEsc(line.labor ?? 0)}</td>
+                        <td style="padding:8px; border-bottom:1px solid #eee; text-align:right;">${popupEsc(line.paint ?? 0)}</td>
+                    </tr>
+                `).join('');
+                content.innerHTML = `<table style="width:100%; border-collapse:collapse;"><thead><tr><th style="text-align:left; padding:8px;">Line</th><th style="text-align:left; padding:8px;">Description</th><th style="text-align:right; padding:8px;">Labor</th><th style="text-align:right; padding:8px;">Paint</th></tr></thead><tbody>${rowsHtml || '<tr><td colspan="4" style="padding:12px; color:#777;">No estimate lines.</td></tr>'}</tbody></table>`;
+            } catch (err) {
+                content.innerHTML = '<div style="color:#c62828;">Error loading estimate.</div>';
+            }
+        }
+
+        async function renderTechView() {
+            if (!contentEl) return;
+            contentEl.innerHTML = `<div class="ro-window-card"><div style="font-weight:700; font-size:18px; margin-bottom:10px; color:#333;">Tech</div><div id="roPopupTechContent" style="color:#444;"><div style="color:#777;">Loading...</div></div></div>`;
+            const content = roDoc.getElementById('roPopupTechContent');
+            try {
+                const res = await popupFetchJson(`/api/ro-tech-lines?ro=${encodeURIComponent(roKey)}`);
+                const items = Array.isArray(res.tech_lines) ? res.tech_lines : [];
+                content.innerHTML = items.map((item) => `<div style="padding:8px 0; border-bottom:1px solid #eee;"><strong>${popupEsc(item.tech || item.tech_name || 'Unassigned')}</strong> - ${popupEsc(item.repair_type || item.type || '')} (${popupEsc(item.hours || 0)} hrs)</div>`).join('') || '<div style="color:#777;">No tech assignments.</div>';
+            } catch (err) {
+                content.innerHTML = '<div style="color:#c62828;">Error loading tech data.</div>';
+            }
+        }
+
+        async function renderPartsView() {
+            if (!contentEl) return;
+            contentEl.innerHTML = `<div class="ro-window-card"><div style="font-weight:700; font-size:18px; margin-bottom:10px; color:#333;">Parts</div><div id="roPopupPartsContent" style="color:#444;"><div style="color:#777;">Loading...</div></div></div>`;
+            const content = roDoc.getElementById('roPopupPartsContent');
+            try {
+                const res = await popupFetchJson(`/api/parts/ro-lines?ro=${encodeURIComponent(roKey)}`);
+                const lines = Array.isArray(res.lines) ? res.lines : [];
+                content.innerHTML = lines.map((line) => `<div style="padding:8px 0; border-bottom:1px solid #eee;">Line ${popupEsc(line.line || '-')}: ${popupEsc(line.description || '-')} (${popupEsc(line.qty || 0)} qty)</div>`).join('') || '<div style="color:#777;">No parts lines.</div>';
+            } catch (err) {
+                content.innerHTML = '<div style="color:#c62828;">Error loading parts data.</div>';
+            }
+        }
+
+        async function renderPaymentsView() {
+            if (!contentEl) return;
+            contentEl.innerHTML = `
+                <div class="ro-window-card">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+                        <div id="roPopupPaymentsTitle" style="font-weight:700; font-size:18px; color:#333;">Payments - GRAND TOTAL: -</div>
+                        <button id="roPopupPaymentsSave" type="button" style="padding:9px 14px; background:#d32f2f; color:#fff; border:none; border-radius:6px; cursor:pointer; font-weight:700;">SAVE</button>
+                    </div>
+                    <div id="roPopupPaymentsLog"><div style="color:#777;">Loading...</div></div>
+                </div>
+            `;
+
+            const logEl = roDoc.getElementById('roPopupPaymentsLog');
+            const saveBtn = roDoc.getElementById('roPopupPaymentsSave');
+            const titleEl = roDoc.getElementById('roPopupPaymentsTitle');
+
+            function renderPaymentLog(entries) {
+                const list = Array.isArray(entries) ? entries : [];
+                if (!list.length) return '<div style="color:#777;">No payments yet.</div>';
+                return list.map((entry) => {
+                    const dt = popupEsc(String(entry.business_date || entry.date || '').trim() || '--/--/--');
+                    const typ = popupEsc(String(entry.payment_type || 'CARD').toUpperCase());
+                    const who = popupEsc(String(entry.created_by || 'Unknown'));
+                    return `<div style="display:flex; justify-content:space-between; align-items:center; padding:6px 0; border-bottom:1px solid #f0f0f0;"><div>${dt} - ${typ} - ${who}</div><div style="font-weight:600;">${popupMoney(entry.amount || 0)}</div></div>`;
+                }).join('');
+            }
+
+            const data = await popupFetchJson('/api/payments/open-ros');
+            const rows = Array.isArray(data.rows) ? data.rows : [];
+            const row = rows.find((item) => String(item.ro || '') === roKey);
+            if (!row) {
+                logEl.innerHTML = '<div style="color:#777;">No payments found for this RO.</div>';
+                return;
+            }
+
+            const insuranceEntries = Array.isArray(row.insurance_payment_entries) ? row.insurance_payment_entries : [];
+            const customerEntries = Array.isArray(row.customer_payment_entries) ? row.customer_payment_entries : [];
+            const insuranceTotal = Number(row.insurance_total || 0);
+            const customerTotal = Number(row.customer_total || 0);
+            const roGrandTotal = insuranceTotal + customerTotal;
+            titleEl.textContent = `Payments - GRAND TOTAL: ${popupMoney(roGrandTotal)}`;
+
+            logEl.innerHTML = `
+                <div style="border:1px solid #e2e2e2; border-radius:6px; padding:12px; margin-bottom:14px; background:#fff;">
+                    <div style="font-weight:700; margin-bottom:8px;">INSURANCE: ${popupEsc(row.insurance_name || ro.insurance || '-')}</div>
+                    <div style="display:flex; gap:8px; align-items:center; margin-bottom:10px;">
+                        <input id="roPopupInsurancePaymentInput" type="number" step="0.01" min="0" placeholder="0.00" style="padding:8px; border:1px solid #ccc; border-radius:4px; width:180px;" />
+                        <select id="roPopupInsurancePaymentType" style="padding:8px; border:1px solid #ccc; border-radius:4px; width:120px;">
+                            <option value="CARD">CARD</option><option value="CASH">CASH</option><option value="CHECK">CHECK</option>
+                        </select>
+                        <input id="roPopupInsuranceCheckNumber" type="text" placeholder="Check #" style="display:none; padding:8px; border:1px solid #ccc; border-radius:4px; width:150px;" />
+                    </div>
+                    <div id="roPopupInsuranceLog">${renderPaymentLog(insuranceEntries)}</div>
+                </div>
+                <div style="border:1px solid #e2e2e2; border-radius:6px; padding:12px; background:#fff;">
+                    <div style="font-weight:700; margin-bottom:8px;">CUSTOMER: ${popupEsc(row.customer || ro.customer || '-')}</div>
+                    <div style="display:flex; gap:8px; align-items:center; margin-bottom:10px;">
+                        <input id="roPopupCustomerPaymentInput" type="number" step="0.01" min="0" placeholder="0.00" style="padding:8px; border:1px solid #ccc; border-radius:4px; width:180px;" />
+                        <select id="roPopupCustomerPaymentType" style="padding:8px; border:1px solid #ccc; border-radius:4px; width:120px;">
+                            <option value="CARD">CARD</option><option value="CASH">CASH</option><option value="CHECK">CHECK</option>
+                        </select>
+                        <input id="roPopupCustomerCheckNumber" type="text" placeholder="Check #" style="display:none; padding:8px; border:1px solid #ccc; border-radius:4px; width:150px;" />
+                    </div>
+                    <div id="roPopupCustomerLog">${renderPaymentLog(customerEntries)}</div>
+                </div>
+            `;
+
+            function syncCheck(selectId, inputId) {
+                const s = roDoc.getElementById(selectId);
+                const i = roDoc.getElementById(inputId);
+                if (!s || !i) return;
+                const isCheck = String(s.value || '').toUpperCase() === 'CHECK';
+                i.style.display = isCheck ? 'inline-block' : 'none';
+                if (!isCheck) i.value = '';
+            }
+            ['roPopupInsurancePaymentType', 'roPopupCustomerPaymentType'].forEach((id, idx) => {
+                const inputId = idx === 0 ? 'roPopupInsuranceCheckNumber' : 'roPopupCustomerCheckNumber';
+                const sel = roDoc.getElementById(id);
+                if (sel) sel.addEventListener('change', () => syncCheck(id, inputId));
+                syncCheck(id, inputId);
+            });
+
+            saveBtn.onclick = async () => {
+                const insuranceInput = roDoc.getElementById('roPopupInsurancePaymentInput');
+                const customerInput = roDoc.getElementById('roPopupCustomerPaymentInput');
+                const insuranceType = roDoc.getElementById('roPopupInsurancePaymentType');
+                const customerType = roDoc.getElementById('roPopupCustomerPaymentType');
+                const insuranceCheck = roDoc.getElementById('roPopupInsuranceCheckNumber');
+                const customerCheck = roDoc.getElementById('roPopupCustomerCheckNumber');
+
+                const insuranceAmount = parseFloat((insuranceInput?.value || '').trim());
+                const customerAmount = parseFloat((customerInput?.value || '').trim());
+                const hasInsurance = Number.isFinite(insuranceAmount) && insuranceAmount > 0;
+                const hasCustomer = Number.isFinite(customerAmount) && customerAmount > 0;
+                if (!hasInsurance && !hasCustomer) {
+                    alert('Enter an insurance or customer payment amount.');
+                    return;
+                }
+
+                saveBtn.disabled = true;
+                try {
+                    await popupFetchJson('/api/payments/save', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            ro: roKey,
+                            insurance_payment: hasInsurance ? insuranceAmount : undefined,
+                            customer_payment: hasCustomer ? customerAmount : undefined,
+                            insurance_payment_type: String(insuranceType?.value || 'CARD').toUpperCase(),
+                            customer_payment_type: String(customerType?.value || 'CARD').toUpperCase(),
+                            insurance_check_number: hasInsurance ? String(insuranceCheck?.value || '').trim() : '',
+                            customer_check_number: hasCustomer ? String(customerCheck?.value || '').trim() : '',
+                            business_date: new Date().toISOString().slice(0, 10),
+                        }),
+                    });
+                    await renderPaymentsView();
+                } catch (err) {
+                    alert('Error saving payment.');
+                } finally {
+                    saveBtn.disabled = false;
+                }
+            };
+        }
+
+        async function showView(view) {
+            roDoc.querySelectorAll('.ro-sidebar-btn').forEach((b) => {
+                b.classList.toggle('active', b.getAttribute('data-view') === view);
+            });
+            if (view === 'notes') return renderNotesView();
+            if (view === 'estimate') return renderEstimateView();
+            if (view === 'tech') return renderTechView();
+            if (view === 'parts') return renderPartsView();
+            if (view === 'payments') return renderPaymentsView();
+        }
+
+        roDoc.querySelectorAll('.ro-sidebar-btn').forEach((btn) => {
+            btn.addEventListener('click', () => showView(btn.getAttribute('data-view') || 'notes'));
+        });
+
+        showView('notes');
+    }
+
     function reportsBuildRoRowsHtml(rows, options = {}) {
         const boldGpDollar = !!options.boldGpDollar;
         const normalizedRows = Array.isArray(rows) ? rows : [];
@@ -507,14 +742,12 @@ def get_reports_screen_html():
             const totalGpDollarHtml = boldGpDollar
                 ? `<strong>${formatReportsMoney(totalGp.gpDollar)}</strong>`
                 : `${formatReportsMoney(totalGp.gpDollar)}`;
-            const roNumberValue = String(ro.ro_number || ro.ro || '').trim();
-            const roNumberHtml = roNumberValue
-                ? `<button type="button" onclick="reportsOpenRoWindow(event, '${reportsEscapeHtml(roNumberValue)}')" style="background:none; border:none; color:#0d47a1; text-decoration:underline; cursor:pointer; padding:0; font:inherit;">${reportsEscapeHtml(roNumberValue)}</button>`
-                : '-';
 
             return `
                 <tr style="background:${rowBg};">
-                    <td style='padding:12px;'>${roNumberHtml}</td>
+                    <td style='padding:12px;'>
+                        <button type="button" data-ro="${reportsEscapeHtml(ro.ro_number || '')}" onclick="reportsOpenClosedRoWindow(event, this.dataset.ro)" style="background:none; border:none; padding:0; color:#1b4f9c; font-weight:700; text-decoration:underline; cursor:pointer;">${reportsEscapeHtml(ro.ro_number || '')}</button>
+                    </td>
                     <td style='padding:12px;'>${reportsEscapeHtml(ro.vehicle || '')}</td>
                     <td style='padding:12px;'>${reportsEscapeHtml(ro.insurance || '')}</td>
                     <td style='padding:12px; text-align:right;'>${formatReportsHours(ro.hours)}</td>
