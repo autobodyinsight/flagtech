@@ -435,16 +435,18 @@ async def home_screen(request: Request):
             border-radius: 0;
             display: flex;
             flex-direction: column;
-            padding: 20px 22px;
+            padding: 18px 22px;
+            overflow: hidden;
         }}
         #chatModal .header-chat-layout {{
-            margin-bottom: 14px;
             flex: 1;
             min-height: 0;
             display: grid;
             grid-template-columns: 1fr 1fr 1.35fr;
-            gap: 14px;
+            gap: 0;
             align-items: stretch;
+            border-top: 1px solid #e7e1de;
+            border-bottom: 1px solid #e7e1de;
         }}
         .chat-task-card {{
             border: 1px solid #ddd;
@@ -469,37 +471,75 @@ async def home_screen(request: Request):
             display: flex;
             flex-direction: column;
             background: #fff;
-            border: 1px solid #e7e1de;
-            border-radius: 12px;
-            padding: 10px;
+            border: none;
+            border-radius: 0;
+            padding: 0;
+        }}
+        .chat-user-panel {{
+            border-left: 1px solid #ece6e3;
+            border-right: 1px solid #ece6e3;
+        }}
+        .chat-column-header {{
+            height: 54px;
+            display: flex;
+            align-items: center;
+            padding: 0 14px;
+            font-size: 15px;
+            font-weight: 800;
+            letter-spacing: 0.2px;
+            color: #2b2b2b;
+            border-bottom: 1px solid #ece6e3;
+            background: #fcfbfb;
+        }}
+        .chat-main-grid {{
+            flex: 1;
+            min-height: 0;
+            display: grid;
+            grid-template-columns: 1fr 1fr 1.35fr;
+            border-top: 1px solid #e7e1de;
+            border-bottom: 1px solid #e7e1de;
+            background: #fff;
+        }}
+        .chat-bottom-strip {{
+            margin-top: 10px;
+            border: 1px solid #ddd;
+            border-radius: 10px;
+            padding: 12px;
+            background: #fafafa;
+            min-height: 130px;
+            max-height: 24vh;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
         }}
         .chat-user-list {{
             flex: 1;
             min-height: 0;
             overflow-y: auto;
-            border-top: 1px solid #eee8e5;
-            border-bottom: 1px solid #eee8e5;
-            background: #fff;
+            background: #f8f8f8;
         }}
         .chat-user-row {{
             width: 100%;
             border: none;
-            border-bottom: 1px solid #f0ece9;
-            background: transparent;
+            border-bottom: 1px solid #ebe7e5;
+            background: #f7f6f6;
             color: #222;
             text-align: left;
-            padding: 11px 8px;
+            padding: 12px 10px;
             cursor: pointer;
             font-size: 14px;
             display: flex;
             align-items: center;
             gap: 10px;
+            border-left: 3px solid transparent;
+            transition: background 0.15s ease, border-color 0.15s ease;
         }}
         .chat-user-row:hover {{
-            background: #f7f4f2;
+            background: #f1eeee;
         }}
         .chat-user-row.active {{
-            background: #f1ece9;
+            background: #f9efef;
+            border-left-color: #b22222;
         }}
         .chat-user-row.unread {{
             font-weight: 800;
@@ -508,7 +548,7 @@ async def home_screen(request: Request):
             width: 28px;
             height: 28px;
             border-radius: 999px;
-            background: #e8e3e0;
+            background: #ece8e6;
             color: #333;
             display: inline-flex;
             align-items: center;
@@ -526,37 +566,126 @@ async def home_screen(request: Request):
             flex: 1;
             min-height: 0;
             overflow-y: auto;
-            border-top: 1px solid #eee8e5;
-            border-bottom: 1px solid #eee8e5;
-            padding: 12px 6px;
+            padding: 14px 14px;
             display: flex;
             flex-direction: column;
-            gap: 8px;
-            background: #fcfbfa;
+            gap: 10px;
+            background: #f3f2f2;
         }}
         .chat-bubble {{
-            max-width: 78%;
-            border-radius: 12px;
-            padding: 8px 10px;
+            max-width: 74%;
+            border-radius: 16px;
+            padding: 9px 12px;
             font-size: 14px;
             line-height: 1.35;
             border: 1px solid transparent;
         }}
         .chat-bubble.sender {{
             margin-left: auto;
-            background: #2f3b4a;
+            background: #b22222;
             color: #fff;
+            border-top-right-radius: 6px;
         }}
         .chat-bubble.receiver {{
             margin-right: auto;
             background: #ffffff;
             color: #222;
-            border-color: #e6dfdc;
+            border-color: #e3dedb;
+            border-top-left-radius: 6px;
+        }}
+        .chat-window-head {{
+            min-height: 54px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            padding: 0 14px;
+            border-bottom: 1px solid #ece6e3;
+            background: #ffffff;
+        }}
+        .chat-window-title {{
+            font-size: 16px;
+            font-weight: 800;
+            color: #262626;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }}
+        .chat-window-input-wrap {{
+            border-top: 1px solid #ece6e3;
+            background: #fff;
+            padding: 10px 12px;
+            display: grid;
+            gap: 8px;
+        }}
+        .chat-task-send-row {{
+            display: flex;
+            justify-content: flex-end;
+        }}
+        .chat-task-send-btn {{
+            border: 1px solid #b22222;
+            background: #fff;
+            color: #b22222;
+            border-radius: 999px;
+            padding: 5px 10px;
+            font-size: 12px;
+            font-weight: 700;
+            cursor: pointer;
+        }}
+        .chat-input-row {{
+            display: flex;
+            align-items: stretch;
+            gap: 8px;
+        }}
+        .chat-text-input {{
+            flex: 1;
+            min-height: 46px;
+            max-height: 96px;
+            border: 1px solid #d8d1ce;
+            border-radius: 999px;
+            padding: 12px 16px;
+            resize: none;
+            font-size: 14px;
+            line-height: 1.25;
+            outline: none;
+            background: #fff;
+        }}
+        .chat-text-input:focus {{
+            border-color: #b22222;
+            box-shadow: 0 0 0 2px rgba(178, 34, 34, 0.12);
+        }}
+        .chat-send-btn {{
+            width: 46px;
+            height: 46px;
+            border: none;
+            border-radius: 999px;
+            background: #b22222;
+            color: #fff;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            flex: 0 0 46px;
+        }}
+        .chat-send-btn:hover {{
+            filter: brightness(0.95);
         }}
         @media (max-width: 840px) {{
             .content-area {{ padding: 18px; }}
             .app-brand-text {{ font-size: 18px; }}
-            #chatModal .header-chat-layout {{ grid-template-columns: 1fr; }}
+            .chat-main-grid {{
+                grid-template-columns: 1fr;
+                overflow-y: auto;
+            }}
+            .chat-user-panel {{
+                border-left: none;
+                border-right: none;
+                border-top: 1px solid #ece6e3;
+                border-bottom: 1px solid #ece6e3;
+            }}
+            .chat-window-panel {{
+                min-height: 340px;
+            }}
         }}
         .content-area {{
             flex: 1;
@@ -746,33 +875,45 @@ async def home_screen(request: Request):
                 <h3 style="margin:0; color:#333;">Messages & Tasks</h3>
                 <button type="button" class="header-menu-action" style="width:auto;" onclick="closeChatModal()">Close</button>
             </div>
-            <div class="header-chat-layout">
-                <div class="chat-task-card">
-                    <div style="font-weight:700; margin-bottom:8px;">Task List</div>
-                    <div class="chat-task-scroll">
+            <div class="chat-main-grid">
+                <div class="chat-task-card" style="margin:0;">
+                    <div class="chat-column-header" style="padding-left:0; padding-right:0; background:transparent; border-bottom:none; height:auto; margin-bottom:8px;">Task List</div>
+                    <div class="chat-task-scroll" style="border-top:1px solid #ebe6e3; border-bottom:1px solid #ebe6e3; padding-top:6px; padding-bottom:6px;">
                         <div id="chatTaskList" style="display:flex; flex-direction:column; gap:8px; color:#333;">NO TASK</div>
-                    </div>
-                    <div style="font-weight:800; letter-spacing:0.6px; margin:12px 0 8px 0;">COMPLETED</div>
-                    <div class="chat-task-scroll" style="max-height:34%;">
-                        <div id="chatCompletedList" style="display:flex; flex-direction:column; gap:8px; color:#333;">NO COMPLETED TASKS</div>
                     </div>
                 </div>
                 <div class="chat-user-panel">
-                    <div style="font-weight:700; margin-bottom:8px;">User List</div>
+                    <div class="chat-column-header">User List</div>
                     <div id="chatUserList" class="chat-user-list"></div>
                     <select id="chatUserSelect" style="display:none;"></select>
                 </div>
                 <div class="chat-window-panel">
-                    <div id="chatSelectedUserName" style="font-weight:700; margin-bottom:8px;">Select a user</div>
+                    <div class="chat-window-head">
+                        <div id="chatSelectedUserName" class="chat-window-title">Select a user</div>
+                    </div>
                     <div id="chatMessagesArea" class="chat-message-scroll">
                         <div style="color:#666;">No messages yet.</div>
                     </div>
-                    <div style="display:flex; gap:8px; margin-top:10px; align-items:flex-end;">
-                        <textarea id="chatMessageText" rows="3" placeholder="Write a message or task..." style="flex:1; padding:10px; border:1px solid #ccc; border-radius:8px; resize:vertical;"></textarea>
-                        <button type="button" class="header-menu-action" style="width:auto; background:#b22222; color:#fff;" onclick="sendChatPanelMessage()">Send</button>
-                        <button type="button" class="header-menu-action" style="width:auto; background:#1f2326; color:#fff;" onclick="sendHeaderMessage('task')">Send Task</button>
+                    <div class="chat-window-input-wrap">
+                        <div class="chat-task-send-row">
+                            <button type="button" class="chat-task-send-btn" onclick="sendHeaderMessage('task')">Send Task</button>
+                        </div>
+                        <div class="chat-input-row">
+                            <textarea id="chatMessageText" class="chat-text-input" rows="2" placeholder="Write a message..."></textarea>
+                            <button type="button" class="chat-send-btn" onclick="sendChatPanelMessage()" aria-label="Send message">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                                    <path d="M3 11.5L20.5 3.5L14 20.5L11 13.5L3 11.5Z" fill="currentColor"/>
+                                </svg>
+                            </button>
+                        </div>
                     </div>
-                    <div id="chatSendStatus" style="min-height:18px; margin-top:8px; font-size:12px; color:#444;"></div>
+                    <div id="chatSendStatus" style="min-height:18px; margin:0 12px 10px 12px; font-size:12px; color:#444;"></div>
+                </div>
+            </div>
+            <div class="chat-bottom-strip">
+                <div style="font-weight:800; letter-spacing:0.6px; margin-bottom:8px;">COMPLETED</div>
+                <div class="chat-task-scroll">
+                    <div id="chatCompletedList" style="display:flex; flex-direction:column; gap:8px; color:#333;">NO COMPLETED TASKS</div>
                 </div>
             </div>
         </div>
