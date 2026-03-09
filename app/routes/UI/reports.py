@@ -449,7 +449,7 @@ def get_reports_screen_html():
         }
 
         win.document.title = `Closed RO Window - ${roKey}`;
-        win.document.body.innerHTML = `<div style='display:flex; flex-direction:row; height:100vh; width:100vw; background:#f2f2f2;'>${sidebarHtml}<div style='flex:1; display:flex; flex-direction:column; min-width:0;'>${bannerHtml}</div></div><div id='roPrintBackdrop' style='display:none; position:fixed; inset:0; background:rgba(0,0,0,0.35); z-index:9990;'></div>`;
+        win.document.body.innerHTML = `<div style='display:flex; flex-direction:row; height:100vh; width:100vw; background:#f2f2f2;'>${sidebarHtml}<div style='flex:1; display:flex; flex-direction:column; min-width:0;'>${bannerHtml}</div></div>`;
 
         const style = win.document.createElement('style');
         style.textContent = `
@@ -462,7 +462,29 @@ def get_reports_screen_html():
             .ro-header-value { color:#fff; font-weight:600; }
             .ro-header-date-text { color:#fff; font-weight:600; min-width:110px; }
             .ro-window-card { background:#fafafa; border:1px solid #ddd; border-radius:8px; padding:14px; }
-            .mini-popup-panel { position:absolute; min-width:240px; background:#fff; border:1px solid #ddd; border-radius:8px; box-shadow:0 10px 24px rgba(0,0,0,0.16); padding:12px; z-index:10000; margin-top:8px; }
+            .mini-popup-panel {
+                position: absolute;
+                top: 100%;
+                left: 0;
+                z-index: 1000;
+                background: #fff;
+                border: 2px solid #b22222;
+                border-radius: 6px;
+                padding: 12px;
+                min-width: 300px;
+                max-width: 500px;
+                box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+                margin-top: 4px;
+                opacity: 0;
+                transform: translateY(-6px);
+                transition: opacity 0.18s ease, transform 0.18s ease;
+                pointer-events: none;
+            }
+            .mini-popup-panel.open {
+                opacity: 1;
+                transform: translateY(0);
+                pointer-events: auto;
+            }
         `;
         win.document.head.appendChild(style);
 
@@ -470,7 +492,6 @@ def get_reports_screen_html():
         const contentEl = roDoc.getElementById('roWindowContent');
         const printBtn = roDoc.getElementById('roPopupPrintButton');
         const printPanel = roDoc.getElementById('roPrintOptionsModal');
-        const printBackdrop = roDoc.getElementById('roPrintBackdrop');
         const headerEl = roDoc.getElementById('roHeaderBar');
         if (headerEl) {
             const h = Math.ceil(headerEl.getBoundingClientRect().height);
@@ -847,10 +868,6 @@ def get_reports_screen_html():
             if ((printBtn && printBtn.contains(target)) || printPanel.contains(target)) return;
             roClosePrintOptionsModal();
         });
-        if (printBackdrop) {
-            printBackdrop.addEventListener('click', () => roClosePrintOptionsModal());
-        }
-
         async function popupFetchJson(url, options = {}) {
             const resp = await fetch(url, { credentials: 'include', cache: 'no-store', ...options });
             const data = await resp.json();
