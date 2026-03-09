@@ -392,9 +392,8 @@ async def home_screen(request: Request):
         }}
         .side-menu-item.active {{
             background: transparent;
-            color: #000;
-            text-decoration: underline;
-            text-underline-offset: 5px;
+            color: #b22222;
+            text-decoration: none;
         }}
         .side-menu-item:last-child {{
             border-bottom: none;
@@ -830,7 +829,10 @@ async def home_screen(request: Request):
                 appUiState.sessionUser = sessionData.user || null;
                 appUiState.shopDomain = String(contextData.default_domain || sessionData.user?.domain || '').trim();
 
-                const shopResp = await fetch(`/api/setup/shop${appUiState.shopDomain ? `?shop_domain=${encodeURIComponent(appUiState.shopDomain)}` : ''}`, {{ credentials: 'include' }});
+                const shopScopeQuery = appUiState.shopDomain
+                    ? `?shop_domain=${{encodeURIComponent(appUiState.shopDomain)}}`
+                    : '';
+                const shopResp = await fetch('/api/setup/shop' + shopScopeQuery, {{ credentials: 'include' }});
                 const shopData = await shopResp.json();
                 appUiState.shopName = String(shopData?.shop?.shop_name || '').trim();
 
