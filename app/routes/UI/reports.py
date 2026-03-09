@@ -31,7 +31,23 @@ async def reports_data():
 def get_reports_screen_html():
     """Return the HTML content for the REPORTS window."""
     return r'''
-    <div id="reports" class="screen" style="padding:20px;">
+    <div id="reports" class="screen" style="padding:20px; position:relative;">
+        <div id="reportsExtraSidebar" style="position:fixed; left:0; top:76px; height:calc(100vh - 76px); width:64px; background:#23272a; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:38px; z-index:100; box-shadow:2px 0 8px rgba(0,0,0,0.08);">
+            <div style="display:flex; flex-direction:column; align-items:center; gap:38px; width:100%;">
+                <button id="reportsSidebarBtn-main" class="reports-sidebar-btn active" data-view="main" title="Reports" onclick="reportsExtraSwitchView('main')" style="background:none; border:none; padding:0; cursor:pointer;">
+                    <svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="4" y="4" width="20" height="20" rx="3" stroke="white" stroke-width="2"/><line x1="8" y1="10" x2="20" y2="10" stroke="white" stroke-width="2"/><line x1="8" y1="15" x2="20" y2="15" stroke="white" stroke-width="2"/><line x1="8" y1="20" x2="16" y2="20" stroke="white" stroke-width="2"/></svg>
+                </button>
+                <button id="reportsSidebarBtn-tech" class="reports-sidebar-btn" data-view="tech" title="Tech" onclick="reportsExtraSwitchView('tech')" style="background:none; border:none; padding:0; cursor:pointer;">
+                    <svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="14" cy="9" r="4" stroke="white" stroke-width="2"/><rect x="7" y="17" width="14" height="6" rx="3" stroke="white" stroke-width="2"/><path d="M21 21l2.5 2.5" stroke="white" stroke-width="2" stroke-linecap="round"/><path d="M7 21l-2.5 2.5" stroke="white" stroke-width="2" stroke-linecap="round"/></svg>
+                </button>
+                <button id="reportsSidebarBtn-parts" class="reports-sidebar-btn" data-view="parts" title="Parts" onclick="reportsExtraSwitchView('parts')" style="background:none; border:none; padding:0; cursor:pointer;">
+                    <svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="10" cy="23" r="2" stroke="white" stroke-width="2"/><circle cx="20" cy="23" r="2" stroke="white" stroke-width="2"/><rect x="5" y="7" width="18" height="10" rx="2" stroke="white" stroke-width="2"/><path d="M7 7V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v2" stroke="white" stroke-width="2"/></svg>
+                </button>
+            </div>
+        </div>
+
+        <div id="reportsMainPanel" style="margin-left:84px;">
+        <div id="reportsPanel-main" class="reports-content-panel" style="display:block;">
         <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:30px; gap:20px;">
             <div style="display:flex; flex-direction:column; align-items:flex-start; gap:10px; min-width:260px;">
                 <label style="display:flex; align-items:center; gap:10px; cursor:pointer; user-select:none;">
@@ -111,6 +127,79 @@ def get_reports_screen_html():
                 </table>
             </div>
         </div>
+        </div>
+
+        <div id="reportsPanel-tech" class="reports-content-panel" style="display:none; background:#fff; padding:20px; border-radius:8px; box-shadow:0 2px 4px rgba(0,0,0,0.1);">
+            <h3 style="margin:0 0 18px 0; color:#333;">Tech</h3>
+            <div style="overflow-x:auto;">
+                <table id="reportsTechListTable" style="width:100%; border-collapse:collapse;">
+                    <thead>
+                        <tr class="dashboard-header-row">
+                            <th class="dashboard-header-cell" style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold;">TECH</th>
+                            <th class="dashboard-header-cell" style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold; text-align:right;">PAY RATE</th>
+                            <th class="dashboard-header-cell" style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold; text-align:right;">TOTAL HRS</th>
+                            <th class="dashboard-header-cell" style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold; text-align:center;">TOTAL RO'S</th>
+                        </tr>
+                    </thead>
+                    <tbody id="reportsTechListBody">
+                        <tr><td colspan="4" style="padding:20px; text-align:center; color:#999;">Loading...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div id="reportsPanel-parts" class="reports-content-panel" style="display:none; background:#fff; padding:20px; border-radius:8px; box-shadow:0 2px 4px rgba(0,0,0,0.1);">
+            <h3 style="margin:0 0 18px 0; color:#333;">Parts</h3>
+            <div style="overflow-x:auto;">
+                <table id="reportsPartsVendorTable" style="width:100%; border-collapse:collapse;">
+                    <thead>
+                        <tr class="dashboard-header-row">
+                            <th class="dashboard-header-cell" style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold;">VENDOR</th>
+                            <th class="dashboard-header-cell" style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold;">TYPE</th>
+                            <th class="dashboard-header-cell" style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold; text-align:right;">INVOICES</th>
+                            <th class="dashboard-header-cell" style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold; text-align:right;">TOTAL</th>
+                        </tr>
+                    </thead>
+                    <tbody id="reportsPartsVendorBody">
+                        <tr><td colspan="4" style="padding:20px; text-align:center; color:#999;">Loading...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div id="reportsPartsVendorModal" style="display:none; position:fixed; z-index:1200; left:0; top:0; width:100%; height:100%; background:rgba(0,0,0,0.45);">
+                <div style="background:#f2f2f2; margin:3% auto; width:95%; max-width:1180px; max-height:90vh; overflow:auto; border-radius:8px; border:1px solid #888; padding:18px;">
+                    <div style="display:flex; align-items:center; justify-content:space-between; gap:16px; margin-bottom:12px;">
+                        <h2 id="reportsPartsVendorModalTitle" style="margin:0; color:#333;">Vendor</h2>
+                        <div style="display:flex; align-items:center; gap:8px;">
+                            <label for="reportsPartsVendorDateStart" style="font-weight:bold; color:#333;">Date Range:</label>
+                            <input id="reportsPartsVendorDateStart" type="date" style="padding:6px;" />
+                            <span style="color:#555;">to</span>
+                            <input id="reportsPartsVendorDateEnd" type="date" style="padding:6px;" />
+                        </div>
+                        <button type="button" onclick="reportsClosePartsVendorModal()" style="padding:8px 14px; background:#505050; color:#fff; border:none; border-radius:4px; cursor:pointer; font-weight:bold;">Close</button>
+                    </div>
+
+                    <div style="overflow-x:auto;">
+                        <table id="reportsPartsVendorInvoiceTable" style="width:100%; border-collapse:collapse;">
+                            <thead>
+                                <tr class="dashboard-header-row">
+                                    <th class="dashboard-header-cell" style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold;">DATE</th>
+                                    <th class="dashboard-header-cell" style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold;">RO#</th>
+                                    <th class="dashboard-header-cell" style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold;">INVOICE</th>
+                                    <th class="dashboard-header-cell" style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold; text-align:right;">PARTS</th>
+                                    <th class="dashboard-header-cell" style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold; text-align:right;">TOTAL</th>
+                                </tr>
+                            </thead>
+                            <tbody id="reportsPartsVendorInvoiceBody">
+                                <tr><td colspan="5" style="padding:20px; text-align:center; color:#999;">Loading...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        </div>
     </div>
     <style>
         .dashboard-header-row th, .dashboard-header-cell {
@@ -183,11 +272,423 @@ def get_reports_screen_html():
         .reports-toggle-input:checked + .reports-toggle-slider:before {
             transform: translateX(22px);
         }
+        #reportsExtraSidebar svg { display:block; margin:0 auto; }
+        #reportsExtraSidebar .reports-sidebar-btn { opacity:0.72; transition:opacity 0.15s ease, transform 0.15s ease; }
+        #reportsExtraSidebar .reports-sidebar-btn:hover { opacity:1; transform:translateY(-1px); }
+        #reportsExtraSidebar .reports-sidebar-btn.active { opacity:1; }
+        @media (max-width: 700px) {
+            #reportsExtraSidebar { width:44px; }
+            #reportsExtraSidebar svg { width:22px; height:22px; }
+            #reportsMainPanel { margin-left:64px !important; }
+        }
     </style>
     <script>
     let reportsDataCache = { summary: [], closed_ros: [], open_ros: [] };
     let reportsUiState = { status: 'closed', startDate: '', endDate: '' };
     let reportsRoLookup = {};
+    const reportsPartsState = {
+        activeVendorId: null,
+        activeVendorName: '',
+    };
+
+    function reportsFormatShortDate(value) {
+        const source = String(value || '').trim();
+        if (!source) return '-';
+        const dt = new Date(source);
+        if (Number.isNaN(dt.getTime())) return source;
+        const mm = String(dt.getMonth() + 1).padStart(2, '0');
+        const dd = String(dt.getDate()).padStart(2, '0');
+        const yy = String(dt.getFullYear()).slice(-2);
+        return `${mm}/${dd}/${yy}`;
+    }
+
+    function reportsFormatQty(value) {
+        const qty = Number(value || 0);
+        if (!Number.isFinite(qty)) return '0';
+        return Number.isInteger(qty) ? String(qty) : qty.toFixed(2).replace(/\.00$/, '');
+    }
+
+    function reportsExtraSetActiveSidebar(view) {
+        document.querySelectorAll('#reportsExtraSidebar .reports-sidebar-btn').forEach((button) => {
+            const btnView = String(button.getAttribute('data-view') || '').toLowerCase();
+            button.classList.toggle('active', btnView === String(view || '').toLowerCase());
+        });
+    }
+
+    function reportsExtraSwitchView(view) {
+        const normalizedView = String(view || 'main').toLowerCase();
+        document.querySelectorAll('#reports .reports-content-panel').forEach((panel) => {
+            panel.style.display = 'none';
+        });
+
+        const targetPanel = document.getElementById(`reportsPanel-${normalizedView}`);
+        if (targetPanel) {
+            targetPanel.style.display = 'block';
+        } else {
+            const defaultPanel = document.getElementById('reportsPanel-main');
+            if (defaultPanel) defaultPanel.style.display = 'block';
+        }
+
+        reportsExtraSetActiveSidebar(normalizedView);
+        if (normalizedView === 'main') {
+            loadReportsData();
+        } else if (normalizedView === 'tech') {
+            reportsLoadTechPayouts();
+        } else if (normalizedView === 'parts') {
+            reportsLoadPartsVendors();
+        }
+    }
+
+    function reportsShowMainPanelOnly() {
+        document.querySelectorAll('#reports .reports-content-panel').forEach((panel) => {
+            panel.style.display = 'none';
+        });
+        const defaultPanel = document.getElementById('reportsPanel-main');
+        if (defaultPanel) {
+            defaultPanel.style.display = 'block';
+        }
+        reportsExtraSetActiveSidebar('main');
+    }
+
+    async function reportsOpenTechDetailWindow(techId, techName) {
+        const win = window.open('', `Reports_Tech_${techId}`, 'width=1220,height=760,scrollbars=yes,resizable=yes');
+        if (!win) {
+            alert('Popup blocked. Please allow popups for this site.');
+            return;
+        }
+
+        const safeTechName = reportsEscapeHtml(techName || `Tech #${techId}`);
+        win.document.title = `Tech Detail - ${safeTechName}`;
+        win.document.body.innerHTML = `
+            <div style="padding:20px; background:#d3d3d3; min-height:100vh; font-family:Arial,sans-serif;">
+                <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:20px;">
+                    <h2 style="margin:0; color:#333;">Paid RO's - ${safeTechName}</h2>
+                    <button onclick="window.close()" style="padding:8px 14px; background:#505050; color:#fff; border:none; border-radius:4px; cursor:pointer; font-weight:bold;">Close</button>
+                </div>
+                <div style="background:#fff; padding:20px; border-radius:8px; box-shadow:0 2px 4px rgba(0,0,0,0.1);">
+                    <div style="overflow-x:auto;">
+                        <table id="reportsTechDetailTable" style="width:100%; border-collapse:collapse;">
+                            <thead>
+                                <tr class="dashboard-header-row">
+                                    <th class="dashboard-header-cell" style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold;">RO#</th>
+                                    <th class="dashboard-header-cell" style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold;">Vehicle</th>
+                                    <th class="dashboard-header-cell" style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold;">Insurance</th>
+                                    <th class="dashboard-header-cell" style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold;">PAID</th>
+                                    <th class="dashboard-header-cell" style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold; text-align:right;">Total</th>
+                                </tr>
+                            </thead>
+                            <tbody id="reportsTechDetailBody">
+                                <tr><td colspan="5" style="padding:20px; text-align:center; color:#999;">Loading...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        const style = win.document.createElement('style');
+        style.textContent = `
+            body { margin:0; }
+            .dashboard-header-row th, .dashboard-header-cell {
+                font-family: inherit;
+                font-size: 16px;
+                font-weight: bold;
+                background: #23272a;
+                color: #fff;
+            }
+        `;
+        win.document.head.appendChild(style);
+
+        try {
+            const resp = await fetch(`/api/records/tech-paid-ros?tech_id=${encodeURIComponent(String(techId))}`, { credentials: 'include' });
+            const data = await resp.json();
+            const rows = Array.isArray(data.rows) ? data.rows : [];
+            const body = win.document.getElementById('reportsTechDetailBody');
+            if (!body) return;
+
+            if (!rows.length) {
+                body.innerHTML = `<tr><td colspan='5' style='padding:20px; text-align:center; color:#999;'>No paid RO records found for this tech.</td></tr>`;
+                return;
+            }
+
+            body.innerHTML = '';
+            rows.forEach((row, index) => {
+                const rowBg = index % 2 === 0 ? '#f2f0ef' : '#ffffff';
+                const roValue = String(row.ro || '').trim();
+                const roEscaped = reportsEscapeHtml(roValue);
+                const vehicle = reportsEscapeHtml(row.vehicle || 'N/A');
+                const insurance = reportsEscapeHtml(row.insurance || '-');
+                const paidDate = reportsFormatShortDate(row.paid_at);
+                const total = formatReportsMoney(row.total || 0);
+
+                body.innerHTML += `
+                    <tr>
+                        <td style='padding:12px; border-bottom:1px solid #eee; background:${rowBg};'>${roEscaped}</td>
+                        <td style='padding:12px; border-bottom:1px solid #eee; background:${rowBg}; color:#333;'>${vehicle}</td>
+                        <td style='padding:12px; border-bottom:1px solid #eee; background:${rowBg}; color:#333;'>${insurance}</td>
+                        <td style='padding:12px; border-bottom:1px solid #eee; background:${rowBg}; color:#333;'>${paidDate}</td>
+                        <td style='padding:12px; border-bottom:1px solid #eee; background:${rowBg}; text-align:right; color:#333;'>${total}</td>
+                    </tr>
+                `;
+            });
+        } catch (error) {
+            const body = win.document.getElementById('reportsTechDetailBody');
+            if (body) {
+                body.innerHTML = `<tr><td colspan='5' style='padding:20px; text-align:center; color:#c00;'>Error loading paid RO records</td></tr>`;
+            }
+        }
+    }
+
+    async function reportsLoadTechPayouts() {
+        const body = document.getElementById('reportsTechListBody');
+        if (!body) return;
+
+        body.innerHTML = `<tr><td colspan='4' style='padding:20px; text-align:center; color:#999;'>Loading...</td></tr>`;
+        try {
+            const resp = await fetch('/api/records/tech-payouts', { credentials: 'include' });
+            const data = await resp.json();
+            const rows = Array.isArray(data.rows) ? data.rows : [];
+
+            body.innerHTML = '';
+            if (!rows.length) {
+                body.innerHTML = `<tr><td colspan='4' style='padding:20px; text-align:center; color:#999;'>No paid tech payouts found.</td></tr>`;
+                return;
+            }
+
+            rows.forEach((row, index) => {
+                const rowBg = (index % 2 === 0) ? '#d3d3d3' : '#f2f0ef';
+                const techName = String(row.tech_name || '').trim() || `Tech #${row.tech_id || ''}`;
+                const totalRos = Number(row.total_ros || 0);
+
+                body.innerHTML += `<tr>
+                    <td style='padding:12px; background:${rowBg};'><button type='button' class='reports-tech-link' data-tech-id='${Number(row.tech_id || 0)}' data-tech-name='${reportsEscapeHtml(techName)}' style='background:none; border:none; color:#0066cc; text-decoration:underline; cursor:pointer; padding:0; font:inherit; font-weight:bold;'>${reportsEscapeHtml(techName)}</button></td>
+                    <td style='padding:12px; text-align:right; background:${rowBg};'>${formatReportsMoney(row.pay_rate || 0)}</td>
+                    <td style='padding:12px; text-align:right; background:${rowBg};'>${Number(row.total_hours || 0).toFixed(1)}</td>
+                    <td style='padding:12px; text-align:center; background:${rowBg};'>${totalRos}</td>
+                </tr>`;
+            });
+
+            body.querySelectorAll('button.reports-tech-link').forEach((button) => {
+                button.addEventListener('click', () => {
+                    const techId = Number(button.getAttribute('data-tech-id') || 0);
+                    const techName = String(button.getAttribute('data-tech-name') || '').trim();
+                    if (!techId) return;
+                    reportsOpenTechDetailWindow(techId, techName);
+                });
+            });
+        } catch (error) {
+            body.innerHTML = `<tr><td colspan='4' style='padding:20px; text-align:center; color:#c00;'>Error loading tech payouts</td></tr>`;
+        }
+    }
+
+    async function reportsLoadPartsVendors() {
+        const body = document.getElementById('reportsPartsVendorBody');
+        if (!body) return;
+
+        body.innerHTML = `<tr><td colspan='4' style='padding:20px; text-align:center; color:#999;'>Loading...</td></tr>`;
+        try {
+            const resp = await fetch('/api/records/parts/vendors-summary', { credentials: 'include' });
+            const data = await resp.json();
+            const rows = Array.isArray(data.rows) ? data.rows : [];
+
+            if (!rows.length) {
+                body.innerHTML = `<tr><td colspan='4' style='padding:20px; text-align:center; color:#999;'>No vendors found.</td></tr>`;
+                return;
+            }
+
+            body.innerHTML = rows.map((row, index) => {
+                const rowBg = (index % 2 === 0) ? '#d3d3d3' : '#f2f0ef';
+                const vendorName = reportsEscapeHtml(row.vendor || '—');
+                const vendorType = reportsEscapeHtml(row.type || '—');
+                const invoices = Number(row.invoices || 0);
+                const total = formatReportsMoney(row.total || 0);
+                const vendorId = Number(row.vendor_id || 0);
+                const buttonHtml = `<button type='button' class='reports-parts-vendor-link' data-vendor-id='${vendorId}' data-vendor-name='${vendorName}' style='background:none; border:none; color:#0066cc; text-decoration:underline; cursor:pointer; padding:0; font:inherit; font-weight:bold;'>${vendorName}</button>`;
+                return `
+                    <tr>
+                        <td style='padding:12px; background:${rowBg};'>${buttonHtml}</td>
+                        <td style='padding:12px; background:${rowBg};'>${vendorType}</td>
+                        <td style='padding:12px; text-align:right; background:${rowBg};'>${invoices}</td>
+                        <td style='padding:12px; text-align:right; background:${rowBg};'>${total}</td>
+                    </tr>
+                `;
+            }).join('');
+
+            body.querySelectorAll('button.reports-parts-vendor-link').forEach((button) => {
+                button.addEventListener('click', () => {
+                    const vendorId = Number(button.getAttribute('data-vendor-id') || 0);
+                    const vendorName = String(button.getAttribute('data-vendor-name') || '').trim();
+                    if (!vendorId) return;
+                    reportsOpenPartsVendorModal(vendorId, vendorName);
+                });
+            });
+        } catch (error) {
+            body.innerHTML = `<tr><td colspan='4' style='padding:20px; text-align:center; color:#c00;'>Error loading vendor data.</td></tr>`;
+        }
+    }
+
+    function reportsClosePartsVendorModal() {
+        const modal = document.getElementById('reportsPartsVendorModal');
+        if (modal) modal.style.display = 'none';
+        reportsPartsState.activeVendorId = null;
+        reportsPartsState.activeVendorName = '';
+    }
+
+    async function reportsOpenPartsVendorModal(vendorId, vendorName) {
+        const modal = document.getElementById('reportsPartsVendorModal');
+        const title = document.getElementById('reportsPartsVendorModalTitle');
+        const startInput = document.getElementById('reportsPartsVendorDateStart');
+        const endInput = document.getElementById('reportsPartsVendorDateEnd');
+        if (!modal || !title || !startInput || !endInput) return;
+
+        reportsPartsState.activeVendorId = Number(vendorId || 0);
+        reportsPartsState.activeVendorName = String(vendorName || '').trim();
+        title.textContent = reportsPartsState.activeVendorName || 'Vendor';
+
+        if (!startInput.dataset.bound) {
+            startInput.addEventListener('change', () => reportsLoadPartsVendorInvoices());
+            startInput.dataset.bound = '1';
+        }
+        if (!endInput.dataset.bound) {
+            endInput.addEventListener('change', () => reportsLoadPartsVendorInvoices());
+            endInput.dataset.bound = '1';
+        }
+
+        modal.style.display = 'block';
+        await reportsLoadPartsVendorInvoices();
+    }
+
+    async function reportsLoadPartsVendorInvoices() {
+        const vendorId = Number(reportsPartsState.activeVendorId || 0);
+        const body = document.getElementById('reportsPartsVendorInvoiceBody');
+        const startInput = document.getElementById('reportsPartsVendorDateStart');
+        const endInput = document.getElementById('reportsPartsVendorDateEnd');
+        if (!vendorId || !body || !startInput || !endInput) return;
+
+        const query = new URLSearchParams({ vendor_id: String(vendorId) });
+        const startDate = String(startInput.value || '').trim();
+        const endDate = String(endInput.value || '').trim();
+        if (startDate) query.set('start_date', startDate);
+        if (endDate) query.set('end_date', endDate);
+
+        body.innerHTML = `<tr><td colspan='5' style='padding:20px; text-align:center; color:#999;'>Loading...</td></tr>`;
+        try {
+            const resp = await fetch(`/api/records/parts/vendor-invoices?${query.toString()}`, { credentials: 'include' });
+            const data = await resp.json();
+            const rows = Array.isArray(data.rows) ? data.rows : [];
+
+            if (!rows.length) {
+                body.innerHTML = `<tr><td colspan='5' style='padding:20px; text-align:center; color:#999;'>No invoices found for selected range.</td></tr>`;
+                return;
+            }
+
+            body.innerHTML = rows.map((row, index) => {
+                const rowBg = index % 2 === 0 ? '#f2f0ef' : '#ffffff';
+                const ro = reportsEscapeHtml(row.ro || '');
+                const invoice = String(row.invoice || '').trim();
+                const invoiceEscaped = reportsEscapeHtml(invoice || '—');
+                const safeKey = `${String(row.ro || '').trim()}__${invoice}`.replace(/[^a-zA-Z0-9_-]/g, '_');
+                const detailRowId = `reports-parts-invoice-detail-row-${safeKey}`;
+                const detailWrapId = `reports-parts-invoice-detail-wrap-${safeKey}`;
+                const dateDisplay = reportsFormatShortDate(row.date);
+                const partsCount = Number(row.parts || 0);
+                const total = formatReportsMoney(row.total || 0);
+
+                return `
+                    <tr>
+                        <td style='padding:12px; border-bottom:1px solid #eee; background:${rowBg};'>${dateDisplay}</td>
+                        <td style='padding:12px; border-bottom:1px solid #eee; background:${rowBg};'>${ro}</td>
+                        <td style='padding:12px; border-bottom:1px solid #eee; background:${rowBg};'>
+                            <button type='button' onclick='reportsTogglePartsInvoiceRow(${vendorId}, ${JSON.stringify(String(row.ro || '').trim())}, ${JSON.stringify(invoice)}, ${JSON.stringify(safeKey)})' style='background:none; border:none; color:#0066cc; text-decoration:underline; cursor:pointer; padding:0;'>${invoiceEscaped}</button>
+                        </td>
+                        <td style='padding:12px; border-bottom:1px solid #eee; text-align:right; background:${rowBg};'>${partsCount}</td>
+                        <td style='padding:12px; border-bottom:1px solid #eee; text-align:right; background:${rowBg};'>${total}</td>
+                    </tr>
+                    <tr id='${detailRowId}' style='display:none;'>
+                        <td colspan='5' style='padding:10px 12px; border-bottom:1px solid #eee; background:${rowBg};'>
+                            <div id='${detailWrapId}' style='background:#fafafa; border:1px solid #ddd; border-radius:6px; padding:10px;'>Loading...</div>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+        } catch (error) {
+            body.innerHTML = `<tr><td colspan='5' style='padding:20px; text-align:center; color:#c00;'>Error loading invoices.</td></tr>`;
+        }
+    }
+
+    function reportsTogglePartsInvoiceRow(vendorId, roValue, invoiceNumber, safeKey) {
+        const body = document.getElementById('reportsPartsVendorInvoiceBody');
+        const detailRow = document.getElementById(`reports-parts-invoice-detail-row-${safeKey}`);
+        const detailWrap = document.getElementById(`reports-parts-invoice-detail-wrap-${safeKey}`);
+        if (!body || !detailRow || !detailWrap) return;
+
+        const isOpening = detailRow.style.display === 'none' || detailRow.style.display === '';
+        Array.from(body.querySelectorAll('tr[id^="reports-parts-invoice-detail-row-"]')).forEach((row) => {
+            if (row.id !== `reports-parts-invoice-detail-row-${safeKey}`) {
+                row.style.display = 'none';
+            }
+        });
+
+        detailRow.style.display = isOpening ? 'table-row' : 'none';
+        if (!isOpening) return;
+
+        detailWrap.innerHTML = '<div style="color:#777;">Loading invoice parts...</div>';
+        reportsLoadPartsInvoiceParts(vendorId, roValue, invoiceNumber, detailWrap);
+    }
+
+    async function reportsLoadPartsInvoiceParts(vendorId, roValue, invoiceNumber, container) {
+        if (!container) return;
+        const query = new URLSearchParams({
+            vendor_id: String(vendorId),
+            ro: String(roValue || ''),
+            invoice: String(invoiceNumber || ''),
+        });
+
+        try {
+            const resp = await fetch(`/api/records/parts/vendor-invoice-parts?${query.toString()}`, { credentials: 'include' });
+            const data = await resp.json();
+            const rows = Array.isArray(data.parts) ? data.parts : [];
+
+            if (!rows.length) {
+                container.innerHTML = '<div style="color:#777;">No parts lines found for this invoice.</div>';
+                return;
+            }
+
+            const bodyRows = rows.map((item, idx) => {
+                const rowBg = idx % 2 === 0 ? '#f2f0ef' : 'var(--list-row-white, #ffffff)';
+                return `
+                    <tr style="background:${rowBg};">
+                        <td style="padding:10px; border-bottom:1px solid #eee; width:80px;">${reportsEscapeHtml(item.line || '—')}</td>
+                        <td style="padding:10px; border-bottom:1px solid #eee;">${reportsEscapeHtml(item.description || '')}</td>
+                        <td style="padding:10px; border-bottom:1px solid #eee; text-align:right; width:80px;">${reportsFormatQty(item.qty || 0)}</td>
+                        <td style="padding:10px; border-bottom:1px solid #eee; width:170px;">${reportsEscapeHtml(item.part_number || '—')}</td>
+                        <td style="padding:10px; border-bottom:1px solid #eee; width:110px; text-align:right;">${formatReportsMoney(item.list || 0)}</td>
+                        <td style="padding:10px; border-bottom:1px solid #eee; width:110px; text-align:right;">${formatReportsMoney(item.cost || 0)}</td>
+                    </tr>
+                `;
+            }).join('');
+
+            container.innerHTML = `
+                <div style="overflow-x:auto;">
+                    <table style="width:100%; border-collapse:collapse;">
+                        <thead>
+                            <tr class="parts-header-row" style="background:#3c4142; text-align:left;">
+                                <th style="padding:10px; border-bottom:2px solid #ddd; width:80px; color:#fff;">Line</th>
+                                <th style="padding:10px; border-bottom:2px solid #ddd; color:#fff;">Description</th>
+                                <th style="padding:10px; border-bottom:2px solid #ddd; width:80px; text-align:right; color:#fff;">QTY</th>
+                                <th style="padding:10px; border-bottom:2px solid #ddd; width:170px; color:#fff;">Part #</th>
+                                <th style="padding:10px; border-bottom:2px solid #ddd; width:110px; text-align:right; color:#fff;">List</th>
+                                <th style="padding:10px; border-bottom:2px solid #ddd; width:110px; text-align:right; color:#fff;">Cost</th>
+                            </tr>
+                        </thead>
+                        <tbody>${bodyRows}</tbody>
+                    </table>
+                </div>
+            `;
+        } catch (error) {
+            container.innerHTML = '<div style="color:#c00;">Error loading invoice parts.</div>';
+        }
+    }
 
     function formatReportsPercent(value) {
         const amount = Number(value || 0);
@@ -1430,6 +1931,7 @@ def get_reports_screen_html():
     }
 
     async function loadReportsData() {
+        reportsShowMainPanelOnly();
         try {
             const [reportsResp, dashboardResp] = await Promise.all([
                 fetch('/api/reports_data'),
@@ -1476,7 +1978,9 @@ def get_reports_screen_html():
     document.addEventListener('DOMContentLoaded', function() {
         const reportsTab = document.querySelector('.nav-tab[onclick*="reports"]');
         if (reportsTab) {
-            reportsTab.addEventListener('click', loadReportsData);
+            reportsTab.addEventListener('click', function() {
+                reportsExtraSwitchView('main');
+            });
         }
 
         const toggleEl = document.getElementById('reportsStatusToggle');
@@ -1494,12 +1998,21 @@ def get_reports_screen_html():
             endDateEl.addEventListener('change', reportsApplyFiltersFromControls);
         }
         reportsApplyFiltersFromControls();
+        reportsExtraSwitchView('main');
 
         window.addEventListener('click', function(event) {
             const panel = document.getElementById('reportsPrintOptionsModal');
             if (!panel || !panel.classList.contains('open')) return;
             if (event.target.closest('#reportsPrintTrigger') || event.target.closest('#reportsPrintOptionsModal')) return;
             reportsClosePrintOptionsModal();
+        });
+
+        window.addEventListener('click', function(event) {
+            const modal = document.getElementById('reportsPartsVendorModal');
+            if (!modal || modal.style.display !== 'block') return;
+            if (event.target === modal) {
+                reportsClosePartsVendorModal();
+            }
         });
     });
     </script>
