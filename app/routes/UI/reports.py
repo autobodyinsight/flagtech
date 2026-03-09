@@ -326,7 +326,7 @@ def get_reports_screen_html():
             roBody.innerHTML = `<tr><td colspan='10' style='padding:20px; text-align:center; color:#999;'>${noneLabel}</td></tr>`;
             return;
         }
-        roBody.innerHTML = reportsBuildRoRowsHtml(rows);
+        roBody.innerHTML = reportsBuildRoRowsHtml(rows, { roClickable: !isOpenView });
     }
 
     function reportsApplyFiltersFromControls() {
@@ -1146,6 +1146,7 @@ def get_reports_screen_html():
 
     function reportsBuildRoRowsHtml(rows, options = {}) {
         const boldGpDollar = !!options.boldGpDollar;
+        const roClickable = options.roClickable !== false;
         const normalizedRows = Array.isArray(rows) ? rows : [];
         return normalizedRows.map((ro, index) => {
             const partsSales = Number(ro.parts_sales || 0);
@@ -1172,10 +1173,15 @@ def get_reports_screen_html():
                 ? `<strong>${formatReportsMoney(totalGp.gpDollar)}</strong>`
                 : `${formatReportsMoney(totalGp.gpDollar)}`;
 
+            const roNumber = reportsEscapeHtml(ro.ro_number || '');
+            const roCellHtml = roClickable
+                ? `<button type="button" data-ro="${roNumber}" onclick="reportsOpenClosedRoWindow(event, this.dataset.ro)" style="background:none; border:none; padding:0; color:#1b4f9c; font-weight:700; text-decoration:underline; cursor:pointer;">${roNumber}</button>`
+                : `<span style="color:#222; font-weight:700;">${roNumber}</span>`;
+
             return `
                 <tr style="background:${rowBg};">
                     <td style='padding:12px;'>
-                        <button type="button" data-ro="${reportsEscapeHtml(ro.ro_number || '')}" onclick="reportsOpenClosedRoWindow(event, this.dataset.ro)" style="background:none; border:none; padding:0; color:#1b4f9c; font-weight:700; text-decoration:underline; cursor:pointer;">${reportsEscapeHtml(ro.ro_number || '')}</button>
+                        ${roCellHtml}
                     </td>
                     <td style='padding:12px;'>${reportsEscapeHtml(ro.vehicle || '')}</td>
                     <td style='padding:12px;'>${reportsEscapeHtml(ro.insurance || '')}</td>

@@ -251,38 +251,178 @@ async def home_screen(request: Request):
             background-color: #d3d3d3;
             margin: 0;
         }}
-        .tab-bar {{
-            background-color: #3c4142;
+        .app-header {{
+            height: 60px;
+            min-height: 60px;
+            width: 100%;
             display: flex;
-            gap: 0;
-            padding: 0;
-            border-bottom: 3px solid #333;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 16px;
+            background: linear-gradient(90deg, #000000 0%, #b22222 100%);
+            color: #fff;
+            position: relative;
+            z-index: 1200;
         }}
-        .nav-tab {{
-            padding: 18px 35px;
-            background-color: #3c4142;
-            color: white;
-            opacity: 1;
-            background-image: none;
-            box-shadow: none;
-            filter: none;
-            text-align: center;
+        .app-header-left {{
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            min-width: 0;
+        }}
+        .app-header-right {{
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }}
+        .header-icon-btn {{
+            width: 40px;
+            height: 40px;
+            border: 1px solid rgba(255,255,255,0.35);
+            border-radius: 10px;
+            background: rgba(255,255,255,0.08);
+            color: #fff;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
             cursor: pointer;
-            font-weight: bold;
-            border-right: 1px solid #555;
-            transition: all 0.3s ease;
-            font-size: 14px;
-            flex: 1;
-            max-width: 200px;
+            padding: 0;
         }}
-        .nav-tab:hover {{
-            background-color: #3c4142;
+        .header-icon-btn:hover {{
+            background: rgba(255,255,255,0.16);
         }}
-        .nav-tab.active {{
-            background-color: #b22222;
-            color: white;
-            border-bottom: 3px solid #b22222;
-            margin-bottom: -3px;
+        #appMenuButton span {{
+            display: block;
+            width: 18px;
+            height: 2px;
+            margin: 2px 0;
+            background: #fff;
+            border-radius: 2px;
+        }}
+        .app-brand-logo {{
+            width: 32px;
+            height: 32px;
+            object-fit: contain;
+            border-radius: 6px;
+            background: rgba(255,255,255,0.92);
+            padding: 2px;
+        }}
+        .app-brand-text {{
+            font-size: 22px;
+            font-weight: 800;
+            letter-spacing: 0.4px;
+            white-space: nowrap;
+        }}
+        #headerUserButton {{
+            width: 40px;
+            height: 40px;
+            border-radius: 999px;
+            border: 1px solid rgba(255,255,255,0.35);
+            background: rgba(255,255,255,0.14);
+            color: #fff;
+            font-weight: 800;
+            cursor: pointer;
+        }}
+        #headerUserDropdown {{
+            position: absolute;
+            top: 48px;
+            right: 0;
+            min-width: 170px;
+            background: #fff;
+            border: 1px solid #ddd;
+            border-radius: 10px;
+            box-shadow: 0 10px 24px rgba(0,0,0,0.18);
+            padding: 6px;
+            display: none;
+            z-index: 1250;
+        }}
+        .header-menu-action {{
+            width: 100%;
+            text-align: left;
+            border: none;
+            background: #fff;
+            color: #222;
+            padding: 10px 12px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+        }}
+        .header-menu-action:hover {{
+            background: #f3f3f3;
+        }}
+        #sideNavBackdrop {{
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.3);
+            display: none;
+            z-index: 1300;
+        }}
+        #sideNavDrawer {{
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 260px;
+            height: 100vh;
+            background: #f2f0ef;
+            box-shadow: 2px 0 18px rgba(0,0,0,0.2);
+            transform: translateX(-100%);
+            transition: transform 0.22s ease;
+            z-index: 1310;
+            padding: 76px 14px 14px 14px;
+            overflow-y: auto;
+        }}
+        #sideNavDrawer.open {{
+            transform: translateX(0);
+        }}
+        .side-menu-list {{
+            display: grid;
+            gap: 8px;
+        }}
+        .side-menu-item {{
+            width: 100%;
+            border: 1px solid #ddd1cc;
+            background: #fff;
+            color: #222;
+            border-radius: 10px;
+            padding: 12px 14px;
+            text-align: left;
+            font-size: 15px;
+            font-weight: 700;
+            cursor: pointer;
+        }}
+        .side-menu-item.active {{
+            background: #b22222;
+            color: #fff;
+            border-color: #b22222;
+        }}
+        .header-modal-shell {{
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.38);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 1320;
+            padding: 18px;
+        }}
+        .header-modal-card {{
+            width: min(860px, 96vw);
+            max-height: 86vh;
+            overflow: auto;
+            background: #fff;
+            border-radius: 12px;
+            padding: 18px;
+            box-shadow: 0 16px 34px rgba(0,0,0,0.26);
+        }}
+        .header-chat-layout {{
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 14px;
+        }}
+        @media (max-width: 840px) {{
+            .content-area {{ padding: 18px; }}
+            .app-brand-text {{ font-size: 18px; }}
+            .header-chat-layout {{ grid-template-columns: 1fr; }}
         }}
         .content-area {{
             flex: 1;
@@ -426,17 +566,85 @@ async def home_screen(request: Request):
     </style>
 </head>
 <body>
-    <div class="tab-bar">
-        <div class="nav-tab active" onclick="switchScreen('dashboard')">DASHBOARD</div>
-        <div class="nav-tab" onclick="switchScreen('upload')">UPLOAD</div>
-        <div class="nav-tab" onclick="switchScreen('parts')">PARTS</div>
-        <div class="nav-tab" onclick="switchScreen('tech')">TECHS</div>
-        <div class="nav-tab" onclick="switchScreen('phase')">ROADMAP</div>
-        <div class="nav-tab" onclick="switchScreen('flagtech')">FLAGOUT</div>
-        <div class="nav-tab" onclick="switchScreen('reports')">REPORTS</div>
-        <div class="nav-tab" onclick="switchScreen('records')">RECORDS</div>
-        <div class="nav-tab" onclick="switchScreen('setup')">SETUP</div>
-        <div class="nav-tab" onclick="logoutApp()">LOGOUT</div>
+    <header class="app-header">
+        <div class="app-header-left">
+            <button id="appMenuButton" class="header-icon-btn" type="button" aria-label="Open menu">
+                <span></span><span></span><span></span>
+            </button>
+            <img class="app-brand-logo" src="/static/autobodyos.png" alt="AutobodyOS logo" />
+            <div class="app-brand-text">AutobodyOS</div>
+        </div>
+        <div class="app-header-right">
+            <button id="headerChatButton" class="header-icon-btn" type="button" aria-label="Open chat">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M4 5h16v10H8l-4 4V5z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>
+            </button>
+            <div style="position:relative;">
+                <button id="headerUserButton" type="button" aria-label="Open user menu">--</button>
+                <div id="headerUserDropdown">
+                    <button type="button" class="header-menu-action" onclick="openProfileModal()">Profile</button>
+                    <button type="button" class="header-menu-action" onclick="logoutApp()">Log Out</button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <div id="sideNavBackdrop"></div>
+    <aside id="sideNavDrawer" aria-hidden="true">
+        <div class="side-menu-list">
+            <button type="button" class="side-menu-item active" data-screen="dashboard">Dashboard</button>
+            <button type="button" class="side-menu-item" data-screen="upload">Upload</button>
+            <button type="button" class="side-menu-item" data-screen="phase">Roadmap</button>
+            <button type="button" class="side-menu-item" data-screen="parts">Parts</button>
+            <button type="button" class="side-menu-item" data-screen="tech">Techs</button>
+            <button type="button" class="side-menu-item" data-screen="flagtech">Flagout</button>
+            <button type="button" class="side-menu-item" data-screen="reports">Reports</button>
+            <button type="button" class="side-menu-item" data-screen="setup">Setup</button>
+        </div>
+    </aside>
+
+    <div id="chatModal" class="header-modal-shell">
+        <div class="header-modal-card">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+                <h3 style="margin:0; color:#333;">Messages & Tasks</h3>
+                <button type="button" class="header-menu-action" style="width:auto;" onclick="closeChatModal()">Close</button>
+            </div>
+            <div class="header-chat-layout">
+                <div style="border:1px solid #ddd; border-radius:10px; padding:12px; background:#fafafa;">
+                    <div style="font-weight:700; margin-bottom:8px;">Task List</div>
+                    <ul style="padding-left:18px; line-height:1.7; color:#333;">
+                        <li>Review open repair orders</li>
+                        <li>Check pending parts</li>
+                        <li>Follow up on flagged tech items</li>
+                    </ul>
+                </div>
+                <div style="border:1px solid #ddd; border-radius:10px; padding:12px; background:#fafafa;">
+                    <label for="chatUserSelect" style="display:block; font-weight:700; margin-bottom:6px;">User</label>
+                    <select id="chatUserSelect" style="width:100%; padding:10px; border:1px solid #ccc; border-radius:8px; margin-bottom:10px;"></select>
+                    <textarea id="chatMessageText" rows="4" placeholder="Write a message or task..." style="width:100%; padding:10px; border:1px solid #ccc; border-radius:8px; resize:vertical;"></textarea>
+                    <div style="display:flex; gap:8px; margin-top:10px;">
+                        <button type="button" class="header-menu-action" style="width:auto; background:#b22222; color:#fff;" onclick="sendHeaderMessage('message')">Send Message</button>
+                        <button type="button" class="header-menu-action" style="width:auto; background:#1f2326; color:#fff;" onclick="sendHeaderMessage('task')">Send Task</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="profileModal" class="header-modal-shell">
+        <div class="header-modal-card" style="width:min(520px, 96vw);">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+                <h3 style="margin:0; color:#333;">Profile</h3>
+                <button type="button" class="header-menu-action" style="width:auto;" onclick="closeProfileModal()">Close</button>
+            </div>
+            <div style="display:grid; grid-template-columns:1fr; gap:10px; color:#222;">
+                <div><strong>Shop association:</strong> <span id="profileShopText">-</span></div>
+                <div><strong>Role:</strong> <span id="profileRoleText">-</span></div>
+                <div><strong>Email:</strong> <span id="profileEmailText">-</span></div>
+            </div>
+            <div style="margin-top:14px;">
+                <button id="profileResetPasswordBtn" type="button" class="header-menu-action" style="width:auto; background:#b22222; color:#fff;" onclick="resetProfilePassword()">Reset Password</button>
+            </div>
+        </div>
     </div>
     
     <div class="content-area">
@@ -495,18 +703,201 @@ async def home_screen(request: Request):
         const a11yObserver = new MutationObserver(() => normalizeFormAccessibility());
         a11yObserver.observe(document.body, {{ childList: true, subtree: true }});
 
-        function switchScreen(screenName) {{
+        const appUiState = {{
+            activeScreen: 'dashboard',
+            sessionUser: null,
+            shopDomain: '',
+            users: [],
+            currentUser: null,
+        }};
+
+        function setActiveMenuItem(screenName) {{
+            const items = document.querySelectorAll('.side-menu-item[data-screen]');
+            items.forEach((item) => item.classList.toggle('active', item.getAttribute('data-screen') === screenName));
+        }}
+
+        function openSideMenu() {{
+            const drawer = document.getElementById('sideNavDrawer');
+            const backdrop = document.getElementById('sideNavBackdrop');
+            if (drawer) drawer.classList.add('open');
+            if (backdrop) backdrop.style.display = 'block';
+        }}
+
+        function closeSideMenu() {{
+            const drawer = document.getElementById('sideNavDrawer');
+            const backdrop = document.getElementById('sideNavBackdrop');
+            if (drawer) drawer.classList.remove('open');
+            if (backdrop) backdrop.style.display = 'none';
+        }}
+
+        function toggleUserDropdown(forceOpen = null) {{
+            const menu = document.getElementById('headerUserDropdown');
+            if (!menu) return;
+            const openNow = menu.style.display === 'block';
+            const shouldOpen = forceOpen === null ? !openNow : !!forceOpen;
+            menu.style.display = shouldOpen ? 'block' : 'none';
+        }}
+
+        function openChatModal() {{
+            const modal = document.getElementById('chatModal');
+            if (modal) modal.style.display = 'flex';
+        }}
+
+        function closeChatModal() {{
+            const modal = document.getElementById('chatModal');
+            if (modal) modal.style.display = 'none';
+        }}
+
+        function openProfileModal() {{
+            toggleUserDropdown(false);
+            const modal = document.getElementById('profileModal');
+            if (modal) modal.style.display = 'flex';
+        }}
+
+        function closeProfileModal() {{
+            const modal = document.getElementById('profileModal');
+            if (modal) modal.style.display = 'none';
+        }}
+
+        function sendHeaderMessage(kind) {{
+            const select = document.getElementById('chatUserSelect');
+            const textArea = document.getElementById('chatMessageText');
+            const userLabel = select ? select.options[select.selectedIndex]?.text || 'Selected user' : 'Selected user';
+            const text = String(textArea?.value || '').trim();
+            if (!text) {{
+                alert('Enter a message first.');
+                return;
+            }}
+            alert(`Sent ${{kind}} to ${{userLabel}}.`);
+            if (textArea) textArea.value = '';
+        }}
+
+        async function resetProfilePassword() {{
+            if (!appUiState.currentUser || !appUiState.currentUser.id) {{
+                alert('Current user not available.');
+                return;
+            }}
+            const newPassword = window.prompt('Enter new password:');
+            if (!newPassword) return;
+            try {{
+                const payload = {{ user_ids: [appUiState.currentUser.id], new_password: newPassword }};
+                if (appUiState.shopDomain) payload.shop_domain = appUiState.shopDomain;
+                const resp = await fetch('/api/setup/users/reset-password', {{
+                    method: 'POST',
+                    credentials: 'include',
+                    headers: {{ 'Content-Type': 'application/json' }},
+                    body: JSON.stringify(payload),
+                }});
+                const data = await resp.json();
+                if (!resp.ok || data.error) throw new Error(data.error || 'Unable to reset password');
+                alert('Password reset complete.');
+            }} catch (error) {{
+                alert(String(error.message || 'Unable to reset password'));
+            }}
+        }}
+
+        async function initHeaderData() {{
+            try {{
+                const [sessionResp, contextResp] = await Promise.all([
+                    fetch('/api/auth/session', {{ credentials: 'include' }}),
+                    fetch('/api/setup/context', {{ credentials: 'include' }}),
+                ]);
+                const sessionData = await sessionResp.json();
+                const contextData = await contextResp.json();
+                if (!sessionResp.ok || !sessionData.authenticated) return;
+                appUiState.sessionUser = sessionData.user || null;
+                appUiState.shopDomain = String(contextData.default_domain || sessionData.user?.domain || '').trim();
+
+                const userResp = await fetch(`/api/setup/users${{appUiState.shopDomain ? `?shop_domain=${{encodeURIComponent(appUiState.shopDomain)}}` : ''}}`, {{ credentials: 'include' }});
+                const userData = await userResp.json();
+                appUiState.users = Array.isArray(userData.users) ? userData.users : [];
+
+                const sessionEmail = String(appUiState.sessionUser?.email || '').toLowerCase();
+                appUiState.currentUser = appUiState.users.find((u) => String(u.email || '').toLowerCase() === sessionEmail) || null;
+
+                const firstName = String(appUiState.currentUser?.first_name || '').trim();
+                const lastName = String(appUiState.currentUser?.last_name || '').trim();
+                const initials = `${{(firstName[0] || '').toUpperCase()}}${{(lastName[0] || '').toUpperCase()}}` || 'U';
+                const role = String(appUiState.currentUser?.role || appUiState.sessionUser?.access_level || '-');
+                const email = String(appUiState.currentUser?.email || appUiState.sessionUser?.email || '-');
+
+                const bubble = document.getElementById('headerUserButton');
+                if (bubble) bubble.textContent = initials;
+
+                const shopText = document.getElementById('profileShopText');
+                const roleText = document.getElementById('profileRoleText');
+                const emailText = document.getElementById('profileEmailText');
+                if (shopText) shopText.textContent = appUiState.shopDomain || '-';
+                if (roleText) roleText.textContent = role;
+                if (emailText) emailText.textContent = email;
+
+                const userSelect = document.getElementById('chatUserSelect');
+                if (userSelect) {{
+                    userSelect.innerHTML = appUiState.users.map((u) => `
+                        <option value="${{String(u.id || '')}}">${{String(u.first_name || '').trim()}} ${{String(u.last_name || '').trim()}} (${{String(u.role || '')}})</option>
+                    `).join('') || '<option value="">No users found</option>';
+                }}
+            }} catch (error) {{
+                console.error('Header init error:', error);
+            }}
+        }}
+
+        function initGlobalHeaderUi() {{
+            const menuButton = document.getElementById('appMenuButton');
+            const menuBackdrop = document.getElementById('sideNavBackdrop');
+            const drawer = document.getElementById('sideNavDrawer');
+            const chatButton = document.getElementById('headerChatButton');
+            const userButton = document.getElementById('headerUserButton');
+
+            if (menuButton) menuButton.addEventListener('click', openSideMenu);
+            if (menuBackdrop) menuBackdrop.addEventListener('click', closeSideMenu);
+            if (chatButton) chatButton.addEventListener('click', openChatModal);
+            if (userButton) userButton.addEventListener('click', () => toggleUserDropdown());
+
+            document.querySelectorAll('.side-menu-item[data-screen]').forEach((item) => {{
+                item.addEventListener('click', () => {{
+                    const target = item.getAttribute('data-screen');
+                    switchScreen(target, item);
+                    closeSideMenu();
+                }});
+            }});
+
+            [document.getElementById('chatModal'), document.getElementById('profileModal')].forEach((modal) => {{
+                if (!modal) return;
+                modal.addEventListener('click', (event) => {{
+                    if (event.target === modal) modal.style.display = 'none';
+                }});
+            }});
+
+            document.addEventListener('click', (event) => {{
+                if (drawer && drawer.contains(event.target)) return;
+                if (menuButton && menuButton.contains(event.target)) return;
+                if (menuBackdrop && menuBackdrop.style.display === 'block' && !drawer?.classList.contains('open')) {{
+                    menuBackdrop.style.display = 'none';
+                }}
+
+                const userWrap = document.getElementById('headerUserButton')?.parentElement;
+                if (userWrap && !userWrap.contains(event.target)) toggleUserDropdown(false);
+            }});
+        }}
+
+        function switchScreen(screenName, sourceEl = null) {{
             const screens = document.querySelectorAll('.screen');
             screens.forEach(screen => screen.classList.remove('active'));
-            
-            const navTabs = document.querySelectorAll('.nav-tab');
-            navTabs.forEach(tab => tab.classList.remove('active'));
-            
-            document.getElementById(screenName).classList.add('active');
-            event.target.classList.add('active');            
+
+            const nextScreen = document.getElementById(screenName);
+            if (!nextScreen) return;
+            nextScreen.classList.add('active');
+            appUiState.activeScreen = screenName;
+            setActiveMenuItem(screenName);
+
             // Load dashboard data if switching to dashboard
             if (screenName === 'dashboard' && typeof loadDashboardDataIfNeeded === 'function') {{
                 loadDashboardDataIfNeeded();
+            }}
+
+            if (screenName === 'upload' && typeof loadUploadScreen === 'function') {{
+                loadUploadScreen();
             }}
 
             if (screenName === 'parts' && typeof partsLoadRos === 'function') {{
@@ -526,6 +917,10 @@ async def home_screen(request: Request):
                 loadFlagoutTechs();
             }}
 
+            if (screenName === 'reports' && typeof loadReportsData === 'function') {{
+                loadReportsData();
+            }}
+
             if (screenName === 'records' && typeof loadRecordsData === 'function') {{
                 loadRecordsData();
             }}
@@ -534,6 +929,10 @@ async def home_screen(request: Request):
                 setupLoadData();
             }}
         }}
+
+        initGlobalHeaderUi();
+        initHeaderData();
+        setActiveMenuItem('dashboard');
 
         async function logoutApp() {{
             try {{
