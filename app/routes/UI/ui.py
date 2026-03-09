@@ -468,45 +468,71 @@ async def home_screen(request: Request):
             height: 100%;
             display: flex;
             flex-direction: column;
-            background: transparent;
+            background: #fff;
+            border: 1px solid #e7e1de;
+            border-radius: 12px;
+            padding: 10px;
         }}
         .chat-user-list {{
             flex: 1;
             min-height: 0;
             overflow-y: auto;
-            border-top: 1px solid #e8e2df;
-            border-bottom: 1px solid #e8e2df;
+            border-top: 1px solid #eee8e5;
+            border-bottom: 1px solid #eee8e5;
+            background: #fff;
         }}
         .chat-user-row {{
             width: 100%;
             border: none;
-            border-bottom: 1px solid #ebe6e2;
+            border-bottom: 1px solid #f0ece9;
             background: transparent;
             color: #222;
             text-align: left;
-            padding: 12px 8px;
+            padding: 11px 8px;
             cursor: pointer;
             font-size: 14px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
         }}
         .chat-user-row:hover {{
-            background: #f3efed;
+            background: #f7f4f2;
         }}
         .chat-user-row.active {{
-            background: #ece7e4;
+            background: #f1ece9;
         }}
         .chat-user-row.unread {{
             font-weight: 800;
+        }}
+        .chat-user-avatar {{
+            width: 28px;
+            height: 28px;
+            border-radius: 999px;
+            background: #e8e3e0;
+            color: #333;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            font-weight: 800;
+            flex: 0 0 28px;
+        }}
+        .chat-user-label {{
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }}
         .chat-message-scroll {{
             flex: 1;
             min-height: 0;
             overflow-y: auto;
-            border-top: 1px solid #e8e2df;
-            border-bottom: 1px solid #e8e2df;
-            padding: 10px 2px;
+            border-top: 1px solid #eee8e5;
+            border-bottom: 1px solid #eee8e5;
+            padding: 12px 6px;
             display: flex;
             flex-direction: column;
             gap: 8px;
+            background: #fcfbfa;
         }}
         .chat-bubble {{
             max-width: 78%;
@@ -514,16 +540,18 @@ async def home_screen(request: Request):
             padding: 8px 10px;
             font-size: 14px;
             line-height: 1.35;
+            border: 1px solid transparent;
         }}
         .chat-bubble.sender {{
             margin-left: auto;
-            background: #b22222;
+            background: #2f3b4a;
             color: #fff;
         }}
         .chat-bubble.receiver {{
             margin-right: auto;
-            background: #ece7e4;
+            background: #ffffff;
             color: #222;
+            border-color: #e6dfdc;
         }}
         @media (max-width: 840px) {{
             .content-area {{ padding: 18px; }}
@@ -835,7 +863,109 @@ async def home_screen(request: Request):
             chatConversations: {{}},
             chatSelectedUserId: '',
             chatUnreadUserIds: [],
+            chatLastActivityByUser: {{}},
+            chatMessages: [],
+            chatPollTimer: null,
         }};
+
+        async function fetchChatMessages() {{
+            const response = await fetch('/api/chat/messages', {{ credentials: 'include' }});
+            const data = await response.json();
+            if (!response.ok || data.error) throw new Error(data.error || 'Unable to load chat messages');
+            appUiState.chatMessages = Array.isArray(data.messages) ? data.messages : [];
+        }}
+
+        function deriveChatStateFromMessages() {{
+            const currentUserId = String(appUiState.currentUser?.id || '');
+            const convoMap = {{}};
+            const lastActivity = {{}};
+            const unreadSet = new Set();
+            const openTasks = [];
+            const doneTasks = [];
+
+            if (!currentUserId) {{
+                appUiState.chatConversations = {{}};
+                appUiState.chatUnreadUserIds = [];
+                appUiState.chatLastActivityByUser = {{}};
+                appUiState.chatTasks = [];
+                appUiState.completedTasks = [];
+                return;
+            }}
+
+            (Array.isArray(appUiState.chatMessages) ? appUiState.chatMessages : []).forEach((row) => {{
+                const fromId = String(row?.from_user_id || '');
+                const toId = String(row?.to_user_id || '');
+                if (!fromId || !toId) return;
+                if (fromId !== currentUserId && toId !== currentUserId) return;
+
+                const otherId = fromId === currentUserId ? toId : fromId;
+                const ts = Number(row?.ts || 0) || Date.now();
+                if (!lastActivity[otherId] || ts > lastActivity[otherId]) lastActivity[otherId] = ts;
+
+                const kind = String(row?.kind || 'message');
+                if (kind === 'task') {{
+                    if (toId === currentUserId) {{
+                        const taskRow = {{
+                            id: Number(row?.id || 0),
+                            text: String(row?.text || ''),
+                            ts,
+                            fromUserId: fromId,
+                        }};
+                        if (row?.completed_at) doneTasks.push(taskRow);
+                        else openTasks.push(taskRow);
+                    }}
+                    return;
+                }}
+
+                if (!convoMap[otherId]) convoMap[otherId] = [];
+                convoMap[otherId].push({{
+                    side: fromId === currentUserId ? 'sender' : 'receiver',
+                    text: String(row?.text || ''),
+                    ts,
+                }});
+
+                if (toId === currentUserId && !row?.read_at) unreadSet.add(otherId);
+            }});
+
+            Object.keys(convoMap).forEach((otherId) => {{
+                convoMap[otherId].sort((a, b) => Number(a.ts || 0) - Number(b.ts || 0));
+            }});
+
+            openTasks.sort((a, b) => Number(b.ts || 0) - Number(a.ts || 0));
+            doneTasks.sort((a, b) => Number(b.ts || 0) - Number(a.ts || 0));
+
+            const unreadIds = Array.from(unreadSet);
+
+            unreadIds.sort((a, b) => (lastActivity[b] || 0) - (lastActivity[a] || 0));
+            appUiState.chatConversations = convoMap;
+            appUiState.chatUnreadUserIds = unreadIds;
+            appUiState.chatLastActivityByUser = lastActivity;
+            appUiState.chatTasks = openTasks;
+            appUiState.completedTasks = doneTasks;
+
+            if (appUiState.chatSelectedUserId && !appUiState.users.some((u) => String(u?.id || '') === String(appUiState.chatSelectedUserId))) {{
+                appUiState.chatSelectedUserId = '';
+            }}
+        }}
+
+        async function markConversationRead(userId) {{
+            const currentUserId = String(appUiState.currentUser?.id || '');
+            const otherId = String(userId || '');
+            if (!currentUserId || !otherId) return;
+
+            try {{
+                await fetch('/api/chat/read', {{
+                    method: 'POST',
+                    credentials: 'include',
+                    headers: {{ 'Content-Type': 'application/json' }},
+                    body: JSON.stringify({{ with_user_id: Number(otherId) }}),
+                }});
+            }} catch (error) {{
+                console.error('Unable to mark conversation as read:', error);
+            }}
+
+            appUiState.chatUnreadUserIds = appUiState.chatUnreadUserIds.filter((id) => String(id) !== otherId);
+        }}
 
         function headerEscapeHtml(value) {{
             return String(value === null || value === undefined ? '' : value)
@@ -846,12 +976,28 @@ async def home_screen(request: Request):
                 .replace(/'/g, '&#39;');
         }}
 
-        function completeChatTaskAt(index) {{
+        async function completeChatTaskAt(index) {{
             const parsed = Number(index);
             if (!Number.isInteger(parsed) || parsed < 0 || parsed >= appUiState.chatTasks.length) return;
-            const [doneTask] = appUiState.chatTasks.splice(parsed, 1);
-            if (doneTask) appUiState.completedTasks.unshift(doneTask);
-            renderChatTaskPanels();
+            const task = appUiState.chatTasks[parsed];
+            if (!task?.id) return;
+            try {{
+                const response = await fetch('/api/chat/task/complete', {{
+                    method: 'POST',
+                    credentials: 'include',
+                    headers: {{ 'Content-Type': 'application/json' }},
+                    body: JSON.stringify({{ task_id: Number(task.id) }}),
+                }});
+                const data = await response.json();
+                if (!response.ok || data.error) throw new Error(data.error || 'Unable to complete task');
+                await fetchChatMessages();
+                deriveChatStateFromMessages();
+                renderChatTaskPanels();
+                renderChatUserList();
+                renderChatConversation();
+            }} catch (error) {{
+                alert(String(error.message || 'Unable to complete task'));
+            }}
         }}
 
         function renderChatTaskPanels() {{
@@ -865,15 +1011,15 @@ async def home_screen(request: Request):
                 listEl.innerHTML = appUiState.chatTasks.map((task, index) => `
                     <label style="display:flex; align-items:flex-start; gap:10px; padding:8px 6px; border-bottom:1px solid #ececec; cursor:pointer;">
                         <input type="checkbox" data-task-index="${{index}}" style="margin-top:2px; width:16px; height:16px; cursor:pointer;" />
-                        <span style="line-height:1.4;">${{headerEscapeHtml(task)}}</span>
+                        <span style="line-height:1.4;">${{headerEscapeHtml(task?.text || '')}}</span>
                     </label>
                 `).join('');
 
                 listEl.querySelectorAll('input[type="checkbox"][data-task-index]').forEach((checkbox) => {{
-                    checkbox.addEventListener('change', (event) => {{
+                    checkbox.addEventListener('change', async (event) => {{
                         if (!event.target.checked) return;
                         const idx = Number(event.target.getAttribute('data-task-index'));
-                        completeChatTaskAt(idx);
+                        await completeChatTaskAt(idx);
                     }});
                 }});
             }}
@@ -882,7 +1028,7 @@ async def home_screen(request: Request):
                 completedEl.innerHTML = '<div style="color:#666;">NO COMPLETED TASKS</div>';
             }} else {{
                 completedEl.innerHTML = appUiState.completedTasks.map((task) => `
-                    <div style="padding:8px 6px; border-bottom:1px solid #ececec; color:#444;">${{headerEscapeHtml(task)}}</div>
+                    <div style="padding:8px 6px; border-bottom:1px solid #ececec; color:#444;">${{headerEscapeHtml(task?.text || '')}}</div>
                 `).join('');
             }}
         }}
@@ -899,7 +1045,9 @@ async def home_screen(request: Request):
                 const bUnread = appUiState.chatUnreadUserIds.includes(bid);
                 if (aUnread && !bUnread) return -1;
                 if (!aUnread && bUnread) return 1;
-                return 0;
+                const aTs = Number(appUiState.chatLastActivityByUser[aid] || 0);
+                const bTs = Number(appUiState.chatLastActivityByUser[bid] || 0);
+                return bTs - aTs;
             }});
 
             if (!orderedUsers.length) {{
@@ -912,19 +1060,21 @@ async def home_screen(request: Request):
                 const first = String(u?.first_name || '').trim();
                 const last = String(u?.last_name || '').trim();
                 const label = `${{first}} ${{last}}`.trim() || String(u?.email || 'Unknown');
+                const initials = `${{(first[0] || '').toUpperCase()}}${{(last[0] || '').toUpperCase()}}` || 'U';
                 const unread = appUiState.chatUnreadUserIds.includes(id);
                 const active = appUiState.chatSelectedUserId && appUiState.chatSelectedUserId === id;
-                return `<button type="button" class="chat-user-row${{active ? ' active' : ''}}${{unread ? ' unread' : ''}}" data-chat-user-id="${{headerEscapeHtml(id)}}">${{headerEscapeHtml(label)}}</button>`;
+                return `<button type="button" class="chat-user-row${{active ? ' active' : ''}}${{unread ? ' unread' : ''}}" data-chat-user-id="${{headerEscapeHtml(id)}}"><span class="chat-user-avatar">${{headerEscapeHtml(initials)}}</span><span class="chat-user-label">${{headerEscapeHtml(label)}}</span></button>`;
             }}).join('');
 
             wrap.querySelectorAll('[data-chat-user-id]').forEach((btn) => {{
-                btn.addEventListener('click', () => {{
+                btn.addEventListener('click', async () => {{
                     const id = String(btn.getAttribute('data-chat-user-id') || '');
                     appUiState.chatSelectedUserId = id;
-                    appUiState.chatUnreadUserIds = appUiState.chatUnreadUserIds.filter((v) => v !== id);
 
                     const hiddenSelect = document.getElementById('chatUserSelect');
                     if (hiddenSelect) hiddenSelect.value = id;
+
+                    await markConversationRead(id);
 
                     renderChatUserList();
                     renderChatConversation();
@@ -960,7 +1110,7 @@ async def home_screen(request: Request):
             msgsEl.scrollTop = msgsEl.scrollHeight;
         }}
 
-        function sendChatPanelMessage() {{
+        async function sendChatPanelMessage() {{
             const selectedId = String(appUiState.chatSelectedUserId || '');
             const textArea = document.getElementById('chatMessageText');
             const messageText = String(textArea?.value || '').trim();
@@ -973,22 +1123,7 @@ async def home_screen(request: Request):
                 return;
             }}
 
-            if (!Array.isArray(appUiState.chatConversations[selectedId])) {{
-                appUiState.chatConversations[selectedId] = [];
-            }}
-            appUiState.chatConversations[selectedId].push({{ side: 'sender', text: messageText }});
-
-            appUiState.chatUnreadUserIds = appUiState.chatUnreadUserIds.filter((v) => v !== selectedId);
-            appUiState.chatUnreadUserIds.unshift(selectedId);
-
-            const hiddenSelect = document.getElementById('chatUserSelect');
-            if (hiddenSelect) hiddenSelect.value = selectedId;
-
-            sendHeaderMessage('message');
-
-            appUiState.chatUnreadUserIds = appUiState.chatUnreadUserIds.filter((v) => v !== selectedId);
-            renderChatUserList();
-            renderChatConversation();
+            await sendHeaderMessage('message');
         }}
 
         function isSideMenuOpen() {{
@@ -1031,17 +1166,42 @@ async def home_screen(request: Request):
             menu.style.display = shouldOpen ? 'block' : 'none';
         }}
 
-        function openChatModal() {{
+        async function openChatModal() {{
             const modal = document.getElementById('chatModal');
             if (modal) modal.style.display = 'flex';
+            try {{
+                await fetchChatMessages();
+                deriveChatStateFromMessages();
+            }} catch (error) {{
+                console.error('Unable to load chat modal data:', error);
+            }}
             renderChatTaskPanels();
             renderChatUserList();
             renderChatConversation();
+
+            if (appUiState.chatPollTimer) clearInterval(appUiState.chatPollTimer);
+            appUiState.chatPollTimer = setInterval(async () => {{
+                const modalEl = document.getElementById('chatModal');
+                if (!modalEl || modalEl.style.display !== 'flex') return;
+                try {{
+                    await fetchChatMessages();
+                    deriveChatStateFromMessages();
+                    renderChatTaskPanels();
+                    renderChatUserList();
+                    renderChatConversation();
+                }} catch (error) {{
+                    console.error('Chat refresh failed:', error);
+                }}
+            }}, 4000);
         }}
 
         function closeChatModal() {{
             const modal = document.getElementById('chatModal');
             if (modal) modal.style.display = 'none';
+            if (appUiState.chatPollTimer) {{
+                clearInterval(appUiState.chatPollTimer);
+                appUiState.chatPollTimer = null;
+            }}
         }}
 
         function openProfileModal() {{
@@ -1055,23 +1215,50 @@ async def home_screen(request: Request):
             if (modal) modal.style.display = 'none';
         }}
 
-        function sendHeaderMessage(kind) {{
+        async function sendHeaderMessage(kind) {{
             const select = document.getElementById('chatUserSelect');
             const textArea = document.getElementById('chatMessageText');
             const statusEl = document.getElementById('chatSendStatus');
+            const selectedId = String(appUiState.chatSelectedUserId || select?.value || '');
             const userLabel = select ? select.options[select.selectedIndex]?.text || 'Selected user' : 'Selected user';
             const text = String(textArea?.value || '').trim();
+            if (!selectedId) {{
+                alert('Select a user first.');
+                return;
+            }}
             if (!text) {{
                 alert('Enter a message first.');
                 return;
             }}
-            if (kind === 'task') {{
-                appUiState.chatTasks.push(text);
+
+            try {{
+                const response = await fetch('/api/chat/send', {{
+                    method: 'POST',
+                    credentials: 'include',
+                    headers: {{ 'Content-Type': 'application/json' }},
+                    body: JSON.stringify({{
+                        to_user_id: Number(selectedId),
+                        kind: kind === 'task' ? 'task' : 'message',
+                        text,
+                    }}),
+                }});
+                const data = await response.json();
+                if (!response.ok || data.error) throw new Error(data.error || 'Unable to send');
+
+                await fetchChatMessages();
+                deriveChatStateFromMessages();
                 renderChatTaskPanels();
-                if (statusEl) statusEl.textContent = `Task added for ${{userLabel}}.`;
-            }} else {{
-                if (statusEl) statusEl.textContent = `Message sent to ${{userLabel}}.`;
+                renderChatUserList();
+                renderChatConversation();
+
+                if (statusEl) statusEl.textContent = kind === 'task'
+                    ? `Task added for ${{userLabel}}.`
+                    : `Message sent to ${{userLabel}}.`;
+            }} catch (error) {{
+                alert(String(error.message || 'Unable to send'));
+                return;
             }}
+
             if (select) select.disabled = false;
             if (textArea) {{
                 textArea.disabled = false;
@@ -1131,6 +1318,9 @@ async def home_screen(request: Request):
                 const sessionEmail = String(appUiState.sessionUser?.email || '').toLowerCase();
                 appUiState.currentUser = appUiState.users.find((u) => String(u.email || '').toLowerCase() === sessionEmail) || null;
 
+                await fetchChatMessages();
+                deriveChatStateFromMessages();
+
                 const firstName = String(appUiState.currentUser?.first_name || '').trim();
                 const lastName = String(appUiState.currentUser?.last_name || '').trim();
                 const initials = `${{(firstName[0] || '').toUpperCase()}}${{(lastName[0] || '').toUpperCase()}}` || 'U';
@@ -1159,6 +1349,7 @@ async def home_screen(request: Request):
                 }}
                 renderChatUserList();
                 renderChatConversation();
+                renderChatTaskPanels();
             }} catch (error) {{
                 console.error('Header init error:', error);
             }}
@@ -1190,7 +1381,9 @@ async def home_screen(request: Request):
             [document.getElementById('chatModal'), document.getElementById('profileModal')].forEach((modal) => {{
                 if (!modal) return;
                 modal.addEventListener('click', (event) => {{
-                    if (event.target === modal) modal.style.display = 'none';
+                    if (event.target !== modal) return;
+                    if (modal.id === 'chatModal') closeChatModal();
+                    else modal.style.display = 'none';
                 }});
             }});
 

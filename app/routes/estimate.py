@@ -531,6 +531,57 @@ def _ensure_shop_users_table(cur) -> None:
     cur.execute("CREATE INDEX IF NOT EXISTS idx_shop_users_domain_active ON shop_users(domain, active)")
 
 
+def _ensure_chat_messages_table(cur) -> None:
+    cur.execute(
+        """
+        CREATE TABLE IF NOT EXISTS chat_messages (
+            id SERIAL PRIMARY KEY,
+            domain VARCHAR(255) NOT NULL,
+            sender_user_id INTEGER NOT NULL,
+            recipient_user_id INTEGER NOT NULL,
+            kind VARCHAR(24) NOT NULL DEFAULT 'message',
+            body TEXT NOT NULL,
+            read_at TIMESTAMP NULL,
+            completed_at TIMESTAMP NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+        """
+    )
+    cur.execute("ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS domain VARCHAR(255)")
+    cur.execute("ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS sender_user_id INTEGER")
+    cur.execute("ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS recipient_user_id INTEGER")
+    cur.execute("ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS kind VARCHAR(24) NOT NULL DEFAULT 'message'")
+    cur.execute("ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS body TEXT")
+    cur.execute("ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS read_at TIMESTAMP NULL")
+    cur.execute("ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS completed_at TIMESTAMP NULL")
+    cur.execute("ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP")
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_chat_messages_domain_pair_created ON chat_messages(domain, sender_user_id, recipient_user_id, created_at)")
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_chat_messages_domain_recipient_unread ON chat_messages(domain, recipient_user_id, read_at)")
+
+
+def _resolve_current_user_row(request: Request, cur, domain: str) -> dict | None:
+    email = _resolve_request_user_email(request)
+    normalized_email = str(email or "").strip().lower()
+    normalized_domain = str(domain or "").strip().lower()
+    if not normalized_email or not normalized_domain:
+        return None
+
+    _ensure_shop_users_table(cur)
+    cur.execute(
+        """
+        SELECT id, first_name, last_name, email
+        FROM shop_users
+        WHERE domain = %s
+          AND LOWER(email) = %s
+          AND active = TRUE
+        ORDER BY created_at DESC, id DESC
+        LIMIT 1
+        """,
+        (normalized_domain, normalized_email),
+    )
+    return cur.fetchone() or None
+
+
 def _ensure_saved_estimates_table(cur) -> None:
     cur.execute(
         """
@@ -1925,6 +1976,234 @@ async def get_setup_context(request: Request):
         "is_architect": _request_is_architect(request),
         "default_domain": str(domain or "").strip().lower(),
     }
+
+
+@router.post("/chat/send")
+async def chat_send(request: Request):
+    domain = str(get_user_domain(request) or "").strip().lower()
+    if not domain:
+        return JSONResponse(status_code=401, content={"error": "Not authenticated"})
+
+    data = await request.json()
+    try:
+        recipient_user_id = int(data.get("to_user_id"))
+    except (TypeError, ValueError):
+        return JSONResponse(status_code=400, content={"error": "to_user_id is required"})
+
+    kind = str(data.get("kind") or "message").strip().lower()
+    if kind not in {"message", "task"}:
+        return JSONResponse(status_code=400, content={"error": "kind must be message or task"})
+
+    body = str(data.get("text") or "").strip()
+    if not body:
+        return JSONResponse(status_code=400, content={"error": "text is required"})
+
+    conn = get_conn()
+    cur = conn.cursor()
+    try:
+        _ensure_shop_users_table(cur)
+        _ensure_chat_messages_table(cur)
+
+        sender = _resolve_current_user_row(request, cur, domain)
+        if not sender:
+            return JSONResponse(status_code=401, content={"error": "Not authenticated"})
+
+        cur.execute(
+            """
+            SELECT id
+            FROM shop_users
+            WHERE id = %s
+              AND domain = %s
+              AND active = TRUE
+            LIMIT 1
+            """,
+            (recipient_user_id, domain),
+        )
+        recipient = cur.fetchone() or {}
+        if not recipient:
+            return JSONResponse(status_code=404, content={"error": "Recipient not found"})
+
+        cur.execute(
+            """
+            INSERT INTO chat_messages (domain, sender_user_id, recipient_user_id, kind, body)
+            VALUES (%s, %s, %s, %s, %s)
+            RETURNING id, created_at
+            """,
+            (domain, int(sender.get("id") or 0), recipient_user_id, kind, body),
+        )
+        row = cur.fetchone() or {}
+        conn.commit()
+
+        created_at = row.get("created_at")
+        created_ts = int(created_at.timestamp() * 1000) if isinstance(created_at, datetime) else int(datetime.now(tz=timezone.utc).timestamp() * 1000)
+        return {
+            "status": "ok",
+            "message": {
+                "id": int(row.get("id") or 0),
+                "from_user_id": int(sender.get("id") or 0),
+                "to_user_id": int(recipient_user_id),
+                "kind": kind,
+                "text": body,
+                "ts": created_ts,
+            },
+        }
+    finally:
+        cur.close()
+
+
+@router.get("/chat/messages")
+async def chat_messages(request: Request):
+    domain = str(get_user_domain(request) or "").strip().lower()
+    if not domain:
+        return JSONResponse(status_code=401, content={"error": "Not authenticated"})
+
+    conn = get_conn()
+    cur = conn.cursor()
+    try:
+        _ensure_shop_users_table(cur)
+        _ensure_chat_messages_table(cur)
+
+        current_user = _resolve_current_user_row(request, cur, domain)
+        if not current_user:
+            return JSONResponse(status_code=401, content={"error": "Not authenticated"})
+        current_user_id = int(current_user.get("id") or 0)
+
+        cur.execute(
+            """
+            SELECT
+                m.id,
+                m.sender_user_id,
+                m.recipient_user_id,
+                m.kind,
+                m.body,
+                m.read_at,
+                m.completed_at,
+                m.created_at,
+                su.first_name AS sender_first,
+                su.last_name AS sender_last,
+                ru.first_name AS recipient_first,
+                ru.last_name AS recipient_last
+            FROM chat_messages m
+            LEFT JOIN shop_users su
+                ON su.id = m.sender_user_id
+               AND su.domain = m.domain
+            LEFT JOIN shop_users ru
+                ON ru.id = m.recipient_user_id
+               AND ru.domain = m.domain
+            WHERE m.domain = %s
+              AND (m.sender_user_id = %s OR m.recipient_user_id = %s)
+            ORDER BY m.created_at ASC, m.id ASC
+            LIMIT 3000
+            """,
+            (domain, current_user_id, current_user_id),
+        )
+        rows = cur.fetchall() or []
+
+        messages = []
+        for row in rows:
+            created_at = row.get("created_at")
+            ts = int(created_at.timestamp() * 1000) if isinstance(created_at, datetime) else 0
+            read_at = row.get("read_at")
+            completed_at = row.get("completed_at")
+            messages.append(
+                {
+                    "id": int(row.get("id") or 0),
+                    "from_user_id": int(row.get("sender_user_id") or 0),
+                    "to_user_id": int(row.get("recipient_user_id") or 0),
+                    "kind": str(row.get("kind") or "message"),
+                    "text": str(row.get("body") or ""),
+                    "ts": ts,
+                    "read_at": read_at.isoformat() if isinstance(read_at, datetime) else None,
+                    "completed_at": completed_at.isoformat() if isinstance(completed_at, datetime) else None,
+                    "from_name": " ".join(part for part in [str(row.get("sender_first") or "").strip(), str(row.get("sender_last") or "").strip()] if part),
+                    "to_name": " ".join(part for part in [str(row.get("recipient_first") or "").strip(), str(row.get("recipient_last") or "").strip()] if part),
+                }
+            )
+
+        return {"messages": messages}
+    finally:
+        cur.close()
+
+
+@router.post("/chat/read")
+async def chat_mark_read(request: Request):
+    domain = str(get_user_domain(request) or "").strip().lower()
+    if not domain:
+        return JSONResponse(status_code=401, content={"error": "Not authenticated"})
+
+    data = await request.json()
+    try:
+        with_user_id = int(data.get("with_user_id"))
+    except (TypeError, ValueError):
+        return JSONResponse(status_code=400, content={"error": "with_user_id is required"})
+
+    conn = get_conn()
+    cur = conn.cursor()
+    try:
+        _ensure_chat_messages_table(cur)
+        current_user = _resolve_current_user_row(request, cur, domain)
+        if not current_user:
+            return JSONResponse(status_code=401, content={"error": "Not authenticated"})
+        current_user_id = int(current_user.get("id") or 0)
+
+        cur.execute(
+            """
+            UPDATE chat_messages
+            SET read_at = CURRENT_TIMESTAMP
+            WHERE domain = %s
+              AND recipient_user_id = %s
+              AND sender_user_id = %s
+              AND read_at IS NULL
+            """,
+            (domain, current_user_id, with_user_id),
+        )
+        updated = int(cur.rowcount or 0)
+        conn.commit()
+        return {"status": "ok", "updated": updated}
+    finally:
+        cur.close()
+
+
+@router.post("/chat/task/complete")
+async def chat_complete_task(request: Request):
+    domain = str(get_user_domain(request) or "").strip().lower()
+    if not domain:
+        return JSONResponse(status_code=401, content={"error": "Not authenticated"})
+
+    data = await request.json()
+    try:
+        task_id = int(data.get("task_id"))
+    except (TypeError, ValueError):
+        return JSONResponse(status_code=400, content={"error": "task_id is required"})
+
+    conn = get_conn()
+    cur = conn.cursor()
+    try:
+        _ensure_chat_messages_table(cur)
+        current_user = _resolve_current_user_row(request, cur, domain)
+        if not current_user:
+            return JSONResponse(status_code=401, content={"error": "Not authenticated"})
+        current_user_id = int(current_user.get("id") or 0)
+
+        cur.execute(
+            """
+            UPDATE chat_messages
+            SET completed_at = CURRENT_TIMESTAMP,
+                read_at = COALESCE(read_at, CURRENT_TIMESTAMP)
+            WHERE id = %s
+              AND domain = %s
+              AND recipient_user_id = %s
+              AND kind = 'task'
+            """,
+            (task_id, domain, current_user_id),
+        )
+        updated = int(cur.rowcount or 0)
+        conn.commit()
+        if not updated:
+            return JSONResponse(status_code=404, content={"error": "Task not found"})
+        return {"status": "ok"}
+    finally:
+        cur.close()
 
 
 @router.get("/setup/shops")
