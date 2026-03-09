@@ -291,13 +291,8 @@ async def home_screen(request: Request):
         .header-icon-btn:hover {{
             background: rgba(255,255,255,0.16);
         }}
-        #appMenuButton span {{
+        #appMenuButton svg {{
             display: block;
-            width: 18px;
-            height: 2px;
-            margin: 2px 0;
-            background: #fff;
-            border-radius: 2px;
         }}
         .app-brand-logo {{
             width: 32px;
@@ -352,23 +347,26 @@ async def home_screen(request: Request):
         }}
         #sideNavBackdrop {{
             position: fixed;
-            inset: 0;
+            left: 0;
+            right: 0;
+            top: 60px;
+            bottom: 0;
             background: rgba(0,0,0,0.3);
             display: none;
             z-index: 1300;
         }}
         #sideNavDrawer {{
             position: fixed;
-            top: 0;
+            top: 60px;
             left: 0;
             width: 260px;
-            height: 100vh;
+            height: calc(100vh - 60px);
             background: #f2f0ef;
             box-shadow: 2px 0 18px rgba(0,0,0,0.2);
             transform: translateX(-100%);
             transition: transform 0.22s ease;
             z-index: 1310;
-            padding: 76px 14px 14px 14px;
+            padding: 14px 14px 14px 14px;
             overflow-y: auto;
         }}
         #sideNavDrawer.open {{
@@ -376,24 +374,30 @@ async def home_screen(request: Request):
         }}
         .side-menu-list {{
             display: grid;
-            gap: 8px;
+            gap: 0;
         }}
         .side-menu-item {{
             width: 100%;
-            border: 1px solid #ddd1cc;
-            background: #fff;
-            color: #222;
-            border-radius: 10px;
-            padding: 12px 14px;
-            text-align: left;
-            font-size: 15px;
+            border: none;
+            border-bottom: 1px solid #d0c8c4;
+            background: transparent;
+            color: #1f1f1f;
+            border-radius: 0;
+            padding: 14px 12px;
+            text-align: center;
+            font-size: 16px;
             font-weight: 700;
+            letter-spacing: 0.6px;
             cursor: pointer;
         }}
         .side-menu-item.active {{
-            background: #b22222;
-            color: #fff;
-            border-color: #b22222;
+            background: transparent;
+            color: #000;
+            text-decoration: underline;
+            text-underline-offset: 5px;
+        }}
+        .side-menu-item:last-child {{
+            border-bottom: none;
         }}
         .header-modal-shell {{
             position: fixed;
@@ -470,7 +474,7 @@ async def home_screen(request: Request):
             background: var(--brand-red) !important;
             background-color: var(--brand-red) !important;
         }}
-        button:not([style*="background:none"]):not([style*="background: none"]):not(.link-button):not(.tech-link) {{
+        button:not([style*="background:none"]):not([style*="background: none"]):not(.link-button):not(.tech-link):not(.header-icon-btn):not(.side-menu-item):not(.header-menu-action) {{
             background: var(--brand-red) !important;
             background-color: var(--brand-red) !important;
             color: #fff !important;
@@ -569,7 +573,11 @@ async def home_screen(request: Request):
     <header class="app-header">
         <div class="app-header-left">
             <button id="appMenuButton" class="header-icon-btn" type="button" aria-label="Open menu">
-                <span></span><span></span><span></span>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                    <path d="M4 7H20" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                    <path d="M4 12H20" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                    <path d="M4 17H20" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                </svg>
             </button>
             <img class="app-brand-logo" src="/static/autobodyos.png" alt="AutobodyOS logo" />
             <div class="app-brand-text">AutobodyOS</div>
