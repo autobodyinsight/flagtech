@@ -892,7 +892,7 @@ async def home_screen(request: Request):
             if (!wrap) return;
 
             const orderedUsers = Array.isArray(appUiState.users) ? [...appUiState.users] : [];
-            orderedUsers.sort((a, b) => {
+            orderedUsers.sort((a, b) => {{
                 const aid = String(a?.id || '');
                 const bid = String(b?.id || '');
                 const aUnread = appUiState.chatUnreadUserIds.includes(aid);
@@ -900,7 +900,7 @@ async def home_screen(request: Request):
                 if (aUnread && !bUnread) return -1;
                 if (!aUnread && bUnread) return 1;
                 return 0;
-            });
+            }});
 
             if (!orderedUsers.length) {{
                 wrap.innerHTML = '<div style="padding:10px 8px; color:#666;">No users found.</div>';
