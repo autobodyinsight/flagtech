@@ -2706,6 +2706,138 @@ async def list_open_ros_for_payments(request: Request):
         cur.close()
 
 
+@router.get("/payments/ro")
+async def get_ro_payments(request: Request):
+    domain = get_user_domain(request)
+    if not domain:
+        return JSONResponse(status_code=401, content={"error": "Not authenticated"})
+
+    ro_value = str(request.query_params.get("ro") or "").strip()
+    if not ro_value:
+        return JSONResponse(status_code=400, content={"error": "ro is required"})
+
+    conn = get_conn()
+    cur = conn.cursor()
+    try:
+        _ensure_saved_estimates_table(cur)
+        _ensure_ro_payment_totals_table(cur)
+        _ensure_ro_payment_entries_table(cur)
+
+        cur.execute(
+            """
+            SELECT DISTINCT ON (ro)
+                   ro,
+                   vehicle,
+                   year,
+                   make,
+                   model,
+                   owner_info,
+                   insurance_company,
+                   grand_total,
+                   customer_pay,
+                   insurance_pay,
+                   deductible,
+                   saved_at
+            FROM saved_estimates
+            WHERE domain = %s
+              AND ro = %s
+            ORDER BY ro, saved_at DESC, id DESC
+            """,
+            (domain, ro_value),
+        )
+        row = cur.fetchone()
+        if not row:
+            return JSONResponse(status_code=404, content={"error": "RO not found"})
+
+        cur.execute(
+            """
+            SELECT insurance_paid, customer_paid
+            FROM ro_payment_totals
+            WHERE domain = %s
+              AND ro = %s
+            LIMIT 1
+            """,
+            (domain, ro_value),
+        )
+        totals_row = cur.fetchone() or {}
+
+        cur.execute(
+            """
+            SELECT ro, payer_type, payment_method, check_number, created_by, amount, business_date
+            FROM ro_payment_entries
+            WHERE domain = %s
+              AND ro = %s
+            ORDER BY business_date DESC NULLS LAST, id DESC
+            """,
+            (domain, ro_value),
+        )
+        payment_entry_rows = cur.fetchall() or []
+
+        payment_entries = {"insurance": [], "customer": []}
+        for entry_row in payment_entry_rows:
+            payer_type = str(entry_row.get("payer_type") or "").strip().lower()
+            if payer_type not in {"insurance", "customer"}:
+                continue
+
+            business_date = entry_row.get("business_date")
+            if isinstance(business_date, datetime):
+                business_date_display = business_date.date().isoformat()
+            elif isinstance(business_date, date):
+                business_date_display = business_date.isoformat()
+            else:
+                business_date_display = str(business_date or "")[:10]
+
+            payment_entries[payer_type].append(
+                {
+                    "amount": _parse_float_value(entry_row.get("amount")),
+                    "business_date": business_date_display,
+                    "payment_type": str(entry_row.get("payment_method") or "").strip().upper(),
+                    "check_number": str(entry_row.get("check_number") or "").strip(),
+                    "created_by": _resolve_note_created_by(cur, entry_row.get("created_by")),
+                }
+            )
+
+        customer_name, _ = _parse_owner_info((row.get("owner_info") or "").strip())
+
+        year = (row.get("year") or "").strip()
+        make = (row.get("make") or "").strip()
+        model = (row.get("model") or "").strip()
+        vehicle_display = " ".join(part for part in (year, make, model) if part) or (row.get("vehicle") or "")
+
+        grand_total = _parse_float_value(row.get("grand_total"))
+        customer_total = _parse_float_value(row.get("customer_pay"))
+        insurance_total = _parse_float_value(row.get("insurance_pay"))
+        deductible = _parse_float_value(row.get("deductible"))
+
+        if customer_total == 0 and deductible > 0:
+            customer_total = deductible
+        if insurance_total == 0 and grand_total > 0:
+            insurance_total = max(0.0, grand_total - customer_total)
+
+        insurance_paid = _parse_float_value(totals_row.get("insurance_paid"))
+        customer_paid = _parse_float_value(totals_row.get("customer_paid"))
+        balance = max(0.0, grand_total - insurance_paid - customer_paid)
+
+        return {
+            "row": {
+                "ro": ro_value,
+                "customer": customer_name,
+                "insurance_name": (row.get("insurance_company") or "").strip(),
+                "vehicle": vehicle_display,
+                "insurance_total": insurance_total,
+                "customer_total": customer_total,
+                "insurance_paid": insurance_paid,
+                "customer_paid": customer_paid,
+                "grand_total": grand_total,
+                "balance": balance,
+                "insurance_payment_entries": payment_entries.get("insurance", []),
+                "customer_payment_entries": payment_entries.get("customer", []),
+            }
+        }
+    finally:
+        cur.close()
+
+
 @router.get("/records/closed-ros")
 async def list_records_closed_ros(request: Request):
     domain = get_user_domain(request) or "default"

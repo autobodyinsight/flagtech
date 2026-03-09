@@ -447,7 +447,7 @@ def get_reports_screen_html():
         }
 
         win.document.title = `Closed RO Window - ${roKey}`;
-        win.document.body.innerHTML = `<div style='display:flex; flex-direction:row; height:100vh; width:100vw; background:#f2f2f2;'>${sidebarHtml}<div style='flex:1; display:flex; flex-direction:column; min-width:0;'>${bannerHtml}</div></div>`;
+        win.document.body.innerHTML = `<div style='display:flex; flex-direction:row; height:100vh; width:100vw; background:#f2f2f2;'>${sidebarHtml}<div style='flex:1; display:flex; flex-direction:column; min-width:0;'>${bannerHtml}</div></div><div id='roPrintBackdrop' style='display:none; position:fixed; inset:0; background:rgba(0,0,0,0.35); z-index:9990;'></div>`;
 
         const style = win.document.createElement('style');
         style.textContent = `
@@ -468,6 +468,7 @@ def get_reports_screen_html():
         const contentEl = roDoc.getElementById('roWindowContent');
         const printBtn = roDoc.getElementById('roPopupPrintButton');
         const printPanel = roDoc.getElementById('roPrintOptionsModal');
+        const printBackdrop = roDoc.getElementById('roPrintBackdrop');
         const headerEl = roDoc.getElementById('roHeaderBar');
         if (headerEl) {
             const h = Math.ceil(headerEl.getBoundingClientRect().height);
@@ -518,6 +519,19 @@ def get_reports_screen_html():
                 return Number(left) === Number(right);
             }
             return left.toLowerCase() === right.toLowerCase();
+        }
+
+        function popupFormatDateTime(value) {
+            const source = String(value || '').trim();
+            if (!source) return '-';
+            const dt = new Date(source);
+            if (Number.isNaN(dt.getTime())) return source;
+            const mm = String(dt.getMonth() + 1).padStart(2, '0');
+            const dd = String(dt.getDate()).padStart(2, '0');
+            const yyyy = String(dt.getFullYear());
+            const hh = String(dt.getHours()).padStart(2, '0');
+            const min = String(dt.getMinutes()).padStart(2, '0');
+            return `${mm}/${dd}/${yyyy} ${hh}:${min}`;
         }
 
         function popupBuildUnifiedLinesFromSections(sections) {
@@ -591,6 +605,8 @@ def get_reports_screen_html():
                 panel.style.display = 'block';
                 panel.style.zIndex = '10000';
                 panel.classList.add('open');
+                if (printBackdrop) printBackdrop.style.display = 'block';
+                roDoc.body.style.overflow = 'hidden';
             }
         }
 
@@ -598,6 +614,8 @@ def get_reports_screen_html():
             if (!printPanel) return;
             printPanel.classList.remove('open');
             printPanel.style.display = 'none';
+            if (printBackdrop) printBackdrop.style.display = 'none';
+            roDoc.body.style.overflow = '';
         }
 
         function roOpenPrintWindow(title, bodyHtml, options = {}) {
@@ -638,12 +656,11 @@ def get_reports_screen_html():
             try {
                 const [res, paymentsRes] = await Promise.all([
                     popupFetchJson(`/api/ro-estimate?ro=${encodeURIComponent(roKey)}`),
-                    popupFetchJson('/api/payments/open-ros'),
+                    popupFetchJson(`/api/payments/ro?ro=${encodeURIComponent(roKey)}`),
                 ]);
                 const estimate = res.estimate || {};
                 const lines = popupGetUnifiedEstimateLines(estimate);
-                const paymentRows = Array.isArray(paymentsRes?.rows) ? paymentsRes.rows : [];
-                const paymentRow = paymentRows.find((item) => popupSameRo(item?.ro || item?.ro_number, roKey)) || {};
+                const paymentRow = paymentsRes?.row || {};
                 const insuranceTotal = popupToNumber(paymentRow.insurance_total ?? ro.insurance_pay ?? 0, 0);
                 const customerTotal = popupToNumber(paymentRow.customer_total ?? ro.customer_pay ?? 0, 0);
                 const grandTotal = insuranceTotal + customerTotal;
@@ -833,6 +850,9 @@ def get_reports_screen_html():
             if ((printBtn && printBtn.contains(target)) || printPanel.contains(target)) return;
             roClosePrintOptionsModal();
         });
+        if (printBackdrop) {
+            printBackdrop.addEventListener('click', () => roClosePrintOptionsModal());
+        }
 
         async function popupFetchJson(url, options = {}) {
             const resp = await fetch(url, { credentials: 'include', cache: 'no-store', ...options });
@@ -860,18 +880,22 @@ def get_reports_screen_html():
 
             async function loadNotes() {
                 listEl.innerHTML = '<div style="color:#777;">Loading...</div>';
-                const res = await popupFetchJson(`/api/ro-notes?ro=${encodeURIComponent(roKey)}`);
-                const notes = Array.isArray(res.notes) ? res.notes : [];
-                if (!notes.length) {
-                    listEl.innerHTML = '<div style="color:#999;">No notes yet.</div>';
-                    return;
+                try {
+                    const res = await popupFetchJson(`/api/ro-notes?ro=${encodeURIComponent(roKey)}`);
+                    const notes = Array.isArray(res.notes) ? res.notes : [];
+                    if (!notes.length) {
+                        listEl.innerHTML = '<div style="color:#999;">No notes yet.</div>';
+                        return;
+                    }
+                    listEl.innerHTML = notes.map((note) => `
+                        <div style="padding:10px 0; border-bottom:1px solid #eee;">
+                            <div style="font-size:12px; color:#666; margin-bottom:4px;">${popupEsc(popupFormatDateTime(note.created_at))} • ${popupEsc(note.created_by || 'Unknown')}</div>
+                            <div style="white-space:pre-wrap; color:#222;">${popupEsc(note.note || '')}</div>
+                        </div>
+                    `).join('');
+                } catch (error) {
+                    listEl.innerHTML = '<div style="color:#c62828;">Error loading notes.</div>';
                 }
-                listEl.innerHTML = notes.map((note) => `
-                    <div style="padding:10px 0; border-bottom:1px solid #eee;">
-                        <div style="font-size:12px; color:#666; margin-bottom:4px;">${popupEsc(String(note.created_at || ''))} • ${popupEsc(note.created_by || 'Unknown')}</div>
-                        <div style="white-space:pre-wrap; color:#222;">${popupEsc(note.note || '')}</div>
-                    </div>
-                `).join('');
             }
 
             saveBtn.addEventListener('click', async () => {
@@ -886,6 +910,8 @@ def get_reports_screen_html():
                     });
                     inputEl.value = '';
                     await loadNotes();
+                } catch (error) {
+                    alert('Error saving note.');
                 } finally {
                     saveBtn.disabled = false;
                 }
@@ -991,9 +1017,8 @@ def get_reports_screen_html():
                 }).join('');
             }
 
-            const data = await popupFetchJson('/api/payments/open-ros');
-            const rows = Array.isArray(data.rows) ? data.rows : [];
-            const row = rows.find((item) => popupSameRo(item?.ro || item?.ro_number, roKey));
+            const data = await popupFetchJson(`/api/payments/ro?ro=${encodeURIComponent(roKey)}`);
+            const row = data?.row || null;
             if (!row) {
                 logEl.innerHTML = '<div style="color:#777;">No payments found for this RO.</div>';
                 return;
