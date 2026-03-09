@@ -385,7 +385,7 @@ def get_reports_screen_html():
         };
 
         const sidebarHtml = `
-            <div id="roSidebar" style="position:fixed; left:0; top:var(--ro-header-height, 170px); height:calc(100vh - var(--ro-header-height, 170px)); width:64px; background:#23272a; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:38px; z-index:100; box-shadow:2px 0 8px rgba(0,0,0,0.08);">
+            <div id="roSidebar" style="position:fixed; left:0; top:var(--ro-header-height, 170px); height:calc(100vh - var(--ro-header-height, 170px)); width:64px; background:#23272a; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:38px; z-index:10; box-shadow:2px 0 8px rgba(0,0,0,0.08);">
                 <button class="ro-sidebar-btn active" data-view="notes" style="background:none; border:none; padding:0; cursor:pointer;">${icons.notepad}</button>
                 <button class="ro-sidebar-btn" data-view="estimate" style="background:none; border:none; padding:0; cursor:pointer;">${icons.estimate}</button>
                 <button class="ro-sidebar-btn" data-view="tech" style="background:none; border:none; padding:0; cursor:pointer;">${icons.tech}</button>
@@ -395,7 +395,7 @@ def get_reports_screen_html():
         `;
 
         const bannerHtml = `
-            <div id="roHeaderBar" style="background:#23272a; color:#fff; padding:16px 24px 18px 24px; border-bottom:3px solid #d32f2f; position:relative; min-height:132px; z-index:120;">
+            <div id="roHeaderBar" style="background:#23272a; color:#fff; padding:16px 24px 18px 24px; border-bottom:3px solid #d32f2f; position:relative; min-height:132px; z-index:10;">
                 <div style="font-size:20px; font-weight:bold; margin-bottom:10px;">RO Window</div>
                 <div style="position:absolute; top:14px; left:50%; transform:translateX(-50%); font-weight:900; letter-spacing:1.5px; font-size:20px; color:#fff;">CLOSED</div>
                 <div style="position:absolute; top:18px; right:24px; display:flex; gap:12px; z-index:10;">
@@ -439,7 +439,7 @@ def get_reports_screen_html():
                     </div>
                 </div>
             </div>
-            <div id="roWindowContent" style="padding:32px 32px 32px 88px; min-height:180px; background:#fff; color:#23272a; font-size:18px;"></div>
+            <div id="roWindowContent" style="position:relative; z-index:10; padding:32px 32px 32px 88px; min-height:180px; background:#fff; color:#23272a; font-size:18px;"></div>
         `;
 
         const win = window.open('', `Reports_Closed_RO_${roKey}`, 'width=900,height=640,scrollbars=yes,resizable=yes');
@@ -449,7 +449,7 @@ def get_reports_screen_html():
         }
 
         win.document.title = `Closed RO Window - ${roKey}`;
-        win.document.body.innerHTML = `<div style='display:flex; flex-direction:row; height:100vh; width:100vw; background:#f2f2f2;'>${sidebarHtml}<div style='flex:1; display:flex; flex-direction:column; min-width:0;'>${bannerHtml}</div></div>`;
+        win.document.body.innerHTML = `<div id='roWindowShell' style='position:relative; z-index:10; display:flex; flex-direction:row; height:100vh; width:100vw; background:#f2f2f2;'>${sidebarHtml}<div style='flex:1; display:flex; flex-direction:column; min-width:0; position:relative; z-index:10;'>${bannerHtml}</div></div><div id='roPrintBackdrop' class='ro-print-backdrop' style='display:none;'></div>`;
 
         const style = win.document.createElement('style');
         style.textContent = `
@@ -463,10 +463,8 @@ def get_reports_screen_html():
             .ro-header-date-text { color:#fff; font-weight:600; min-width:110px; }
             .ro-window-card { background:#fafafa; border:1px solid #ddd; border-radius:8px; padding:14px; }
             .mini-popup-panel {
-                position: absolute;
-                top: 100%;
-                left: 0;
-                z-index: 1000;
+                position: fixed;
+                z-index: 1100;
                 background: #fff;
                 border: 2px solid #b22222;
                 border-radius: 6px;
@@ -474,7 +472,6 @@ def get_reports_screen_html():
                 min-width: 300px;
                 max-width: 500px;
                 box-shadow: 0 4px 8px rgba(0,0,0,0.2);
-                margin-top: 4px;
                 opacity: 0;
                 transform: translateY(-6px);
                 transition: opacity 0.18s ease, transform 0.18s ease;
@@ -485,6 +482,12 @@ def get_reports_screen_html():
                 transform: translateY(0);
                 pointer-events: auto;
             }
+            .ro-print-backdrop {
+                position: fixed;
+                inset: 0;
+                z-index: 1000;
+                background: rgba(20, 24, 28, 0.45);
+            }
         `;
         win.document.head.appendChild(style);
 
@@ -492,6 +495,7 @@ def get_reports_screen_html():
         const contentEl = roDoc.getElementById('roWindowContent');
         const printBtn = roDoc.getElementById('roPopupPrintButton');
         const printPanel = roDoc.getElementById('roPrintOptionsModal');
+        const printBackdrop = roDoc.getElementById('roPrintBackdrop');
         const headerEl = roDoc.getElementById('roHeaderBar');
         if (headerEl) {
             const h = Math.ceil(headerEl.getBoundingClientRect().height);
@@ -624,9 +628,19 @@ def get_reports_screen_html():
                 openPanel.classList.remove('open');
                 openPanel.style.display = 'none';
             });
+            if (printBackdrop) printBackdrop.style.display = 'none';
             if (!isOpen) {
+                const trigger = roDoc.getElementById('roPopupPrintButton');
+                if (trigger) {
+                    const rect = trigger.getBoundingClientRect();
+                    const viewportWidth = roDoc.defaultView ? roDoc.defaultView.innerWidth : roDoc.documentElement.clientWidth;
+                    panel.style.top = `${Math.max(10, rect.bottom + 8)}px`;
+                    panel.style.right = `${Math.max(12, viewportWidth - rect.right)}px`;
+                    panel.style.left = 'auto';
+                }
                 panel.style.display = 'block';
                 panel.classList.add('open');
+                if (printBackdrop) printBackdrop.style.display = 'block';
             }
         }
 
@@ -634,6 +648,7 @@ def get_reports_screen_html():
             if (!printPanel) return;
             printPanel.classList.remove('open');
             printPanel.style.display = 'none';
+            if (printBackdrop) printBackdrop.style.display = 'none';
         }
 
         function roOpenPrintWindow(title, bodyHtml, options = {}) {
@@ -868,6 +883,11 @@ def get_reports_screen_html():
             if ((printBtn && printBtn.contains(target)) || printPanel.contains(target)) return;
             roClosePrintOptionsModal();
         });
+        if (printBackdrop) {
+            printBackdrop.addEventListener('click', () => {
+                roClosePrintOptionsModal();
+            });
+        }
         async function popupFetchJson(url, options = {}) {
             const resp = await fetch(url, { credentials: 'include', cache: 'no-store', ...options });
             const data = await resp.json();
