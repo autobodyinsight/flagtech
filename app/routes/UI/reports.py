@@ -32,7 +32,7 @@ def get_reports_screen_html():
     """Return the HTML content for the REPORTS window."""
     return r'''
     <div id="reports" class="screen" style="padding:20px; position:relative;">
-        <div id="reportsExtraSidebar" style="position:fixed; left:0; top:76px; height:calc(100vh - 76px); width:64px; background:#23272a; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:38px; z-index:100; box-shadow:2px 0 8px rgba(0,0,0,0.08);">
+        <div id="reportsExtraSidebar" style="position:fixed; left:0; top:60px; height:calc(100vh - 60px); width:64px; background:linear-gradient(180deg, #000000 0%, #b22222 100%); display:flex; flex-direction:column; align-items:center; justify-content:center; gap:38px; z-index:100; box-shadow:2px 0 8px rgba(0,0,0,0.08);">
             <div style="display:flex; flex-direction:column; align-items:center; gap:38px; width:100%;">
                 <button id="reportsSidebarBtn-main" class="reports-sidebar-btn active" data-view="main" title="Reports" onclick="reportsExtraSwitchView('main')" style="background:none; border:none; padding:0; cursor:pointer;">
                     <svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="4" y="4" width="20" height="20" rx="3" stroke="white" stroke-width="2"/><line x1="8" y1="10" x2="20" y2="10" stroke="white" stroke-width="2"/><line x1="8" y1="15" x2="20" y2="15" stroke="white" stroke-width="2"/><line x1="8" y1="20" x2="16" y2="20" stroke="white" stroke-width="2"/></svg>
