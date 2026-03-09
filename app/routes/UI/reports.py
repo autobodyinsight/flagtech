@@ -398,8 +398,16 @@ def get_reports_screen_html():
             <div id="roHeaderBar" style="background:#23272a; color:#fff; padding:16px 24px 18px 24px; border-bottom:3px solid #d32f2f; position:relative; min-height:132px; z-index:120;">
                 <div style="font-size:20px; font-weight:bold; margin-bottom:10px;">RO Window</div>
                 <div style="position:absolute; top:14px; left:50%; transform:translateX(-50%); font-weight:900; letter-spacing:1.5px; font-size:20px; color:#fff;">CLOSED</div>
-                <div style="position:absolute; top:18px; right:24px; display:flex; gap:12px; z-index:10;">
-                    <div style="position:relative;">
+                <div style="position:absolute; top:58px; right:24px; display:flex; flex-direction:column; align-items:flex-start; gap:6px; z-index:10;">
+                    <div style="display:flex; align-items:center; gap:8px;">
+                        <span class="ro-header-label" style="margin-right:0;">Picked Up:</span>
+                        <span class="ro-header-date-text">${pickedUpDateText}</span>
+                    </div>
+                    <div style="display:flex; align-items:center; gap:8px;">
+                        <span class="ro-header-label" style="margin-right:0;">Closed:</span>
+                        <span class="ro-header-date-text">${closedDateText}</span>
+                    </div>
+                    <div style="position:relative; margin-top:4px;">
                         <button type="button" id="roPopupPrintButton" class="mini-popup-trigger" style="padding:7px 18px; background:#d32f2f; color:#fff; border:none; border-radius:4px; font-weight:bold; font-size:15px; cursor:pointer;">Print</button>
                         <div id="roPrintOptionsModal" class="mini-popup-panel" style="display:none; right:0; left:auto; top:100%;">
                             <h2 style="margin:0 0 14px 0; color:#333; font-size:18px;">Print RO</h2>
@@ -410,16 +418,6 @@ def get_reports_screen_html():
                                 <button id="roPrintOptionParts" type="button" style="padding:10px 12px; background:#f5f5f5; color:#333; border:1px solid #ddd; border-radius:4px; cursor:pointer; text-align:left; font-size:14px;">Parts</button>
                             </div>
                         </div>
-                    </div>
-                </div>
-                <div style="position:absolute; top:58px; right:24px; display:flex; flex-direction:column; align-items:flex-start; gap:6px; z-index:10;">
-                    <div style="display:flex; align-items:center; gap:8px;">
-                        <span class="ro-header-label" style="margin-right:0;">Picked Up:</span>
-                        <span class="ro-header-date-text">${pickedUpDateText}</span>
-                    </div>
-                    <div style="display:flex; align-items:center; gap:8px;">
-                        <span class="ro-header-label" style="margin-right:0;">Closed:</span>
-                        <span class="ro-header-date-text">${closedDateText}</span>
                     </div>
                 </div>
                 <div style="display:grid; grid-template-columns:repeat(3, minmax(0, 1fr)); gap:20px 28px; margin-right:260px; align-items:start;">
