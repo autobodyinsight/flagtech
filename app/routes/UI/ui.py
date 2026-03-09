@@ -715,9 +715,15 @@ async def home_screen(request: Request):
             activeScreen: 'dashboard',
             sessionUser: null,
             shopDomain: '',
+            shopName: '',
             users: [],
             currentUser: null,
         }};
+
+        function isSideMenuOpen() {{
+            const drawer = document.getElementById('sideNavDrawer');
+            return !!(drawer && drawer.classList.contains('open'));
+        }}
 
         function setActiveMenuItem(screenName) {{
             const items = document.querySelectorAll('.side-menu-item[data-screen]');
@@ -736,6 +742,14 @@ async def home_screen(request: Request):
             const backdrop = document.getElementById('sideNavBackdrop');
             if (drawer) drawer.classList.remove('open');
             if (backdrop) backdrop.style.display = 'none';
+        }}
+
+        function toggleSideMenu() {{
+            if (isSideMenuOpen()) {{
+                closeSideMenu();
+                return;
+            }}
+            openSideMenu();
         }}
 
         function toggleUserDropdown(forceOpen = null) {{
@@ -816,6 +830,10 @@ async def home_screen(request: Request):
                 appUiState.sessionUser = sessionData.user || null;
                 appUiState.shopDomain = String(contextData.default_domain || sessionData.user?.domain || '').trim();
 
+                const shopResp = await fetch(`/api/setup/shop${appUiState.shopDomain ? `?shop_domain=${encodeURIComponent(appUiState.shopDomain)}` : ''}`, {{ credentials: 'include' }});
+                const shopData = await shopResp.json();
+                appUiState.shopName = String(shopData?.shop?.shop_name || '').trim();
+
                 const userResp = await fetch(`/api/setup/users${{appUiState.shopDomain ? `?shop_domain=${{encodeURIComponent(appUiState.shopDomain)}}` : ''}}`, {{ credentials: 'include' }});
                 const userData = await userResp.json();
                 appUiState.users = Array.isArray(userData.users) ? userData.users : [];
@@ -835,7 +853,7 @@ async def home_screen(request: Request):
                 const shopText = document.getElementById('profileShopText');
                 const roleText = document.getElementById('profileRoleText');
                 const emailText = document.getElementById('profileEmailText');
-                if (shopText) shopText.textContent = appUiState.shopDomain || '-';
+                if (shopText) shopText.textContent = appUiState.shopName || appUiState.shopDomain || '-';
                 if (roleText) roleText.textContent = role;
                 if (emailText) emailText.textContent = email;
 
@@ -857,7 +875,10 @@ async def home_screen(request: Request):
             const chatButton = document.getElementById('headerChatButton');
             const userButton = document.getElementById('headerUserButton');
 
-            if (menuButton) menuButton.addEventListener('click', openSideMenu);
+            if (menuButton) menuButton.addEventListener('click', (event) => {{
+                event.stopPropagation();
+                toggleSideMenu();
+            }});
             if (menuBackdrop) menuBackdrop.addEventListener('click', closeSideMenu);
             if (chatButton) chatButton.addEventListener('click', openChatModal);
             if (userButton) userButton.addEventListener('click', () => toggleUserDropdown());
