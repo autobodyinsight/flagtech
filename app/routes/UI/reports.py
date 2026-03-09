@@ -400,15 +400,15 @@ def get_reports_screen_html():
                 <div style="position:absolute; top:14px; left:50%; transform:translateX(-50%); font-weight:900; letter-spacing:1.5px; font-size:20px; color:#fff;">CLOSED</div>
                 <div style="position:absolute; top:18px; right:24px; display:flex; gap:12px; z-index:10;">
                     <div style="position:relative;">
-                        <button type="button" id="roPopupPrintButton" class="mini-popup-trigger" style="padding:7px 18px; background:#d32f2f; color:#fff; border:none; border-radius:4px; font-weight:bold; font-size:15px; cursor:pointer;">Print</button>
-                        <div id="roPrintOptionsModal" class="mini-popup-panel" style="display:none; right:0; left:auto; top:100%;">
-                            <h2 style="margin:0 0 14px 0; color:#333; font-size:18px;">Print RO</h2>
-                            <p style="margin:0 0 12px 0; font-weight:bold; color:#555;">Print by:</p>
-                            <div style="display:flex; flex-direction:column; gap:8px;">
-                                <button id="roPrintOptionBill" type="button" style="padding:10px 12px; background:#f5f5f5; color:#333; border:1px solid #ddd; border-radius:4px; cursor:pointer; text-align:left; font-size:14px;">Bill</button>
-                                <button id="roPrintOptionServiceOrder" type="button" style="padding:10px 12px; background:#f5f5f5; color:#333; border:1px solid #ddd; border-radius:4px; cursor:pointer; text-align:left; font-size:14px;">Service Order</button>
-                                <button id="roPrintOptionParts" type="button" style="padding:10px 12px; background:#f5f5f5; color:#333; border:1px solid #ddd; border-radius:4px; cursor:pointer; text-align:left; font-size:14px;">Parts</button>
-                            </div>
+                            <button type="button" id="roPopupPrintButton" class="mini-popup-trigger" style="padding:7px 18px; background:#d32f2f; color:#fff; border:none; border-radius:4px; font-weight:bold; font-size:15px; cursor:pointer;">Print</button>
+                            <div id="roPrintOptionsModal" class="mini-popup-panel" style="display:none; right:24px; top:72px; position:fixed;">
+                                <h2 style="margin:0 0 14px 0; color:#333; font-size:18px;">Print RO</h2>
+                                <p style="margin:0 0 12px 0; font-weight:bold; color:#555;">Select document:</p>
+                                <div style="display:flex; flex-direction:column; gap:8px;">
+                                    <button id="roPrintOptionBill" type="button" style="padding:10px 12px; background:#f5f5f5; color:#333; border:1px solid #ddd; border-radius:4px; cursor:pointer; text-align:left; font-size:14px;">Bill</button>
+                                    <button id="roPrintOptionServiceOrder" type="button" style="padding:10px 12px; background:#f5f5f5; color:#333; border:1px solid #ddd; border-radius:4px; cursor:pointer; text-align:left; font-size:14px;">Service Order</button>
+                                    <button id="roPrintOptionParts" type="button" style="padding:10px 12px; background:#f5f5f5; color:#333; border:1px solid #ddd; border-radius:4px; cursor:pointer; text-align:left; font-size:14px;">Parts</button>
+                                </div>
                         </div>
                     </div>
                 </div>
