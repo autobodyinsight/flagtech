@@ -422,6 +422,24 @@ async def home_screen(request: Request):
             grid-template-columns: 1fr 1fr;
             gap: 14px;
         }}
+        #chatModal {{
+            padding: 0;
+            align-items: stretch;
+            justify-content: stretch;
+        }}
+        #chatModal .header-modal-card {{
+            width: 100vw;
+            max-width: none;
+            height: 100vh;
+            max-height: none;
+            border-radius: 0;
+            display: flex;
+            flex-direction: column;
+            padding: 20px 22px;
+        }}
+        #chatModal .header-chat-layout {{
+            margin-bottom: 14px;
+        }}
         @media (max-width: 840px) {{
             .content-area {{ padding: 18px; }}
             .app-brand-text {{ font-size: 18px; }}
@@ -618,21 +636,22 @@ async def home_screen(request: Request):
             <div class="header-chat-layout">
                 <div style="border:1px solid #ddd; border-radius:10px; padding:12px; background:#fafafa;">
                     <div style="font-weight:700; margin-bottom:8px;">Task List</div>
-                    <ul style="padding-left:18px; line-height:1.7; color:#333;">
-                        <li>Review open repair orders</li>
-                        <li>Check pending parts</li>
-                        <li>Follow up on flagged tech items</li>
-                    </ul>
+                    <div id="chatTaskList" style="display:flex; flex-direction:column; gap:8px; color:#333;">NO TASK</div>
                 </div>
                 <div style="border:1px solid #ddd; border-radius:10px; padding:12px; background:#fafafa;">
                     <label for="chatUserSelect" style="display:block; font-weight:700; margin-bottom:6px;">User</label>
                     <select id="chatUserSelect" style="width:100%; padding:10px; border:1px solid #ccc; border-radius:8px; margin-bottom:10px;"></select>
                     <textarea id="chatMessageText" rows="4" placeholder="Write a message or task..." style="width:100%; padding:10px; border:1px solid #ccc; border-radius:8px; resize:vertical;"></textarea>
+                    <div id="chatSendStatus" style="min-height:18px; margin-top:8px; font-size:12px; color:#444;"></div>
                     <div style="display:flex; gap:8px; margin-top:10px;">
                         <button type="button" class="header-menu-action" style="width:auto; background:#b22222; color:#fff;" onclick="sendHeaderMessage('message')">Send Message</button>
                         <button type="button" class="header-menu-action" style="width:auto; background:#1f2326; color:#fff;" onclick="sendHeaderMessage('task')">Send Task</button>
                     </div>
                 </div>
+            </div>
+            <div style="border:1px solid #ddd; border-radius:10px; padding:12px; background:#fafafa; margin-top:auto;">
+                <div style="font-weight:800; letter-spacing:0.6px; margin-bottom:8px;">COMPLETED</div>
+                <div id="chatCompletedList" style="display:flex; flex-direction:column; gap:8px; color:#333;">NO COMPLETED TASKS</div>
             </div>
         </div>
     </div>
@@ -717,7 +736,59 @@ async def home_screen(request: Request):
             shopName: '',
             users: [],
             currentUser: null,
+            chatTasks: [],
+            completedTasks: [],
         }};
+
+        function headerEscapeHtml(value) {{
+            return String(value === null || value === undefined ? '' : value)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }}
+
+        function completeChatTaskAt(index) {{
+            const parsed = Number(index);
+            if (!Number.isInteger(parsed) || parsed < 0 || parsed >= appUiState.chatTasks.length) return;
+            const [doneTask] = appUiState.chatTasks.splice(parsed, 1);
+            if (doneTask) appUiState.completedTasks.unshift(doneTask);
+            renderChatTaskPanels();
+        }}
+
+        function renderChatTaskPanels() {{
+            const listEl = document.getElementById('chatTaskList');
+            const completedEl = document.getElementById('chatCompletedList');
+            if (!listEl || !completedEl) return;
+
+            if (!Array.isArray(appUiState.chatTasks) || appUiState.chatTasks.length === 0) {{
+                listEl.innerHTML = '<div style="color:#666; font-weight:700;">NO TASK</div>';
+            }} else {{
+                listEl.innerHTML = appUiState.chatTasks.map((task, index) => `
+                    <label style="display:flex; align-items:flex-start; gap:10px; padding:8px 6px; border-bottom:1px solid #ececec; cursor:pointer;">
+                        <input type="checkbox" data-task-index="${{index}}" style="margin-top:2px; width:16px; height:16px; cursor:pointer;" />
+                        <span style="line-height:1.4;">${{headerEscapeHtml(task)}}</span>
+                    </label>
+                `).join('');
+
+                listEl.querySelectorAll('input[type="checkbox"][data-task-index]').forEach((checkbox) => {{
+                    checkbox.addEventListener('change', (event) => {{
+                        if (!event.target.checked) return;
+                        const idx = Number(event.target.getAttribute('data-task-index'));
+                        completeChatTaskAt(idx);
+                    }});
+                }});
+            }}
+
+            if (!Array.isArray(appUiState.completedTasks) || appUiState.completedTasks.length === 0) {{
+                completedEl.innerHTML = '<div style="color:#666;">NO COMPLETED TASKS</div>';
+            }} else {{
+                completedEl.innerHTML = appUiState.completedTasks.map((task) => `
+                    <div style="padding:8px 6px; border-bottom:1px solid #ececec; color:#444;">${{headerEscapeHtml(task)}}</div>
+                `).join('');
+            }}
+        }}
 
         function isSideMenuOpen() {{
             const drawer = document.getElementById('sideNavDrawer');
@@ -762,6 +833,7 @@ async def home_screen(request: Request):
         function openChatModal() {{
             const modal = document.getElementById('chatModal');
             if (modal) modal.style.display = 'flex';
+            renderChatTaskPanels();
         }}
 
         function closeChatModal() {{
@@ -783,14 +855,27 @@ async def home_screen(request: Request):
         function sendHeaderMessage(kind) {{
             const select = document.getElementById('chatUserSelect');
             const textArea = document.getElementById('chatMessageText');
+            const statusEl = document.getElementById('chatSendStatus');
             const userLabel = select ? select.options[select.selectedIndex]?.text || 'Selected user' : 'Selected user';
             const text = String(textArea?.value || '').trim();
             if (!text) {{
                 alert('Enter a message first.');
                 return;
             }}
-            alert(`Sent ${{kind}} to ${{userLabel}}.`);
-            if (textArea) textArea.value = '';
+            if (kind === 'task') {{
+                appUiState.chatTasks.push(text);
+                renderChatTaskPanels();
+                if (statusEl) statusEl.textContent = `Task added for ${{userLabel}}.`;
+            }} else {{
+                if (statusEl) statusEl.textContent = `Message sent to ${{userLabel}}.`;
+            }}
+            if (select) select.disabled = false;
+            if (textArea) {{
+                textArea.disabled = false;
+                textArea.readOnly = false;
+                textArea.value = '';
+                textArea.focus();
+            }}
         }}
 
         async function resetProfilePassword() {{
