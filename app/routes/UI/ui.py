@@ -1178,7 +1178,10 @@ async def home_screen(request: Request):
             const wrap = document.getElementById('chatUserList');
             if (!wrap) return;
 
-            const orderedUsers = Array.isArray(appUiState.users) ? [...appUiState.users] : [];
+            const currentUserId = String(appUiState.currentUser?.id || '');
+            const orderedUsers = Array.isArray(appUiState.users)
+                ? appUiState.users.filter((u) => String(u?.id || '') !== currentUserId)
+                : [];
             orderedUsers.sort((a, b) => {{
                 const aid = String(a?.id || '');
                 const bid = String(b?.id || '');
@@ -1478,15 +1481,18 @@ async def home_screen(request: Request):
                 if (roleText) roleText.textContent = role;
                 if (emailText) emailText.textContent = email;
 
+                const currentUserId = String(appUiState.currentUser?.id || '');
+                const chatUsers = appUiState.users.filter((u) => String(u?.id || '') !== currentUserId);
+
                 const userSelect = document.getElementById('chatUserSelect');
                 if (userSelect) {{
-                    userSelect.innerHTML = appUiState.users.map((u) => `
+                    userSelect.innerHTML = chatUsers.map((u) => `
                         <option value="${{String(u.id || '')}}">${{String(u.first_name || '').trim()}} ${{String(u.last_name || '').trim()}} (${{String(u.role || '')}})</option>
                     `).join('') || '<option value="">No users found</option>';
                 }}
 
-                if (!appUiState.chatSelectedUserId && appUiState.users.length) {{
-                    appUiState.chatSelectedUserId = String(appUiState.users[0]?.id || '');
+                if (!chatUsers.some((u) => String(u?.id || '') === String(appUiState.chatSelectedUserId || ''))) {{
+                    appUiState.chatSelectedUserId = chatUsers.length ? String(chatUsers[0]?.id || '') : '';
                 }}
                 renderChatUserList();
                 renderChatConversation();
