@@ -439,11 +439,96 @@ async def home_screen(request: Request):
         }}
         #chatModal .header-chat-layout {{
             margin-bottom: 14px;
+            flex: 1;
+            min-height: 0;
+            display: grid;
+            grid-template-columns: 1fr 1fr 1.35fr;
+            gap: 14px;
+            align-items: stretch;
+        }}
+        .chat-task-card {{
+            border: 1px solid #ddd;
+            border-radius: 10px;
+            padding: 12px;
+            background: #fafafa;
+            display: flex;
+            flex-direction: column;
+            min-height: 0;
+            overflow: hidden;
+        }}
+        .chat-task-scroll {{
+            flex: 1;
+            min-height: 0;
+            overflow-y: auto;
+            padding-right: 2px;
+        }}
+        .chat-user-panel,
+        .chat-window-panel {{
+            min-height: 0;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            background: transparent;
+        }}
+        .chat-user-list {{
+            flex: 1;
+            min-height: 0;
+            overflow-y: auto;
+            border-top: 1px solid #e8e2df;
+            border-bottom: 1px solid #e8e2df;
+        }}
+        .chat-user-row {{
+            width: 100%;
+            border: none;
+            border-bottom: 1px solid #ebe6e2;
+            background: transparent;
+            color: #222;
+            text-align: left;
+            padding: 12px 8px;
+            cursor: pointer;
+            font-size: 14px;
+        }}
+        .chat-user-row:hover {{
+            background: #f3efed;
+        }}
+        .chat-user-row.active {{
+            background: #ece7e4;
+        }}
+        .chat-user-row.unread {{
+            font-weight: 800;
+        }}
+        .chat-message-scroll {{
+            flex: 1;
+            min-height: 0;
+            overflow-y: auto;
+            border-top: 1px solid #e8e2df;
+            border-bottom: 1px solid #e8e2df;
+            padding: 10px 2px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }}
+        .chat-bubble {{
+            max-width: 78%;
+            border-radius: 12px;
+            padding: 8px 10px;
+            font-size: 14px;
+            line-height: 1.35;
+        }}
+        .chat-bubble.sender {{
+            margin-left: auto;
+            background: #b22222;
+            color: #fff;
+        }}
+        .chat-bubble.receiver {{
+            margin-right: auto;
+            background: #ece7e4;
+            color: #222;
         }}
         @media (max-width: 840px) {{
             .content-area {{ padding: 18px; }}
             .app-brand-text {{ font-size: 18px; }}
-            .header-chat-layout {{ grid-template-columns: 1fr; }}
+            #chatModal .header-chat-layout {{ grid-template-columns: 1fr; }}
         }}
         .content-area {{
             flex: 1;
@@ -634,24 +719,33 @@ async def home_screen(request: Request):
                 <button type="button" class="header-menu-action" style="width:auto;" onclick="closeChatModal()">Close</button>
             </div>
             <div class="header-chat-layout">
-                <div style="border:1px solid #ddd; border-radius:10px; padding:12px; background:#fafafa;">
+                <div class="chat-task-card">
                     <div style="font-weight:700; margin-bottom:8px;">Task List</div>
-                    <div id="chatTaskList" style="display:flex; flex-direction:column; gap:8px; color:#333;">NO TASK</div>
-                </div>
-                <div style="border:1px solid #ddd; border-radius:10px; padding:12px; background:#fafafa;">
-                    <label for="chatUserSelect" style="display:block; font-weight:700; margin-bottom:6px;">User</label>
-                    <select id="chatUserSelect" style="width:100%; padding:10px; border:1px solid #ccc; border-radius:8px; margin-bottom:10px;"></select>
-                    <textarea id="chatMessageText" rows="4" placeholder="Write a message or task..." style="width:100%; padding:10px; border:1px solid #ccc; border-radius:8px; resize:vertical;"></textarea>
-                    <div id="chatSendStatus" style="min-height:18px; margin-top:8px; font-size:12px; color:#444;"></div>
-                    <div style="display:flex; gap:8px; margin-top:10px;">
-                        <button type="button" class="header-menu-action" style="width:auto; background:#b22222; color:#fff;" onclick="sendHeaderMessage('message')">Send Message</button>
-                        <button type="button" class="header-menu-action" style="width:auto; background:#1f2326; color:#fff;" onclick="sendHeaderMessage('task')">Send Task</button>
+                    <div class="chat-task-scroll">
+                        <div id="chatTaskList" style="display:flex; flex-direction:column; gap:8px; color:#333;">NO TASK</div>
+                    </div>
+                    <div style="font-weight:800; letter-spacing:0.6px; margin:12px 0 8px 0;">COMPLETED</div>
+                    <div class="chat-task-scroll" style="max-height:34%;">
+                        <div id="chatCompletedList" style="display:flex; flex-direction:column; gap:8px; color:#333;">NO COMPLETED TASKS</div>
                     </div>
                 </div>
-            </div>
-            <div style="border:1px solid #ddd; border-radius:10px; padding:12px; background:#fafafa; margin-top:auto;">
-                <div style="font-weight:800; letter-spacing:0.6px; margin-bottom:8px;">COMPLETED</div>
-                <div id="chatCompletedList" style="display:flex; flex-direction:column; gap:8px; color:#333;">NO COMPLETED TASKS</div>
+                <div class="chat-user-panel">
+                    <div style="font-weight:700; margin-bottom:8px;">User List</div>
+                    <div id="chatUserList" class="chat-user-list"></div>
+                    <select id="chatUserSelect" style="display:none;"></select>
+                </div>
+                <div class="chat-window-panel">
+                    <div id="chatSelectedUserName" style="font-weight:700; margin-bottom:8px;">Select a user</div>
+                    <div id="chatMessagesArea" class="chat-message-scroll">
+                        <div style="color:#666;">No messages yet.</div>
+                    </div>
+                    <div style="display:flex; gap:8px; margin-top:10px; align-items:flex-end;">
+                        <textarea id="chatMessageText" rows="3" placeholder="Write a message or task..." style="flex:1; padding:10px; border:1px solid #ccc; border-radius:8px; resize:vertical;"></textarea>
+                        <button type="button" class="header-menu-action" style="width:auto; background:#b22222; color:#fff;" onclick="sendChatPanelMessage()">Send</button>
+                        <button type="button" class="header-menu-action" style="width:auto; background:#1f2326; color:#fff;" onclick="sendHeaderMessage('task')">Send Task</button>
+                    </div>
+                    <div id="chatSendStatus" style="min-height:18px; margin-top:8px; font-size:12px; color:#444;"></div>
+                </div>
             </div>
         </div>
     </div>
@@ -738,6 +832,9 @@ async def home_screen(request: Request):
             currentUser: null,
             chatTasks: [],
             completedTasks: [],
+            chatConversations: {{}},
+            chatSelectedUserId: '',
+            chatUnreadUserIds: [],
         }};
 
         function headerEscapeHtml(value) {{
@@ -790,6 +887,110 @@ async def home_screen(request: Request):
             }}
         }}
 
+        function renderChatUserList() {{
+            const wrap = document.getElementById('chatUserList');
+            if (!wrap) return;
+
+            const orderedUsers = Array.isArray(appUiState.users) ? [...appUiState.users] : [];
+            orderedUsers.sort((a, b) => {
+                const aid = String(a?.id || '');
+                const bid = String(b?.id || '');
+                const aUnread = appUiState.chatUnreadUserIds.includes(aid);
+                const bUnread = appUiState.chatUnreadUserIds.includes(bid);
+                if (aUnread && !bUnread) return -1;
+                if (!aUnread && bUnread) return 1;
+                return 0;
+            });
+
+            if (!orderedUsers.length) {{
+                wrap.innerHTML = '<div style="padding:10px 8px; color:#666;">No users found.</div>';
+                return;
+            }}
+
+            wrap.innerHTML = orderedUsers.map((u) => {{
+                const id = String(u?.id || '');
+                const first = String(u?.first_name || '').trim();
+                const last = String(u?.last_name || '').trim();
+                const label = `${{first}} ${{last}}`.trim() || String(u?.email || 'Unknown');
+                const unread = appUiState.chatUnreadUserIds.includes(id);
+                const active = appUiState.chatSelectedUserId && appUiState.chatSelectedUserId === id;
+                return `<button type="button" class="chat-user-row${{active ? ' active' : ''}}${{unread ? ' unread' : ''}}" data-chat-user-id="${{headerEscapeHtml(id)}}">${{headerEscapeHtml(label)}}</button>`;
+            }}).join('');
+
+            wrap.querySelectorAll('[data-chat-user-id]').forEach((btn) => {{
+                btn.addEventListener('click', () => {{
+                    const id = String(btn.getAttribute('data-chat-user-id') || '');
+                    appUiState.chatSelectedUserId = id;
+                    appUiState.chatUnreadUserIds = appUiState.chatUnreadUserIds.filter((v) => v !== id);
+
+                    const hiddenSelect = document.getElementById('chatUserSelect');
+                    if (hiddenSelect) hiddenSelect.value = id;
+
+                    renderChatUserList();
+                    renderChatConversation();
+                }});
+            }});
+        }}
+
+        function renderChatConversation() {{
+            const titleEl = document.getElementById('chatSelectedUserName');
+            const msgsEl = document.getElementById('chatMessagesArea');
+            if (!titleEl || !msgsEl) return;
+
+            const selectedId = String(appUiState.chatSelectedUserId || '');
+            if (!selectedId) {{
+                titleEl.textContent = 'Select a user';
+                msgsEl.innerHTML = '<div style="color:#666;">No messages yet.</div>';
+                return;
+            }}
+
+            const selectedUser = (appUiState.users || []).find((u) => String(u?.id || '') === selectedId);
+            const selectedName = `${{String(selectedUser?.first_name || '').trim()}} ${{String(selectedUser?.last_name || '').trim()}}`.trim() || String(selectedUser?.email || 'Selected user');
+            titleEl.textContent = selectedName;
+
+            const rows = Array.isArray(appUiState.chatConversations[selectedId]) ? appUiState.chatConversations[selectedId] : [];
+            if (!rows.length) {{
+                msgsEl.innerHTML = '<div style="color:#666;">No messages yet.</div>';
+                return;
+            }}
+
+            msgsEl.innerHTML = rows.map((row) => `
+                <div class="chat-bubble ${{row.side === 'receiver' ? 'receiver' : 'sender'}}">${{headerEscapeHtml(row.text)}}</div>
+            `).join('');
+            msgsEl.scrollTop = msgsEl.scrollHeight;
+        }}
+
+        function sendChatPanelMessage() {{
+            const selectedId = String(appUiState.chatSelectedUserId || '');
+            const textArea = document.getElementById('chatMessageText');
+            const messageText = String(textArea?.value || '').trim();
+            if (!selectedId) {{
+                alert('Select a user first.');
+                return;
+            }}
+            if (!messageText) {{
+                alert('Enter a message first.');
+                return;
+            }}
+
+            if (!Array.isArray(appUiState.chatConversations[selectedId])) {{
+                appUiState.chatConversations[selectedId] = [];
+            }}
+            appUiState.chatConversations[selectedId].push({{ side: 'sender', text: messageText }});
+
+            appUiState.chatUnreadUserIds = appUiState.chatUnreadUserIds.filter((v) => v !== selectedId);
+            appUiState.chatUnreadUserIds.unshift(selectedId);
+
+            const hiddenSelect = document.getElementById('chatUserSelect');
+            if (hiddenSelect) hiddenSelect.value = selectedId;
+
+            sendHeaderMessage('message');
+
+            appUiState.chatUnreadUserIds = appUiState.chatUnreadUserIds.filter((v) => v !== selectedId);
+            renderChatUserList();
+            renderChatConversation();
+        }}
+
         function isSideMenuOpen() {{
             const drawer = document.getElementById('sideNavDrawer');
             return !!(drawer && drawer.classList.contains('open'));
@@ -834,6 +1035,8 @@ async def home_screen(request: Request):
             const modal = document.getElementById('chatModal');
             if (modal) modal.style.display = 'flex';
             renderChatTaskPanels();
+            renderChatUserList();
+            renderChatConversation();
         }}
 
         function closeChatModal() {{
@@ -950,6 +1153,12 @@ async def home_screen(request: Request):
                         <option value="${{String(u.id || '')}}">${{String(u.first_name || '').trim()}} ${{String(u.last_name || '').trim()}} (${{String(u.role || '')}})</option>
                     `).join('') || '<option value="">No users found</option>';
                 }}
+
+                if (!appUiState.chatSelectedUserId && appUiState.users.length) {{
+                    appUiState.chatSelectedUserId = String(appUiState.users[0]?.id || '');
+                }}
+                renderChatUserList();
+                renderChatConversation();
             }} catch (error) {{
                 console.error('Header init error:', error);
             }}
