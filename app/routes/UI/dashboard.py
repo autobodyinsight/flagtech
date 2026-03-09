@@ -340,7 +340,7 @@ def get_dashboard_screen_html():
 
             // Sidebar HTML
             const sidebarHtml = `
-                <div id="roSidebar" style="position:fixed; left:0; top:var(--ro-header-height, 170px); height:calc(100vh - var(--ro-header-height, 170px)); width:64px; background:#23272a; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:38px; z-index:10; box-shadow:2px 0 8px rgba(0,0,0,0.08);">
+                <div id="roSidebar" style="position:fixed; left:0; top:var(--ro-header-height, 170px); height:calc(100vh - var(--ro-header-height, 170px)); width:64px; background:#23272a; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:38px; z-index:100; box-shadow:2px 0 8px rgba(0,0,0,0.08);">
                     <div style="display:flex; flex-direction:column; align-items:center; gap:38px; width:100%;">
                         <button id="roSidebarBtn-notes" class="ro-sidebar-btn" data-view="notes" title="Notes" style="background:none; border:none; padding:0; cursor:pointer;">${icons.notepad}</button>
                         <button id="roSidebarBtn-estimate" class="ro-sidebar-btn" data-view="estimate" title="Estimate" style="background:none; border:none; padding:0; cursor:pointer;">${icons.estimate}</button>
@@ -385,7 +385,7 @@ def get_dashboard_screen_html():
 
             // Banner fields
             const bannerHtml = `
-                <div id="roHeaderBar" style="background:#23272a; color:#fff; padding:16px 24px 18px 24px; border-bottom:3px solid #d32f2f; position:relative; min-height:132px; z-index:10;">
+                <div id="roHeaderBar" style="background:#23272a; color:#fff; padding:16px 24px 18px 24px; border-bottom:3px solid #d32f2f; position:relative; min-height:132px; z-index:120;">
                     <div style="font-size:20px; font-weight:bold; margin-bottom:10px;">RO Window</div>
                     <div id="roClosedStatusLabel" style="position:absolute; top:14px; left:50%; transform:translateX(-50%); font-weight:900; letter-spacing:1.5px; font-size:20px; color:#fff; display:${String((ro.phase || '')).toLowerCase().includes('complete') ? 'block' : 'none'};">CLOSED</div>
                     ${buttonsHtml}
@@ -412,7 +412,7 @@ def get_dashboard_screen_html():
                         </div>
                     </div>
                 </div>
-                <div id="roWindowContent" style="position:relative; z-index:10; padding:32px 32px 32px 88px; min-height:180px; background:#fff; color:#23272a; font-size:18px;">(Content area)</div>
+                <div id="roWindowContent" style="padding:32px 32px 32px 88px; min-height:180px; background:#fff; color:#23272a; font-size:18px;">(Content area)</div>
             `;
 
             // Open new window
@@ -422,7 +422,7 @@ def get_dashboard_screen_html():
                 return;
             }
             win.document.title = `RO Window - ${ro.ro}`;
-            win.document.body.innerHTML = `<div id='roWindowShell' style='position:relative; z-index:10; display:flex; flex-direction:row; height:100vh; width:100vw; background:#f2f2f2;'>${sidebarHtml}<div style='flex:1; display:flex; flex-direction:column; min-width:0; position:relative; z-index:10;'>${bannerHtml}</div></div><div id='roPrintBackdrop' class='ro-print-backdrop' style='display:none;'></div>`;
+            win.document.body.innerHTML = `<div style='display:flex; flex-direction:row; height:100vh; width:100vw; background:#f2f2f2;'>${sidebarHtml}<div style='flex:1; display:flex; flex-direction:column; min-width:0;'>${bannerHtml}</div></div>`;
             // Add styles for sidebar and icons
             const style = win.document.createElement('style');
             style.textContent = `
@@ -433,8 +433,10 @@ def get_dashboard_screen_html():
                 #roSidebar .ro-sidebar-btn.active { opacity:1; }
                 #roSidebar { box-shadow:2px 0 8px rgba(0,0,0,0.08); }
                 .mini-popup-panel {
-                    position: fixed;
-                    z-index: 1100;
+                    position: absolute;
+                    top: 100%;
+                    left: 0;
+                    z-index: 1000;
                     background: #fff;
                     border: 2px solid #b22222;
                     border-radius: 6px;
@@ -442,6 +444,7 @@ def get_dashboard_screen_html():
                     min-width: 300px;
                     max-width: 500px;
                     box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+                    margin-top: 4px;
                     opacity: 0;
                     transform: translateY(-6px);
                     transition: opacity 0.18s ease, transform 0.18s ease;
@@ -451,12 +454,6 @@ def get_dashboard_screen_html():
                     opacity: 1;
                     transform: translateY(0);
                     pointer-events: auto;
-                }
-                .ro-print-backdrop {
-                    position: fixed;
-                    inset: 0;
-                    z-index: 1000;
-                    background: rgba(20, 24, 28, 0.45);
                 }
                 .ro-header-item { font-size:15px; line-height:1.25; min-width:0; }
                 .ro-header-label { color:#d32f2f; font-weight:700; margin-right:6px; white-space:nowrap; }
@@ -497,7 +494,6 @@ def get_dashboard_screen_html():
 
             const roWindowDoc = win.document;
             const roWindowContentEl = roWindowDoc.getElementById('roWindowContent');
-            const printBackdrop = roWindowDoc.getElementById('roPrintBackdrop');
             const popupState = {
                 activeView: '',
                 techLineItems: [],
@@ -701,19 +697,9 @@ def get_dashboard_screen_html():
                     openPanel.classList.remove('open');
                     openPanel.style.display = 'none';
                 });
-                if (printBackdrop) printBackdrop.style.display = 'none';
                 if (!isOpen) {
-                    const trigger = roWindowDoc.getElementById('roPrintTrigger');
-                    if (trigger) {
-                        const rect = trigger.getBoundingClientRect();
-                        const viewportWidth = roWindowDoc.defaultView ? roWindowDoc.defaultView.innerWidth : roWindowDoc.documentElement.clientWidth;
-                        panel.style.top = `${Math.max(10, rect.bottom + 8)}px`;
-                        panel.style.right = `${Math.max(12, viewportWidth - rect.right)}px`;
-                        panel.style.left = 'auto';
-                    }
                     panel.style.display = 'block';
                     panel.classList.add('open');
-                    if (printBackdrop) printBackdrop.style.display = 'block';
                 }
             }
 
@@ -722,7 +708,6 @@ def get_dashboard_screen_html():
                 if (!panel) return;
                 panel.classList.remove('open');
                 panel.style.display = 'none';
-                if (printBackdrop) printBackdrop.style.display = 'none';
                 const wrap = roWindowDoc.getElementById('roPrintServiceOrderWrap');
                 if (wrap) wrap.style.display = 'none';
             }
@@ -1241,11 +1226,6 @@ def get_dashboard_screen_html():
                     if ((trigger && trigger.contains(target)) || panel.contains(target)) return;
                     roClosePrintOptionsModal();
                 });
-                if (printBackdrop) {
-                    printBackdrop.addEventListener('click', () => {
-                        roClosePrintOptionsModal();
-                    });
-                }
             }
 
             async function patchRoDate(roNumber, field, isoValue) {

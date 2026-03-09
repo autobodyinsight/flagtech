@@ -385,7 +385,7 @@ def get_reports_screen_html():
         };
 
         const sidebarHtml = `
-            <div id="roSidebar" style="position:fixed; left:0; top:var(--ro-header-height, 170px); height:calc(100vh - var(--ro-header-height, 170px)); width:64px; background:#23272a; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:38px; z-index:10; box-shadow:2px 0 8px rgba(0,0,0,0.08);">
+            <div id="roSidebar" style="position:fixed; left:0; top:var(--ro-header-height, 170px); height:calc(100vh - var(--ro-header-height, 170px)); width:64px; background:#23272a; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:38px; z-index:100; box-shadow:2px 0 8px rgba(0,0,0,0.08);">
                 <button class="ro-sidebar-btn active" data-view="notes" style="background:none; border:none; padding:0; cursor:pointer;">${icons.notepad}</button>
                 <button class="ro-sidebar-btn" data-view="estimate" style="background:none; border:none; padding:0; cursor:pointer;">${icons.estimate}</button>
                 <button class="ro-sidebar-btn" data-view="tech" style="background:none; border:none; padding:0; cursor:pointer;">${icons.tech}</button>
@@ -395,23 +395,9 @@ def get_reports_screen_html():
         `;
 
         const bannerHtml = `
-            <div id="roHeaderBar" style="background:#23272a; color:#fff; padding:16px 24px 18px 24px; border-bottom:3px solid #d32f2f; position:relative; min-height:132px; z-index:10;">
+            <div id="roHeaderBar" style="background:#23272a; color:#fff; padding:16px 24px 18px 24px; border-bottom:3px solid #d32f2f; position:relative; min-height:132px; z-index:120;">
                 <div style="font-size:20px; font-weight:bold; margin-bottom:10px;">RO Window</div>
                 <div style="position:absolute; top:14px; left:50%; transform:translateX(-50%); font-weight:900; letter-spacing:1.5px; font-size:20px; color:#fff;">CLOSED</div>
-                <div style="position:absolute; top:18px; right:24px; display:flex; gap:12px; z-index:10;">
-                    <div style="position:relative;">
-                        <button type="button" id="roPopupPrintButton" class="mini-popup-trigger" style="padding:7px 18px; background:#d32f2f; color:#fff; border:none; border-radius:4px; font-weight:bold; font-size:15px; cursor:pointer;">Print</button>
-                        <div id="roPrintOptionsModal" class="mini-popup-panel" style="display:none; right:0; left:auto; top:100%;">
-                            <h2 style="margin:0 0 14px 0; color:#333; font-size:18px;">Print RO</h2>
-                            <p style="margin:0 0 12px 0; font-weight:bold; color:#555;">Print by:</p>
-                            <div style="display:flex; flex-direction:column; gap:8px;">
-                                <button id="roPrintOptionBill" type="button" style="padding:10px 12px; background:#f5f5f5; color:#333; border:1px solid #ddd; border-radius:4px; cursor:pointer; text-align:left; font-size:14px;">Bill</button>
-                                <button id="roPrintOptionServiceOrder" type="button" style="padding:10px 12px; background:#f5f5f5; color:#333; border:1px solid #ddd; border-radius:4px; cursor:pointer; text-align:left; font-size:14px;">Service Order</button>
-                                <button id="roPrintOptionParts" type="button" style="padding:10px 12px; background:#f5f5f5; color:#333; border:1px solid #ddd; border-radius:4px; cursor:pointer; text-align:left; font-size:14px;">Parts</button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
                 <div style="position:absolute; top:58px; right:24px; display:flex; flex-direction:column; align-items:flex-start; gap:6px; z-index:10;">
                     <div style="display:flex; align-items:center; gap:8px;">
                         <span class="ro-header-label" style="margin-right:0;">Picked Up:</span>
@@ -439,7 +425,7 @@ def get_reports_screen_html():
                     </div>
                 </div>
             </div>
-            <div id="roWindowContent" style="position:relative; z-index:10; padding:32px 32px 32px 88px; min-height:180px; background:#fff; color:#23272a; font-size:18px;"></div>
+            <div id="roWindowContent" style="padding:32px 32px 32px 88px; min-height:180px; background:#fff; color:#23272a; font-size:18px;"></div>
         `;
 
         const win = window.open('', `Reports_Closed_RO_${roKey}`, 'width=900,height=640,scrollbars=yes,resizable=yes');
@@ -449,7 +435,7 @@ def get_reports_screen_html():
         }
 
         win.document.title = `Closed RO Window - ${roKey}`;
-        win.document.body.innerHTML = `<div id='roWindowShell' style='position:relative; z-index:10; display:flex; flex-direction:row; height:100vh; width:100vw; background:#f2f2f2;'>${sidebarHtml}<div style='flex:1; display:flex; flex-direction:column; min-width:0; position:relative; z-index:10;'>${bannerHtml}</div></div><div id='roPrintBackdrop' class='ro-print-backdrop' style='display:none;'></div>`;
+        win.document.body.innerHTML = `<div style='display:flex; flex-direction:row; height:100vh; width:100vw; background:#f2f2f2;'>${sidebarHtml}<div style='flex:1; display:flex; flex-direction:column; min-width:0;'>${bannerHtml}</div></div>`;
 
         const style = win.document.createElement('style');
         style.textContent = `
@@ -462,40 +448,11 @@ def get_reports_screen_html():
             .ro-header-value { color:#fff; font-weight:600; }
             .ro-header-date-text { color:#fff; font-weight:600; min-width:110px; }
             .ro-window-card { background:#fafafa; border:1px solid #ddd; border-radius:8px; padding:14px; }
-            .mini-popup-panel {
-                position: fixed;
-                z-index: 1100;
-                background: #fff;
-                border: 2px solid #b22222;
-                border-radius: 6px;
-                padding: 12px;
-                min-width: 300px;
-                max-width: 500px;
-                box-shadow: 0 4px 8px rgba(0,0,0,0.2);
-                opacity: 0;
-                transform: translateY(-6px);
-                transition: opacity 0.18s ease, transform 0.18s ease;
-                pointer-events: none;
-            }
-            .mini-popup-panel.open {
-                opacity: 1;
-                transform: translateY(0);
-                pointer-events: auto;
-            }
-            .ro-print-backdrop {
-                position: fixed;
-                inset: 0;
-                z-index: 1000;
-                background: rgba(20, 24, 28, 0.45);
-            }
         `;
         win.document.head.appendChild(style);
 
         const roDoc = win.document;
         const contentEl = roDoc.getElementById('roWindowContent');
-        const printBtn = roDoc.getElementById('roPopupPrintButton');
-        const printPanel = roDoc.getElementById('roPrintOptionsModal');
-        const printBackdrop = roDoc.getElementById('roPrintBackdrop');
         const headerEl = roDoc.getElementById('roHeaderBar');
         if (headerEl) {
             const h = Math.ceil(headerEl.getBoundingClientRect().height);
@@ -621,273 +578,6 @@ def get_reports_screen_html():
                 : popupBuildUnifiedLinesFromSections(Array.isArray(estimate?.sections) ? estimate.sections : []);
         }
 
-        function roTogglePrintPopup(panel) {
-            if (!panel) return;
-            const isOpen = panel.classList.contains('open');
-            roDoc.querySelectorAll('.mini-popup-panel.open').forEach((openPanel) => {
-                openPanel.classList.remove('open');
-                openPanel.style.display = 'none';
-            });
-            if (printBackdrop) printBackdrop.style.display = 'none';
-            if (!isOpen) {
-                const trigger = roDoc.getElementById('roPopupPrintButton');
-                if (trigger) {
-                    const rect = trigger.getBoundingClientRect();
-                    const viewportWidth = roDoc.defaultView ? roDoc.defaultView.innerWidth : roDoc.documentElement.clientWidth;
-                    panel.style.top = `${Math.max(10, rect.bottom + 8)}px`;
-                    panel.style.right = `${Math.max(12, viewportWidth - rect.right)}px`;
-                    panel.style.left = 'auto';
-                }
-                panel.style.display = 'block';
-                panel.classList.add('open');
-                if (printBackdrop) printBackdrop.style.display = 'block';
-            }
-        }
-
-        function roClosePrintOptionsModal() {
-            if (!printPanel) return;
-            printPanel.classList.remove('open');
-            printPanel.style.display = 'none';
-            if (printBackdrop) printBackdrop.style.display = 'none';
-        }
-
-        function roOpenPrintWindow(title, bodyHtml, options = {}) {
-            const printWindow = window.open('', '_blank');
-            if (!printWindow) {
-                alert('Unable to open print preview. Please allow pop-ups for this site.');
-                return;
-            }
-            printWindow.document.write(`
-                <!DOCTYPE html>
-                <html>
-                    <head>
-                        <title>${popupEsc(title)}</title>
-                        <style>
-                            @media print { @page { margin: 0.5in; } body { margin: 0; } }
-                            body { font-family: Arial, sans-serif; color:#222; padding:20px; }
-                            .header { text-align:center; margin-bottom:16px; border-bottom:2px solid #b22222; padding-bottom:8px; }
-                            table { width:100%; border-collapse:collapse; margin-top:10px; }
-                            thead th { background:#3c4142; color:#fff; text-align:left; padding:8px; font-size:12px; }
-                            tbody td { padding:8px; border-bottom:1px solid #eee; font-size:12px; }
-                            .num { text-align:right; }
-                        </style>
-                    </head>
-                    <body>${bodyHtml}</body>
-                </html>
-            `);
-            printWindow.document.close();
-            printWindow.focus();
-            if (options.immediatePrint) {
-                printWindow.print();
-                return;
-            }
-            setTimeout(() => printWindow.print(), 250);
-        }
-
-        async function roPrintBill() {
-            roClosePrintOptionsModal();
-            try {
-                const [res, paymentsRes] = await Promise.all([
-                    popupFetchJson(`/api/ro-estimate?ro=${encodeURIComponent(roKey)}`),
-                    popupFetchJson(`/api/payments/ro?ro=${encodeURIComponent(roKey)}`),
-                ]);
-                const estimate = res.estimate || {};
-                const lines = popupGetUnifiedEstimateLines(estimate);
-                const paymentRow = paymentsRes?.row || {};
-                const insuranceTotal = popupToNumber(paymentRow.insurance_total ?? ro.insurance_pay ?? 0, 0);
-                const customerTotal = popupToNumber(paymentRow.customer_total ?? ro.customer_pay ?? 0, 0);
-                const grandTotal = insuranceTotal + customerTotal;
-                const linesHtml = lines.map((line) => {
-                    const qty = line?.qty;
-                    const qtyDisplay = qty === null || qty === undefined || String(qty).trim() === '' ? '-' : popupNormalizeDisplayNumber(qty);
-                    const priceDisplay = (line?.extendedPrice === null || line?.extendedPrice === undefined || String(line?.extendedPrice).trim() === '')
-                        ? '-'
-                        : popupNormalizeDisplayNumber(line?.extendedPrice);
-                    return `
-                        <tr>
-                            <td>${popupEsc(line?.lineNumber || '-')}</td>
-                            <td>${popupEsc(String(line?.description || '').trim() || '-')}</td>
-                            <td>${popupEsc(String(line?.partNumber || '').trim() || '-')}</td>
-                            <td class="num">${popupEsc(qtyDisplay)}</td>
-                            <td class="num">${popupEsc(popupNormalizeDisplayNumber(line?.labor || 0))}</td>
-                            <td class="num">${popupEsc(popupNormalizeDisplayNumber(line?.paint || 0))}</td>
-                            <td class="num">${popupEsc(priceDisplay)}</td>
-                        </tr>
-                    `;
-                }).join('');
-
-                roOpenPrintWindow(
-                    `RO ${roKey} Bill`,
-                    `
-                        <div class="header" style="text-align:left;">
-                            <div style="font-size:56px; font-weight:800; line-height:1; margin-bottom:8px;">RO #${popupEsc(roKey || '-')}</div>
-                            <div style="display:flex; justify-content:space-between; align-items:flex-end; gap:18px; margin-bottom:6px;">
-                                <div style="font-size:20px; font-weight:600;">Vehicle: ${popupEsc(ro.vehicle || '-')}</div>
-                                <div style="font-size:30px; font-weight:800; letter-spacing:1px;">INVOICE</div>
-                            </div>
-                            <div style="font-size:18px; font-weight:600;">Customer: ${popupEsc(ro.customer || '-')} | Insurance: ${popupEsc(ro.insurance || '-')}</div>
-                            <div style="font-size:16px; font-weight:600; margin-top:4px;">In ${popupEsc(inDateText)} | ECD ${popupEsc(ecdDateText)} | Picked Up ${popupEsc(pickedUpDateText)} | Closed ${popupEsc(closedDateText)}</div>
-                        </div>
-                        <table>
-                            <thead>
-                                <tr><th>Line #</th><th>Description</th><th>Part #</th><th class="num">Qty</th><th class="num">Labor</th><th class="num">Paint</th><th class="num">Price</th></tr>
-                            </thead>
-                            <tbody>${linesHtml || '<tr><td colspan="7" style="text-align:center; color:#777;">No repair lines found.</td></tr>'}</tbody>
-                        </table>
-                        <div style="display:flex; justify-content:flex-end; margin-top:14px;">
-                            <div style="min-width:320px; font-size:13px;">
-                                <div style="display:flex; justify-content:space-between; padding:3px 0;"><span>Insurance Total</span><span>${popupMoney(insuranceTotal)}</span></div>
-                                <div style="display:flex; justify-content:space-between; padding:3px 0;"><span>Customer Total</span><span>${popupMoney(customerTotal)}</span></div>
-                                <div style="display:flex; justify-content:space-between; padding:5px 0; border-top:1px solid #ccc; margin-top:4px; font-weight:700;"><span>Grand Total</span><span>${popupMoney(grandTotal)}</span></div>
-                            </div>
-                        </div>
-                    `
-                );
-            } catch (error) {
-                alert('Unable to generate Bill print.');
-            }
-        }
-
-        async function roPrintServiceOrder() {
-            roClosePrintOptionsModal();
-            try {
-                const data = await popupFetchJson(`/api/ro-tech-lines?ro=${encodeURIComponent(roKey)}`);
-                const techTargets = (Array.isArray(data.tech_lines) ? data.tech_lines : [])
-                    .filter((item) => String(item.mode || '').toLowerCase() === 'tech' && String(item.tech_name || item.tech || '').trim());
-
-                if (!techTargets.length) {
-                    alert('No tech lines available for Service Order.');
-                    return;
-                }
-
-                const sectionsByTech = new Map();
-                for (const target of techTargets) {
-                    const techName = String(target.tech_name || target.tech || '').trim();
-                    const repairType = String(target.repair_type || target.type || 'body').trim();
-                    const query = new URLSearchParams({ ro: roKey, mode: 'tech', repair_type: repairType, tech_name: techName });
-                    const details = await popupFetchJson(`/api/ro-assignment-lines?${query.toString()}`);
-                    const lines = Array.isArray(details.lines) ? details.lines : [];
-                    if (!sectionsByTech.has(techName)) sectionsByTech.set(techName, []);
-                    const targetLines = sectionsByTech.get(techName);
-                    lines.forEach((line) => {
-                        targetLines.push({
-                            line_number: line.line_number || line.line_key || '-',
-                            description: line.description || '-',
-                            repair_type: line.repair_type || repairType,
-                            hours: popupToNumber(line.hours || 0),
-                        });
-                    });
-                }
-
-                const sections = Array.from(sectionsByTech.entries()).map(([techName, techLines]) => {
-                    const techTotalHours = techLines.reduce((sum, line) => sum + popupToNumber(line.hours || 0), 0);
-                    const rowsHtml = techLines
-                        .sort((a, b) => (popupExtractLineNumber(a.line_number) ?? 999999) - (popupExtractLineNumber(b.line_number) ?? 999999))
-                        .map((line) => `
-                            <tr>
-                                <td>${popupEsc(line.line_number || '-')}</td>
-                                <td>${popupEsc(line.description || '-')}</td>
-                                <td>${popupEsc(line.repair_type || '-')}</td>
-                                <td class="num">${popupToNumber(line.hours || 0).toFixed(1)}</td>
-                            </tr>
-                        `).join('');
-                    return `
-                        <div style="margin-top:18px;">
-                            <div style="font-size:16px; font-weight:700; margin-bottom:6px;">${popupEsc(techName)}</div>
-                            <table>
-                                <thead><tr><th>Line</th><th>Description</th><th>Type</th><th class="num">HRS</th></tr></thead>
-                                <tbody>${rowsHtml || '<tr><td colspan="4" style="text-align:center; color:#777;">No lines assigned.</td></tr>'}</tbody>
-                            </table>
-                            <div style="display:flex; justify-content:flex-end; margin-top:6px; font-size:13px; font-weight:700;">TOTAL HRS: ${techTotalHours.toFixed(1)}</div>
-                        </div>
-                    `;
-                });
-
-                roOpenPrintWindow(
-                    `RO ${roKey} Service Order`,
-                    `
-                        <div class="header" style="text-align:left;">
-                            <div style="font-size:56px; font-weight:800; line-height:1; margin-bottom:8px;">RO #${popupEsc(roKey || '-')}</div>
-                            <div style="display:flex; justify-content:space-between; align-items:flex-end; gap:18px; margin-bottom:6px;">
-                                <div style="font-size:20px; font-weight:600;">Vehicle: ${popupEsc(ro.vehicle || '-')}</div>
-                                <div style="font-size:30px; font-weight:800; letter-spacing:1px;">SERVICE ORDER</div>
-                            </div>
-                        </div>
-                        ${sections.join('')}
-                    `
-                );
-            } catch (error) {
-                alert('Unable to generate Service Order print.');
-            }
-        }
-
-        async function roPrintParts() {
-            roClosePrintOptionsModal();
-            try {
-                const linesRes = await popupFetchJson(`/api/parts/ro-lines?ro=${encodeURIComponent(roKey)}`);
-                const lines = Array.isArray(linesRes.lines) ? linesRes.lines : [];
-                const totalPrice = lines.reduce((sum, line) => {
-                    const qty = popupToNumber(line.qty || 0, 0);
-                    const price = popupToNumber(line.price || line.extended_price || 0, 0);
-                    return sum + (qty > 0 ? (price * qty) : price);
-                }, 0);
-                const rowsHtml = lines.map((line) => `
-                    <tr>
-                        <td>${popupEsc(line.line || '-')}</td>
-                        <td>${popupEsc(line.description || '-')}</td>
-                        <td class="num">${popupEsc(line.qty || 0)}</td>
-                        <td class="num">${popupMoney(line.price || 0)}</td>
-                    </tr>
-                `).join('');
-
-                roOpenPrintWindow(
-                    `RO ${roKey} Parts`,
-                    `
-                        <div class="header" style="text-align:left;">
-                            <div style="font-size:56px; font-weight:800; line-height:1; margin-bottom:8px;">RO #${popupEsc(roKey || '-')}</div>
-                            <div style="display:flex; justify-content:space-between; align-items:flex-end; gap:18px; margin-bottom:6px;">
-                                <div style="font-size:20px; font-weight:600;">Vehicle: ${popupEsc(ro.vehicle || '-')}</div>
-                                <div style="font-size:30px; font-weight:800; letter-spacing:1px;">PARTS</div>
-                            </div>
-                        </div>
-                        <table>
-                            <thead><tr><th>Line</th><th>Description</th><th class="num">QTY</th><th class="num">Price</th></tr></thead>
-                            <tbody>${rowsHtml || '<tr><td colspan="4" style="text-align:center; color:#777;">No parts lines found.</td></tr>'}</tbody>
-                        </table>
-                        <div style="display:flex; justify-content:flex-end; margin-top:10px; font-size:14px; font-weight:700;">TOTAL PRICE: ${popupMoney(totalPrice)}</div>
-                    `,
-                    { immediatePrint: true }
-                );
-            } catch (error) {
-                alert('Unable to generate Parts print.');
-            }
-        }
-
-        if (printBtn && printPanel) {
-            printBtn.addEventListener('click', (event) => {
-                event.stopPropagation();
-                roTogglePrintPopup(printPanel);
-            });
-        }
-
-        const printBillBtn = roDoc.getElementById('roPrintOptionBill');
-        const printServiceOrderBtn = roDoc.getElementById('roPrintOptionServiceOrder');
-        const printPartsBtn = roDoc.getElementById('roPrintOptionParts');
-        if (printBillBtn) printBillBtn.addEventListener('click', () => { roPrintBill(); });
-        if (printServiceOrderBtn) printServiceOrderBtn.addEventListener('click', () => { roPrintServiceOrder(); });
-        if (printPartsBtn) printPartsBtn.addEventListener('click', () => { roPrintParts(); });
-
-        roDoc.addEventListener('click', (event) => {
-            if (!printPanel || !printPanel.classList.contains('open')) return;
-            const target = event.target;
-            if ((printBtn && printBtn.contains(target)) || printPanel.contains(target)) return;
-            roClosePrintOptionsModal();
-        });
-        if (printBackdrop) {
-            printBackdrop.addEventListener('click', () => {
-                roClosePrintOptionsModal();
-            });
-        }
         async function popupFetchJson(url, options = {}) {
             const resp = await fetch(url, { credentials: 'include', cache: 'no-store', ...options });
             const data = await resp.json();
