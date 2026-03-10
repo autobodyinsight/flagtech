@@ -176,19 +176,19 @@ def get_dashboard_screen_html():
                     </div>
                 </div>
                 <div style="overflow-x:auto;">
-                    <table id="roListTable" style="width:100%; border-collapse:collapse;">
+                    <table id="roListTable" style="width:100%; border-collapse:separate; border-spacing:0 10px;">
                         <thead>
                             <tr class="dashboard-header-row">
-                                <th class="dashboard-header-cell" data-sort-key="ro" onclick="sortRoListByHeader('ro')" style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold; cursor:pointer; user-select:none;">RO# <span data-sort-indicator="ro" style="font-size:12px;"></span></th>
-                                <th class="dashboard-header-cell" data-sort-key="vehicle" onclick="sortRoListByHeader('vehicle')" style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold; cursor:pointer; user-select:none;">Vehicle <span data-sort-indicator="vehicle" style="font-size:12px;"></span></th>
-                                <th class="dashboard-header-cell" data-sort-key="customer" onclick="sortRoListByHeader('customer')" style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold; cursor:pointer; user-select:none;">Customer <span data-sort-indicator="customer" style="font-size:12px;"></span></th>
-                                <th class="dashboard-header-cell" data-sort-key="insurance" onclick="sortRoListByHeader('insurance')" style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold; cursor:pointer; user-select:none;">Insurance <span data-sort-indicator="insurance" style="font-size:12px;"></span></th>
-                                <th class="dashboard-header-cell" data-sort-key="phase" onclick="sortRoListByHeader('phase')" style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold; cursor:pointer; user-select:none;">Phase <span data-sort-indicator="phase" style="font-size:12px;"></span></th>
-                                <th class="dashboard-header-cell" data-sort-key="in_date" onclick="sortRoListByHeader('in_date')" style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold; cursor:pointer; user-select:none;">In <span data-sort-indicator="in_date" style="font-size:12px;"></span></th>
-                                <th class="dashboard-header-cell" data-sort-key="days_since_in" onclick="sortRoListByHeader('days_since_in')" style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold; text-align:center; cursor:pointer; user-select:none;" title="Days Since In Date">⏳ <span data-sort-indicator="days_since_in" style="font-size:12px;"></span></th>
-                                <th class="dashboard-header-cell" data-sort-key="ecd_date" onclick="sortRoListByHeader('ecd_date')" style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold; cursor:pointer; user-select:none;">ECD <span data-sort-indicator="ecd_date" style="font-size:12px;"></span></th>
-                                <th class="dashboard-header-cell" style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold; text-align:right; user-select:none;">HRS</th>
-                                <th class="dashboard-header-cell" data-sort-key="total" onclick="sortRoListByHeader('total')" style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold; text-align:right; cursor:pointer; user-select:none;">Total <span data-sort-indicator="total" style="font-size:12px;"></span></th>
+                                <th class="dashboard-header-cell" data-sort-key="ro" onclick="sortRoListByHeader('ro')" style="padding:14px 12px; border-bottom:1px solid #e5e7eb; font-weight:600; cursor:pointer; user-select:none;">RO# <span data-sort-indicator="ro" style="font-size:12px;"></span></th>
+                                <th class="dashboard-header-cell" data-sort-key="vehicle" onclick="sortRoListByHeader('vehicle')" style="padding:14px 12px; border-bottom:1px solid #e5e7eb; font-weight:600; cursor:pointer; user-select:none;">Vehicle <span data-sort-indicator="vehicle" style="font-size:12px;"></span></th>
+                                <th class="dashboard-header-cell" data-sort-key="customer" onclick="sortRoListByHeader('customer')" style="padding:14px 12px; border-bottom:1px solid #e5e7eb; font-weight:600; cursor:pointer; user-select:none;">Customer <span data-sort-indicator="customer" style="font-size:12px;"></span></th>
+                                <th class="dashboard-header-cell" data-sort-key="insurance" onclick="sortRoListByHeader('insurance')" style="padding:14px 12px; border-bottom:1px solid #e5e7eb; font-weight:600; cursor:pointer; user-select:none;">Insurance <span data-sort-indicator="insurance" style="font-size:12px;"></span></th>
+                                <th class="dashboard-header-cell" data-sort-key="phase" onclick="sortRoListByHeader('phase')" style="padding:14px 12px; border-bottom:1px solid #e5e7eb; font-weight:600; cursor:pointer; user-select:none;">Phase <span data-sort-indicator="phase" style="font-size:12px;"></span></th>
+                                <th class="dashboard-header-cell" data-sort-key="in_date" onclick="sortRoListByHeader('in_date')" style="padding:14px 12px; border-bottom:1px solid #e5e7eb; font-weight:600; cursor:pointer; user-select:none;">In <span data-sort-indicator="in_date" style="font-size:12px;"></span></th>
+                                <th class="dashboard-header-cell" data-sort-key="days_since_in" onclick="sortRoListByHeader('days_since_in')" style="padding:14px 12px; border-bottom:1px solid #e5e7eb; font-weight:600; text-align:center; cursor:pointer; user-select:none;" title="Days Since In Date">⏳ <span data-sort-indicator="days_since_in" style="font-size:12px;"></span></th>
+                                <th class="dashboard-header-cell" data-sort-key="ecd_date" onclick="sortRoListByHeader('ecd_date')" style="padding:14px 12px; border-bottom:1px solid #e5e7eb; font-weight:600; cursor:pointer; user-select:none;">ECD <span data-sort-indicator="ecd_date" style="font-size:12px;"></span></th>
+                                <th class="dashboard-header-cell" style="padding:14px 12px; border-bottom:1px solid #e5e7eb; font-weight:600; text-align:right; user-select:none;">HRS</th>
+                                <th class="dashboard-header-cell" data-sort-key="total" onclick="sortRoListByHeader('total')" style="padding:14px 12px; border-bottom:1px solid #e5e7eb; font-weight:600; text-align:right; cursor:pointer; user-select:none;">Total <span data-sort-indicator="total" style="font-size:12px;"></span></th>
                             </tr>
                         </thead>
                         <tbody id="roListBody">
@@ -244,10 +244,99 @@ def get_dashboard_screen_html():
         <style>
             .dashboard-header-row th, .dashboard-header-cell {
                 font-family: inherit;
-                font-size: 16px;
-                font-weight: bold;
-                background: #23272a;
-                color: #fff;
+                font-size: 15px;
+                font-weight: 600;
+                background: transparent;
+                color: #6b7280;
+            }
+            .dashboard-ro-row {
+                transition: transform 0.16s ease, box-shadow 0.16s ease;
+            }
+            .dashboard-ro-row td {
+                background: #f8fafc;
+                padding: 18px 12px;
+                border-top: 1px solid #edf2f7;
+                border-bottom: 1px solid #edf2f7;
+                color: #475569;
+                font-size: 13px;
+                vertical-align: middle;
+            }
+            .dashboard-ro-row td:first-child {
+                border-left: 1px solid #edf2f7;
+                border-radius: 8px 0 0 8px;
+            }
+            .dashboard-ro-row td:last-child {
+                border-right: 1px solid #edf2f7;
+                border-radius: 0 8px 8px 0;
+            }
+            .dashboard-ro-row:hover {
+                transform: translateY(-1px);
+            }
+            .dashboard-ro-row:hover td {
+                background: #f1f5f9;
+                box-shadow: 0 4px 10px rgba(15, 23, 42, 0.06);
+            }
+            .dashboard-ro-primary-btn {
+                background: none;
+                border: none;
+                color: #0f172a;
+                cursor: pointer;
+                padding: 0;
+                text-align: left;
+                font: inherit;
+                font-size: 15px;
+                font-weight: 600;
+                text-decoration: none;
+            }
+            .dashboard-ro-secondary-btn {
+                background: none;
+                border: none;
+                color: #475569;
+                cursor: pointer;
+                padding: 0;
+                text-align: left;
+                font: inherit;
+                text-decoration: none;
+            }
+            .dashboard-neutral-pill {
+                display: inline-flex;
+                align-items: center;
+                padding: 4px 10px;
+                border-radius: 999px;
+                background: #eef2f7;
+                color: #475569;
+                font-size: 12px;
+                font-weight: 600;
+                border: 1px solid #dde5ef;
+                max-width: 100%;
+            }
+            .dashboard-phase-pill {
+                padding: 4px 10px;
+                border-radius: 999px;
+                border: 1px solid transparent;
+                font-size: 12px;
+                font-weight: 600;
+                cursor: pointer;
+                max-width: 160px;
+            }
+            .dashboard-phase-pill.phase-teardown { background:#f1f5f9; color:#334155; border-color:#dbe5f0; }
+            .dashboard-phase-pill.phase-auth { background:#fff7ed; color:#9a3412; border-color:#fed7aa; }
+            .dashboard-phase-pill.phase-parts { background:#eef2ff; color:#3730a3; border-color:#c7d2fe; }
+            .dashboard-phase-pill.phase-body { background:#ecfdf5; color:#065f46; border-color:#a7f3d0; }
+            .dashboard-phase-pill.phase-refinish { background:#f5f3ff; color:#5b21b6; border-color:#ddd6fe; }
+            .dashboard-phase-pill.phase-reassy { background:#f0f9ff; color:#0c4a6e; border-color:#bae6fd; }
+            .dashboard-phase-pill.phase-sublet { background:#fff1f2; color:#9f1239; border-color:#fecdd3; }
+            .dashboard-phase-pill.phase-washqc { background:#f0fdf4; color:#166534; border-color:#bbf7d0; }
+            .dashboard-phase-pill.phase-complete { background:#ecfeff; color:#0e7490; border-color:#a5f3fc; }
+            .dashboard-meta-date,
+            .dashboard-meta-hours {
+                display: inline-flex;
+                align-items: center;
+                gap: 6px;
+            }
+            .dashboard-meta-icon {
+                color: #94a3b8;
+                font-size: 12px;
             }
             .mini-popup-panel {
                 position: absolute;
@@ -3568,6 +3657,36 @@ def get_dashboard_screen_html():
                 return labelMap[key] || phase || 'Teardown';
             }
 
+            function getPhaseToneClass(phase) {
+                const key = normalizePhaseValue(phase);
+                if (key === 'complete') return 'phase-complete';
+                if (key === 'washqc') return 'phase-washqc';
+                if (key === 'sublet') return 'phase-sublet';
+                if (key === 'reassy') return 'phase-reassy';
+                if (key === 'refinish') return 'phase-refinish';
+                if (key === 'body') return 'phase-body';
+                if (key === 'parts') return 'phase-parts';
+                if (key === 'auth') return 'phase-auth';
+                return 'phase-teardown';
+            }
+
+            function applyDashboardPhaseTone(selectEl) {
+                if (!selectEl) return;
+                const phaseClasses = [
+                    'phase-teardown',
+                    'phase-auth',
+                    'phase-parts',
+                    'phase-body',
+                    'phase-refinish',
+                    'phase-reassy',
+                    'phase-sublet',
+                    'phase-washqc',
+                    'phase-complete',
+                ];
+                phaseClasses.forEach((cls) => selectEl.classList.remove(cls));
+                selectEl.classList.add(getPhaseToneClass(selectEl.value));
+            }
+
             function normalizePhaseValue(phase) {
                 const key = String(phase || 'teardown').trim().toLowerCase();
                 if (key === 'wash/qc') return 'washqc';
@@ -4004,6 +4123,7 @@ def get_dashboard_screen_html():
                     const claimDisplay = ro.claim_number || '-';
                     const phaseDisplay = formatPhaseDisplay(ro.phase);
                     const phaseSelectOptions = getPhaseDropdownOptions(ro.phase);
+                    const phaseToneClass = getPhaseToneClass(ro.phase);
                     const vinDisplay = ro.vin || '-';
                     const phoneNumbers = normalizePhoneList(ro.phone_numbers);
                     if (phoneNumbers.length === 0 && phoneDisplay && phoneDisplay !== '-') {
@@ -4026,10 +4146,10 @@ def get_dashboard_screen_html():
                     const subletItems = showSubletWarning ? getPendingSubletItems(ro) : [];
                     
                     html += `
-                        <tr style="background:${rowBg};">
-                            <td style="padding:12px; border-bottom:1px solid #eee; position:relative;">
+                        <tr class="dashboard-ro-row">
+                            <td style="position:relative;">
                                 <div style="display:inline-flex; align-items:center; gap:6px;">
-                                    <button type="button" onclick="openRoWindowFromDashboard(event, '${ro.ro}')" style="background:none; border:none; color:#0066cc; text-decoration:underline; cursor:pointer; padding:0; font:inherit;">
+                                    <button type="button" onclick="openRoWindowFromDashboard(event, '${ro.ro}')" class="dashboard-ro-primary-btn" title="Open RO">
                                         ${ro.ro}
                                     </button>
                                     ${showSubletWarning ? `
@@ -4048,35 +4168,35 @@ def get_dashboard_screen_html():
                                     ` : ''}
                                 </div>
                             </td>
-                            <td style="padding:12px; border-bottom:1px solid #eee; color:#333;">
-                                <button type="button" onclick="toggleVehicleVin(event, '${ro.ro}')" style="background:none; border:none; color:#0066cc; text-decoration:underline; cursor:pointer; padding:0; font:inherit; text-align:left;">
+                            <td>
+                                <button type="button" onclick="toggleVehicleVin(event, '${ro.ro}')" class="dashboard-ro-primary-btn" title="Vehicle and VIN">
                                     ${ro.vehicle || 'N/A'}
                                 </button>
                             </td>
-                            <td style="padding:12px; border-bottom:1px solid #eee; color:#333;">
-                                <button type="button" onclick="toggleCustomerContact(event, '${ro.ro}')" style="background:none; border:none; color:#0066cc; text-decoration:underline; cursor:pointer; padding:0; font:inherit; text-align:left;">
+                            <td>
+                                <button type="button" onclick="toggleCustomerContact(event, '${ro.ro}')" class="dashboard-ro-secondary-btn" title="Customer contact">
                                     ${customerDisplay}
                                 </button>
                             </td>
-                            <td style="padding:12px; border-bottom:1px solid #eee; color:#333;">
-                                <button type="button" onclick="toggleInsuranceClaim(event, '${ro.ro}')" style="background:none; border:none; color:#0066cc; text-decoration:underline; cursor:pointer; padding:0; font:inherit; text-align:left;">
-                                    ${insuranceDisplay}
+                            <td>
+                                <button type="button" onclick="toggleInsuranceClaim(event, '${ro.ro}')" class="dashboard-ro-secondary-btn" title="Insurance details">
+                                    <span class="dashboard-neutral-pill">${insuranceDisplay}</span>
                                 </button>
                             </td>
-                            <td style="padding:12px; border-bottom:1px solid #eee; color:#333;">
-                                <select onchange="changeRoPhase(event, '${ro.ro}', this.value)" style="padding:4px 6px; border:1px solid #ccc; border-radius:4px; background:#fff; color:#333; font-size:13px; max-width:160px;">
+                            <td>
+                                <select onchange="changeRoPhase(event, '${ro.ro}', this.value); applyDashboardPhaseTone(this);" class="dashboard-phase-pill ${phaseToneClass}" title="${phaseDisplay}">
                                     ${phaseSelectOptions}
                                 </select>
                             </td>
-                            <td style="padding:12px; border-bottom:1px solid #eee; color:#333;">${inDisplay}</td>
-                            <td style="padding:12px; border-bottom:1px solid #eee; color:#555; text-align:center; font-weight:bold;">${daysDisplay}</td>
-                            <td style="padding:12px; border-bottom:1px solid #eee; color:#333;">${ecdDisplay}</td>
-                            <td style="padding:12px; border-bottom:1px solid #eee; text-align:right; font-weight:bold; color:#333;">
-                                <button type="button" onclick="toggleRoHrsAssignments(event, '${ro.ro}')" style="background:none; border:none; color:#0066cc; text-decoration:underline; cursor:pointer; padding:0; font:inherit; font-weight:bold;">
-                                    ${ro.hours.toFixed(1)}
+                            <td><span class="dashboard-meta-date"><span class="dashboard-meta-icon">📅</span>${inDisplay}</span></td>
+                            <td style="text-align:center; font-weight:600;">${daysDisplay}</td>
+                            <td><span class="dashboard-meta-date"><span class="dashboard-meta-icon">📅</span>${ecdDisplay}</span></td>
+                            <td style="text-align:right; font-weight:600; color:#1f2937;">
+                                <button type="button" onclick="toggleRoHrsAssignments(event, '${ro.ro}')" class="dashboard-ro-secondary-btn" style="font-weight:600; color:#1f2937;" title="Hours assignments">
+                                    <span class="dashboard-meta-hours"><span class="dashboard-meta-icon">⏱</span>${ro.hours.toFixed(1)}</span>
                                 </button>
                             </td>
-                            <td style="padding:12px; border-bottom:1px solid #eee; color:#333; text-align:right; font-weight:bold;">$${ro.total.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                            <td style="text-align:right; font-weight:600; color:#1f2937;">$${ro.total.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
                         </tr>
                         <tr id="hrs-assignment-row-${rowId}" style="display:none; background:${rowBg};">
                             <td colspan="10" style="padding:0 16px 10px 16px; border-bottom:1px solid #eee;">
