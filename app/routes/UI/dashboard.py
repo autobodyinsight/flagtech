@@ -288,7 +288,7 @@ def get_dashboard_screen_html():
                 box-shadow: 0 4px 10px rgba(15, 23, 42, 0.06);
             }
             .dashboard-ro-primary-btn {
-                background: transparent !important;
+                background: none;
                 border: none;
                 color: #000;
                 cursor: pointer;
@@ -298,10 +298,9 @@ def get_dashboard_screen_html():
                 font-size: 18px;
                 font-weight: 600;
                 text-decoration: none;
-                box-shadow: none !important;
             }
             .dashboard-ro-secondary-btn {
-                background: transparent !important;
+                background: none;
                 border: none;
                 color: #000;
                 cursor: pointer;
@@ -309,17 +308,17 @@ def get_dashboard_screen_html():
                 text-align: left;
                 font: inherit;
                 text-decoration: none;
-                box-shadow: none !important;
             }
             .dashboard-neutral-pill {
-                display: inline;
-                padding: 0;
-                border-radius: 0;
-                background: transparent;
+                display: inline-flex;
+                align-items: center;
+                padding: 4px 10px;
+                border-radius: 999px;
+                background: #f1f5f9;
                 color: #000;
-                font-size: 16px;
+                font-size: 14px;
                 font-weight: 600;
-                border: none;
+                border: 1px solid #dde5ef;
                 max-width: 100%;
             }
             .dashboard-phase-pill {
