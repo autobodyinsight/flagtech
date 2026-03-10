@@ -4142,10 +4142,24 @@ def get_dashboard_screen_html():
                 const toTitleCaseName = (value) => String(value || '')
                     .trim()
                     .toLowerCase()
-                printWindow.focus();
-                setTimeout(() => {
-                    printWindow.print();
-                }, 250);
+                    .split(/\s+/)
+                    .filter(Boolean)
+                    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+                    .join(' ');
+
+                const estimatorName = toTitleCaseName(ro?.estimator || '');
+                const writtenByName = toTitleCaseName(ro?.written_by || '');
+
+                if (estimatorName && writtenByName) {
+                    if (estimatorName.toLowerCase() === writtenByName.toLowerCase()) {
+                        return `${estimatorName} (Estimator / Written by)`;
+                    }
+                    return `${estimatorName} / ${writtenByName}`;
+                }
+
+                if (estimatorName) return `${estimatorName} (Estimator)`;
+                if (writtenByName) return `${writtenByName} (Written by)`;
+                return '-';
             }
             
             function escapeHtml(text) {
