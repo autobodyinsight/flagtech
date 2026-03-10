@@ -361,7 +361,7 @@ async def home_screen(request: Request):
             left: 0;
             width: 260px;
             height: calc(100vh - 60px);
-            background: #f2f0ef;
+            background: #971d1d;
             box-shadow: 2px 0 18px rgba(0,0,0,0.2);
             transform: translateX(-100%);
             transition: transform 0.22s ease;
@@ -379,21 +379,28 @@ async def home_screen(request: Request):
         .side-menu-item {{
             width: 100%;
             border: none;
-            border-bottom: 1px solid #d0c8c4;
             background: transparent;
-            color: #1f1f1f;
+            color: #ffffff;
             border-radius: 0;
             padding: 14px 12px;
-            text-align: center;
+            text-align: left;
             font-size: 16px;
             font-weight: 700;
             letter-spacing: 0.6px;
             cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: flex-start;
+        }}
+        .side-menu-item:hover {{
+            background: #9f1e1e;
+            color: #ffffff;
         }}
         .side-menu-item.active {{
-            background: transparent;
-            color: #b22222;
+            background: #b22222;
+            color: #ffffff;
             text-decoration: none;
+            box-shadow: inset 4px 0 0 #ffffff;
         }}
         .side-menu-item:last-child {{
             border-bottom: none;
