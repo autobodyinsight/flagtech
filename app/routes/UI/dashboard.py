@@ -179,16 +179,16 @@ def get_dashboard_screen_html():
                     <table id="roListTable" style="width:100%; border-collapse:separate; border-spacing:0 10px;">
                         <thead>
                             <tr class="dashboard-header-row">
-                                <th class="dashboard-header-cell" data-sort-key="ro" onclick="sortRoListByHeader('ro')" style="padding:14px 12px; border-bottom:1px solid #e5e7eb; font-weight:600; cursor:pointer; user-select:none;">RO# <span data-sort-indicator="ro" style="font-size:12px;"></span></th>
-                                <th class="dashboard-header-cell" data-sort-key="vehicle" onclick="sortRoListByHeader('vehicle')" style="padding:14px 12px; border-bottom:1px solid #e5e7eb; font-weight:600; cursor:pointer; user-select:none;">Vehicle <span data-sort-indicator="vehicle" style="font-size:12px;"></span></th>
-                                <th class="dashboard-header-cell" data-sort-key="customer" onclick="sortRoListByHeader('customer')" style="padding:14px 12px; border-bottom:1px solid #e5e7eb; font-weight:600; cursor:pointer; user-select:none;">Customer <span data-sort-indicator="customer" style="font-size:12px;"></span></th>
-                                <th class="dashboard-header-cell" data-sort-key="insurance" onclick="sortRoListByHeader('insurance')" style="padding:14px 12px; border-bottom:1px solid #e5e7eb; font-weight:600; cursor:pointer; user-select:none;">Insurance <span data-sort-indicator="insurance" style="font-size:12px;"></span></th>
-                                <th class="dashboard-header-cell" data-sort-key="phase" onclick="sortRoListByHeader('phase')" style="padding:14px 12px; border-bottom:1px solid #e5e7eb; font-weight:600; cursor:pointer; user-select:none;">Phase <span data-sort-indicator="phase" style="font-size:12px;"></span></th>
-                                <th class="dashboard-header-cell" data-sort-key="in_date" onclick="sortRoListByHeader('in_date')" style="padding:14px 12px; border-bottom:1px solid #e5e7eb; font-weight:600; cursor:pointer; user-select:none;">In <span data-sort-indicator="in_date" style="font-size:12px;"></span></th>
-                                <th class="dashboard-header-cell" data-sort-key="days_since_in" onclick="sortRoListByHeader('days_since_in')" style="padding:14px 12px; border-bottom:1px solid #e5e7eb; font-weight:600; text-align:center; cursor:pointer; user-select:none;" title="Days Since In Date">⏳ <span data-sort-indicator="days_since_in" style="font-size:12px;"></span></th>
-                                <th class="dashboard-header-cell" data-sort-key="ecd_date" onclick="sortRoListByHeader('ecd_date')" style="padding:14px 12px; border-bottom:1px solid #e5e7eb; font-weight:600; cursor:pointer; user-select:none;">ECD <span data-sort-indicator="ecd_date" style="font-size:12px;"></span></th>
-                                <th class="dashboard-header-cell" style="padding:14px 12px; border-bottom:1px solid #e5e7eb; font-weight:600; text-align:right; user-select:none;">HRS</th>
-                                <th class="dashboard-header-cell" data-sort-key="total" onclick="sortRoListByHeader('total')" style="padding:14px 12px; border-bottom:1px solid #e5e7eb; font-weight:600; text-align:right; cursor:pointer; user-select:none;">Total <span data-sort-indicator="total" style="font-size:12px;"></span></th>
+                                <th class="dashboard-header-cell" data-sort-key="ro" onclick="sortRoListByHeader('ro')" style="padding:14px 12px; font-weight:600; cursor:pointer; user-select:none;">RO# <span data-sort-indicator="ro" style="font-size:12px;"></span></th>
+                                <th class="dashboard-header-cell" data-sort-key="vehicle" onclick="sortRoListByHeader('vehicle')" style="padding:14px 12px; font-weight:600; cursor:pointer; user-select:none;">Vehicle <span data-sort-indicator="vehicle" style="font-size:12px;"></span></th>
+                                <th class="dashboard-header-cell" data-sort-key="customer" onclick="sortRoListByHeader('customer')" style="padding:14px 12px; font-weight:600; cursor:pointer; user-select:none;">Customer <span data-sort-indicator="customer" style="font-size:12px;"></span></th>
+                                <th class="dashboard-header-cell" data-sort-key="insurance" onclick="sortRoListByHeader('insurance')" style="padding:14px 12px; font-weight:600; cursor:pointer; user-select:none;">Insurance <span data-sort-indicator="insurance" style="font-size:12px;"></span></th>
+                                <th class="dashboard-header-cell" data-sort-key="phase" onclick="sortRoListByHeader('phase')" style="padding:14px 12px; font-weight:600; cursor:pointer; user-select:none;">Phase <span data-sort-indicator="phase" style="font-size:12px;"></span></th>
+                                <th class="dashboard-header-cell" data-sort-key="in_date" onclick="sortRoListByHeader('in_date')" style="padding:14px 12px; font-weight:600; cursor:pointer; user-select:none;">In <span data-sort-indicator="in_date" style="font-size:12px;"></span></th>
+                                <th class="dashboard-header-cell" data-sort-key="days_since_in" onclick="sortRoListByHeader('days_since_in')" style="padding:14px 12px; font-weight:600; text-align:center; cursor:pointer; user-select:none;" title="Days Since In Date">⏳ <span data-sort-indicator="days_since_in" style="font-size:12px;"></span></th>
+                                <th class="dashboard-header-cell" data-sort-key="ecd_date" onclick="sortRoListByHeader('ecd_date')" style="padding:14px 12px; font-weight:600; cursor:pointer; user-select:none;">ECD <span data-sort-indicator="ecd_date" style="font-size:12px;"></span></th>
+                                <th class="dashboard-header-cell" style="padding:14px 12px; font-weight:600; text-align:right; user-select:none;">HRS</th>
+                                <th class="dashboard-header-cell" data-sort-key="total" onclick="sortRoListByHeader('total')" style="padding:14px 12px; font-weight:600; text-align:right; cursor:pointer; user-select:none;">Total <span data-sort-indicator="total" style="font-size:12px;"></span></th>
                             </tr>
                         </thead>
                         <tbody id="roListBody">
@@ -243,11 +243,21 @@ def get_dashboard_screen_html():
 
         <style>
             .dashboard-header-row th, .dashboard-header-cell {
-                font-family: inherit;
-                font-size: 15px;
+                font-family: "Segoe UI Variable", "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+                font-size: 18px;
                 font-weight: 600;
-                background: transparent;
-                color: #6b7280;
+                background: #e5e7eb;
+                color: #000;
+                border-top: 1px solid #d1d5db;
+                border-bottom: 1px solid #d1d5db;
+            }
+            .dashboard-header-row th:first-child {
+                border-left: 1px solid #d1d5db;
+                border-radius: 10px 0 0 10px;
+            }
+            .dashboard-header-row th:last-child {
+                border-right: 1px solid #d1d5db;
+                border-radius: 0 10px 10px 0;
             }
             .dashboard-ro-row {
                 transition: transform 0.16s ease, box-shadow 0.16s ease;
@@ -257,8 +267,9 @@ def get_dashboard_screen_html():
                 padding: 18px 12px;
                 border-top: 1px solid #edf2f7;
                 border-bottom: 1px solid #edf2f7;
-                color: #475569;
-                font-size: 13px;
+                color: #000;
+                font-family: "Segoe UI Variable", "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+                font-size: 16px;
                 vertical-align: middle;
             }
             .dashboard-ro-row td:first-child {
@@ -279,19 +290,19 @@ def get_dashboard_screen_html():
             .dashboard-ro-primary-btn {
                 background: none;
                 border: none;
-                color: #0f172a;
+                color: #000;
                 cursor: pointer;
                 padding: 0;
                 text-align: left;
                 font: inherit;
-                font-size: 15px;
+                font-size: 18px;
                 font-weight: 600;
                 text-decoration: none;
             }
             .dashboard-ro-secondary-btn {
                 background: none;
                 border: none;
-                color: #475569;
+                color: #000;
                 cursor: pointer;
                 padding: 0;
                 text-align: left;
@@ -303,9 +314,9 @@ def get_dashboard_screen_html():
                 align-items: center;
                 padding: 4px 10px;
                 border-radius: 999px;
-                background: #eef2f7;
-                color: #475569;
-                font-size: 12px;
+                background: #f1f5f9;
+                color: #000;
+                font-size: 14px;
                 font-weight: 600;
                 border: 1px solid #dde5ef;
                 max-width: 100%;
@@ -314,20 +325,22 @@ def get_dashboard_screen_html():
                 padding: 4px 10px;
                 border-radius: 999px;
                 border: 1px solid transparent;
-                font-size: 12px;
+                font-size: 14px;
                 font-weight: 600;
                 cursor: pointer;
                 max-width: 160px;
+                color: #000;
+                background: #f1f5f9;
             }
-            .dashboard-phase-pill.phase-teardown { background:#f1f5f9; color:#334155; border-color:#dbe5f0; }
-            .dashboard-phase-pill.phase-auth { background:#fff7ed; color:#9a3412; border-color:#fed7aa; }
-            .dashboard-phase-pill.phase-parts { background:#eef2ff; color:#3730a3; border-color:#c7d2fe; }
-            .dashboard-phase-pill.phase-body { background:#ecfdf5; color:#065f46; border-color:#a7f3d0; }
-            .dashboard-phase-pill.phase-refinish { background:#f5f3ff; color:#5b21b6; border-color:#ddd6fe; }
-            .dashboard-phase-pill.phase-reassy { background:#f0f9ff; color:#0c4a6e; border-color:#bae6fd; }
-            .dashboard-phase-pill.phase-sublet { background:#fff1f2; color:#9f1239; border-color:#fecdd3; }
-            .dashboard-phase-pill.phase-washqc { background:#f0fdf4; color:#166534; border-color:#bbf7d0; }
-            .dashboard-phase-pill.phase-complete { background:#ecfeff; color:#0e7490; border-color:#a5f3fc; }
+            .dashboard-phase-pill.phase-teardown { background:#f1f5f9; color:#000; border-color:#dbe5f0; }
+            .dashboard-phase-pill.phase-auth { background:#f3f4f6; color:#000; border-color:#d1d5db; }
+            .dashboard-phase-pill.phase-parts { background:#f3f4f6; color:#000; border-color:#d1d5db; }
+            .dashboard-phase-pill.phase-body { background:#f3f4f6; color:#000; border-color:#d1d5db; }
+            .dashboard-phase-pill.phase-refinish { background:#f3f4f6; color:#000; border-color:#d1d5db; }
+            .dashboard-phase-pill.phase-reassy { background:#f3f4f6; color:#000; border-color:#d1d5db; }
+            .dashboard-phase-pill.phase-sublet { background:#f3f4f6; color:#000; border-color:#d1d5db; }
+            .dashboard-phase-pill.phase-washqc { background:#f3f4f6; color:#000; border-color:#d1d5db; }
+            .dashboard-phase-pill.phase-complete { background:#f3f4f6; color:#000; border-color:#d1d5db; }
             .dashboard-meta-date,
             .dashboard-meta-hours {
                 display: inline-flex;
@@ -335,7 +348,7 @@ def get_dashboard_screen_html():
                 gap: 6px;
             }
             .dashboard-meta-icon {
-                color: #94a3b8;
+                color: #000;
                 font-size: 12px;
             }
             .mini-popup-panel {
@@ -4191,12 +4204,12 @@ def get_dashboard_screen_html():
                             <td><span class="dashboard-meta-date"><span class="dashboard-meta-icon">📅</span>${inDisplay}</span></td>
                             <td style="text-align:center; font-weight:600;">${daysDisplay}</td>
                             <td><span class="dashboard-meta-date"><span class="dashboard-meta-icon">📅</span>${ecdDisplay}</span></td>
-                            <td style="text-align:right; font-weight:600; color:#1f2937;">
-                                <button type="button" onclick="toggleRoHrsAssignments(event, '${ro.ro}')" class="dashboard-ro-secondary-btn" style="font-weight:600; color:#1f2937;" title="Hours assignments">
+                            <td style="text-align:right; font-weight:600; color:#000;">
+                                <button type="button" onclick="toggleRoHrsAssignments(event, '${ro.ro}')" class="dashboard-ro-secondary-btn" style="font-weight:600; color:#000;" title="Hours assignments">
                                     <span class="dashboard-meta-hours"><span class="dashboard-meta-icon">⏱</span>${ro.hours.toFixed(1)}</span>
                                 </button>
                             </td>
-                            <td style="text-align:right; font-weight:600; color:#1f2937;">$${ro.total.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                            <td style="text-align:right; font-weight:600; color:#000;">$${ro.total.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
                         </tr>
                         <tr id="hrs-assignment-row-${rowId}" style="display:none; background:${rowBg};">
                             <td colspan="10" style="padding:0 16px 10px 16px; border-bottom:1px solid #eee;">
@@ -4239,7 +4252,7 @@ def get_dashboard_screen_html():
                                             <div style="display:flex; align-items:center; gap:8px;">
                                                 <span style="font-weight:bold; color:#555;">Phone:</span>
                                                 <span id="phone-primary-display-wrap-${rowId}" style="display:inline-flex;">
-                                                    <button type="button" onclick="startPrimaryPhoneEdit(event, '${rowId}')" style="background:none; border:none; color:#0066cc; text-decoration:underline; cursor:pointer; padding:0; font:inherit;">
+                                                    <button type="button" onclick="startPrimaryPhoneEdit(event, '${rowId}')" style="background:none; border:none; color:#000; text-decoration:underline; cursor:pointer; padding:0; font:inherit;">
                                                         <span id="phone-primary-display-text-${rowId}">${primaryPhoneDisplay}</span>
                                                     </button>
                                                 </span>
@@ -4249,7 +4262,7 @@ def get_dashboard_screen_html():
                                                 <button id="phone-add-toggle-${rowId}" data-enabled="0" type="button" onclick="toggleAddPhoneInput(event, '${rowId}')" style="background:#d32f2f; border:1px solid #b71c1c; color:#fff; border-radius:3px; padding:0 8px; font-size:13px; cursor:pointer;">+</button>
                                             </div>
                                             <div id="phone-additional-${rowId}" style="display:flex; align-items:center; gap:12px; margin-left:56px; flex-wrap:wrap;">
-                                                ${additionalPhoneDisplays.map(phone => `<button type="button" onclick='startPrimaryPhoneEditWithValue(event, ${JSON.stringify(rowId)}, ${JSON.stringify(phone)})' style="background:none; border:none; color:#0066cc; text-decoration:underline; cursor:pointer; padding:0; font:inherit;">${escapeHtml(phone)}</button>`).join('')}
+                                                ${additionalPhoneDisplays.map(phone => `<button type="button" onclick='startPrimaryPhoneEditWithValue(event, ${JSON.stringify(rowId)}, ${JSON.stringify(phone)})' style="background:none; border:none; color:#000; text-decoration:underline; cursor:pointer; padding:0; font:inherit;">${escapeHtml(phone)}</button>`).join('')}
                                             </div>
                                             <div id="phone-add-input-wrap-${rowId}" style="display:none; margin-left:56px;">
                                                 <input id="phone-add-input-${rowId}" placeholder="Add phone and press Enter" onkeydown="handleAdditionalPhoneEnter(event, '${rowId}', '${ro.ro}')" style="padding:4px 6px; width:190px;" />
@@ -4258,7 +4271,7 @@ def get_dashboard_screen_html():
                                         <div style="display:flex; align-items:center; gap:8px; margin-left:auto;">
                                             <span style="font-weight:bold; color:#555;">Email:</span>
                                             <span id="email-display-wrap-${rowId}" style="${emailDisplay ? 'display:inline-flex;' : 'display:none;'}">
-                                                <button type="button" onclick="startEmailEdit(event, '${rowId}')" style="background:none; border:none; color:#0066cc; text-decoration:underline; cursor:pointer; padding:0; font:inherit; text-align:left;">
+                                                <button type="button" onclick="startEmailEdit(event, '${rowId}')" style="background:none; border:none; color:#000; text-decoration:underline; cursor:pointer; padding:0; font:inherit; text-align:left;">
                                                     <span id="email-display-text-${rowId}">${escapeHtml(emailDisplay)}</span>
                                                 </button>
                                             </span>
