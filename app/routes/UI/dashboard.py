@@ -314,6 +314,7 @@ def get_dashboard_screen_html():
                 align-items: center;
                 padding: 4px 10px;
                 border-radius: 999px;
+                background: #f1f5f9;
                 color: #000;
                 font-size: 14px;
                 font-weight: 600;
@@ -329,16 +330,17 @@ def get_dashboard_screen_html():
                 cursor: pointer;
                 max-width: 160px;
                 color: #000;
+                background: #f1f5f9;
             }
-            .dashboard-phase-pill.phase-teardown { color:#000; border-color:#dbe5f0; }
-            .dashboard-phase-pill.phase-auth { color:#000; border-color:#d1d5db; }
-            .dashboard-phase-pill.phase-parts { color:#000; border-color:#d1d5db; }
-            .dashboard-phase-pill.phase-body { color:#000; border-color:#d1d5db; }
-            .dashboard-phase-pill.phase-refinish { color:#000; border-color:#d1d5db; }
-            .dashboard-phase-pill.phase-reassy { color:#000; border-color:#d1d5db; }
-            .dashboard-phase-pill.phase-sublet { color:#000; border-color:#d1d5db; }
-            .dashboard-phase-pill.phase-washqc { color:#000; border-color:#d1d5db; }
-            .dashboard-phase-pill.phase-complete { color:#000; border-color:#d1d5db; }
+            .dashboard-phase-pill.phase-teardown { background:#f1f5f9; color:#000; border-color:#dbe5f0; }
+            .dashboard-phase-pill.phase-auth { background:#f3f4f6; color:#000; border-color:#d1d5db; }
+            .dashboard-phase-pill.phase-parts { background:#f3f4f6; color:#000; border-color:#d1d5db; }
+            .dashboard-phase-pill.phase-body { background:#f3f4f6; color:#000; border-color:#d1d5db; }
+            .dashboard-phase-pill.phase-refinish { background:#f3f4f6; color:#000; border-color:#d1d5db; }
+            .dashboard-phase-pill.phase-reassy { background:#f3f4f6; color:#000; border-color:#d1d5db; }
+            .dashboard-phase-pill.phase-sublet { background:#f3f4f6; color:#000; border-color:#d1d5db; }
+            .dashboard-phase-pill.phase-washqc { background:#f3f4f6; color:#000; border-color:#d1d5db; }
+            .dashboard-phase-pill.phase-complete { background:#f3f4f6; color:#000; border-color:#d1d5db; }
             .dashboard-meta-date,
             .dashboard-meta-hours {
                 display: inline-flex;
