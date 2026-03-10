@@ -2716,31 +2716,103 @@ def get_dashboard_screen_html():
                     alert('Flash failed: ' + error.message);
                 }
             }
+
+            function isOpenDashboardRo(ro) {
+                const phase = String(ro?.phase || '').trim().toLowerCase();
+                return phase !== 'complete' && phase !== 'complete/finish';
+            }
+
+            function toNumeric(value) {
+                const parsed = Number(value);
+                return Number.isFinite(parsed) ? parsed : 0;
+            }
+
+            function sumRepairHours(items) {
+                if (!Array.isArray(items)) return 0;
+                return items.reduce((sum, item) => sum + toNumeric(item?.value), 0);
+            }
+
+            function computeOpenOnlyDashboardMetrics(roList) {
+                const openRos = (Array.isArray(roList) ? roList : []).filter(isOpenDashboardRo);
+                const totalROs = openRos.length;
+
+                let totalSales = 0;
+                let totalHours = 0;
+
+                const hoursByTech = {};
+                const rosByTechSets = {};
+
+                openRos.forEach((ro) => {
+                    const roKey = String(ro?.ro || '');
+                    const roTotal = toNumeric(ro?.total);
+                    const roHours = toNumeric(ro?.hours);
+
+                    totalSales += roTotal;
+                    totalHours += roHours;
+
+                    const laborTech = String(ro?.tech || '').trim() || 'Unassigned';
+                    const paintTech = String(ro?.painter || '').trim() || 'Unassigned';
+                    const laborHours = sumRepairHours(ro?.labor_repairs);
+                    const paintHours = sumRepairHours(ro?.paint_repairs);
+
+                    hoursByTech[laborTech] = (hoursByTech[laborTech] || 0) + laborHours;
+                    hoursByTech[paintTech] = (hoursByTech[paintTech] || 0) + paintHours;
+
+                    if (!rosByTechSets[laborTech]) rosByTechSets[laborTech] = new Set();
+                    if (!rosByTechSets[paintTech]) rosByTechSets[paintTech] = new Set();
+                    if (roKey) {
+                        rosByTechSets[laborTech].add(roKey);
+                        rosByTechSets[paintTech].add(roKey);
+                    }
+                });
+
+                const averageHrs = totalROs ? totalHours / totalROs : 0;
+                const averageRO = totalROs ? totalSales / totalROs : 0;
+
+                const hoursPerTech = Object.entries(hoursByTech)
+                    .map(([tech, hours]) => ({ tech, hours: toNumeric(hours) }))
+                    .sort((a, b) => b.hours - a.hours);
+
+                const rosPerTech = Object.entries(rosByTechSets)
+                    .map(([tech, roSet]) => ({ tech, ros: roSet.size }))
+                    .sort((a, b) => b.ros - a.ros);
+
+                return {
+                    totalSales,
+                    totalROs,
+                    averageHrs,
+                    averageRO,
+                    hoursPerTech,
+                    rosPerTech,
+                };
+            }
             
             // Update all dashboard elements
             function updateDashboard(data) {
-                // Update Total Sales bar and value
-                const maxSales = Math.max(data.totalSales, 10000); // minimum scale
-                const salesPercent = (data.totalSales / maxSales) * 100;
-                document.getElementById('totalSalesBar').style.height = salesPercent + '%';
-                document.getElementById('totalSalesValue').innerText = '$' + data.totalSales.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+                const openMetrics = computeOpenOnlyDashboardMetrics(data?.roList || []);
 
-                const maxRos = Math.max(data.totalROs, 1);
-                const rosPercent = (data.totalROs / maxRos) * 100;
+                // Update Total Sales bar and value
+                const maxSales = Math.max(openMetrics.totalSales, 10000); // minimum scale
+                const salesPercent = (openMetrics.totalSales / maxSales) * 100;
+                document.getElementById('totalSalesBar').style.height = salesPercent + '%';
+                document.getElementById('totalSalesValue').innerText = '$' + openMetrics.totalSales.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+
+                const maxRos = Math.max(openMetrics.totalROs, 1);
+                const rosPercent = (openMetrics.totalROs / maxRos) * 100;
                 document.getElementById('totalRosBar').style.height = rosPercent + '%';
-                document.getElementById('totalRosValue').innerText = data.totalROs.toLocaleString('en-US');
+                document.getElementById('totalRosValue').innerText = openMetrics.totalROs.toLocaleString('en-US');
                 
                 // Update Average Hours
-                document.getElementById('averageHrs').innerText = data.averageHrs.toFixed(1);
+                document.getElementById('averageHrs').innerText = openMetrics.averageHrs.toFixed(1);
                 
                 // Update Average RO
-                document.getElementById('averageRO').innerText = '$' + data.averageRO.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+                document.getElementById('averageRO').innerText = '$' + openMetrics.averageRO.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
                 
                 // Update Total Hrs per Tech - Pie Chart
-                updateHoursPerTechChart(data.hoursPerTech);
+                updateHoursPerTechChart(openMetrics.hoursPerTech);
                 
                 // Update Total ROs per Tech - List
-                updateRosPerTechList(data.rosPerTech);
+                updateRosPerTechList(openMetrics.rosPerTech);
                 
                 // Update RO List Table
                 updateRoListTable(data.roList);
