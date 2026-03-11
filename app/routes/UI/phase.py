@@ -62,24 +62,25 @@ def get_phase_screen_html():
                 background: rgba(0, 0, 0, 0.12);
             }
             .phase-header {
-                color: #111;
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                color: #222;
                 font-weight: 700;
-                padding: 8px 4px;
+                font-size: 12px;
+                letter-spacing: 0.4px;
+                text-transform: uppercase;
+                padding: 0 2px 8px;
                 margin: 6px 0 12px;
-                text-align: center;
-                background: transparent;
-                border: none;
-                box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
-                border-radius: 10px;
+                border-bottom: 2px solid #b22222;
             }
             .phase-count {
                 display: inline-block;
-                margin-left: 6px;
-                padding: 2px 6px;
-                font-size: 11px;
-                border-radius: 10px;
-                background: #e0e0e0;
-                color: #333;
+                margin-left: 8px;
+                padding: 0;
+                font-size: 12px;
+                font-weight: 700;
+                color: #b22222;
             }
             .phase-card {
                 border: 1.5px solid #e0e0e0;

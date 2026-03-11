@@ -173,7 +173,6 @@ async def home_screen():
         .dash-mini-card,
         .mini-popup-panel,
         .phase-card,
-        .phase-cards,
         #estimateSummary,
         #flagoutTechTable,
         #techsTableContainer,
@@ -216,6 +215,10 @@ async def home_screen():
         [style*="background-color: #d9d9d9"] {{
             background: var(--card-bg) !important;
             background-color: var(--card-bg) !important;
+        }}
+        .phase-cards {{
+            background: transparent !important;
+            background-color: transparent !important;
         }}
     </style>
 </head>
