@@ -426,8 +426,8 @@ def get_dashboard_screen_html():
 
             // Sidebar HTML
             const sidebarHtml = `
-                <div id="roSidebar" style="position:fixed; left:0; top:var(--ro-header-height, 170px); height:calc(100vh - var(--ro-header-height, 170px)); width:64px; background:#23272a; display:flex; flex-direction:column; align-items:center; justify-content:center; z-index:100; box-shadow:2px 0 8px rgba(0,0,0,0.08);">
-                    <div style="display:flex; flex-direction:column; align-items:center; justify-content:space-evenly; height:50%; min-height:340px; width:100%; padding:8px 0;">
+                <div id="roSidebar" style="position:fixed; left:0; top:var(--ro-header-height, 170px); bottom:0; width:64px; background:#23272a; display:flex; flex-direction:column; align-items:center; justify-content:center; z-index:100; box-shadow:2px 0 8px rgba(0,0,0,0.08);">
+                    <div style="display:flex; flex-direction:column; align-items:center; justify-content:space-evenly; height:100%; width:100%; padding:10px 0;">
                         <button id="roSidebarBtn-notes" class="ro-sidebar-btn" data-view="notes" title="Notes" style="background:none; border:none; padding:0; cursor:pointer;">${icons.notepad}</button>
                         <button id="roSidebarBtn-estimate" class="ro-sidebar-btn" data-view="estimate" title="Estimate" style="background:none; border:none; padding:0; cursor:pointer;">${icons.estimate}</button>
                         <button id="roSidebarBtn-tech" class="ro-sidebar-btn" data-view="tech" title="Tech" style="background:none; border:none; padding:0; cursor:pointer;">${icons.tech}</button>
@@ -505,7 +505,7 @@ def get_dashboard_screen_html():
             style.textContent = `
                 body { margin:0; font-family:Segoe UI,Arial,sans-serif; background:#f2f2f2; }
                 #roSidebar svg { display:block; margin:0 auto; }
-                #roSidebar .ro-sidebar-btn { opacity:0.72; transition:opacity 0.15s ease, transform 0.15s ease; }
+                #roSidebar .ro-sidebar-btn { opacity:0.72; transition:opacity 0.15s ease, transform 0.15s ease; width:100%; display:flex; align-items:center; justify-content:center; }
                 #roSidebar .ro-sidebar-btn:hover { opacity:1; transform:translateY(-1px); }
                 #roSidebar .ro-sidebar-btn.active { opacity:1; }
                 #roSidebar { box-shadow:2px 0 8px rgba(0,0,0,0.08); }
