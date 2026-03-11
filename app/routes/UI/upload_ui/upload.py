@@ -21,6 +21,7 @@ def get_upload_screen_html():
                 }
                 #upload .import-button {
                     display: inline-flex;
+                    flex-direction: column;
                     align-items: center;
                     justify-content: center;
                     padding: 14px 26px;
@@ -31,11 +32,30 @@ def get_upload_screen_html():
                     cursor: pointer;
                     font-size: 16px;
                     font-weight: bold;
+                    gap: 6px;
+                }
+                #upload .import-button svg {
+                    display: block;
+                    width: 28px;
+                    height: 28px;
+                }
+                #upload .import-button-text {
+                    font-size: 13px;
+                    font-weight: 700;
+                    letter-spacing: 0.8px;
+                    line-height: 1;
                 }
             </style>
             <form id="uploadForm" enctype="multipart/form-data">
                 <div id="importButtonWrap" class="upload-center">
-                    <label for="fileInput" class="import-button">+ import</label>
+                    <label for="fileInput" class="import-button" aria-label="Import">
+                        <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                            <path d="M7.5 18.5H6.5C4.567 18.5 3 16.933 3 15C3 13.267 4.26 11.828 5.916 11.549C6.41 8.958 8.686 7 11.4 7C14.08 7 16.332 8.909 16.862 11.453C18.662 11.578 20.086 13.079 20.086 14.91C20.086 16.821 18.537 18.37 16.626 18.37H15.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+                            <path d="M12 10.5V18" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+                            <path d="M9.2 13.3L12 10.5L14.8 13.3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+                        </svg>
+                        <span class="import-button-text">IMPORT</span>
+                    </label>
                 </div>
                 <input type="file" id="fileInput" name="file" accept="application/pdf" onchange="handleFileUpload()" style="display: none;" />
             </form>

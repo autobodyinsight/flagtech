@@ -4019,6 +4019,12 @@ def get_dashboard_screen_html():
                     closeMiniPopup(panel);
                 }
             }
+
+            function openPrintOptionsModal() {
+                const panel = document.getElementById('printOptionsModal');
+                if (!panel) return;
+                toggleMiniPopup(panel);
+            }
             
             function toggleSubletPanel(event, roNumber) {
                 event.stopPropagation();
