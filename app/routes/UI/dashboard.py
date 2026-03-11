@@ -427,7 +427,7 @@ def get_dashboard_screen_html():
             // Sidebar HTML
             const sidebarHtml = `
                 <div id="roSidebar" style="position:relative; flex:0 0 64px; height:100%; background:linear-gradient(180deg, #000 0%, #b22222 100%); display:flex; flex-direction:column; align-items:center; justify-content:center; box-shadow:2px 0 8px rgba(0,0,0,0.08);">
-                    <div style="display:flex; flex-direction:column; align-items:center; justify-content:center; gap:18px; flex:1 1 auto; height:100%; width:100%; padding:10px 0; transform:translateY(-30%);">
+                    <div style="display:flex; flex-direction:column; align-items:center; justify-content:center; gap:18px; flex:1 1 auto; height:100%; width:100%; padding:10px 0; transform:translateY(30%);">
                         <button id="roSidebarBtn-notes" class="ro-sidebar-btn" data-view="notes" title="Notes" style="background:none; border:none; padding:0; cursor:pointer;">${icons.notepad}</button>
                         <button id="roSidebarBtn-estimate" class="ro-sidebar-btn" data-view="estimate" title="Estimate" style="background:none; border:none; padding:0; cursor:pointer;">${icons.estimate}</button>
                         <button id="roSidebarBtn-tech" class="ro-sidebar-btn" data-view="tech" title="Tech" style="background:none; border:none; padding:0; cursor:pointer;">${icons.tech}</button>
@@ -461,7 +461,7 @@ def get_dashboard_screen_html():
 
             // Banner fields
             const bannerHtml = `
-                <div id="roHeaderBar" style="background:linear-gradient(90deg, #111 0%, #23272a 48%, #d32f2f 100%); color:#fff; padding:12px 24px; border-bottom:none; position:relative; z-index:120;">
+                <div id="roHeaderBar" style="background:linear-gradient(90deg, #000 0%, #b22222 100%); color:#fff; padding:12px 24px; border-bottom:none; position:relative; z-index:120;">
                     <div id="roClosedStatusLabel" style="position:absolute; top:14px; left:50%; transform:translateX(-50%); font-weight:900; letter-spacing:1.5px; font-size:20px; color:#fff; display:${String((ro.phase || '')).toLowerCase().includes('complete') ? 'block' : 'none'};">CLOSED</div>
                     <div id="roSummaryHeaderGrid" style="display:flex; flex-direction:column; gap:10px; align-items:stretch; margin-right:8px;">
                         <div style="display:grid; grid-template-columns:repeat(5, minmax(0, 1fr)); gap:16px; align-items:center;">
