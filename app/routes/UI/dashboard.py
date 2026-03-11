@@ -426,8 +426,8 @@ def get_dashboard_screen_html():
 
             // Sidebar HTML
             const sidebarHtml = `
-                <div id="roSidebar" style="position:fixed; left:0; top:var(--ro-header-height, 170px); bottom:0; width:64px; background:#23272a; display:flex; flex-direction:column; align-items:center; justify-content:center; z-index:100; box-shadow:2px 0 8px rgba(0,0,0,0.08);">
-                    <div style="display:flex; flex-direction:column; align-items:center; justify-content:space-evenly; height:100%; width:100%; padding:10px 0;">
+                <div id="roSidebar" style="position:relative; flex:0 0 64px; height:100%; background:#23272a; display:flex; flex-direction:column; align-items:center; justify-content:center; box-shadow:2px 0 8px rgba(0,0,0,0.08);">
+                    <div style="display:flex; flex-direction:column; align-items:center; justify-content:space-evenly; flex:1 1 auto; height:100%; width:100%; padding:10px 0;">
                         <button id="roSidebarBtn-notes" class="ro-sidebar-btn" data-view="notes" title="Notes" style="background:none; border:none; padding:0; cursor:pointer;">${icons.notepad}</button>
                         <button id="roSidebarBtn-estimate" class="ro-sidebar-btn" data-view="estimate" title="Estimate" style="background:none; border:none; padding:0; cursor:pointer;">${icons.estimate}</button>
                         <button id="roSidebarBtn-tech" class="ro-sidebar-btn" data-view="tech" title="Tech" style="background:none; border:none; padding:0; cursor:pointer;">${icons.tech}</button>
@@ -489,7 +489,10 @@ def get_dashboard_screen_html():
                         </div>
                     </div>
                 </div>
-                <div id="roWindowContent" style="padding:32px 32px 32px 88px; min-height:180px; background:#fff; color:#23272a; font-size:18px;">(Content area)</div>
+            `;
+
+            const contentHtml = `
+                <div id="roWindowContent" style="padding:32px; min-height:180px; background:#fff; color:#23272a; font-size:18px; flex:1 1 auto; overflow:auto;">(Content area)</div>
             `;
 
             // Open new window
@@ -499,7 +502,7 @@ def get_dashboard_screen_html():
                 return;
             }
             win.document.title = `RO Window - ${ro.ro}`;
-            win.document.body.innerHTML = `<div style='display:flex; flex-direction:row; height:100vh; width:100vw; background:#f2f2f2;'>${sidebarHtml}<div style='flex:1; display:flex; flex-direction:column; min-width:0;'>${bannerHtml}</div></div>`;
+            win.document.body.innerHTML = `<div id='roPopupRoot' style='display:flex; flex-direction:column; height:100vh; width:100vw; background:#f2f2f2; overflow:hidden;'>${bannerHtml}<div id='roPopupLowerLayout' style='display:flex; flex:1 1 auto; min-height:0;'>${sidebarHtml}<div style='flex:1 1 auto; min-width:0; display:flex; flex-direction:column; min-height:0;'>${contentHtml}</div></div></div>`;
             // Add styles for sidebar and icons
             const style = win.document.createElement('style');
             style.textContent = `
@@ -578,17 +581,11 @@ def get_dashboard_screen_html():
                                 }
                                 .ro-window-card { background:#fafafa; border:1px solid #ddd; border-radius:8px; padding:14px; }
                 @media (max-width: 700px) {
-                  #roSidebar { width:44px; }
+                                    #roSidebar { flex-basis:44px; }
                   #roSidebar svg { width:22px; height:22px; }
                 }
             `;
             win.document.head.appendChild(style);
-
-            const headerEl = win.document.getElementById('roHeaderBar');
-            if (headerEl) {
-                const headerHeight = Math.ceil(headerEl.getBoundingClientRect().height);
-                win.document.documentElement.style.setProperty('--ro-header-height', `${headerHeight}px`);
-            }
 
             const roWindowDoc = win.document;
             const roWindowContentEl = roWindowDoc.getElementById('roWindowContent');
