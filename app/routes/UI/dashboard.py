@@ -426,7 +426,7 @@ def get_dashboard_screen_html():
 
             // Sidebar HTML
             const sidebarHtml = `
-                <div id="roSidebar" style="position:relative; flex:0 0 64px; height:100%; background:#23272a; display:flex; flex-direction:column; align-items:center; justify-content:center; box-shadow:2px 0 8px rgba(0,0,0,0.08);">
+                <div id="roSidebar" style="position:relative; flex:0 0 64px; height:100%; background:linear-gradient(180deg, #000 0%, #b22222 100%); display:flex; flex-direction:column; align-items:center; justify-content:center; box-shadow:2px 0 8px rgba(0,0,0,0.08);">
                     <div style="display:flex; flex-direction:column; align-items:center; justify-content:center; gap:18px; flex:1 1 auto; height:100%; width:100%; padding:10px 0; transform:translateY(-30%);">
                         <button id="roSidebarBtn-notes" class="ro-sidebar-btn" data-view="notes" title="Notes" style="background:none; border:none; padding:0; cursor:pointer;">${icons.notepad}</button>
                         <button id="roSidebarBtn-estimate" class="ro-sidebar-btn" data-view="estimate" title="Estimate" style="background:none; border:none; padding:0; cursor:pointer;">${icons.estimate}</button>
@@ -1331,28 +1331,41 @@ def get_dashboard_screen_html():
                 });
             }
 
-            function bindDateAutosave(inputId) {
+            async function saveRoHeaderDateInput(input, errorLabel = 'date') {
+                if (!input) return;
+                const roNumber = input.dataset.ro || '';
+                const field = input.dataset.field || '';
+                const nextValue = input.value || '';
+                const prevValue = input.dataset.lastValue || '';
+                if (!roNumber || !field || !nextValue || nextValue === prevValue) return;
+
+                input.disabled = true;
+                try {
+                    await patchRoDate(roNumber, field, nextValue);
+                    input.dataset.lastValue = nextValue;
+                } catch (error) {
+                    console.error('Error updating RO date:', error);
+                    input.value = prevValue;
+                    alert(`Unable to save ${errorLabel}.`);
+                } finally {
+                    input.disabled = false;
+                }
+            }
+
+            function bindDateAutosave(inputId, options = {}) {
                 const input = roWindowDoc.getElementById(inputId);
                 if (!input) return;
+                const errorLabel = options.errorLabel || 'date';
                 input.dataset.lastValue = input.value || '';
-                input.addEventListener('change', async function() {
-                    const roNumber = this.dataset.ro || '';
-                    const field = this.dataset.field || '';
-                    const nextValue = this.value || '';
-                    const prevValue = this.dataset.lastValue || '';
-                    if (!roNumber || !field || !nextValue || nextValue === prevValue) return;
 
-                    this.disabled = true;
-                    try {
-                        await patchRoDate(roNumber, field, nextValue);
-                        this.dataset.lastValue = nextValue;
-                    } catch (error) {
-                        console.error('Error updating RO date:', error);
-                        this.value = prevValue;
-                        alert('Unable to save date.');
-                    } finally {
-                        this.disabled = false;
-                    }
+                input.addEventListener('change', async function() {
+                    await saveRoHeaderDateInput(this, errorLabel);
+                });
+
+                input.addEventListener('keydown', async function(event) {
+                    if (event.key !== 'Enter') return;
+                    event.preventDefault();
+                    await saveRoHeaderDateInput(this, errorLabel);
                 });
             }
 
@@ -1502,34 +1515,6 @@ def get_dashboard_screen_html():
                         }
                     });
                 }
-            }
-
-            function bindPickedUpEnterSave() {
-                const input = roWindowDoc.getElementById('roHeaderPickedUpDate');
-                if (!input) return;
-                input.dataset.lastValue = input.value || '';
-                input.addEventListener('keydown', async function(event) {
-                    if (event.key !== 'Enter') return;
-                    event.preventDefault();
-
-                    const roNumber = this.dataset.ro || '';
-                    const field = this.dataset.field || '';
-                    const nextValue = this.value || '';
-                    const prevValue = this.dataset.lastValue || '';
-                    if (!roNumber || !field || !nextValue || nextValue === prevValue) return;
-
-                    this.disabled = true;
-                    try {
-                        await patchRoDate(roNumber, field, nextValue);
-                        this.dataset.lastValue = nextValue;
-                    } catch (error) {
-                        console.error('Error updating picked up date:', error);
-                        this.value = prevValue;
-                        alert('Unable to save Picked Up date.');
-                    } finally {
-                        this.disabled = false;
-                    }
-                });
             }
 
             function bindCloseRoButton() {
@@ -2751,9 +2736,9 @@ def get_dashboard_screen_html():
                 roWindowContentEl.innerHTML = '<div class="ro-window-card" style="color:#777;">Select a sidebar item.</div>';
             }
 
-            bindDateAutosave('roHeaderInDate');
-            bindDateAutosave('roHeaderEcdDate');
-            bindPickedUpEnterSave();
+            bindDateAutosave('roHeaderInDate', { errorLabel: 'In Date' });
+            bindDateAutosave('roHeaderEcdDate', { errorLabel: 'ECD Date' });
+            bindDateAutosave('roHeaderPickedUpDate', { errorLabel: 'Pick Up Date' });
             bindRoPrintActions();
             bindSidebarButtons();
             bindCloseRoButton();
