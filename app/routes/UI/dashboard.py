@@ -427,7 +427,7 @@ def get_dashboard_screen_html():
             // Sidebar HTML
             const sidebarHtml = `
                 <div id="roSidebar" style="position:fixed; left:0; top:var(--ro-header-height, 170px); height:calc(100vh - var(--ro-header-height, 170px)); width:64px; background:#23272a; display:flex; flex-direction:column; align-items:center; justify-content:center; z-index:100; box-shadow:2px 0 8px rgba(0,0,0,0.08);">
-                    <div style="display:flex; flex-direction:column; align-items:center; justify-content:space-evenly; height:100%; width:100%; padding:10px 0;">
+                    <div style="display:flex; flex-direction:column; align-items:center; justify-content:space-evenly; height:50%; min-height:340px; width:100%; padding:8px 0;">
                         <button id="roSidebarBtn-notes" class="ro-sidebar-btn" data-view="notes" title="Notes" style="background:none; border:none; padding:0; cursor:pointer;">${icons.notepad}</button>
                         <button id="roSidebarBtn-estimate" class="ro-sidebar-btn" data-view="estimate" title="Estimate" style="background:none; border:none; padding:0; cursor:pointer;">${icons.estimate}</button>
                         <button id="roSidebarBtn-tech" class="ro-sidebar-btn" data-view="tech" title="Tech" style="background:none; border:none; padding:0; cursor:pointer;">${icons.tech}</button>
@@ -461,7 +461,7 @@ def get_dashboard_screen_html():
 
             // Banner fields
             const bannerHtml = `
-                <div id="roHeaderBar" style="background:#23272a; color:#fff; padding:16px 24px 18px 24px; border-bottom:3px solid #d32f2f; position:relative; min-height:132px; z-index:120;">
+                <div id="roHeaderBar" style="background:linear-gradient(90deg, #111 0%, #23272a 48%, #d32f2f 100%); color:#fff; padding:12px 24px; border-bottom:none; position:relative; z-index:120;">
                     <div id="roClosedStatusLabel" style="position:absolute; top:14px; left:50%; transform:translateX(-50%); font-weight:900; letter-spacing:1.5px; font-size:20px; color:#fff; display:${String((ro.phase || '')).toLowerCase().includes('complete') ? 'block' : 'none'};">CLOSED</div>
                     <div id="roSummaryHeaderGrid" style="display:flex; flex-direction:column; gap:10px; align-items:stretch; margin-right:8px;">
                         <div style="display:grid; grid-template-columns:repeat(5, minmax(0, 1fr)); gap:16px; align-items:center;">
@@ -546,10 +546,24 @@ def get_dashboard_screen_html():
                     color:#fff;
                     padding:0;
                     font-size:14px;
+                    cursor:pointer;
+                    -webkit-appearance: none;
+                    appearance: none;
                 }
                 .ro-header-date-input:focus {
                     outline:none;
                     box-shadow:none;
+                }
+                .ro-header-date-input::-webkit-calendar-picker-indicator {
+                    opacity: 0;
+                    display: none;
+                    width: 0;
+                    margin: 0;
+                    padding: 0;
+                }
+                .ro-header-date-input::-webkit-inner-spin-button,
+                .ro-header-date-input::-webkit-clear-button {
+                    display: none;
                 }
                 .ro-sidebar-action {
                     opacity: 0.9;
