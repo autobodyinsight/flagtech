@@ -4025,6 +4025,111 @@ def get_dashboard_screen_html():
                 if (!panel) return;
                 toggleMiniPopup(panel);
             }
+
+            function printRoList(sortBy) {
+                const panel = document.getElementById('printOptionsModal');
+                if (panel) {
+                    closeMiniPopup(panel);
+                }
+
+                const source = (dashboardData && Array.isArray(dashboardData.roList)) ? [...dashboardData.roList] : [];
+                if (!source.length) {
+                    alert('No repair orders to print.');
+                    return;
+                }
+
+                const sortKey = String(sortBy || 'ro').toLowerCase();
+                const sorted = [...source].sort((a, b) => {
+                    const left = a || {};
+                    const right = b || {};
+
+                    if (sortKey === 'in_date' || sortKey === 'ecd_date') {
+                        const leftDate = Date.parse(left[sortKey] || '') || 0;
+                        const rightDate = Date.parse(right[sortKey] || '') || 0;
+                        return leftDate - rightDate;
+                    }
+
+                    const leftText = String(left[sortKey] || '').toLowerCase();
+                    const rightText = String(right[sortKey] || '').toLowerCase();
+                    return leftText.localeCompare(rightText, undefined, { numeric: true, sensitivity: 'base' });
+                });
+
+                const headingMap = {
+                    ro: 'RO #',
+                    insurance: 'Insurance',
+                    in_date: 'In Date',
+                    ecd_date: 'ECD',
+                };
+                const heading = headingMap[sortKey] || 'RO #';
+
+                const rowsHtml = sorted.map((ro) => {
+                    const roNumber = escapeHtml(String(ro?.ro || '-'));
+                    const vehicle = escapeHtml(String(ro?.vehicle || '-'));
+                    const customer = escapeHtml(String(ro?.customer || '-'));
+                    const insurance = escapeHtml(String(ro?.insurance || '-'));
+                    const roadmap = escapeHtml(formatPhaseDisplay(ro?.phase || ''));
+                    const inDate = escapeHtml(formatShortDate(ro?.in_date || ''));
+                    const ecdDate = escapeHtml(formatShortDate(ro?.ecd_date || ''));
+                    const hoursValue = Number(ro?.hours || 0);
+                    const totalValue = Number(ro?.total || 0);
+
+                    return `
+                        <tr>
+                            <td>${roNumber}</td>
+                            <td>${vehicle}</td>
+                            <td>${customer}</td>
+                            <td>${insurance}</td>
+                            <td>${roadmap}</td>
+                            <td style="text-align:center;">${inDate}</td>
+                            <td style="text-align:center;">${ecdDate}</td>
+                            <td style="text-align:right;">${hoursValue.toFixed(1)}</td>
+                            <td style="text-align:right;">$${totalValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                        </tr>
+                    `;
+                }).join('');
+
+                const printWindow = window.open('', '_blank');
+                if (!printWindow) return;
+
+                printWindow.document.write(`
+                    <!DOCTYPE html>
+                    <html>
+                    <head>
+                        <title>Repair Orders</title>
+                        <style>
+                            body { font-family: Arial, sans-serif; margin: 20px; color: #111; }
+                            h1 { margin: 0 0 6px 0; font-size: 20px; }
+                            .sub { margin: 0 0 14px 0; color: #555; font-size: 13px; }
+                            table { width: 100%; border-collapse: collapse; }
+                            th, td { border: 1px solid #ddd; padding: 8px; font-size: 12px; text-align: left; }
+                            th { background: #f5f5f5; font-weight: 700; }
+                        </style>
+                    </head>
+                    <body>
+                        <h1>Repair Orders</h1>
+                        <p class="sub">Sorted by ${escapeHtml(heading)}</p>
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>RO#</th>
+                                    <th>Vehicle</th>
+                                    <th>Customer</th>
+                                    <th>Insurance</th>
+                                    <th>Roadmap</th>
+                                    <th style="text-align:center;">In</th>
+                                    <th style="text-align:center;">ECD</th>
+                                    <th style="text-align:right;">HRS</th>
+                                    <th style="text-align:right;">Total</th>
+                                </tr>
+                            </thead>
+                            <tbody>${rowsHtml}</tbody>
+                        </table>
+                    </body>
+                    </html>
+                `);
+                printWindow.document.close();
+                setTimeout(() => printWindow.print(), 150);
+            }
             
             function toggleSubletPanel(event, roNumber) {
                 event.stopPropagation();
