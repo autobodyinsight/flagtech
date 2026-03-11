@@ -408,6 +408,11 @@ def get_dashboard_screen_html():
             const inDateValue = normalizeIsoDateForInput(ro.in_date);
             const ecdDateValue = normalizeIsoDateForInput(ro.ecd_date);
             const pickedUpDateValue = normalizeIsoDateForInput(ro.picked_up);
+            const insuranceHeaderValue = (() => {
+                const text = String(ro.insurance || '').trim();
+                if (!text) return '-';
+                return text.split(/\s+/).slice(0, 3).join(' ');
+            })();
             // SVG line icons (white, flat, no fill)
             const icons = {
                 notepad: `<svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="5" y="6" width="18" height="16" rx="2" stroke="white" stroke-width="2"/><line x1="9" y1="10" x2="19" y2="10" stroke="white" stroke-width="2"/><line x1="9" y1="14" x2="19" y2="14" stroke="white" stroke-width="2"/><line x1="9" y1="18" x2="15" y2="18" stroke="white" stroke-width="2"/></svg>`,
@@ -421,15 +426,13 @@ def get_dashboard_screen_html():
 
             // Sidebar HTML
             const sidebarHtml = `
-                <div id="roSidebar" style="position:fixed; left:0; top:var(--ro-header-height, 170px); height:calc(100vh - var(--ro-header-height, 170px)); width:64px; background:#23272a; display:flex; flex-direction:column; align-items:center; justify-content:space-between; padding:20px 0 22px; z-index:100; box-shadow:2px 0 8px rgba(0,0,0,0.08);">
-                    <div style="display:flex; flex-direction:column; align-items:center; gap:38px; width:100%;">
+                <div id="roSidebar" style="position:fixed; left:0; top:var(--ro-header-height, 170px); height:calc(100vh - var(--ro-header-height, 170px)); width:64px; background:#23272a; display:flex; flex-direction:column; align-items:center; justify-content:center; z-index:100; box-shadow:2px 0 8px rgba(0,0,0,0.08);">
+                    <div style="display:flex; flex-direction:column; align-items:center; justify-content:space-evenly; height:100%; width:100%; padding:10px 0;">
                         <button id="roSidebarBtn-notes" class="ro-sidebar-btn" data-view="notes" title="Notes" style="background:none; border:none; padding:0; cursor:pointer;">${icons.notepad}</button>
                         <button id="roSidebarBtn-estimate" class="ro-sidebar-btn" data-view="estimate" title="Estimate" style="background:none; border:none; padding:0; cursor:pointer;">${icons.estimate}</button>
                         <button id="roSidebarBtn-tech" class="ro-sidebar-btn" data-view="tech" title="Tech" style="background:none; border:none; padding:0; cursor:pointer;">${icons.tech}</button>
                         <button id="roSidebarBtn-parts" class="ro-sidebar-btn" data-view="parts" title="Parts" style="background:none; border:none; padding:0; cursor:pointer;">${icons.cart}</button>
                         <button id="roSidebarBtn-payments" class="ro-sidebar-btn" data-view="payments" title="Payments" style="background:none; border:none; padding:0; cursor:pointer;">${icons.credit}</button>
-                    </div>
-                    <div style="display:flex; flex-direction:column; align-items:center; gap:16px; width:100%;">
                         <div style="position:relative; display:flex; justify-content:center; width:100%;">
                             <button id="roPrintTrigger" class="ro-sidebar-btn ro-sidebar-action mini-popup-trigger" type="button" aria-label="Print" title="Print" style="background:none; border:none; padding:0; cursor:pointer;">${icons.print}</button>
                             <div id="roPrintOptionsModal" class="mini-popup-panel" style="display:none; left:calc(100% + 10px); right:auto; top:0;">
@@ -458,21 +461,19 @@ def get_dashboard_screen_html():
 
             // Banner fields
             const bannerHtml = `
-                <div id="roHeaderBar" style="background:#f3f5f7; color:#111; padding:18px 24px 18px 24px; border-bottom:1px solid #e0e4e8; position:relative; min-height:132px; z-index:120; box-shadow:0 2px 10px rgba(0,0,0,0.08);">
+                <div id="roHeaderBar" style="background:#23272a; color:#fff; padding:16px 24px 18px 24px; border-bottom:3px solid #d32f2f; position:relative; min-height:132px; z-index:120;">
                     <div id="roClosedStatusLabel" style="position:absolute; top:14px; left:50%; transform:translateX(-50%); font-weight:900; letter-spacing:1.5px; font-size:20px; color:#fff; display:${String((ro.phase || '')).toLowerCase().includes('complete') ? 'block' : 'none'};">CLOSED</div>
-                    <div id="roSummaryHeaderGrid" style="display:flex; flex-direction:column; gap:10px; align-items:stretch;">
-                        <div class="ro-header-row" style="display:grid; grid-template-columns:repeat(5, minmax(0, 1fr)); gap:14px; align-items:center;">
+                    <div id="roSummaryHeaderGrid" style="display:flex; flex-direction:column; gap:10px; align-items:stretch; margin-right:8px;">
+                        <div style="display:grid; grid-template-columns:repeat(5, minmax(0, 1fr)); gap:16px; align-items:center;">
                             <div class="ro-header-item"><span class="ro-header-label">RO#:</span> <span class="ro-header-value">${ro.ro || '-'}</span></div>
                             <div class="ro-header-item"><span class="ro-header-label">Customer:</span> <span class="ro-header-value">${ro.customer || '-'}</span></div>
                             <div class="ro-header-item"><span class="ro-header-label">Phone:</span> <span class="ro-header-value">${ro.phone || '-'}</span></div>
                             <div class="ro-header-item"><span class="ro-header-label">Vehicle:</span> <span class="ro-header-value">${ro.vehicle || '-'}</span></div>
                             <div class="ro-header-item"><span class="ro-header-label">VIN:</span> <span class="ro-header-value">${ro.vin || '-'}</span></div>
                         </div>
-                        <div class="ro-header-row" style="display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:14px; align-items:center;">
-                            <div class="ro-header-item"><span class="ro-header-label">Insurance:</span> <span class="ro-header-value">${ro.insurance || '-'}</span></div>
+                        <div style="display:grid; grid-template-columns:repeat(5, minmax(0, 1fr)); gap:16px; align-items:center;">
+                            <div class="ro-header-item"><span class="ro-header-label">Insurance:</span> <span class="ro-header-value">${insuranceHeaderValue}</span></div>
                             <div class="ro-header-item"><span class="ro-header-label">Claim#:</span> <span class="ro-header-value">${ro.claim_number || '-'}</span></div>
-                        </div>
-                        <div class="ro-header-row" style="display:grid; grid-template-columns:repeat(3, minmax(0, 1fr)); gap:14px; align-items:center;">
                             <div class="ro-header-item ro-header-date-row">
                                 <span class="ro-header-label">In Date:</span>
                                 <input type="date" id="roHeaderInDate" class="ro-header-date-input" value="${inDateValue}" data-field="in_date" data-ro="${ro.ro || ''}" />
@@ -532,31 +533,23 @@ def get_dashboard_screen_html():
                     pointer-events: auto;
                 }
                 .ro-header-item { font-size:15px; line-height:1.25; min-width:0; }
-                .ro-header-label { color:#111; font-weight:700; margin-right:6px; white-space:nowrap; }
-                .ro-header-value { color:#1f2328; font-weight:600; word-break:break-word; }
+                .ro-header-label { color:#d32f2f; font-weight:700; margin-right:6px; white-space:nowrap; }
+                .ro-header-value { color:#fff; font-weight:600; word-break:break-word; }
                 .ro-header-date-row { display:flex; align-items:center; gap:8px; }
                 .ro-header-date-input {
-                    height:28px;
-                    min-width:132px;
+                    height:24px;
+                    min-width:96px;
                     width:100%;
-                    border:1px solid #cfd6dc;
-                    border-radius:4px;
-                    background:#fff;
-                    color:#1f2328;
-                    padding:2px 8px;
+                    border:none;
+                    border-radius:0;
+                    background:transparent;
+                    color:#fff;
+                    padding:0;
                     font-size:14px;
                 }
                 .ro-header-date-input:focus {
                     outline:none;
-                    border-color:#d32f2f;
-                    box-shadow:0 0 0 2px rgba(211,47,47,0.25);
-                }
-                .ro-header-row {
-                    background:#f7f9fb;
-                    border:1px solid #e5eaef;
-                    border-radius:10px;
-                    box-shadow:0 1px 6px rgba(0,0,0,0.06);
-                    padding:10px 12px;
+                    box-shadow:none;
                 }
                 .ro-sidebar-action {
                     opacity: 0.9;
