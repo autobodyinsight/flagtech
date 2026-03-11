@@ -7,61 +7,70 @@ def get_phase_screen_html():
     <div id="phase" class="screen" style="padding:20px;">
         <h1 style="text-align:center; margin-bottom:20px;">ROADMAP</h1>
 
-        <div style="display:grid; grid-template-columns:repeat(9, minmax(140px, 1fr)); gap:12px; align-items:start;">
-            <div class="phase-column">
+        <div class="phase-board" style="display:grid; grid-template-columns:repeat(9, minmax(140px, 1fr)); gap:12px; align-items:start;">
+            <div class="phase-lane">
                 <div class="phase-header">Teardown <span class="phase-count" id="phase-count-teardown">0</span></div>
                 <div id="phase-teardown" class="phase-cards"></div>
             </div>
-            <div class="phase-column">
+            <div class="phase-lane">
                 <div class="phase-header">Auth <span class="phase-count" id="phase-count-auth">0</span></div>
                 <div id="phase-auth" class="phase-cards"></div>
             </div>
-            <div class="phase-column">
+            <div class="phase-lane">
                 <div class="phase-header">Parts <span class="phase-count" id="phase-count-parts">0</span></div>
                 <div id="phase-parts" class="phase-cards"></div>
             </div>
-            <div class="phase-column">
+            <div class="phase-lane">
                 <div class="phase-header">Body <span class="phase-count" id="phase-count-body">0</span></div>
                 <div id="phase-body" class="phase-cards"></div>
             </div>
-            <div class="phase-column">
+            <div class="phase-lane">
                 <div class="phase-header">Refinish <span class="phase-count" id="phase-count-refinish">0</span></div>
                 <div id="phase-refinish" class="phase-cards"></div>
             </div>
-            <div class="phase-column">
+            <div class="phase-lane">
                 <div class="phase-header">Reassy <span class="phase-count" id="phase-count-reassy">0</span></div>
                 <div id="phase-reassy" class="phase-cards"></div>
             </div>
-            <div class="phase-column">
+            <div class="phase-lane">
                 <div class="phase-header">Sublet <span class="phase-count" id="phase-count-sublet">0</span></div>
                 <div id="phase-sublet" class="phase-cards"></div>
             </div>
-            <div class="phase-column">
+            <div class="phase-lane">
                 <div class="phase-header">Wash/QC <span class="phase-count" id="phase-count-washqc">0</span></div>
                 <div id="phase-washqc" class="phase-cards"></div>
             </div>
-            <div class="phase-column">
+            <div class="phase-lane">
                 <div class="phase-header">Done <span class="phase-count" id="phase-count-complete">0</span></div>
                 <div id="phase-complete" class="phase-cards"></div>
             </div>
         </div>
 
         <style>
-            .phase-column {
-                background: #fff;
-                border: 1px solid #ddd;
-                border-radius: 8px;
-                padding: 10px;
+            .phase-lane {
+                position: relative;
                 min-height: 200px;
+                padding: 0 12px;
+            }
+            .phase-lane:not(:last-child)::after {
+                content: '';
+                position: absolute;
+                top: 10px;
+                bottom: 10px;
+                right: -6px;
+                width: 1px;
+                background: rgba(0, 0, 0, 0.12);
             }
             .phase-header {
-                font-weight: bold;
-                padding: 10px 8px;
-                border-bottom: 2px solid #eee;
-                margin-bottom: 10px;
+                color: #111;
+                font-weight: 700;
+                padding: 8px 4px;
+                margin: 6px 0 12px;
                 text-align: center;
-                background: #f7f7f7;
-                border-radius: 6px;
+                background: transparent;
+                border: none;
+                box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+                border-radius: 10px;
             }
             .phase-count {
                 display: inline-block;

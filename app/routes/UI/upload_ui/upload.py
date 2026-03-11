@@ -21,6 +21,7 @@ def get_upload_screen_html():
                 }
                 #upload .import-button {
                     display: inline-flex;
+                    flex-direction: column;
                     align-items: center;
                     justify-content: center;
                     padding: 0;
@@ -33,11 +34,16 @@ def get_upload_screen_html():
                 }
                 #upload .import-button svg {
                     display: block;
-                    width: 56px;
-                    height: 56px;
+                    width: 84px;
+                    height: 84px;
                 }
                 #upload .import-button-text {
-                    display: none;
+                    display: block;
+                    margin-top: 8px;
+                    font-size: 16px;
+                    font-weight: 600;
+                    color: #111;
+                    text-align: center;
                 }
             </style>
             <form id="uploadForm" enctype="multipart/form-data">
@@ -48,6 +54,7 @@ def get_upload_screen_html():
                             <path d="M12 10.5V18" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
                             <path d="M9.2 13.3L12 10.5L14.8 13.3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
                         </svg>
+                        <span class="import-button-text">Import</span>
                     </label>
                 </div>
                 <input type="file" id="fileInput" name="file" accept="application/pdf" onchange="handleFileUpload()" style="display: none;" />
