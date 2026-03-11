@@ -16,8 +16,8 @@ def get_dashboard_screen_html():
                         background:#fff;
                         padding:20px;
                         border-radius:8px;
-                        border:2px solid #00bcd4;
-                        box-shadow:0 2px 4px rgba(0,0,0,0.08);
+                        border:none;
+                        box-shadow:0 8px 20px rgba(0,0,0,0.08);
                         height: auto;
                         display:flex;
                         flex-direction:column;
@@ -160,10 +160,17 @@ def get_dashboard_screen_html():
             </div>
             
             <!-- RO List Table -->
-            <div style="margin-top:30px; background:#fff; padding:20px; border-radius:8px; box-shadow:0 2px 4px rgba(0,0,0,0.1);">
+            <div style="margin-top:30px;">
                 <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:20px; position:relative;">
                     <h3 style="margin:0; color:#333;">Repair Orders</h3>
-                    <button id="dashboardPrintTrigger" class="mini-popup-trigger" onclick="openPrintOptionsModal()" style="padding:8px 16px; background:var(--brand-red, #d32f2f); color:#fff; border:none; border-radius:4px; cursor:pointer; font-weight:bold; font-size:14px;">Print</button>
+                    <button id="dashboardPrintTrigger" class="mini-popup-trigger" onclick="openPrintOptionsModal()" style="padding:8px 10px; background:none; border:none; color:#b22222; cursor:pointer; display:inline-flex; align-items:center; justify-content:center;" aria-label="Print">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                            <path d="M7 8V4H17V8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+                            <rect x="5" y="14" width="14" height="6" rx="1" stroke="currentColor" stroke-width="1.8"/>
+                            <rect x="4" y="8" width="16" height="8" rx="2" stroke="currentColor" stroke-width="1.8"/>
+                            <circle cx="17" cy="11" r="1" fill="currentColor"/>
+                        </svg>
+                    </button>
                     <div id="printOptionsModal" class="mini-popup-panel" style="display:none; right:0; left:auto;">
                         <h2 style="margin:0 0 14px 0; color:#333; font-size:18px;">Print RO List</h2>
                         <p style="margin:0 0 12px 0; font-weight:bold; color:#555;">Print by:</p>
@@ -183,7 +190,7 @@ def get_dashboard_screen_html():
                                 <th class="dashboard-header-cell" data-sort-key="vehicle" onclick="sortRoListByHeader('vehicle')" style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold; cursor:pointer; user-select:none;">Vehicle <span data-sort-indicator="vehicle" style="font-size:12px;"></span></th>
                                 <th class="dashboard-header-cell" data-sort-key="customer" onclick="sortRoListByHeader('customer')" style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold; cursor:pointer; user-select:none;">Customer <span data-sort-indicator="customer" style="font-size:12px;"></span></th>
                                 <th class="dashboard-header-cell" data-sort-key="insurance" onclick="sortRoListByHeader('insurance')" style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold; cursor:pointer; user-select:none;">Insurance <span data-sort-indicator="insurance" style="font-size:12px;"></span></th>
-                                <th class="dashboard-header-cell" data-sort-key="phase" onclick="sortRoListByHeader('phase')" style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold; cursor:pointer; user-select:none;">Phase <span data-sort-indicator="phase" style="font-size:12px;"></span></th>
+                                <th class="dashboard-header-cell" data-sort-key="phase" onclick="sortRoListByHeader('phase')" style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold; cursor:pointer; user-select:none;">Roadmap <span data-sort-indicator="phase" style="font-size:12px;"></span></th>
                                 <th class="dashboard-header-cell" data-sort-key="in_date" onclick="sortRoListByHeader('in_date')" style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold; cursor:pointer; user-select:none;">In <span data-sort-indicator="in_date" style="font-size:12px;"></span></th>
                                 <th class="dashboard-header-cell" data-sort-key="days_since_in" onclick="sortRoListByHeader('days_since_in')" style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold; text-align:center; cursor:pointer; user-select:none;" title="Days Since In Date">⏳ <span data-sort-indicator="days_since_in" style="font-size:12px;"></span></th>
                                 <th class="dashboard-header-cell" data-sort-key="ecd_date" onclick="sortRoListByHeader('ecd_date')" style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold; cursor:pointer; user-select:none;">ECD <span data-sort-indicator="ecd_date" style="font-size:12px;"></span></th>
@@ -262,13 +269,16 @@ def get_dashboard_screen_html():
                 font-size: 15px;
                 font-weight: 600;
                 background: rgba(0,0,0,0.03) !important;
-                color: #111;
+                color: #000000;
                 text-align: left !important;
                 border: none !important;
                 border-bottom: 1px solid #b22222 !important;
                 position: sticky;
                 top: 0;
                 z-index: 2;
+                padding-top: 14px !important;
+                padding-bottom: 14px !important;
+                box-shadow: 0 2px 8px rgba(0,0,0,0.08);
             }
             #roListBody tr.dashboard-ro-main-row td {
                 background: #ffffff;
@@ -279,6 +289,10 @@ def get_dashboard_screen_html():
                 text-align: left;
                 vertical-align: middle;
                 box-shadow: none !important;
+            }
+            #roListBody tr.dashboard-ro-main-row + tr.dashboard-ro-main-row td {
+                border-top: 6px solid transparent;
+                background-clip: padding-box;
             }
             #roListBody tr.dashboard-ro-main-row:hover td {
                 background: rgba(0,0,0,0.04) !important;
@@ -4113,7 +4127,7 @@ def get_dashboard_screen_html():
                                 </button>
                             </td>
                             <td style="padding:12px; border-bottom:1px solid #eee; color:#333;">
-                                <select onchange="changeRoPhase(event, '${ro.ro}', this.value)" style="padding:4px 6px; border:1px solid #ccc; border-radius:4px; background:#fff; color:#333; font-size:13px; max-width:160px;">
+                                <select onchange="changeRoPhase(event, '${ro.ro}', this.value)" style="padding:6px 12px; border:none; border-radius:999px; background:#f3f4f6; color:#1f2937; font-size:13px; max-width:160px; outline:none; appearance:none; -webkit-appearance:none; -moz-appearance:none;">
                                     ${phaseSelectOptions}
                                 </select>
                             </td>
