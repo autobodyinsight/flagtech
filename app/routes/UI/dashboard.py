@@ -175,7 +175,7 @@ def get_dashboard_screen_html():
                         </div>
                     </div>
                 </div>
-                <div style="overflow-x:auto;">
+                <div class="dashboard-ro-table-wrap" style="overflow-x:auto;">
                     <table id="roListTable" style="width:100%; border-collapse:collapse;">
                         <thead>
                             <tr class="dashboard-header-row">
@@ -242,12 +242,61 @@ def get_dashboard_screen_html():
         </div>
 
         <style>
-            .dashboard-header-row th, .dashboard-header-cell {
-                font-family: inherit;
-                font-size: 16px;
-                font-weight: bold;
-                background: #23272a;
-                color: #fff;
+            .dashboard-ro-table-wrap {
+                background: #ffffff;
+                border-radius: 4px;
+                overflow: hidden;
+            }
+            #roListTable {
+                width: 100%;
+                background: #ffffff;
+                border-collapse: collapse;
+                border: none;
+                font-family: "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+                font-size: 14px;
+                box-shadow: none;
+            }
+            .dashboard-header-row th,
+            .dashboard-header-cell {
+                font-family: "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+                font-size: 15px;
+                font-weight: 600;
+                background: rgba(0,0,0,0.03) !important;
+                color: #111;
+                text-align: left !important;
+                border: none !important;
+                border-bottom: 1px solid #b22222 !important;
+                position: sticky;
+                top: 0;
+                z-index: 2;
+            }
+            #roListBody tr.dashboard-ro-main-row td {
+                background: #ffffff;
+                border: none;
+                border-bottom: 1px solid rgba(0,0,0,0.06) !important;
+                min-height: 48px;
+                height: 48px;
+                text-align: left;
+                vertical-align: middle;
+                box-shadow: none !important;
+            }
+            #roListBody tr.dashboard-ro-main-row:hover td {
+                background: rgba(0,0,0,0.04) !important;
+                box-shadow: none !important;
+            }
+            #roListTable th:nth-child(6),
+            #roListTable td:nth-child(6),
+            #roListTable th:nth-child(7),
+            #roListTable td:nth-child(7),
+            #roListTable th:nth-child(8),
+            #roListTable td:nth-child(8) {
+                text-align: center !important;
+            }
+            #roListTable th:nth-child(9),
+            #roListTable td:nth-child(9),
+            #roListTable th:nth-child(10),
+            #roListTable td:nth-child(10) {
+                text-align: right !important;
             }
             .mini-popup-panel {
                 position: absolute;
@@ -4026,7 +4075,7 @@ def get_dashboard_screen_html():
                     const subletItems = showSubletWarning ? getPendingSubletItems(ro) : [];
                     
                     html += `
-                        <tr style="background:${rowBg};">
+                        <tr class="dashboard-ro-main-row" style="background:${rowBg};">
                             <td style="padding:12px; border-bottom:1px solid #eee; position:relative;">
                                 <div style="display:inline-flex; align-items:center; gap:6px;">
                                     <button type="button" onclick="openRoWindowFromDashboard(event, '${ro.ro}')" style="background:none; border:none; color:#0066cc; text-decoration:underline; cursor:pointer; padding:0; font:inherit;">
