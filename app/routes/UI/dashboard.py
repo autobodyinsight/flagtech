@@ -414,12 +414,14 @@ def get_dashboard_screen_html():
                 estimate: `<svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="6" y="3" width="16" height="22" rx="2" stroke="white" stroke-width="2"/><line x1="9" y1="8" x2="19" y2="8" stroke="white" stroke-width="2"/><rect x="9" y="11" width="4" height="3" rx="0.8" stroke="white" stroke-width="1.8"/><rect x="15" y="11" width="4" height="3" rx="0.8" stroke="white" stroke-width="1.8"/><rect x="9" y="16" width="4" height="3" rx="0.8" stroke="white" stroke-width="1.8"/><rect x="15" y="16" width="4" height="3" rx="0.8" stroke="white" stroke-width="1.8"/><line x1="9" y1="22" x2="19" y2="22" stroke="white" stroke-width="2"/></svg>`,
                 tech: `<svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="14" cy="9" r="4" stroke="white" stroke-width="2"/><rect x="7" y="17" width="14" height="6" rx="3" stroke="white" stroke-width="2"/><path d="M21 21l2.5 2.5" stroke="white" stroke-width="2" stroke-linecap="round"/><path d="M7 21l-2.5 2.5" stroke="white" stroke-width="2" stroke-linecap="round"/></svg>`,
                 cart: `<svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="14" cy="14" r="9" stroke="white" stroke-width="2"/><circle cx="14" cy="14" r="5.2" stroke="white" stroke-width="2"/><circle cx="14" cy="14" r="1.7" fill="white"/><path d="M14 5.8v3.2" stroke="white" stroke-width="1.8" stroke-linecap="round"/><path d="M14 19v3.2" stroke="white" stroke-width="1.8" stroke-linecap="round"/><path d="M5.8 14h3.2" stroke="white" stroke-width="1.8" stroke-linecap="round"/><path d="M19 14h3.2" stroke="white" stroke-width="1.8" stroke-linecap="round"/><path d="M8.3 8.3l2.3 2.3" stroke="white" stroke-width="1.6" stroke-linecap="round"/><path d="M17.4 17.4l2.3 2.3" stroke="white" stroke-width="1.6" stroke-linecap="round"/><path d="M19.7 8.3l-2.3 2.3" stroke="white" stroke-width="1.6" stroke-linecap="round"/><path d="M10.6 17.4l-2.3 2.3" stroke="white" stroke-width="1.6" stroke-linecap="round"/></svg>`,
-                credit: `<svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="4" y="7" width="20" height="14" rx="3" stroke="white" stroke-width="2"/><rect x="7" y="17" width="6" height="3" rx="1.5" stroke="white" stroke-width="2"/><line x1="4" y1="12" x2="24" y2="12" stroke="white" stroke-width="2"/></svg>`
+                credit: `<svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="4" y="7" width="20" height="14" rx="3" stroke="white" stroke-width="2"/><rect x="7" y="17" width="6" height="3" rx="1.5" stroke="white" stroke-width="2"/><line x1="4" y1="12" x2="24" y2="12" stroke="white" stroke-width="2"/></svg>`,
+                print: `<svg width="26" height="26" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M7 9V4h10v5" stroke="white" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/><rect x="4" y="9" width="16" height="8" rx="2" stroke="white" stroke-width="1.9"/><path d="M7 17h10v3H7z" stroke="white" stroke-width="1.9" stroke-linejoin="round"/><circle cx="17" cy="12.5" r="0.9" fill="white"/></svg>`,
+                close: `<svg width="26" height="26" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="8.5" stroke="white" stroke-width="1.9"/><path d="M9 9l6 6" stroke="white" stroke-width="1.9" stroke-linecap="round"/><path d="M15 9l-6 6" stroke="white" stroke-width="1.9" stroke-linecap="round"/></svg>`
             };
 
             // Sidebar HTML
             const sidebarHtml = `
-                <div id="roSidebar" style="position:fixed; left:0; top:var(--ro-header-height, 170px); height:calc(100vh - var(--ro-header-height, 170px)); width:64px; background:#23272a; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:38px; z-index:100; box-shadow:2px 0 8px rgba(0,0,0,0.08);">
+                <div id="roSidebar" style="position:fixed; left:0; top:var(--ro-header-height, 170px); height:calc(100vh - var(--ro-header-height, 170px)); width:64px; background:#23272a; display:flex; flex-direction:column; align-items:center; justify-content:space-between; padding:20px 0 22px; z-index:100; box-shadow:2px 0 8px rgba(0,0,0,0.08);">
                     <div style="display:flex; flex-direction:column; align-items:center; gap:38px; width:100%;">
                         <button id="roSidebarBtn-notes" class="ro-sidebar-btn" data-view="notes" title="Notes" style="background:none; border:none; padding:0; cursor:pointer;">${icons.notepad}</button>
                         <button id="roSidebarBtn-estimate" class="ro-sidebar-btn" data-view="estimate" title="Estimate" style="background:none; border:none; padding:0; cursor:pointer;">${icons.estimate}</button>
@@ -427,66 +429,61 @@ def get_dashboard_screen_html():
                         <button id="roSidebarBtn-parts" class="ro-sidebar-btn" data-view="parts" title="Parts" style="background:none; border:none; padding:0; cursor:pointer;">${icons.cart}</button>
                         <button id="roSidebarBtn-payments" class="ro-sidebar-btn" data-view="payments" title="Payments" style="background:none; border:none; padding:0; cursor:pointer;">${icons.credit}</button>
                     </div>
-                </div>
-            `;
-
-            // Top-right Print/Close buttons
-            const buttonsHtml = `
-                <div style="position:absolute; top:18px; right:24px; display:flex; gap:12px; z-index:10;">
-                    <div style="position:relative;">
-                        <button id="roPrintTrigger" class="mini-popup-trigger" type="button" style="padding:7px 18px; background:#d32f2f; color:#fff; border:none; border-radius:4px; font-weight:bold; font-size:15px; cursor:pointer;">Print</button>
-                        <div id="roPrintOptionsModal" class="mini-popup-panel" style="display:none; right:0; left:auto; top:100%;">
-                            <h2 style="margin:0 0 14px 0; color:#333; font-size:18px;">Print RO</h2>
-                            <p style="margin:0 0 12px 0; font-weight:bold; color:#555;">Print by:</p>
-                            <div style="display:flex; flex-direction:column; gap:8px;">
-                                <button id="roPrintOptionBill" type="button" style="padding:10px 12px; background:#f5f5f5; color:#333; border:1px solid #ddd; border-radius:4px; cursor:pointer; text-align:left; font-size:14px;">Bill</button>
-                                <button id="roPrintOptionServiceOrder" type="button" style="padding:10px 12px; background:#f5f5f5; color:#333; border:1px solid #ddd; border-radius:4px; cursor:pointer; text-align:left; font-size:14px;">Service Order</button>
-                                <button id="roPrintOptionParts" type="button" style="padding:10px 12px; background:#f5f5f5; color:#333; border:1px solid #ddd; border-radius:4px; cursor:pointer; text-align:left; font-size:14px;">Parts</button>
-                                <button id="roPrintOptionServiceTag" type="button" style="padding:10px 12px; background:#f5f5f5; color:#333; border:1px solid #ddd; border-radius:4px; cursor:pointer; text-align:left; font-size:14px;">Service Tag</button>
-                                <button id="roPrintOptionServiceCover" type="button" style="padding:10px 12px; background:#f5f5f5; color:#333; border:1px solid #ddd; border-radius:4px; cursor:pointer; text-align:left; font-size:14px;">Service Cover</button>
-                            </div>
-                            <div id="roPrintServiceOrderWrap" style="display:none; margin-top:10px; padding-top:10px; border-top:1px solid #eee;">
-                                <label for="roPrintTechSelect" style="display:block; margin-bottom:6px; color:#555; font-weight:600;">Tech</label>
-                                <select id="roPrintTechSelect" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:4px; margin-bottom:8px;">
-                                    <option value="">Loading...</option>
-                                </select>
-                                <button id="roPrintServiceOrderGo" type="button" style="padding:10px 12px; width:100%; background:#d32f2f; color:#fff; border:none; border-radius:4px; cursor:pointer; font-size:14px; font-weight:700;">Print Service Order</button>
+                    <div style="display:flex; flex-direction:column; align-items:center; gap:16px; width:100%;">
+                        <div style="position:relative; display:flex; justify-content:center; width:100%;">
+                            <button id="roPrintTrigger" class="ro-sidebar-btn ro-sidebar-action mini-popup-trigger" type="button" aria-label="Print" title="Print" style="background:none; border:none; padding:0; cursor:pointer;">${icons.print}</button>
+                            <div id="roPrintOptionsModal" class="mini-popup-panel" style="display:none; left:calc(100% + 10px); right:auto; top:0;">
+                                <h2 style="margin:0 0 14px 0; color:#333; font-size:18px;">Print RO</h2>
+                                <p style="margin:0 0 12px 0; font-weight:bold; color:#555;">Print by:</p>
+                                <div style="display:flex; flex-direction:column; gap:8px;">
+                                    <button id="roPrintOptionBill" type="button" style="padding:10px 12px; background:#f5f5f5; color:#333; border:1px solid #ddd; border-radius:4px; cursor:pointer; text-align:left; font-size:14px;">Bill</button>
+                                    <button id="roPrintOptionServiceOrder" type="button" style="padding:10px 12px; background:#f5f5f5; color:#333; border:1px solid #ddd; border-radius:4px; cursor:pointer; text-align:left; font-size:14px;">Service Order</button>
+                                    <button id="roPrintOptionParts" type="button" style="padding:10px 12px; background:#f5f5f5; color:#333; border:1px solid #ddd; border-radius:4px; cursor:pointer; text-align:left; font-size:14px;">Parts</button>
+                                    <button id="roPrintOptionServiceTag" type="button" style="padding:10px 12px; background:#f5f5f5; color:#333; border:1px solid #ddd; border-radius:4px; cursor:pointer; text-align:left; font-size:14px;">Service Tag</button>
+                                    <button id="roPrintOptionServiceCover" type="button" style="padding:10px 12px; background:#f5f5f5; color:#333; border:1px solid #ddd; border-radius:4px; cursor:pointer; text-align:left; font-size:14px;">Service Cover</button>
+                                </div>
+                                <div id="roPrintServiceOrderWrap" style="display:none; margin-top:10px; padding-top:10px; border-top:1px solid #eee;">
+                                    <label for="roPrintTechSelect" style="display:block; margin-bottom:6px; color:#555; font-weight:600;">Tech</label>
+                                    <select id="roPrintTechSelect" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:4px; margin-bottom:8px;">
+                                        <option value="">Loading...</option>
+                                    </select>
+                                    <button id="roPrintServiceOrderGo" type="button" style="padding:10px 12px; width:100%; background:#d32f2f; color:#fff; border:none; border-radius:4px; cursor:pointer; font-size:14px; font-weight:700;">Print Service Order</button>
+                                </div>
                             </div>
                         </div>
+                        <button id="roCloseButton" class="ro-sidebar-btn ro-sidebar-action" type="button" aria-label="Close RO" title="Close RO" style="background:none; border:none; padding:0; cursor:pointer;">${icons.close}</button>
                     </div>
-                    <button id="roCloseButton" type="button" style="padding:7px 18px; background:#505050; color:#fff; border:none; border-radius:4px; font-weight:bold; font-size:15px; cursor:pointer;">Close RO</button>
-                </div>
-                <div style="position:absolute; top:58px; right:24px; display:flex; align-items:center; gap:8px; z-index:10;">
-                    <span class="ro-header-label" style="margin-right:0;">Picked Up:</span>
-                    <input type="date" id="roHeaderPickedUpDate" class="ro-header-date-input" value="${pickedUpDateValue}" data-field="picked_up" data-ro="${ro.ro || ''}" />
                 </div>
             `;
 
             // Banner fields
             const bannerHtml = `
-                <div id="roHeaderBar" style="background:#23272a; color:#fff; padding:16px 24px 18px 24px; border-bottom:3px solid #d32f2f; position:relative; min-height:132px; z-index:120;">
-                    <div style="font-size:20px; font-weight:bold; margin-bottom:10px;">RO Window</div>
+                <div id="roHeaderBar" style="background:#f3f5f7; color:#111; padding:18px 24px 18px 24px; border-bottom:1px solid #e0e4e8; position:relative; min-height:132px; z-index:120; box-shadow:0 2px 10px rgba(0,0,0,0.08);">
                     <div id="roClosedStatusLabel" style="position:absolute; top:14px; left:50%; transform:translateX(-50%); font-weight:900; letter-spacing:1.5px; font-size:20px; color:#fff; display:${String((ro.phase || '')).toLowerCase().includes('complete') ? 'block' : 'none'};">CLOSED</div>
-                    ${buttonsHtml}
-                    <div id="roSummaryHeaderGrid" style="display:grid; grid-template-columns:repeat(3, minmax(0, 1fr)); gap:20px 28px; margin-right:230px; align-items:start;">
-                        <div class="ro-header-col" style="display:flex; flex-direction:column; gap:8px; text-align:left; min-width:0;">
+                    <div id="roSummaryHeaderGrid" style="display:flex; flex-direction:column; gap:10px; align-items:stretch;">
+                        <div class="ro-header-row" style="display:grid; grid-template-columns:repeat(5, minmax(0, 1fr)); gap:14px; align-items:center;">
                             <div class="ro-header-item"><span class="ro-header-label">RO#:</span> <span class="ro-header-value">${ro.ro || '-'}</span></div>
                             <div class="ro-header-item"><span class="ro-header-label">Customer:</span> <span class="ro-header-value">${ro.customer || '-'}</span></div>
                             <div class="ro-header-item"><span class="ro-header-label">Phone:</span> <span class="ro-header-value">${ro.phone || '-'}</span></div>
+                            <div class="ro-header-item"><span class="ro-header-label">Vehicle:</span> <span class="ro-header-value">${ro.vehicle || '-'}</span></div>
+                            <div class="ro-header-item"><span class="ro-header-label">VIN:</span> <span class="ro-header-value">${ro.vin || '-'}</span></div>
                         </div>
-                        <div class="ro-header-col" style="display:flex; flex-direction:column; gap:8px; text-align:left; min-width:0;">
+                        <div class="ro-header-row" style="display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:14px; align-items:center;">
                             <div class="ro-header-item"><span class="ro-header-label">Insurance:</span> <span class="ro-header-value">${ro.insurance || '-'}</span></div>
                             <div class="ro-header-item"><span class="ro-header-label">Claim#:</span> <span class="ro-header-value">${ro.claim_number || '-'}</span></div>
                         </div>
-                        <div class="ro-header-col" style="display:flex; flex-direction:column; gap:8px; text-align:left; min-width:0;">
-                            <div class="ro-header-item"><span class="ro-header-label">Vehicle:</span> <span class="ro-header-value">${ro.vehicle || '-'}</span></div>
+                        <div class="ro-header-row" style="display:grid; grid-template-columns:repeat(3, minmax(0, 1fr)); gap:14px; align-items:center;">
                             <div class="ro-header-item ro-header-date-row">
-                                <span class="ro-header-label">IN Date:</span>
+                                <span class="ro-header-label">In Date:</span>
                                 <input type="date" id="roHeaderInDate" class="ro-header-date-input" value="${inDateValue}" data-field="in_date" data-ro="${ro.ro || ''}" />
                             </div>
                             <div class="ro-header-item ro-header-date-row">
                                 <span class="ro-header-label">ECD Date:</span>
                                 <input type="date" id="roHeaderEcdDate" class="ro-header-date-input" value="${ecdDateValue}" data-field="ecd_date" data-ro="${ro.ro || ''}" />
+                            </div>
+                            <div class="ro-header-item ro-header-date-row">
+                                <span class="ro-header-label">Pick Up Date:</span>
+                                <input type="date" id="roHeaderPickedUpDate" class="ro-header-date-input" value="${pickedUpDateValue}" data-field="picked_up" data-ro="${ro.ro || ''}" />
                             </div>
                         </div>
                     </div>
@@ -535,16 +532,17 @@ def get_dashboard_screen_html():
                     pointer-events: auto;
                 }
                 .ro-header-item { font-size:15px; line-height:1.25; min-width:0; }
-                .ro-header-label { color:#d32f2f; font-weight:700; margin-right:6px; white-space:nowrap; }
-                .ro-header-value { color:#fff; font-weight:600; word-break:break-word; }
+                .ro-header-label { color:#111; font-weight:700; margin-right:6px; white-space:nowrap; }
+                .ro-header-value { color:#1f2328; font-weight:600; word-break:break-word; }
                 .ro-header-date-row { display:flex; align-items:center; gap:8px; }
                 .ro-header-date-input {
                     height:28px;
-                    min-width:140px;
-                    border:1px solid #5b636b;
+                    min-width:132px;
+                    width:100%;
+                    border:1px solid #cfd6dc;
                     border-radius:4px;
-                    background:#2d3135;
-                    color:#fff;
+                    background:#fff;
+                    color:#1f2328;
                     padding:2px 8px;
                     font-size:14px;
                 }
@@ -552,6 +550,20 @@ def get_dashboard_screen_html():
                     outline:none;
                     border-color:#d32f2f;
                     box-shadow:0 0 0 2px rgba(211,47,47,0.25);
+                }
+                .ro-header-row {
+                    background:#f7f9fb;
+                    border:1px solid #e5eaef;
+                    border-radius:10px;
+                    box-shadow:0 1px 6px rgba(0,0,0,0.06);
+                    padding:10px 12px;
+                }
+                .ro-sidebar-action {
+                    opacity: 0.9;
+                }
+                .ro-sidebar-action:hover {
+                    opacity: 1;
+                    transform: translateY(-1px);
                 }
                                 @keyframes roCloseWarnBlink {
                                         0%, 49% { opacity: 1; }
