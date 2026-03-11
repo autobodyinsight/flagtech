@@ -161,10 +161,10 @@ def get_dashboard_screen_html():
             
             <!-- RO List Table -->
             <div style="margin-top:30px;">
-                <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:20px; position:relative;">
-                    <h3 style="margin:0; color:#333;">Repair Orders</h3>
+                <div style="display:flex; align-items:flex-end; justify-content:space-between; margin-bottom:0; position:relative;">
+                    <h3 class="dashboard-ro-title-tab" style="margin:0; color:#333;">Repair Orders</h3>
                     <button id="dashboardPrintTrigger" class="mini-popup-trigger" onclick="openPrintOptionsModal()" style="padding:8px 10px; background:none; border:none; color:#b22222; cursor:pointer; display:inline-flex; align-items:center; justify-content:center;" aria-label="Print">
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
                             <path d="M7 8V4H17V8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
                             <rect x="5" y="14" width="14" height="6" rx="1" stroke="currentColor" stroke-width="1.8"/>
                             <rect x="4" y="8" width="16" height="8" rx="2" stroke="currentColor" stroke-width="1.8"/>
@@ -249,6 +249,17 @@ def get_dashboard_screen_html():
         </div>
 
         <style>
+            .dashboard-ro-title-tab {
+                display: inline-flex;
+                align-items: center;
+                background: rgba(0,0,0,0.03);
+                color: #000000;
+                font-weight: 700;
+                padding: 10px 14px;
+                border-radius: 8px 8px 0 0;
+                box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+                margin-bottom: -1px;
+            }
             .dashboard-ro-table-wrap {
                 background: #ffffff;
                 border-radius: 4px;
@@ -279,6 +290,11 @@ def get_dashboard_screen_html():
                 padding-top: 14px !important;
                 padding-bottom: 14px !important;
                 box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+            }
+            #roListTable thead th,
+            #roListTable thead th span,
+            #roListTable thead th * {
+                color: #000000 !important;
             }
             #roListBody tr.dashboard-ro-main-row td {
                 background: #ffffff;
