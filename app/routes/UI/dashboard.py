@@ -427,7 +427,7 @@ def get_dashboard_screen_html():
             // Sidebar HTML
             const sidebarHtml = `
                 <div id="roSidebar" style="position:relative; flex:0 0 64px; height:100%; background:#23272a; display:flex; flex-direction:column; align-items:center; justify-content:center; box-shadow:2px 0 8px rgba(0,0,0,0.08);">
-                    <div style="display:flex; flex-direction:column; align-items:center; justify-content:space-evenly; flex:1 1 auto; height:100%; width:100%; padding:10px 0;">
+                    <div style="display:flex; flex-direction:column; align-items:center; justify-content:center; gap:18px; flex:1 1 auto; height:100%; width:100%; padding:10px 0;">
                         <button id="roSidebarBtn-notes" class="ro-sidebar-btn" data-view="notes" title="Notes" style="background:none; border:none; padding:0; cursor:pointer;">${icons.notepad}</button>
                         <button id="roSidebarBtn-estimate" class="ro-sidebar-btn" data-view="estimate" title="Estimate" style="background:none; border:none; padding:0; cursor:pointer;">${icons.estimate}</button>
                         <button id="roSidebarBtn-tech" class="ro-sidebar-btn" data-view="tech" title="Tech" style="background:none; border:none; padding:0; cursor:pointer;">${icons.tech}</button>
@@ -511,7 +511,7 @@ def get_dashboard_screen_html():
                 #roSidebar .ro-sidebar-btn { opacity:0.72; transition:opacity 0.15s ease, transform 0.15s ease; width:100%; display:flex; align-items:center; justify-content:center; }
                 #roSidebar .ro-sidebar-btn:hover { opacity:1; transform:translateY(-1px); }
                 #roSidebar .ro-sidebar-btn.active { opacity:1; }
-                #roSidebar { box-shadow:2px 0 8px rgba(0,0,0,0.08); }
+                #roSidebar { box-shadow:2px 0 8px rgba(0,0,0,0.08); min-height:0; flex-shrink:0; }
                 .mini-popup-panel {
                     position: absolute;
                     top: 100%;
