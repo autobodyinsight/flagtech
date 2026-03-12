@@ -250,6 +250,11 @@ def get_reports_screen_html():
             padding-bottom: 14px !important;
             box-shadow: 0 2px 8px rgba(0,0,0,0.08);
         }
+        #reportsRoListTable thead th,
+        #reportsRoListTable thead th span,
+        #reportsRoListTable thead th * {
+            color: #000000 !important;
+        }
         #reportsRoListBody tr.reports-ro-main-row td {
             background: #ffffff;
             border: none;
