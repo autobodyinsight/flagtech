@@ -33,61 +33,63 @@ def get_reports_screen_html():
     return r'''
     <div id="reports" class="screen" style="padding:20px; position:relative;">
         <div id="reportsMainPanel">
-        <div id="reportsPanel-main" class="reports-content-panel" style="display:block;">
-        <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:30px; gap:20px;">
-            <div style="display:flex; flex-direction:column; align-items:flex-start; gap:10px; min-width:260px;">
-                <label style="display:flex; align-items:center; gap:10px; cursor:pointer; user-select:none;">
-                    <span style="font-weight:700; color:#333;">Status</span>
-                    <span class="reports-toggle-wrap">
-                        <input id="reportsStatusToggle" type="checkbox" class="reports-toggle-input" />
-                        <span class="reports-toggle-slider"></span>
-                    </span>
-                    <span id="reportsStatusLabel" style="font-weight:700; color:#333; min-width:68px;">CLOSED</span>
-                </label>
-                <div style="display:flex; gap:10px; align-items:flex-end; flex-wrap:wrap;">
-                    <label style="display:flex; flex-direction:column; gap:4px; font-size:12px; color:#555; font-weight:600;">
-                        <span>Start Date</span>
-                        <input id="reportsStartDate" type="date" style="padding:7px 8px; border:1px solid #ccc; border-radius:4px; min-width:130px;" />
+        <div style="margin-bottom:30px;">
+            <h1 style="text-align:center; margin:0 0 14px 0;">REPORTS</h1>
+            <div style="display:flex; align-items:flex-end; justify-content:space-between; gap:20px;">
+                <div style="display:flex; flex-direction:column; align-items:flex-start; gap:10px; min-width:260px;">
+                    <label style="display:flex; align-items:center; gap:10px; cursor:pointer; user-select:none;">
+                        <span style="font-weight:700; color:#333;">Status</span>
+                        <span class="reports-toggle-wrap">
+                            <input id="reportsStatusToggle" type="checkbox" class="reports-toggle-input" />
+                            <span class="reports-toggle-slider"></span>
+                        </span>
+                        <span id="reportsStatusLabel" style="font-weight:700; color:#333; min-width:68px;">CLOSED</span>
                     </label>
-                    <label style="display:flex; flex-direction:column; gap:4px; font-size:12px; color:#555; font-weight:600;">
-                        <span>End Date</span>
-                        <input id="reportsEndDate" type="date" style="padding:7px 8px; border:1px solid #ccc; border-radius:4px; min-width:130px;" />
-                    </label>
-                    <div class="reports-top-icons" style="display:flex; align-items:flex-end; gap:10px; padding-bottom:2px; margin-left:4px;">
-                        <button id="reportsSidebarBtn-main" class="reports-sidebar-btn active" data-view="main" title="Reports" onclick="reportsExtraSwitchView('main')" style="background:none; border:none; padding:0; cursor:pointer;" aria-label="Reports View">
-                            <svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="4" y="4" width="20" height="20" rx="3" stroke="currentColor" stroke-width="2"/><line x1="8" y1="10" x2="20" y2="10" stroke="currentColor" stroke-width="2"/><line x1="8" y1="15" x2="20" y2="15" stroke="currentColor" stroke-width="2"/><line x1="8" y1="20" x2="16" y2="20" stroke="currentColor" stroke-width="2"/></svg>
-                        </button>
-                        <button id="reportsSidebarBtn-tech" class="reports-sidebar-btn" data-view="tech" title="Tech" onclick="reportsExtraSwitchView('tech')" style="background:none; border:none; padding:0; cursor:pointer;" aria-label="Tech View">
-                            <svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="14" cy="9" r="4" stroke="currentColor" stroke-width="2"/><rect x="7" y="17" width="14" height="6" rx="3" stroke="currentColor" stroke-width="2"/><path d="M21 21l2.5 2.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M7 21l-2.5 2.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
-                        </button>
-                        <button id="reportsSidebarBtn-parts" class="reports-sidebar-btn" data-view="parts" title="Parts" onclick="reportsExtraSwitchView('parts')" style="background:none; border:none; padding:0; cursor:pointer;" aria-label="Parts View">
-                            <svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="10" cy="23" r="2" stroke="currentColor" stroke-width="2"/><circle cx="20" cy="23" r="2" stroke="currentColor" stroke-width="2"/><rect x="5" y="7" width="18" height="10" rx="2" stroke="currentColor" stroke-width="2"/><path d="M7 7V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v2" stroke="currentColor" stroke-width="2"/></svg>
-                        </button>
+                    <div style="display:flex; gap:10px; align-items:flex-end; flex-wrap:wrap;">
+                        <label style="display:flex; flex-direction:column; gap:4px; font-size:12px; color:#555; font-weight:600;">
+                            <span>Start Date</span>
+                            <input id="reportsStartDate" type="date" style="padding:7px 8px; border:1px solid #ccc; border-radius:4px; min-width:130px;" />
+                        </label>
+                        <label style="display:flex; flex-direction:column; gap:4px; font-size:12px; color:#555; font-weight:600;">
+                            <span>End Date</span>
+                            <input id="reportsEndDate" type="date" style="padding:7px 8px; border:1px solid #ccc; border-radius:4px; min-width:130px;" />
+                        </label>
+                        <div class="reports-top-icons" style="display:flex; align-items:flex-end; gap:10px; padding-bottom:2px; margin-left:4px;">
+                            <button id="reportsSidebarBtn-main" class="reports-sidebar-btn active" data-view="main" title="Reports" onclick="reportsExtraSwitchView('main')" style="background:none; border:none; padding:0; cursor:pointer;" aria-label="Reports View">
+                                <svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="4" y="4" width="20" height="20" rx="3" stroke="currentColor" stroke-width="2"/><line x1="8" y1="10" x2="20" y2="10" stroke="currentColor" stroke-width="2"/><line x1="8" y1="15" x2="20" y2="15" stroke="currentColor" stroke-width="2"/><line x1="8" y1="20" x2="16" y2="20" stroke="currentColor" stroke-width="2"/></svg>
+                            </button>
+                            <button id="reportsSidebarBtn-tech" class="reports-sidebar-btn" data-view="tech" title="Tech" onclick="reportsExtraSwitchView('tech')" style="background:none; border:none; padding:0; cursor:pointer;" aria-label="Tech View">
+                                <svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="14" cy="9" r="4" stroke="currentColor" stroke-width="2"/><rect x="7" y="17" width="14" height="6" rx="3" stroke="currentColor" stroke-width="2"/><path d="M21 21l2.5 2.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M7 21l-2.5 2.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+                            </button>
+                            <button id="reportsSidebarBtn-parts" class="reports-sidebar-btn" data-view="parts" title="Parts" onclick="reportsExtraSwitchView('parts')" style="background:none; border:none; padding:0; cursor:pointer;" aria-label="Parts View">
+                                <svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="10" cy="23" r="2" stroke="currentColor" stroke-width="2"/><circle cx="20" cy="23" r="2" stroke="currentColor" stroke-width="2"/><rect x="5" y="7" width="18" height="10" rx="2" stroke="currentColor" stroke-width="2"/><path d="M7 7V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v2" stroke="currentColor" stroke-width="2"/></svg>
+                            </button>
+                        </div>
                     </div>
                 </div>
-            </div>
-            <h1 style="text-align:center; margin:0; flex:1;">REPORTS</h1>
-            <div style="position:relative;">
-                <button id="reportsPrintTrigger" class="mini-popup-trigger" onclick="reportsOpenPrintOptionsModal()" style="padding:8px 10px; background:none; border:none; color:#b22222; cursor:pointer; display:inline-flex; align-items:center; justify-content:center;" aria-label="Print">
-                    <svg width="40" height="40" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-                        <path d="M7 8V4H17V8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
-                        <rect x="5" y="14" width="14" height="6" rx="1" stroke="currentColor" stroke-width="1.8"/>
-                        <rect x="4" y="8" width="16" height="8" rx="2" stroke="currentColor" stroke-width="1.8"/>
-                        <circle cx="17" cy="11" r="1" fill="currentColor"/>
-                    </svg>
-                </button>
-                <div id="reportsPrintOptionsModal" class="mini-popup-panel" style="display:none; right:0; left:auto;">
-                    <h2 style="margin:0 0 14px 0; color:#333; font-size:18px;">Print Closed RO List</h2>
-                    <p style="margin:0 0 12px 0; font-weight:bold; color:#555;">Print by:</p>
-                    <div style="display:flex; flex-direction:column; gap:8px;">
-                        <button onclick="reportsPrintClosedRos('ro')" style="padding:10px 12px; background:#f5f5f5; color:#333; border:1px solid #ddd; border-radius:4px; cursor:pointer; text-align:left; font-size:14px;">RO</button>
-                        <button onclick="reportsPrintClosedRos('insurance')" style="padding:10px 12px; background:#f5f5f5; color:#333; border:1px solid #ddd; border-radius:4px; cursor:pointer; text-align:left; font-size:14px;">INSURANCE</button>
-                        <button onclick="reportsPrintClosedRos('tech')" style="padding:10px 12px; background:#f5f5f5; color:#333; border:1px solid #ddd; border-radius:4px; cursor:pointer; text-align:left; font-size:14px;">TECH</button>
-                        <button onclick="reportsPrintClosedRos('estimator')" style="padding:10px 12px; background:#f5f5f5; color:#333; border:1px solid #ddd; border-radius:4px; cursor:pointer; text-align:left; font-size:14px;">ESTIMATOR</button>
+                <div style="position:relative;">
+                    <button id="reportsPrintTrigger" class="mini-popup-trigger" onclick="reportsOpenPrintOptionsModal()" style="padding:8px 10px; background:none; border:none; color:#b22222; cursor:pointer; display:inline-flex; align-items:center; justify-content:center;" aria-label="Print">
+                        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                            <path d="M7 8V4H17V8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+                            <rect x="5" y="14" width="14" height="6" rx="1" stroke="currentColor" stroke-width="1.8"/>
+                            <rect x="4" y="8" width="16" height="8" rx="2" stroke="currentColor" stroke-width="1.8"/>
+                            <circle cx="17" cy="11" r="1" fill="currentColor"/>
+                        </svg>
+                    </button>
+                    <div id="reportsPrintOptionsModal" class="mini-popup-panel" style="display:none; right:0; left:auto;">
+                        <h2 style="margin:0 0 14px 0; color:#333; font-size:18px;">Print Closed RO List</h2>
+                        <p style="margin:0 0 12px 0; font-weight:bold; color:#555;">Print by:</p>
+                        <div style="display:flex; flex-direction:column; gap:8px;">
+                            <button onclick="reportsPrintClosedRos('ro')" style="padding:10px 12px; background:#f5f5f5; color:#333; border:1px solid #ddd; border-radius:4px; cursor:pointer; text-align:left; font-size:14px;">RO</button>
+                            <button onclick="reportsPrintClosedRos('insurance')" style="padding:10px 12px; background:#f5f5f5; color:#333; border:1px solid #ddd; border-radius:4px; cursor:pointer; text-align:left; font-size:14px;">INSURANCE</button>
+                            <button onclick="reportsPrintClosedRos('tech')" style="padding:10px 12px; background:#f5f5f5; color:#333; border:1px solid #ddd; border-radius:4px; cursor:pointer; text-align:left; font-size:14px;">TECH</button>
+                            <button onclick="reportsPrintClosedRos('estimator')" style="padding:10px 12px; background:#f5f5f5; color:#333; border:1px solid #ddd; border-radius:4px; cursor:pointer; text-align:left; font-size:14px;">ESTIMATOR</button>
+                        </div>
                     </div>
                 </div>
             </div>
         </div>
+        <div id="reportsPanel-main" class="reports-content-panel" style="display:block;">
         <!-- Summary Metrics Section -->
         <div style="margin-bottom:32px;">
             <div id="reportsSummaryCards" class="reports-summary-grid">
