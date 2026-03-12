@@ -71,7 +71,14 @@ def get_reports_screen_html():
             </div>
             <h1 style="text-align:center; margin:0; flex:1;">REPORTS</h1>
             <div style="position:relative;">
-                <button id="reportsPrintTrigger" class="mini-popup-trigger" onclick="reportsOpenPrintOptionsModal()" style="padding:10px 16px; background:var(--brand-red, #d32f2f); color:#fff; border:none; border-radius:4px; font-weight:bold; cursor:pointer;">Print</button>
+                <button id="reportsPrintTrigger" class="mini-popup-trigger" onclick="reportsOpenPrintOptionsModal()" style="padding:8px 10px; background:none; border:none; color:#b22222; cursor:pointer; display:inline-flex; align-items:center; justify-content:center;" aria-label="Print">
+                    <svg width="40" height="40" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                        <path d="M7 8V4H17V8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+                        <rect x="5" y="14" width="14" height="6" rx="1" stroke="currentColor" stroke-width="1.8"/>
+                        <rect x="4" y="8" width="16" height="8" rx="2" stroke="currentColor" stroke-width="1.8"/>
+                        <circle cx="17" cy="11" r="1" fill="currentColor"/>
+                    </svg>
+                </button>
                 <div id="reportsPrintOptionsModal" class="mini-popup-panel" style="display:none; right:0; left:auto;">
                     <h2 style="margin:0 0 14px 0; color:#333; font-size:18px;">Print Closed RO List</h2>
                     <p style="margin:0 0 12px 0; font-weight:bold; color:#555;">Print by:</p>
@@ -86,24 +93,16 @@ def get_reports_screen_html():
         </div>
         <!-- Summary Metrics Section -->
         <div style="margin-bottom:32px;">
-            <table style="width:100%; border-collapse:collapse;">
-                <thead>
-                    <tr style="background:#3c4142;">
-                        <th style="padding:12px; font-size:18px; font-weight:bold; text-align:left; color:#fff;">CATEGORY</th>
-                        <th style="padding:12px; font-size:18px; font-weight:bold; text-align:left; color:#fff;">TOTAL SALES</th>
-                        <th style="padding:12px; font-size:18px; font-weight:bold; text-align:left; color:#fff;">TOTAL GP %</th>
-                        <th style="padding:12px; font-size:18px; font-weight:bold; text-align:left; color:#fff;">TOTAL GP $</th>
-                    </tr>
-                </thead>
-                <tbody id="reportsSummaryBody">
-                    <tr><td colspan="4" style="padding:20px; text-align:center; color:#999;">Loading...</td></tr>
-                </tbody>
-            </table>
+            <div id="reportsSummaryCards" class="reports-summary-grid">
+                <div class="reports-summary-loading">Loading...</div>
+            </div>
         </div>
         <!-- Closed RO List Section -->
-        <div style="background:#fff; padding:20px; border-radius:8px; box-shadow:0 2px 4px rgba(0,0,0,0.1);">
-            <h3 id="reportsRoSectionHeader" style="margin:0 0 18px 0; color:#333;">Closed Repair Orders</h3>
-            <div style="overflow-x:auto;">
+        <div style="margin-top:8px;">
+            <div style="display:flex; align-items:flex-end; justify-content:space-between; margin-bottom:0; position:relative;">
+                <h3 id="reportsRoSectionHeader" class="dashboard-ro-title-tab" style="margin:0; color:#333;">Closed Repair Orders</h3>
+            </div>
+            <div class="dashboard-ro-table-wrap" style="overflow-x:auto;">
                 <table id="reportsRoListTable" style="width:100%; border-collapse:collapse;">
                     <thead>
                         <tr class="dashboard-header-row">
@@ -209,6 +208,113 @@ def get_reports_screen_html():
             background: #23272a;
             color: #fff;
         }
+        .dashboard-ro-title-tab {
+            display: inline-flex;
+            align-items: center;
+            background: rgba(0,0,0,0.03);
+            color: #000000;
+            font-weight: 700;
+            padding: 10px 14px;
+            border-radius: 8px 8px 0 0;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+            margin-bottom: -1px;
+        }
+        .dashboard-ro-table-wrap {
+            background: #ffffff;
+            border-radius: 4px;
+            overflow: hidden;
+        }
+        #reportsRoListTable {
+            width: 100%;
+            background: #ffffff;
+            border-collapse: collapse;
+            border: none;
+            font-family: "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+            font-size: 14px;
+            box-shadow: none;
+        }
+        #reportsRoListTable .dashboard-header-row th,
+        #reportsRoListTable .dashboard-header-cell {
+            font-family: "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+            font-size: 15px;
+            font-weight: 600;
+            background: rgba(0,0,0,0.03) !important;
+            color: #000000;
+            text-align: left !important;
+            border: none !important;
+            border-bottom: 1px solid #b22222 !important;
+            position: sticky;
+            top: 0;
+            z-index: 2;
+            padding-top: 14px !important;
+            padding-bottom: 14px !important;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+        }
+        #reportsRoListBody tr.reports-ro-main-row td {
+            background: #ffffff;
+            border: none;
+            border-bottom: 1px solid rgba(0,0,0,0.06) !important;
+            min-height: 48px;
+            height: 48px;
+            text-align: left;
+            vertical-align: middle;
+            box-shadow: none !important;
+        }
+        #reportsRoListBody tr.reports-ro-gp-row td {
+            background: #ffffff;
+            border: none;
+            border-bottom: 1px solid rgba(0,0,0,0.05) !important;
+            vertical-align: middle;
+        }
+        #reportsRoListBody tr.reports-ro-main-row:hover td,
+        #reportsRoListBody tr.reports-ro-main-row:hover + tr.reports-ro-gp-row td {
+            background: rgba(0,0,0,0.04) !important;
+        }
+        .reports-summary-grid {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(220px, 1fr));
+            gap: 16px;
+            align-items: stretch;
+        }
+        .reports-summary-loading {
+            grid-column: 1 / -1;
+            padding: 20px;
+            color: #999;
+            text-align: center;
+            background: #fff;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.07);
+        }
+        .reports-summary-card {
+            border: 1.5px solid #e0e0e0;
+            border-radius: 12px;
+            background: #fff;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.07);
+            overflow: hidden;
+        }
+        .reports-summary-card .reports-summary-title {
+            font-weight: 700;
+            color: #fff;
+            padding: 8px 0;
+            text-align: center;
+            font-size: 15px;
+            letter-spacing: 1px;
+            border-bottom: 1.5px solid #e0e0e0;
+        }
+        .reports-summary-card .reports-summary-main {
+            padding: 12px 14px 4px;
+            font-size: 21px;
+            font-weight: 700;
+            color: #222;
+        }
+        .reports-summary-card .reports-summary-sub {
+            padding: 0 14px 12px;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            font-size: 13px;
+            color: #444;
+        }
         .reports-green-bold {
             color: #2e7d32;
             font-weight: bold;
@@ -280,6 +386,7 @@ def get_reports_screen_html():
             #reportsExtraSidebar { width:44px; }
             #reportsExtraSidebar svg { width:22px; height:22px; }
             #reportsMainPanel { margin-left:64px !important; }
+            .reports-summary-grid { grid-template-columns: 1fr; }
         }
     </style>
     <script>
@@ -1661,9 +1768,6 @@ def get_reports_screen_html():
             const laborGp = computeGpValues(laborSales, laborCost);
             const totalGp = computeGpValues(totalSales, totalCost);
 
-            const rowBg = index % 2 === 0 ? '#f2f0ef' : '#ffffff';
-            const gpBg = index % 2 === 0 ? '#ececec' : '#f7f7f7';
-
             const partsGpDollarHtml = boldGpDollar
                 ? `<strong>${formatReportsMoney(partsGp.gpDollar)}</strong>`
                 : `${formatReportsMoney(partsGp.gpDollar)}`;
@@ -1680,7 +1784,7 @@ def get_reports_screen_html():
                 : `<span style="color:#222; font-weight:700;">${roNumber}</span>`;
 
             return `
-                <tr style="background:${rowBg};">
+                <tr class="reports-ro-main-row">
                     <td style='padding:12px;'>
                         ${roCellHtml}
                     </td>
@@ -1694,7 +1798,7 @@ def get_reports_screen_html():
                     <td style='padding:12px; text-align:right;'>${formatReportsMoney(totalSales)}</td>
                     <td style='padding:12px; text-align:right;'>${formatReportsMoney(totalCost)}</td>
                 </tr>
-                <tr style="background:${gpBg};">
+                <tr class="reports-ro-gp-row">
                     <td colspan='4' style='padding:8px 12px;'></td>
                     <td colspan='2' style='padding:8px 12px; text-align:right; font-size:12px;'>Parts GP: ${formatReportsPercent(partsGp.gpPercent)}% | ${partsGpDollarHtml}</td>
                     <td colspan='2' style='padding:8px 12px; text-align:right; font-size:12px;'>Labor GP: ${formatReportsPercent(laborGp.gpPercent)}% | ${laborGpDollarHtml}</td>
@@ -1946,28 +2050,54 @@ def get_reports_screen_html():
                 open_ros: reportsBuildOpenRowsFromDashboardRows(dashboardData?.roList || []),
             };
 
-            const summaryBody = document.getElementById('reportsSummaryBody');
-            if (summaryBody) {
-                summaryBody.innerHTML = '';
-                const rowColors = ['#d3d3d3', '#f2f0ef'];
-                for (let i = 0; i < reportsDataCache.summary.length; i += 1) {
-                    const row = reportsDataCache.summary[i];
-                    const rowBg = rowColors[i % 2];
-                    summaryBody.innerHTML += `<tr style='background:${rowBg};'>
-                        <td style='padding:12px;'>${reportsEscapeHtml(row.category)}</td>
-                        <td style='padding:12px;'>${formatReportsMoney(row.sales)}</td>
-                        <td style='padding:12px;'>${formatReportsPercent(row.gp_percent)}%</td>
-                        <td style='padding:12px;'>${formatReportsMoney(row.gp_dollar)}</td>
-                    </tr>`;
-                }
+            const summaryCards = document.getElementById('reportsSummaryCards');
+            if (summaryCards) {
+                const targetOrder = ['RO\'S', 'PARTS', 'LABOR'];
+                const byCategory = new Map();
+                reportsDataCache.summary.forEach((row) => {
+                    const key = String(row?.category || '').trim().toUpperCase();
+                    if (key) byCategory.set(key, row);
+                });
+
+                const fallbackRows = reportsDataCache.summary.slice(0, 3);
+                const cards = targetOrder.map((label, index) => {
+                    const normalizedKey = label.replace(/\s+/g, '').replace(/'/g, '');
+                    let row = null;
+                    for (const [key, value] of byCategory.entries()) {
+                        const candidate = key.replace(/\s+/g, '').replace(/'/g, '');
+                        if (candidate === normalizedKey) {
+                            row = value;
+                            break;
+                        }
+                    }
+                    if (!row) row = fallbackRows[index] || {};
+                    return {
+                        label,
+                        sales: Number(row?.sales || 0),
+                        gpPercent: Number(row?.gp_percent || 0),
+                        gpDollar: Number(row?.gp_dollar || 0),
+                    };
+                });
+
+                const barColors = ['#00BFFF', '#FF8C00', '#32CD32'];
+                summaryCards.innerHTML = cards.map((card, idx) => `
+                    <div class="reports-summary-card">
+                        <div class="reports-summary-title" style="background:${barColors[idx % barColors.length]};">${reportsEscapeHtml(card.label)}</div>
+                        <div class="reports-summary-main">${formatReportsMoney(card.sales)}</div>
+                        <div class="reports-summary-sub">
+                            <div>Total GP%: <strong>${formatReportsPercent(card.gpPercent)}%</strong></div>
+                            <div>Total GP$: <strong>${formatReportsMoney(card.gpDollar)}</strong></div>
+                        </div>
+                    </div>
+                `).join('');
             }
 
             reportsRenderRoList();
         } catch (e) {
-            const summaryBody = document.getElementById('reportsSummaryBody');
+            const summaryCards = document.getElementById('reportsSummaryCards');
             const roBody = document.getElementById('reportsRoListBody');
-            if (summaryBody) {
-                summaryBody.innerHTML = `<tr><td colspan='4' style='padding:20px; text-align:center; color:#c00;'>Error loading data</td></tr>`;
+            if (summaryCards) {
+                summaryCards.innerHTML = `<div class='reports-summary-loading' style='color:#c00;'>Error loading data</div>`;
             }
             if (roBody) {
                 roBody.innerHTML = `<tr><td colspan='10' style='padding:20px; text-align:center; color:#c00;'>Error loading data</td></tr>`;
