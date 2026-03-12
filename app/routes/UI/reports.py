@@ -127,9 +127,12 @@ def get_reports_screen_html():
         </div>
         </div>
 
-        <div id="reportsPanel-tech" class="reports-content-panel" style="display:none; background:#fff; padding:20px; border-radius:8px; box-shadow:0 2px 4px rgba(0,0,0,0.1);">
-            <h3 style="margin:0 0 18px 0; color:#333;">Tech</h3>
-            <div style="overflow-x:auto;">
+        <div id="reportsPanel-tech" class="reports-content-panel" style="display:none;">
+            <div style="margin-top:8px;">
+                <div style="display:flex; align-items:flex-end; justify-content:space-between; margin-bottom:0; position:relative;">
+                    <h3 class="dashboard-ro-title-tab" style="margin:0; color:#333;">Tech</h3>
+                </div>
+                <div class="dashboard-ro-table-wrap" style="overflow-x:auto;">
                 <table id="reportsTechListTable" style="width:100%; border-collapse:collapse;">
                     <thead>
                         <tr class="dashboard-header-row">
@@ -143,12 +146,16 @@ def get_reports_screen_html():
                         <tr><td colspan="4" style="padding:20px; text-align:center; color:#999;">Loading...</td></tr>
                     </tbody>
                 </table>
+                </div>
             </div>
         </div>
 
-        <div id="reportsPanel-parts" class="reports-content-panel" style="display:none; background:#fff; padding:20px; border-radius:8px; box-shadow:0 2px 4px rgba(0,0,0,0.1);">
-            <h3 style="margin:0 0 18px 0; color:#333;">Parts</h3>
-            <div style="overflow-x:auto;">
+        <div id="reportsPanel-parts" class="reports-content-panel" style="display:none;">
+            <div style="margin-top:8px;">
+                <div style="display:flex; align-items:flex-end; justify-content:space-between; margin-bottom:0; position:relative;">
+                    <h3 class="dashboard-ro-title-tab" style="margin:0; color:#333;">Parts</h3>
+                </div>
+                <div class="dashboard-ro-table-wrap" style="overflow-x:auto;">
                 <table id="reportsPartsVendorTable" style="width:100%; border-collapse:collapse;">
                     <thead>
                         <tr class="dashboard-header-row">
@@ -162,6 +169,7 @@ def get_reports_screen_html():
                         <tr><td colspan="4" style="padding:20px; text-align:center; color:#999;">Loading...</td></tr>
                     </tbody>
                 </table>
+                </div>
             </div>
 
             <div id="reportsPartsVendorModal" style="display:none; position:fixed; z-index:1200; left:0; top:0; width:100%; height:100%; background:rgba(0,0,0,0.45);">
@@ -254,6 +262,43 @@ def get_reports_screen_html():
         #reportsRoListTable thead th * {
             color: #000000 !important;
         }
+        #reportsTechListTable,
+        #reportsPartsVendorTable {
+            width: 100%;
+            background: #ffffff;
+            border-collapse: collapse;
+            border: none;
+            font-family: "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+            font-size: 14px;
+            box-shadow: none;
+        }
+        #reportsTechListTable .dashboard-header-row th,
+        #reportsTechListTable .dashboard-header-cell,
+        #reportsPartsVendorTable .dashboard-header-row th,
+        #reportsPartsVendorTable .dashboard-header-cell {
+            font-family: "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+            font-size: 15px;
+            font-weight: 600;
+            background: rgba(0,0,0,0.03) !important;
+            color: #000000 !important;
+            text-align: left !important;
+            border: none !important;
+            border-bottom: 1px solid #b22222 !important;
+            position: sticky;
+            top: 0;
+            z-index: 2;
+            padding-top: 14px !important;
+            padding-bottom: 14px !important;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+        }
+        #reportsTechListTable thead th,
+        #reportsTechListTable thead th span,
+        #reportsTechListTable thead th *,
+        #reportsPartsVendorTable thead th,
+        #reportsPartsVendorTable thead th span,
+        #reportsPartsVendorTable thead th * {
+            color: #000000 !important;
+        }
         #reportsRoListBody tr.reports-ro-main-row td {
             background: #ffffff;
             border: none;
@@ -272,6 +317,21 @@ def get_reports_screen_html():
         }
         #reportsRoListBody tr.reports-ro-main-row:hover td,
         #reportsRoListBody tr.reports-ro-main-row:hover + tr.reports-ro-gp-row td {
+            background: rgba(0,0,0,0.04) !important;
+        }
+        #reportsTechListBody tr.reports-tech-main-row td,
+        #reportsPartsVendorBody tr.reports-parts-main-row td {
+            background: #ffffff;
+            border: none;
+            border-bottom: 1px solid rgba(0,0,0,0.06) !important;
+            min-height: 48px;
+            height: 48px;
+            text-align: left;
+            vertical-align: middle;
+            box-shadow: none !important;
+        }
+        #reportsTechListBody tr.reports-tech-main-row:hover td,
+        #reportsPartsVendorBody tr.reports-parts-main-row:hover td {
             background: rgba(0,0,0,0.04) !important;
         }
         .reports-summary-grid {
@@ -579,16 +639,15 @@ def get_reports_screen_html():
                 return;
             }
 
-            rows.forEach((row, index) => {
-                const rowBg = (index % 2 === 0) ? '#d3d3d3' : '#f2f0ef';
+            rows.forEach((row) => {
                 const techName = String(row.tech_name || '').trim() || `Tech #${row.tech_id || ''}`;
                 const totalRos = Number(row.total_ros || 0);
 
-                body.innerHTML += `<tr>
-                    <td style='padding:12px; background:${rowBg};'><button type='button' class='reports-tech-link' data-tech-id='${Number(row.tech_id || 0)}' data-tech-name='${reportsEscapeHtml(techName)}' style='background:none; border:none; color:#0066cc; text-decoration:underline; cursor:pointer; padding:0; font:inherit; font-weight:bold;'>${reportsEscapeHtml(techName)}</button></td>
-                    <td style='padding:12px; text-align:right; background:${rowBg};'>${formatReportsMoney(row.pay_rate || 0)}</td>
-                    <td style='padding:12px; text-align:right; background:${rowBg};'>${Number(row.total_hours || 0).toFixed(1)}</td>
-                    <td style='padding:12px; text-align:center; background:${rowBg};'>${totalRos}</td>
+                body.innerHTML += `<tr class='reports-tech-main-row'>
+                    <td style='padding:12px;'><button type='button' class='reports-tech-link' data-tech-id='${Number(row.tech_id || 0)}' data-tech-name='${reportsEscapeHtml(techName)}' style='background:none; border:none; color:#0066cc; text-decoration:underline; cursor:pointer; padding:0; font:inherit; font-weight:bold;'>${reportsEscapeHtml(techName)}</button></td>
+                    <td style='padding:12px; text-align:right;'>${formatReportsMoney(row.pay_rate || 0)}</td>
+                    <td style='padding:12px; text-align:right;'>${Number(row.total_hours || 0).toFixed(1)}</td>
+                    <td style='padding:12px; text-align:center;'>${totalRos}</td>
                 </tr>`;
             });
 
@@ -620,8 +679,7 @@ def get_reports_screen_html():
                 return;
             }
 
-            body.innerHTML = rows.map((row, index) => {
-                const rowBg = (index % 2 === 0) ? '#d3d3d3' : '#f2f0ef';
+            body.innerHTML = rows.map((row) => {
                 const vendorName = reportsEscapeHtml(row.vendor || '—');
                 const vendorType = reportsEscapeHtml(row.type || '—');
                 const invoices = Number(row.invoices || 0);
@@ -629,11 +687,11 @@ def get_reports_screen_html():
                 const vendorId = Number(row.vendor_id || 0);
                 const buttonHtml = `<button type='button' class='reports-parts-vendor-link' data-vendor-id='${vendorId}' data-vendor-name='${vendorName}' style='background:none; border:none; color:#0066cc; text-decoration:underline; cursor:pointer; padding:0; font:inherit; font-weight:bold;'>${vendorName}</button>`;
                 return `
-                    <tr>
-                        <td style='padding:12px; background:${rowBg};'>${buttonHtml}</td>
-                        <td style='padding:12px; background:${rowBg};'>${vendorType}</td>
-                        <td style='padding:12px; text-align:right; background:${rowBg};'>${invoices}</td>
-                        <td style='padding:12px; text-align:right; background:${rowBg};'>${total}</td>
+                    <tr class='reports-parts-main-row'>
+                        <td style='padding:12px;'>${buttonHtml}</td>
+                        <td style='padding:12px;'>${vendorType}</td>
+                        <td style='padding:12px; text-align:right;'>${invoices}</td>
+                        <td style='padding:12px; text-align:right;'>${total}</td>
                     </tr>
                 `;
             }).join('');
