@@ -291,9 +291,6 @@ async def home_screen(request: Request):
         .header-icon-btn:hover {{
             background: rgba(255,255,255,0.16);
         }}
-        #appMenuButton svg {{
-            display: block;
-        }}
         .app-brand-logo {{
             width: 32px;
             height: 32px;
@@ -345,52 +342,67 @@ async def home_screen(request: Request):
         .header-menu-action:hover {{
             background: #f3f3f3;
         }}
-        #sideNavBackdrop {{
-            position: fixed;
-            left: 0;
-            right: 0;
-            top: 60px;
-            bottom: 0;
-            background: rgba(0,0,0,0.3);
-            display: none;
-            z-index: 1300;
-        }}
-        #sideNavDrawer {{
+        #sideNavSidebar {{
             position: fixed;
             top: 60px;
             left: 0;
-            width: 260px;
+            width: 64px;
             height: calc(100vh - 60px);
             background: #971d1d;
             box-shadow: 2px 0 18px rgba(0,0,0,0.2);
-            transform: translateX(-100%);
-            transition: transform 0.22s ease;
-            z-index: 1310;
-            padding: 14px 14px 14px 14px;
+            transition: width 0.22s ease;
+            z-index: 1210;
+            padding: 14px 8px;
             overflow-y: auto;
+            overflow-x: hidden;
         }}
-        #sideNavDrawer.open {{
-            transform: translateX(0);
+        #sideNavSidebar.expanded {{
+            width: 240px;
         }}
         .side-menu-list {{
             display: grid;
-            gap: 0;
+            gap: 6px;
         }}
         .side-menu-item {{
             width: 100%;
             border: none;
             background: transparent;
             color: #ffffff;
-            border-radius: 0;
-            padding: 14px 12px;
+            border-radius: 10px;
+            padding: 12px 10px;
             text-align: left;
-            font-size: 16px;
+            font-size: 14px;
             font-weight: 700;
-            letter-spacing: 0.6px;
+            letter-spacing: 0.4px;
             cursor: pointer;
             display: flex;
             align-items: center;
             justify-content: flex-start;
+            gap: 12px;
+        }}
+        .side-menu-item .nav-icon {{
+            width: 24px;
+            height: 24px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            flex: 0 0 24px;
+        }}
+        .side-menu-item .nav-icon svg {{
+            width: 22px;
+            height: 22px;
+            display: block;
+        }}
+        .side-menu-item .nav-label {{
+            opacity: 0;
+            max-width: 0;
+            white-space: nowrap;
+            overflow: hidden;
+            transition: opacity 0.16s ease, max-width 0.2s ease;
+        }}
+        #sideNavSidebar.expanded .side-menu-item .nav-label {{
+            opacity: 1;
+            max-width: 160px;
         }}
         .side-menu-item:hover {{
             background: #9f1e1e;
@@ -680,6 +692,9 @@ async def home_screen(request: Request):
         @media (max-width: 840px) {{
             .content-area {{ padding: 18px; }}
             .app-brand-text {{ font-size: 18px; }}
+            #sideNavSidebar {{ width: 56px; }}
+            #sideNavSidebar.expanded {{ width: 220px; }}
+            .content-area {{ margin-left: 56px; }}
             .chat-main-grid {{
                 grid-template-columns: 1fr;
                 overflow-y: auto;
@@ -697,6 +712,7 @@ async def home_screen(request: Request):
         .content-area {{
             flex: 1;
             padding: 40px;
+            margin-left: 64px;
             overflow-y: auto;
             background-color: #d3d3d3;
         }}
