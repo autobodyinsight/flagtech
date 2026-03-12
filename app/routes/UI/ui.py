@@ -857,20 +857,10 @@ async def home_screen(request: Request):
 <body>
     <header class="app-header">
         <div class="app-header-left">
-            <button id="appMenuButton" class="header-icon-btn" type="button" aria-label="Open menu">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-                    <path d="M4 7H20" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-                    <path d="M4 12H20" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-                    <path d="M4 17H20" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-                </svg>
-            </button>
             <img class="app-brand-logo" src="/static/autobodyos.png" alt="AutobodyOS logo" />
             <div class="app-brand-text">AutobodyOS</div>
         </div>
         <div class="app-header-right">
-            <button id="headerChatButton" class="header-icon-btn" type="button" aria-label="Open chat">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M4 5h16v10H8l-4 4V5z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>
-            </button>
             <div style="position:relative;">
                 <button id="headerUserButton" type="button" aria-label="Open user menu">--</button>
                 <div id="headerUserDropdown">
@@ -881,17 +871,17 @@ async def home_screen(request: Request):
         </div>
     </header>
 
-    <div id="sideNavBackdrop"></div>
-    <aside id="sideNavDrawer" aria-hidden="true">
+    <aside id="sideNavSidebar" aria-label="Primary navigation">
         <div class="side-menu-list">
-            <button type="button" class="side-menu-item active" data-screen="dashboard">Dashboard</button>
-            <button type="button" class="side-menu-item" data-screen="upload">Upload</button>
-            <button type="button" class="side-menu-item" data-screen="phase">Roadmap</button>
-            <button type="button" class="side-menu-item" data-screen="parts">Parts</button>
-            <button type="button" class="side-menu-item" data-screen="tech">Techs</button>
-            <button type="button" class="side-menu-item" data-screen="flagtech">Flagout</button>
-            <button type="button" class="side-menu-item" data-screen="reports">Reports</button>
-            <button type="button" class="side-menu-item" data-screen="setup">Setup</button>
+            <button type="button" class="side-menu-item active" data-screen="dashboard" aria-label="Dashboard"><span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M4 13h6v7H4v-7zm10-9h6v16h-6V4zM4 4h6v7H4V4z" stroke="currentColor" stroke-width="1.8"/></svg></span><span class="nav-label">Dashboard</span></button>
+            <button type="button" class="side-menu-item" data-screen="upload" aria-label="Upload"><span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 16V4m0 0l-4 4m4-4l4 4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M4 20h16" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></span><span class="nav-label">Upload</span></button>
+            <button type="button" class="side-menu-item" data-screen="phase" aria-label="Roadmap"><span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M4 6h8M4 12h16M4 18h10" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></span><span class="nav-label">Roadmap</span></button>
+            <button type="button" class="side-menu-item" data-screen="parts" aria-label="Parts"><span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="8" cy="18" r="2" stroke="currentColor" stroke-width="1.8"/><circle cx="17" cy="18" r="2" stroke="currentColor" stroke-width="1.8"/><path d="M4 6h2l2 9h10l2-7H8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span class="nav-label">Parts</span></button>
+            <button type="button" class="side-menu-item" data-screen="tech" aria-label="Techs"><span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="8" r="3" stroke="currentColor" stroke-width="1.8"/><path d="M5 20c0-3.3 3.1-6 7-6s7 2.7 7 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></span><span class="nav-label">Techs</span></button>
+            <button type="button" class="side-menu-item" data-screen="flagtech" aria-label="Flagout"><span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M6 3v18" stroke="currentColor" stroke-width="1.8"/><path d="M6 4h11l-2.2 3L17 10H6" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg></span><span class="nav-label">Flagout</span></button>
+            <button type="button" class="side-menu-item" data-screen="reports" aria-label="Reports"><span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M5 5h14v14H5z" stroke="currentColor" stroke-width="1.8"/><path d="M8 9h8M8 13h8M8 17h5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></span><span class="nav-label">Reports</span></button>
+            <button type="button" class="side-menu-item" data-screen="setup" aria-label="Setup"><span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 15.2a3.2 3.2 0 1 0 0-6.4 3.2 3.2 0 0 0 0 6.4z" stroke="currentColor" stroke-width="1.8"/><path d="M19.4 15l1.6 1-1.5 2.6-1.8-.6a7.8 7.8 0 0 1-1.4.8l-.3 1.9h-3l-.3-1.9a7.8 7.8 0 0 1-1.4-.8l-1.8.6L3 16l1.6-1a7.7 7.7 0 0 1 0-2l-1.6-1L4.5 9.4l1.8.6a7.8 7.8 0 0 1 1.4-.8l.3-1.9h3l.3 1.9a7.8 7.8 0 0 1 1.4.8l1.8-.6L21 12l-1.6 1a7.7 7.7 0 0 1 0 2z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg></span><span class="nav-label">Setup</span></button>
+            <button type="button" class="side-menu-item" data-action="chat" aria-label="Chat"><span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M4 5h16v10H8l-4 4V5z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg></span><span class="nav-label">Chat</span></button>
         </div>
     </aside>
 
@@ -1296,36 +1286,9 @@ async def home_screen(request: Request):
             await sendHeaderMessage('message');
         }}
 
-        function isSideMenuOpen() {{
-            const drawer = document.getElementById('sideNavDrawer');
-            return !!(drawer && drawer.classList.contains('open'));
-        }}
-
         function setActiveMenuItem(screenName) {{
             const items = document.querySelectorAll('.side-menu-item[data-screen]');
             items.forEach((item) => item.classList.toggle('active', item.getAttribute('data-screen') === screenName));
-        }}
-
-        function openSideMenu() {{
-            const drawer = document.getElementById('sideNavDrawer');
-            const backdrop = document.getElementById('sideNavBackdrop');
-            if (drawer) drawer.classList.add('open');
-            if (backdrop) backdrop.style.display = 'block';
-        }}
-
-        function closeSideMenu() {{
-            const drawer = document.getElementById('sideNavDrawer');
-            const backdrop = document.getElementById('sideNavBackdrop');
-            if (drawer) drawer.classList.remove('open');
-            if (backdrop) backdrop.style.display = 'none';
-        }}
-
-        function toggleSideMenu() {{
-            if (isSideMenuOpen()) {{
-                closeSideMenu();
-                return;
-            }}
-            openSideMenu();
         }}
 
         function toggleUserDropdown(forceOpen = null) {{
@@ -1529,25 +1492,36 @@ async def home_screen(request: Request):
         }}
 
         function initGlobalHeaderUi() {{
-            const menuButton = document.getElementById('appMenuButton');
-            const menuBackdrop = document.getElementById('sideNavBackdrop');
-            const drawer = document.getElementById('sideNavDrawer');
-            const chatButton = document.getElementById('headerChatButton');
+            const sidebar = document.getElementById('sideNavSidebar');
             const userButton = document.getElementById('headerUserButton');
+            let sidebarSuppressed = false;
 
-            if (menuButton) menuButton.addEventListener('click', (event) => {{
-                event.stopPropagation();
-                toggleSideMenu();
-            }});
-            if (menuBackdrop) menuBackdrop.addEventListener('click', closeSideMenu);
-            if (chatButton) chatButton.addEventListener('click', openChatModal);
+            if (sidebar) {{
+                sidebar.addEventListener('mouseenter', () => {{
+                    if (sidebarSuppressed) return;
+                    sidebar.classList.add('expanded');
+                }});
+                sidebar.addEventListener('mouseleave', () => {{
+                    sidebar.classList.remove('expanded');
+                    sidebarSuppressed = false;
+                }});
+            }}
             if (userButton) userButton.addEventListener('click', () => toggleUserDropdown());
 
             document.querySelectorAll('.side-menu-item[data-screen]').forEach((item) => {{
                 item.addEventListener('click', () => {{
                     const target = item.getAttribute('data-screen');
                     switchScreen(target, item);
-                    closeSideMenu();
+                    if (sidebar) sidebar.classList.remove('expanded');
+                    sidebarSuppressed = true;
+                }});
+            }});
+
+            document.querySelectorAll('.side-menu-item[data-action="chat"]').forEach((item) => {{
+                item.addEventListener('click', async () => {{
+                    if (sidebar) sidebar.classList.remove('expanded');
+                    sidebarSuppressed = true;
+                    await openChatModal();
                 }});
             }});
 
@@ -1561,12 +1535,6 @@ async def home_screen(request: Request):
             }});
 
             document.addEventListener('click', (event) => {{
-                if (drawer && drawer.contains(event.target)) return;
-                if (menuButton && menuButton.contains(event.target)) return;
-                if (menuBackdrop && menuBackdrop.style.display === 'block' && !drawer?.classList.contains('open')) {{
-                    menuBackdrop.style.display = 'none';
-                }}
-
                 const userWrap = document.getElementById('headerUserButton')?.parentElement;
                 if (userWrap && !userWrap.contains(event.target)) toggleUserDropdown(false);
             }});
