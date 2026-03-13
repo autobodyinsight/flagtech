@@ -3314,7 +3314,7 @@ def get_dashboard_screen_html():
                                 <span id="phone-secondary-display-wrap-${rowId}-${phoneIndex}" style="display:inline-flex;">
                                     <button
                                         type="button"
-                                        onclick="startSecondaryPhoneEdit(event, ${JSON.stringify(rowId)}, ${phoneIndex})"
+                                        onclick='startSecondaryPhoneEdit(event, ${JSON.stringify(rowId)}, ${phoneIndex})'
                                         style="background:none; border:none; color:#0066cc; text-decoration:underline; cursor:pointer; padding:0; font:inherit;"
                                     >
                                         <span id="phone-secondary-display-text-${rowId}-${phoneIndex}">${escapeHtml(phone)}</span>
@@ -3324,13 +3324,13 @@ def get_dashboard_screen_html():
                                     <input
                                         id="phone-secondary-input-${rowId}-${phoneIndex}"
                                         value="${escapeHtml(phone)}"
-                                        onkeydown="handleSecondaryPhoneEnter(event, ${JSON.stringify(rowId)}, ${JSON.stringify(resolvedRo)}, ${phoneIndex})"
+                                        onkeydown='handleSecondaryPhoneEnter(event, ${JSON.stringify(rowId)}, ${JSON.stringify(resolvedRo)}, ${phoneIndex})'
                                         style="padding:4px 6px; width:150px;"
                                     />
                                 </span>
                                 <button
                                     type="button"
-                                    onclick="deletePhoneAtIndex(event, ${JSON.stringify(rowId)}, ${JSON.stringify(resolvedRo)}, ${phoneIndex})"
+                                    onclick='deletePhoneAtIndex(event, ${JSON.stringify(rowId)}, ${JSON.stringify(resolvedRo)}, ${phoneIndex})'
                                     style="background:#d32f2f; border:1px solid #b71c1c; color:#fff; border-radius:3px; padding:0 8px; font-size:13px; cursor:pointer;"
                                 >-</button>
                             </span>
@@ -4419,7 +4419,7 @@ def get_dashboard_screen_html():
                                                 <button type="button" onclick="deletePrimaryPhone(event, '${rowId}', '${ro.ro}')" style="background:#d32f2f; border:1px solid #b71c1c; color:#fff; border-radius:3px; padding:0 8px; font-size:13px; cursor:pointer;">-</button>
                                             </div>
                                             <div id="phone-additional-${rowId}" data-ro="${escapeHtml(ro.ro)}" style="display:flex; align-items:center; gap:12px; margin-left:56px; flex-wrap:wrap;">
-                                                ${additionalPhoneDisplays.map((phone, idx) => `<span style="display:inline-flex; align-items:center; gap:6px;"><span id="phone-secondary-display-wrap-${rowId}-${idx + 1}" style="display:inline-flex;"><button type="button" onclick="startSecondaryPhoneEdit(event, ${JSON.stringify(rowId)}, ${idx + 1})" style="background:none; border:none; color:#0066cc; text-decoration:underline; cursor:pointer; padding:0; font:inherit;"><span id="phone-secondary-display-text-${rowId}-${idx + 1}">${escapeHtml(phone)}</span></button></span><span id="phone-secondary-edit-wrap-${rowId}-${idx + 1}" style="display:none; align-items:center;"><input id="phone-secondary-input-${rowId}-${idx + 1}" value="${escapeHtml(phone)}" onkeydown="handleSecondaryPhoneEnter(event, ${JSON.stringify(rowId)}, ${JSON.stringify(ro.ro)}, ${idx + 1})" style="padding:4px 6px; width:150px;" /></span><button type="button" onclick="deletePhoneAtIndex(event, ${JSON.stringify(rowId)}, ${JSON.stringify(ro.ro)}, ${idx + 1})" style="background:#d32f2f; border:1px solid #b71c1c; color:#fff; border-radius:3px; padding:0 8px; font-size:13px; cursor:pointer;">-</button></span>`).join('')}
+                                                ${additionalPhoneDisplays.map((phone, idx) => `<span style="display:inline-flex; align-items:center; gap:6px;"><span id="phone-secondary-display-wrap-${rowId}-${idx + 1}" style="display:inline-flex;"><button type="button" onclick='startSecondaryPhoneEdit(event, ${JSON.stringify(rowId)}, ${idx + 1})' style="background:none; border:none; color:#0066cc; text-decoration:underline; cursor:pointer; padding:0; font:inherit;"><span id="phone-secondary-display-text-${rowId}-${idx + 1}">${escapeHtml(phone)}</span></button></span><span id="phone-secondary-edit-wrap-${rowId}-${idx + 1}" style="display:none; align-items:center;"><input id="phone-secondary-input-${rowId}-${idx + 1}" value="${escapeHtml(phone)}" onkeydown='handleSecondaryPhoneEnter(event, ${JSON.stringify(rowId)}, ${JSON.stringify(ro.ro)}, ${idx + 1})' style="padding:4px 6px; width:150px;" /></span><button type="button" onclick='deletePhoneAtIndex(event, ${JSON.stringify(rowId)}, ${JSON.stringify(ro.ro)}, ${idx + 1})' style="background:#d32f2f; border:1px solid #b71c1c; color:#fff; border-radius:3px; padding:0 8px; font-size:13px; cursor:pointer;">-</button></span>`).join('')}
                                             </div>
                                             <div id="phone-add-input-wrap-${rowId}" style="display:none; margin-left:56px;">
                                                 <input id="phone-add-input-${rowId}" placeholder="Add phone and press Enter" onkeydown="handleAdditionalPhoneEnter(event, '${rowId}', '${ro.ro}')" style="padding:4px 6px; width:190px;" />
