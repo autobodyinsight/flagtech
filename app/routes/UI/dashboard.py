@@ -3300,20 +3300,15 @@ def get_dashboard_screen_html():
             function renderAdditionalPhones(rowId, phoneValues, roNumber) {
                 const container = document.getElementById(`phone-additional-${rowId}`);
                 if (!container) return;
-                const values = normalizePhoneList(phoneValues);
-                const secondaryValues = values.slice(1);
+                const values = normalizePhoneList(phoneValues).slice(1);
                 const resolvedRo = String(roNumber || container.dataset.ro || '').trim();
                 if (values.length === 0) {
                     container.innerHTML = '';
                     return;
                 }
-                if (secondaryValues.length === 0) {
-                    container.innerHTML = '';
-                    return;
-                }
-                container.innerHTML = secondaryValues
-                    .map((phone, offset) => {
-                        const phoneIndex = offset + 1;
+                container.innerHTML = values
+                    .map((phone, idx) => {
+                        const phoneIndex = idx + 1;
                         return `
                             <span style="display:inline-flex; align-items:center; gap:6px;">
                                 <span id="phone-secondary-display-wrap-${rowId}-${phoneIndex}" style="display:inline-flex;">
@@ -3587,7 +3582,7 @@ def get_dashboard_screen_html():
                     });
                     applyUpdatedPhoneState(rowId, roNumber, result);
                 } catch (error) {
-                    console.error('Error updating secondary phone:', error);
+                    console.error('Error updating phone:', error);
                     alert('Error updating phone.');
                 } finally {
                     input.disabled = false;
@@ -3599,7 +3594,6 @@ def get_dashboard_screen_html():
                     event.preventDefault();
                     event.stopPropagation();
                 }
-
                 try {
                     const result = await saveRoContactPayload(roNumber, {
                         action: 'delete_phone_at_index',
@@ -3614,7 +3608,7 @@ def get_dashboard_screen_html():
             }
 
             function deletePrimaryPhone(event, rowId, roNumber) {
-                return deletePhoneAtIndex(event, rowId, roNumber, 0);
+                deletePhoneAtIndex(event, rowId, roNumber, 0);
             }
 
             async function handleEmailEnter(event, rowId, roNumber) {
@@ -4425,7 +4419,7 @@ def get_dashboard_screen_html():
                                                 <button type="button" onclick="deletePrimaryPhone(event, '${rowId}', '${ro.ro}')" style="background:#d32f2f; border:1px solid #b71c1c; color:#fff; border-radius:3px; padding:0 8px; font-size:13px; cursor:pointer;">-</button>
                                             </div>
                                             <div id="phone-additional-${rowId}" data-ro="${escapeHtml(ro.ro)}" style="display:flex; align-items:center; gap:12px; margin-left:56px; flex-wrap:wrap;">
-                                                ${additionalPhoneDisplays.map((phone, offset) => `<span style="display:inline-flex; align-items:center; gap:6px;"><span id="phone-secondary-display-wrap-${rowId}-${offset + 1}" style="display:inline-flex;"><button type="button" onclick="startSecondaryPhoneEdit(event, ${JSON.stringify(rowId)}, ${offset + 1})" style="background:none; border:none; color:#0066cc; text-decoration:underline; cursor:pointer; padding:0; font:inherit;"><span id="phone-secondary-display-text-${rowId}-${offset + 1}">${escapeHtml(phone)}</span></button></span><span id="phone-secondary-edit-wrap-${rowId}-${offset + 1}" style="display:none; align-items:center;"><input id="phone-secondary-input-${rowId}-${offset + 1}" value="${escapeHtml(phone)}" onkeydown="handleSecondaryPhoneEnter(event, ${JSON.stringify(rowId)}, ${JSON.stringify(ro.ro)}, ${offset + 1})" style="padding:4px 6px; width:150px;" /></span><button type="button" onclick="deletePhoneAtIndex(event, ${JSON.stringify(rowId)}, ${JSON.stringify(ro.ro)}, ${offset + 1})" style="background:#d32f2f; border:1px solid #b71c1c; color:#fff; border-radius:3px; padding:0 8px; font-size:13px; cursor:pointer;">-</button></span>`).join('')}
+                                                ${additionalPhoneDisplays.map((phone, idx) => `<span style="display:inline-flex; align-items:center; gap:6px;"><span id="phone-secondary-display-wrap-${rowId}-${idx + 1}" style="display:inline-flex;"><button type="button" onclick="startSecondaryPhoneEdit(event, ${JSON.stringify(rowId)}, ${idx + 1})" style="background:none; border:none; color:#0066cc; text-decoration:underline; cursor:pointer; padding:0; font:inherit;"><span id="phone-secondary-display-text-${rowId}-${idx + 1}">${escapeHtml(phone)}</span></button></span><span id="phone-secondary-edit-wrap-${rowId}-${idx + 1}" style="display:none; align-items:center;"><input id="phone-secondary-input-${rowId}-${idx + 1}" value="${escapeHtml(phone)}" onkeydown="handleSecondaryPhoneEnter(event, ${JSON.stringify(rowId)}, ${JSON.stringify(ro.ro)}, ${idx + 1})" style="padding:4px 6px; width:150px;" /></span><button type="button" onclick="deletePhoneAtIndex(event, ${JSON.stringify(rowId)}, ${JSON.stringify(ro.ro)}, ${idx + 1})" style="background:#d32f2f; border:1px solid #b71c1c; color:#fff; border-radius:3px; padding:0 8px; font-size:13px; cursor:pointer;">-</button></span>`).join('')}
                                             </div>
                                             <div id="phone-add-input-wrap-${rowId}" style="display:none; margin-left:56px;">
                                                 <input id="phone-add-input-${rowId}" placeholder="Add phone and press Enter" onkeydown="handleAdditionalPhoneEnter(event, '${rowId}', '${ro.ro}')" style="padding:4px 6px; width:190px;" />

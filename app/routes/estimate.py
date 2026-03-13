@@ -3945,9 +3945,9 @@ async def update_ro_phone(request: Request):
     action = (data.get("action") or "replace_primary").strip().lower()
     new_phone = (data.get("phone") or "").strip()
     new_email = (data.get("email") or "").strip()
-    phone_index_raw = data.get("index")
+    index_raw = data.get("index")
     try:
-        phone_index = int(phone_index_raw)
+        phone_index = int(index_raw)
     except (TypeError, ValueError):
         phone_index = None
 
@@ -4083,7 +4083,7 @@ async def update_ro_phone(request: Request):
                 domain,
                 ro_value,
                 "phone_changed",
-                f"Phone updated: {old_phone_at_index or '-'} → {new_phone}",
+                f"Phone changed: {old_phone_at_index or '-'} → {new_phone}",
             )
         elif action == "delete_phone_at_index":
             _log_ro_activity(
