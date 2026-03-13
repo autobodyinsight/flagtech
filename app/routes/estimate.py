@@ -4019,9 +4019,12 @@ async def update_ro_phone(request: Request):
             if new_phone not in phone_numbers:
                 phone_numbers.append(new_phone)
         elif action == "update_phone_at_index":
-            if phone_index >= len(phone_numbers):
+            if phone_index == 0 and not phone_numbers:
+                phone_numbers.append(new_phone)
+            elif phone_index >= len(phone_numbers):
                 return JSONResponse(status_code=400, content={"error": "phone index out of range"})
-            phone_numbers[phone_index] = new_phone
+            else:
+                phone_numbers[phone_index] = new_phone
         elif action == "delete_phone_at_index":
             if phone_index >= len(phone_numbers):
                 return JSONResponse(status_code=400, content={"error": "phone index out of range"})

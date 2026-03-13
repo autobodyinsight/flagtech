@@ -3506,7 +3506,6 @@ def get_dashboard_screen_html():
                 event.stopPropagation();
 
                 const input = document.getElementById(`phone-primary-input-${rowId}`);
-                const displayText = document.getElementById(`phone-primary-display-text-${rowId}`);
                 if (!input) return;
 
                 const enteredPhone = (input.value || '').trim();
@@ -3517,7 +3516,8 @@ def get_dashboard_screen_html():
                 input.disabled = true;
                 try {
                     const result = await saveRoContactPayload(roNumber, {
-                        action: 'replace_primary',
+                        action: 'update_phone_at_index',
+                        index: 0,
                         phone: enteredPhone,
                     });
                     applyUpdatedPhoneState(rowId, roNumber, result);
