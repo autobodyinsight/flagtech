@@ -3945,11 +3945,16 @@ async def update_ro_phone(request: Request):
     action = (data.get("action") or "replace_primary").strip().lower()
     new_phone = (data.get("phone") or "").strip()
     new_email = (data.get("email") or "").strip()
+    phone_index_raw = data.get("index")
+    try:
+        phone_index = int(phone_index_raw)
+    except (TypeError, ValueError):
+        phone_index = None
 
     if not ro_value:
         return JSONResponse(status_code=400, content={"error": "ro is required"})
 
-    allowed_actions = {"replace_primary", "add_phone", "set_email"}
+    allowed_actions = {"replace_primary", "add_phone", "set_email", "update_phone_at_index", "delete_phone_at_index"}
     if action not in allowed_actions:
         if new_phone:
             action = "replace_primary"
@@ -3958,8 +3963,12 @@ async def update_ro_phone(request: Request):
         else:
             return JSONResponse(status_code=400, content={"error": "invalid action"})
 
-    if action in {"replace_primary", "add_phone"} and not new_phone:
+    if action in {"replace_primary", "add_phone", "update_phone_at_index"} and not new_phone:
         return JSONResponse(status_code=400, content={"error": "phone is required"})
+
+    if action in {"update_phone_at_index", "delete_phone_at_index"}:
+        if phone_index is None or phone_index < 0:
+            return JSONResponse(status_code=400, content={"error": "valid index is required"})
 
     conn = get_conn()
     cur = conn.cursor()
@@ -3997,6 +4006,9 @@ async def update_ro_phone(request: Request):
 
         old_phone = phone_numbers[0] if phone_numbers else ""
         phone_original = (row.get("phone_original") or parsed_phone or old_phone or "").strip()
+        old_phone_at_index = ""
+        if phone_index is not None and 0 <= phone_index < len(phone_numbers):
+            old_phone_at_index = str(phone_numbers[phone_index] or "").strip()
 
         if action == "replace_primary":
             if phone_numbers:
@@ -4006,6 +4018,14 @@ async def update_ro_phone(request: Request):
         elif action == "add_phone":
             if new_phone not in phone_numbers:
                 phone_numbers.append(new_phone)
+        elif action == "update_phone_at_index":
+            if phone_index >= len(phone_numbers):
+                return JSONResponse(status_code=400, content={"error": "phone index out of range"})
+            phone_numbers[phone_index] = new_phone
+        elif action == "delete_phone_at_index":
+            if phone_index >= len(phone_numbers):
+                return JSONResponse(status_code=400, content={"error": "phone index out of range"})
+            phone_numbers.pop(phone_index)
 
         deduped_numbers = []
         for value in phone_numbers:
@@ -4056,6 +4076,22 @@ async def update_ro_phone(request: Request):
                 ro_value,
                 "phone_added",
                 f"Additional phone added: {new_phone}",
+            )
+        elif action == "update_phone_at_index" and old_phone_at_index != new_phone:
+            _log_ro_activity(
+                cur,
+                domain,
+                ro_value,
+                "phone_changed",
+                f"Phone updated: {old_phone_at_index or '-'} → {new_phone}",
+            )
+        elif action == "delete_phone_at_index":
+            _log_ro_activity(
+                cur,
+                domain,
+                ro_value,
+                "phone_removed",
+                f"Phone removed: {old_phone_at_index or '-'}",
             )
 
         if action == "set_email" and old_email != updated_email:

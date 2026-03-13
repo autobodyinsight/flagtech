@@ -3297,22 +3297,50 @@ def get_dashboard_screen_html():
                 return normalized;
             }
 
-            function renderAdditionalPhones(rowId, additionalPhones) {
+            function renderAdditionalPhones(rowId, phoneValues, roNumber) {
                 const container = document.getElementById(`phone-additional-${rowId}`);
                 if (!container) return;
-                const values = normalizePhoneList(additionalPhones);
+                const values = normalizePhoneList(phoneValues);
+                const secondaryValues = values.slice(1);
+                const resolvedRo = String(roNumber || container.dataset.ro || '').trim();
                 if (values.length === 0) {
                     container.innerHTML = '';
                     return;
                 }
-                container.innerHTML = values
-                    .map((phone) => `
-                        <button
-                            type="button"
-                            onclick='startPrimaryPhoneEditWithValue(event, ${JSON.stringify(rowId)}, ${JSON.stringify(phone)})'
-                            style="background:none; border:none; color:#0066cc; text-decoration:underline; cursor:pointer; padding:0; font:inherit;"
-                        >${escapeHtml(phone)}</button>
-                    `)
+                if (secondaryValues.length === 0) {
+                    container.innerHTML = '';
+                    return;
+                }
+                container.innerHTML = secondaryValues
+                    .map((phone, offset) => {
+                        const phoneIndex = offset + 1;
+                        return `
+                            <span style="display:inline-flex; align-items:center; gap:6px;">
+                                <span id="phone-secondary-display-wrap-${rowId}-${phoneIndex}" style="display:inline-flex;">
+                                    <button
+                                        type="button"
+                                        onclick="startSecondaryPhoneEdit(event, ${JSON.stringify(rowId)}, ${phoneIndex})"
+                                        style="background:none; border:none; color:#0066cc; text-decoration:underline; cursor:pointer; padding:0; font:inherit;"
+                                    >
+                                        <span id="phone-secondary-display-text-${rowId}-${phoneIndex}">${escapeHtml(phone)}</span>
+                                    </button>
+                                </span>
+                                <span id="phone-secondary-edit-wrap-${rowId}-${phoneIndex}" style="display:none; align-items:center;">
+                                    <input
+                                        id="phone-secondary-input-${rowId}-${phoneIndex}"
+                                        value="${escapeHtml(phone)}"
+                                        onkeydown="handleSecondaryPhoneEnter(event, ${JSON.stringify(rowId)}, ${JSON.stringify(resolvedRo)}, ${phoneIndex})"
+                                        style="padding:4px 6px; width:150px;"
+                                    />
+                                </span>
+                                <button
+                                    type="button"
+                                    onclick="deletePhoneAtIndex(event, ${JSON.stringify(rowId)}, ${JSON.stringify(resolvedRo)}, ${phoneIndex})"
+                                    style="background:#d32f2f; border:1px solid #b71c1c; color:#fff; border-radius:3px; padding:0 8px; font-size:13px; cursor:pointer;"
+                                >-</button>
+                            </span>
+                        `;
+                    })
                     .join('');
             }
 
@@ -3345,6 +3373,27 @@ def get_dashboard_screen_html():
                 input.value = nextValue;
                 input.focus();
                 input.select();
+            }
+
+            function setSecondaryPhoneEditMode(rowId, phoneIndex, editing) {
+                const displayWrap = document.getElementById(`phone-secondary-display-wrap-${rowId}-${phoneIndex}`);
+                const editWrap = document.getElementById(`phone-secondary-edit-wrap-${rowId}-${phoneIndex}`);
+                const input = document.getElementById(`phone-secondary-input-${rowId}-${phoneIndex}`);
+                if (!displayWrap || !editWrap) return;
+                displayWrap.style.display = editing ? 'none' : 'inline-flex';
+                editWrap.style.display = editing ? 'inline-flex' : 'none';
+                if (editing && input) {
+                    input.focus();
+                    input.select();
+                }
+            }
+
+            function startSecondaryPhoneEdit(event, rowId, phoneIndex) {
+                if (event) {
+                    event.stopPropagation();
+                    event.preventDefault();
+                }
+                setSecondaryPhoneEditMode(rowId, phoneIndex, true);
             }
 
             function setAddPhoneToggleState(rowId, enabled) {
@@ -3430,16 +3479,30 @@ def get_dashboard_screen_html():
                         return row;
                     }
                     const nextRow = { ...row };
-                    if (normalizedPhones.length > 0) {
-                        nextRow.phone_numbers = normalizedPhones;
-                        nextRow.phone = normalizedPhones[0];
-                        nextRow.phone_original = normalizedPhones[0];
-                    }
+                    nextRow.phone_numbers = normalizedPhones;
+                    nextRow.phone = normalizedPhones[0] || '';
+                    nextRow.phone_original = normalizedPhones[0] || '';
                     if (typeof emailValue === 'string') {
                         nextRow.email = emailValue;
                     }
                     return nextRow;
                 });
+            }
+
+            function applyUpdatedPhoneState(rowId, roNumber, result) {
+                const updatedPhones = normalizePhoneList(result.phone_numbers);
+                const primaryPhone = updatedPhones[0] || '-';
+                const primaryInput = document.getElementById(`phone-primary-input-${rowId}`);
+                const primaryDisplayText = document.getElementById(`phone-primary-display-text-${rowId}`);
+                if (primaryInput) {
+                    primaryInput.value = primaryPhone === '-' ? '' : primaryPhone;
+                }
+                if (primaryDisplayText) {
+                    primaryDisplayText.textContent = primaryPhone;
+                }
+                renderAdditionalPhones(rowId, updatedPhones, roNumber);
+                updateRoContactInMemory(roNumber, updatedPhones, result.email);
+                refreshRoSlideDownHeight(roNumber, 'customer-contact');
             }
 
             async function handlePrimaryPhoneEnter(event, rowId, roNumber) {
@@ -3462,16 +3525,8 @@ def get_dashboard_screen_html():
                         action: 'replace_primary',
                         phone: enteredPhone,
                     });
-                    const updatedPhones = normalizePhoneList(result.phone_numbers);
-                    const primaryPhone = updatedPhones[0] || cleanPhoneNumber(result.phone || enteredPhone);
-                    input.value = primaryPhone === '-' ? '' : primaryPhone;
-                    if (displayText) {
-                        displayText.textContent = primaryPhone;
-                    }
-                    renderAdditionalPhones(rowId, updatedPhones.slice(1));
-                    updateRoContactInMemory(roNumber, updatedPhones, result.email);
+                    applyUpdatedPhoneState(rowId, roNumber, result);
                     setPhonePrimaryEditMode(rowId, false);
-                    refreshRoSlideDownHeight(roNumber, 'customer-contact');
                 } catch (error) {
                     console.error('Error updating phone:', error);
                     alert('Error updating phone.');
@@ -3500,17 +3555,66 @@ def get_dashboard_screen_html():
                         action: 'add_phone',
                         phone: enteredPhone,
                     });
-                    const updatedPhones = normalizePhoneList(result.phone_numbers);
-                    renderAdditionalPhones(rowId, updatedPhones.slice(1));
-                    updateRoContactInMemory(roNumber, updatedPhones, result.email);
+                    applyUpdatedPhoneState(rowId, roNumber, result);
                     input.value = '';
-                    refreshRoSlideDownHeight(roNumber, 'customer-contact');
                 } catch (error) {
                     console.error('Error adding phone:', error);
                     alert('Error saving additional phone.');
                 } finally {
                     input.disabled = false;
                 }
+            }
+
+            async function handleSecondaryPhoneEnter(event, rowId, roNumber, phoneIndex) {
+                if (!event || event.key !== 'Enter') return;
+                event.preventDefault();
+                event.stopPropagation();
+
+                const input = document.getElementById(`phone-secondary-input-${rowId}-${phoneIndex}`);
+                if (!input) return;
+
+                const enteredPhone = (input.value || '').trim();
+                if (!enteredPhone) {
+                    return;
+                }
+
+                input.disabled = true;
+                try {
+                    const result = await saveRoContactPayload(roNumber, {
+                        action: 'update_phone_at_index',
+                        index: phoneIndex,
+                        phone: enteredPhone,
+                    });
+                    applyUpdatedPhoneState(rowId, roNumber, result);
+                } catch (error) {
+                    console.error('Error updating secondary phone:', error);
+                    alert('Error updating phone.');
+                } finally {
+                    input.disabled = false;
+                }
+            }
+
+            async function deletePhoneAtIndex(event, rowId, roNumber, phoneIndex) {
+                if (event) {
+                    event.preventDefault();
+                    event.stopPropagation();
+                }
+
+                try {
+                    const result = await saveRoContactPayload(roNumber, {
+                        action: 'delete_phone_at_index',
+                        index: phoneIndex,
+                    });
+                    applyUpdatedPhoneState(rowId, roNumber, result);
+                    setPhonePrimaryEditMode(rowId, false);
+                } catch (error) {
+                    console.error('Error deleting phone:', error);
+                    alert('Error deleting phone.');
+                }
+            }
+
+            function deletePrimaryPhone(event, rowId, roNumber) {
+                return deletePhoneAtIndex(event, rowId, roNumber, 0);
             }
 
             async function handleEmailEnter(event, rowId, roNumber) {
@@ -4318,9 +4422,10 @@ def get_dashboard_screen_html():
                                                     <input id="phone-primary-input-${rowId}" value="${primaryPhoneDisplay === '-' ? '' : primaryPhoneDisplay}" onkeydown="handlePrimaryPhoneEnter(event, '${rowId}', '${ro.ro}')" style="padding:4px 6px; width:150px;" />
                                                 </span>
                                                 <button id="phone-add-toggle-${rowId}" data-enabled="0" type="button" onclick="toggleAddPhoneInput(event, '${rowId}')" style="background:#d32f2f; border:1px solid #b71c1c; color:#fff; border-radius:3px; padding:0 8px; font-size:13px; cursor:pointer;">+</button>
+                                                <button type="button" onclick="deletePrimaryPhone(event, '${rowId}', '${ro.ro}')" style="background:#d32f2f; border:1px solid #b71c1c; color:#fff; border-radius:3px; padding:0 8px; font-size:13px; cursor:pointer;">-</button>
                                             </div>
-                                            <div id="phone-additional-${rowId}" style="display:flex; align-items:center; gap:12px; margin-left:56px; flex-wrap:wrap;">
-                                                ${additionalPhoneDisplays.map(phone => `<button type="button" onclick='startPrimaryPhoneEditWithValue(event, ${JSON.stringify(rowId)}, ${JSON.stringify(phone)})' style="background:none; border:none; color:#0066cc; text-decoration:underline; cursor:pointer; padding:0; font:inherit;">${escapeHtml(phone)}</button>`).join('')}
+                                            <div id="phone-additional-${rowId}" data-ro="${escapeHtml(ro.ro)}" style="display:flex; align-items:center; gap:12px; margin-left:56px; flex-wrap:wrap;">
+                                                ${additionalPhoneDisplays.map((phone, offset) => `<span style="display:inline-flex; align-items:center; gap:6px;"><span id="phone-secondary-display-wrap-${rowId}-${offset + 1}" style="display:inline-flex;"><button type="button" onclick="startSecondaryPhoneEdit(event, ${JSON.stringify(rowId)}, ${offset + 1})" style="background:none; border:none; color:#0066cc; text-decoration:underline; cursor:pointer; padding:0; font:inherit;"><span id="phone-secondary-display-text-${rowId}-${offset + 1}">${escapeHtml(phone)}</span></button></span><span id="phone-secondary-edit-wrap-${rowId}-${offset + 1}" style="display:none; align-items:center;"><input id="phone-secondary-input-${rowId}-${offset + 1}" value="${escapeHtml(phone)}" onkeydown="handleSecondaryPhoneEnter(event, ${JSON.stringify(rowId)}, ${JSON.stringify(ro.ro)}, ${offset + 1})" style="padding:4px 6px; width:150px;" /></span><button type="button" onclick="deletePhoneAtIndex(event, ${JSON.stringify(rowId)}, ${JSON.stringify(ro.ro)}, ${offset + 1})" style="background:#d32f2f; border:1px solid #b71c1c; color:#fff; border-radius:3px; padding:0 8px; font-size:13px; cursor:pointer;">-</button></span>`).join('')}
                                             </div>
                                             <div id="phone-add-input-wrap-${rowId}" style="display:none; margin-left:56px;">
                                                 <input id="phone-add-input-${rowId}" placeholder="Add phone and press Enter" onkeydown="handleAdditionalPhoneEnter(event, '${rowId}', '${ro.ro}')" style="padding:4px 6px; width:190px;" />
