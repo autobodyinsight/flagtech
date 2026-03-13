@@ -37,7 +37,7 @@ def get_reports_screen_html():
             <h1 style="text-align:center; margin:0 0 14px 0;">REPORTS</h1>
             <div style="display:flex; align-items:flex-end; justify-content:space-between; gap:20px;">
                 <div style="display:flex; flex-direction:column; align-items:flex-start; gap:10px; min-width:260px;">
-                    <div id="reportsMainFiltersWrap" style="display:flex; flex-direction:column; align-items:flex-start; gap:10px;">
+                    <div id="reportsStatusToggleWrap" style="display:flex; align-items:center; gap:10px;">
                         <label style="display:flex; align-items:center; gap:10px; cursor:pointer; user-select:none;">
                             <span style="font-weight:700; color:#333;">Status</span>
                             <span class="reports-toggle-wrap">
@@ -46,16 +46,16 @@ def get_reports_screen_html():
                             </span>
                             <span id="reportsStatusLabel" style="font-weight:700; color:#333; min-width:68px;">CLOSED</span>
                         </label>
-                        <div style="display:flex; gap:10px; align-items:flex-end; flex-wrap:wrap;">
-                            <label style="display:flex; flex-direction:column; gap:4px; font-size:12px; color:#555; font-weight:600;">
-                                <span>Start Date</span>
-                                <input id="reportsStartDate" type="date" style="padding:7px 8px; border:1px solid #ccc; border-radius:4px; min-width:130px;" />
-                            </label>
-                            <label style="display:flex; flex-direction:column; gap:4px; font-size:12px; color:#555; font-weight:600;">
-                                <span>End Date</span>
-                                <input id="reportsEndDate" type="date" style="padding:7px 8px; border:1px solid #ccc; border-radius:4px; min-width:130px;" />
-                            </label>
-                        </div>
+                    </div>
+                    <div style="display:flex; gap:10px; align-items:flex-end; flex-wrap:wrap;">
+                        <label style="display:flex; flex-direction:column; gap:4px; font-size:12px; color:#555; font-weight:600;">
+                            <span>Start Date</span>
+                            <input id="reportsStartDate" type="date" style="padding:7px 8px; border:1px solid #ccc; border-radius:4px; min-width:130px;" />
+                        </label>
+                        <label style="display:flex; flex-direction:column; gap:4px; font-size:12px; color:#555; font-weight:600;">
+                            <span>End Date</span>
+                            <input id="reportsEndDate" type="date" style="padding:7px 8px; border:1px solid #ccc; border-radius:4px; min-width:130px;" />
+                        </label>
                     </div>
                     <div class="reports-top-icons" style="display:flex; align-items:flex-end; gap:10px; padding-bottom:2px; margin-left:4px;">
                         <button id="reportsSidebarBtn-main" class="reports-sidebar-btn active" data-view="main" title="Reports" onclick="reportsExtraSwitchView('main')" style="background:none; border:none; padding:0; cursor:pointer;" aria-label="Reports View">
@@ -503,9 +503,9 @@ def get_reports_screen_html():
 
     function reportsExtraSwitchView(view) {
         const normalizedView = String(view || 'main').toLowerCase();
-        const reportsMainFiltersWrap = document.getElementById('reportsMainFiltersWrap');
-        if (reportsMainFiltersWrap) {
-            reportsMainFiltersWrap.style.display = normalizedView === 'main' ? 'flex' : 'none';
+        const reportsStatusToggleWrap = document.getElementById('reportsStatusToggleWrap');
+        if (reportsStatusToggleWrap) {
+            reportsStatusToggleWrap.style.display = normalizedView === 'main' ? 'flex' : 'none';
         }
         document.querySelectorAll('#reports .reports-content-panel').forEach((panel) => {
             panel.style.display = 'none';
@@ -533,9 +533,9 @@ def get_reports_screen_html():
         document.querySelectorAll('#reports .reports-content-panel').forEach((panel) => {
             panel.style.display = 'none';
         });
-        const reportsMainFiltersWrap = document.getElementById('reportsMainFiltersWrap');
-        if (reportsMainFiltersWrap) {
-            reportsMainFiltersWrap.style.display = 'flex';
+        const reportsStatusToggleWrap = document.getElementById('reportsStatusToggleWrap');
+        if (reportsStatusToggleWrap) {
+            reportsStatusToggleWrap.style.display = 'flex';
         }
         const defaultPanel = document.getElementById('reportsPanel-main');
         if (defaultPanel) {
