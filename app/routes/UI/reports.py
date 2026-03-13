@@ -1026,6 +1026,7 @@ def get_reports_screen_html():
             statusLabelEl.textContent = reportsUiState.status === 'open' ? 'OPENED' : 'CLOSED';
         }
 
+        reportsRenderSummaryCards();
         reportsRenderRoList();
     }
 
@@ -1999,6 +2000,49 @@ def get_reports_screen_html():
         };
     }
 
+    function reportsRenderSummaryCards() {
+        const summaryCards = document.getElementById('reportsSummaryCards');
+        if (!summaryCards) return;
+
+        const rows = reportsGetFilteredRows();
+        const metrics = reportsComputeMetrics(rows);
+        const partsSales = rows.reduce((sum, row) => sum + Number(row?.parts_sales || 0), 0);
+        const laborSales = rows.reduce((sum, row) => sum + Number(row?.labor_sales || 0), 0);
+
+        const cards = [
+            {
+                label: "RO'S",
+                sales: metrics.totalSales,
+                gpPercent: metrics.total.gpPercent,
+                gpDollar: metrics.total.gpDollar,
+            },
+            {
+                label: 'PARTS',
+                sales: partsSales,
+                gpPercent: metrics.parts.gpPercent,
+                gpDollar: metrics.parts.gpDollar,
+            },
+            {
+                label: 'LABOR',
+                sales: laborSales,
+                gpPercent: metrics.labor.gpPercent,
+                gpDollar: metrics.labor.gpDollar,
+            },
+        ];
+
+        const barColors = ['#00BFFF', '#FF8C00', '#32CD32'];
+        summaryCards.innerHTML = cards.map((card, idx) => `
+            <div class="reports-summary-card">
+                <div class="reports-summary-title" style="background:${barColors[idx % barColors.length]};">${reportsEscapeHtml(card.label)}</div>
+                <div class="reports-summary-main">${formatReportsMoney(card.sales)}</div>
+                <div class="reports-summary-sub">
+                    <div>Total GP%: <strong>${formatReportsPercent(card.gpPercent)}%</strong></div>
+                    <div>Total GP$: <strong>${formatReportsMoney(card.gpDollar)}</strong></div>
+                </div>
+            </div>
+        `).join('');
+    }
+
     function reportsOpenPrintWindow(title, bodyHtml) {
         const win = window.open('', '_blank');
         if (!win) {
@@ -2125,47 +2169,7 @@ def get_reports_screen_html():
                 open_ros: reportsBuildOpenRowsFromDashboardRows(dashboardData?.roList || []),
             };
 
-            const summaryCards = document.getElementById('reportsSummaryCards');
-            if (summaryCards) {
-                const targetOrder = ['RO\'S', 'PARTS', 'LABOR'];
-                const byCategory = new Map();
-                reportsDataCache.summary.forEach((row) => {
-                    const key = String(row?.category || '').trim().toUpperCase();
-                    if (key) byCategory.set(key, row);
-                });
-
-                const fallbackRows = reportsDataCache.summary.slice(0, 3);
-                const cards = targetOrder.map((label, index) => {
-                    const normalizedKey = label.replace(/\s+/g, '').replace(/'/g, '');
-                    let row = null;
-                    for (const [key, value] of byCategory.entries()) {
-                        const candidate = key.replace(/\s+/g, '').replace(/'/g, '');
-                        if (candidate === normalizedKey) {
-                            row = value;
-                            break;
-                        }
-                    }
-                    if (!row) row = fallbackRows[index] || {};
-                    return {
-                        label,
-                        sales: Number(row?.sales || 0),
-                        gpPercent: Number(row?.gp_percent || 0),
-                        gpDollar: Number(row?.gp_dollar || 0),
-                    };
-                });
-
-                const barColors = ['#00BFFF', '#FF8C00', '#32CD32'];
-                summaryCards.innerHTML = cards.map((card, idx) => `
-                    <div class="reports-summary-card">
-                        <div class="reports-summary-title" style="background:${barColors[idx % barColors.length]};">${reportsEscapeHtml(card.label)}</div>
-                        <div class="reports-summary-main">${formatReportsMoney(card.sales)}</div>
-                        <div class="reports-summary-sub">
-                            <div>Total GP%: <strong>${formatReportsPercent(card.gpPercent)}%</strong></div>
-                            <div>Total GP$: <strong>${formatReportsMoney(card.gpDollar)}</strong></div>
-                        </div>
-                    </div>
-                `).join('');
-            }
+            reportsRenderSummaryCards();
 
             reportsRenderRoList();
         } catch (e) {
