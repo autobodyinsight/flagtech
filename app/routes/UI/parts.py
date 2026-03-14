@@ -1711,7 +1711,7 @@ def get_parts_script():
             if (modal) modal.style.display = 'none';
         }
 
-        function partsOpenPrintOrderView(options) {
+        async function partsOpenPrintOrderView(options) {
             const ro = String(options?.ro || '').trim();
             const vendorName = String(options?.vendorName || '').trim();
             const arrivalDate = String(options?.arrivalDate || '').trim();
@@ -1760,6 +1760,34 @@ def get_parts_script():
                 .join(' ')
                 .trim();
 
+            const roRow = Array.from(document.querySelectorAll('#partsRoBody tr.parts-ro-main-row')).find((row) => {
+                const firstCell = row.querySelector('td');
+                return String(firstCell?.textContent || '').trim() === ro;
+            });
+            const estimatorName = String(roRow?.children?.[2]?.textContent || '').trim();
+            const userEmail = String(appUiState?.currentUser?.email || appUiState?.sessionUser?.email || '').trim();
+
+            let shopInfo = (typeof setupShopData !== 'undefined' && setupShopData) ? setupShopData : null;
+            if (!shopInfo || !Object.keys(shopInfo).length) {
+                try {
+                    const shopScopeQuery = appUiState?.shopDomain
+                        ? `?shop_domain=${encodeURIComponent(String(appUiState.shopDomain))}`
+                        : '';
+                    const shopResp = await fetch('/api/setup/shop' + shopScopeQuery, { credentials: 'include' });
+                    const shopData = await shopResp.json();
+                    shopInfo = shopData?.shop || null;
+                } catch (error) {
+                    shopInfo = null;
+                }
+            }
+            const shopName = String(shopInfo?.shop_name || appUiState?.shopName || '').trim();
+            const shopAddress = String(shopInfo?.address || '').trim();
+            const shopCity = String(shopInfo?.city || '').trim();
+            const shopState = String(shopInfo?.state || '').trim();
+            const shopZip = String(shopInfo?.zip_code || '').trim();
+            const shopPhone = String(shopInfo?.phone || '').trim();
+            const shopCityStateZip = [shopCity, shopState].filter(Boolean).join(', ') + ([shopZip].filter(Boolean).length ? ((shopCity || shopState) ? ` ${shopZip}` : shopZip) : '');
+
             let totalAmount = 0;
             const rowsHtml = orderedLines.map((line, index) => {
                 const qtyValue = Number(line.qty || 0);
@@ -1795,6 +1823,7 @@ def get_parts_script():
                         .header { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px solid #e5e7eb; padding-bottom: 12px; margin-bottom: 14px; }
                         .title { font-size: 26px; font-weight: 700; letter-spacing: 0.2px; color: #111827; }
                         .sub { font-size: 13px; color: #4b5563; margin-top: 4px; }
+                        .ro-emphasis { font-size: 26px; font-weight: 800; color: #111827; line-height: 1.1; }
                         .cards { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 14px; }
                         .card { border: 1px solid #e5e7eb; border-radius: 10px; padding: 12px; background: #fafafa; }
                         .card h4 { margin: 0 0 8px 0; font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px; color: #374151; }
@@ -1819,9 +1848,9 @@ def get_parts_script():
                         <div class="header">
                             <div>
                                 <div class="title">Parts Order</div>
-                                <div class="sub">RO #${safe(ro)} • Generated ${safe(generatedAt)}</div>
+                                <div class="ro-emphasis">RO #${safe(ro)}</div>
+                                <div class="sub">Generated ${safe(generatedAt)}</div>
                             </div>
-                            <div class="sub">Arrival Date: <strong>${safe(formatDate(arrivalDate))}</strong></div>
                         </div>
 
                         <div class="cards">
@@ -1833,9 +1862,13 @@ def get_parts_script():
                                 ${vendorAddress ? `<div class="line">Address: ${safe(vendorAddress)}</div>` : ''}
                             </div>
                             <div class="card">
-                                <h4>Order Details</h4>
-                                <div class="line">Line Count: <strong>${orderedLines.length}</strong></div>
-                                <div class="line">Expected Arrival: <strong>${safe(formatDate(arrivalDate))}</strong></div>
+                                <h4>SHOP INFO</h4>
+                                <div class="line">${safe(shopName || '—')}</div>
+                                <div class="line">${safe(shopAddress || '—')}</div>
+                                <div class="line">${safe(shopCityStateZip || '—')}</div>
+                                <div class="line">${safe(shopPhone || '—')}</div>
+                                <div class="line">Estimator: <strong>${safe(estimatorName || '—')}</strong></div>
+                                <div class="line">User Email: ${safe(userEmail || '—')}</div>
                             </div>
                         </div>
 
@@ -1859,10 +1892,11 @@ def get_parts_script():
                         <div class="footer">
                             <div class="total">
                                 <div class="total-row"><span>Order Total</span><strong>${formatMoney(totalAmount)}</strong></div>
+                                <div class="total-row"><span>Line Count</span><strong>${orderedLines.length}</strong></div>
                             </div>
                         </div>
 
-                        <div class="muted">Prepared by FlagTech Parts Order • RO ${safe(ro)}</div>
+                        <div class="muted" style="text-align:right;">AutobodyOS</div>
                     </div>
                 </body>
                 </html>
