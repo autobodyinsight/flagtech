@@ -1711,6 +1711,16 @@ def get_parts_script():
             if (modal) modal.style.display = 'none';
         }
 
+        function partsGetRoEstimatorFromTable(ro) {
+            const roKey = String(ro || '').trim();
+            if (!roKey) return '';
+            const roRow = Array.from(document.querySelectorAll('#partsRoBody tr.parts-ro-main-row')).find((row) => {
+                const firstCell = row.querySelector('td');
+                return String(firstCell?.textContent || '').trim() === roKey;
+            });
+            return String(roRow?.children?.[2]?.textContent || '').trim();
+        }
+
         async function partsOpenPrintOrderView(options) {
             const ro = String(options?.ro || '').trim();
             const vendorName = String(options?.vendorName || '').trim();
@@ -1760,21 +1770,20 @@ def get_parts_script():
                 .join(' ')
                 .trim();
 
-            const roRow = Array.from(document.querySelectorAll('#partsRoBody tr.parts-ro-main-row')).find((row) => {
-                const firstCell = row.querySelector('td');
-                return String(firstCell?.textContent || '').trim() === ro;
-            });
-            let estimatorName = '';
+            let estimatorName = String(options?.estimatorName || '').trim();
             try {
                 const roResp = await fetch('/api/parts/ros', { credentials: 'include' });
                 const roData = await roResp.json();
                 const matchedRo = (Array.isArray(roData?.ros) ? roData.ros : []).find((item) => String(item?.ro || '').trim() === ro);
-                estimatorName = String(matchedRo?.estimator || '').trim();
+                const apiEstimator = String(matchedRo?.estimator || '').trim();
+                if (apiEstimator && apiEstimator !== '—') {
+                    estimatorName = apiEstimator;
+                }
             } catch (error) {
-                estimatorName = '';
+                // keep estimatorName fallback from options/table when API read fails
             }
             if (!estimatorName) {
-                estimatorName = String(roRow?.children?.[2]?.textContent || '').trim();
+                estimatorName = partsGetRoEstimatorFromTable(ro);
             }
             const userEmail = String(appUiState?.currentUser?.email || appUiState?.sessionUser?.email || '').trim();
 
@@ -1932,6 +1941,8 @@ def get_parts_script():
                 .map(id => parseInt(id, 10))
                 .filter(id => !Number.isNaN(id));
 
+            const printEstimatorName = partsGetRoEstimatorFromTable(partsCurrentRo);
+
             const checkedIdSet = new Set(checked.map(id => String(id)));
             const selectedLines = (partsCurrentLines || []).filter(line => checkedIdSet.has(String(line.id)));
             const selectedVendor = (partsVendorsCache || []).find(v => String(v.id) === String(vendorId));
@@ -1990,6 +2001,7 @@ def get_parts_script():
                         ro: partsCurrentRo,
                         vendorName,
                         arrivalDate,
+                        estimatorName: printEstimatorName,
                         vendorRecord: selectedVendor || {},
                         orderedLines: selectedLines,
                     });
