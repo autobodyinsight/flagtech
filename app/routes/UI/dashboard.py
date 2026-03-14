@@ -171,7 +171,7 @@ def get_dashboard_screen_html():
                             <circle cx="17" cy="11" r="1" fill="currentColor"/>
                         </svg>
                     </button>
-                    <div id="printOptionsModal" class="mini-popup-panel" style="display:none; right:0; left:auto;">
+                    <div id="printOptionsModal" class="mini-popup-panel ro-print-modal-match" style="display:none; right:0; left:auto;">
                         <h2 style="margin:0 0 14px 0; color:#333; font-size:18px;">Print RO List</h2>
                         <p style="margin:0 0 12px 0; font-weight:bold; color:#555;">Print by:</p>
                         <div style="display:flex; flex-direction:column; gap:8px;">
@@ -352,6 +352,19 @@ def get_dashboard_screen_html():
                 opacity: 1;
                 transform: translateY(0);
                 pointer-events: auto;
+            }
+            .ro-print-modal-match {
+                min-width: 300px;
+                max-width: 500px;
+                border: 2px solid #b22222;
+                border-radius: 6px;
+                padding: 12px;
+                box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+            }
+            .ro-print-modal-match button {
+                padding: 10px 12px !important;
+                border-radius: 4px !important;
+                font-size: 14px !important;
             }
             .modal {
                 position: fixed;
@@ -638,6 +651,55 @@ def get_dashboard_screen_html():
                     .replace(/'/g, '&#39;');
             }
 
+            function resolvePopupShopInfo() {
+                const openerRef = window.opener && !window.opener.closed ? window.opener : null;
+                const localShop = (typeof setupShopData === 'object' && setupShopData) ? setupShopData : null;
+                const openerShop = openerRef && typeof openerRef.setupShopData === 'object' ? openerRef.setupShopData : null;
+                const candidate = localShop || openerShop || {};
+
+                let fallbackName = '';
+                if (openerRef && openerRef.document) {
+                    const shopNode = openerRef.document.getElementById('profileShopText');
+                    fallbackName = String(shopNode?.textContent || '').trim();
+                }
+
+                return {
+                    shop_name: String(candidate.shop_name || fallbackName || '').trim(),
+                    address: String(candidate.address || '').trim(),
+                    city: String(candidate.city || '').trim(),
+                    state: String(candidate.state || '').trim(),
+                    zip_code: String(candidate.zip_code || '').trim(),
+                    phone: String(candidate.phone || '').trim(),
+                    email: String(candidate.email || '').trim(),
+                };
+            }
+
+            function buildPopupShopHeaderHtml() {
+                const shop = resolvePopupShopInfo();
+                const shopName = escapePopupHtml(shop.shop_name || '');
+                const address = escapePopupHtml(shop.address || '');
+                const city = escapePopupHtml(shop.city || '');
+                const state = escapePopupHtml(shop.state || '');
+                const zip = escapePopupHtml(shop.zip_code || '');
+                const phone = escapePopupHtml(shop.phone || '');
+                const email = escapePopupHtml(shop.email || '');
+                const cityStateZip = [city, state, zip].filter(Boolean).join(', ').replace(/,\s([^,]+)$/, ' $1');
+                const contactLine = [phone, email].filter(Boolean).join(' | ');
+
+                if (!shopName && !address && !cityStateZip && !contactLine) {
+                    return '';
+                }
+
+                return `
+                    <div class="print-shop-header">
+                        ${shopName ? `<div class="print-shop-name">${shopName}</div>` : ''}
+                        ${address ? `<div class="print-shop-line">${address}</div>` : ''}
+                        ${cityStateZip ? `<div class="print-shop-line">${cityStateZip}</div>` : ''}
+                        ${contactLine ? `<div class="print-shop-line">${contactLine}</div>` : ''}
+                    </div>
+                `;
+            }
+
             function popupFormatMoney(value) {
                 const amount = Number(value || 0);
                 return '$' + amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -842,6 +904,7 @@ def get_dashboard_screen_html():
                     alert('Unable to open print preview. Please allow pop-ups for this site.');
                     return;
                 }
+                const shopHeaderHtml = buildPopupShopHeaderHtml();
                 printWindow.document.write(`
                     <!DOCTYPE html>
                     <html>
@@ -850,6 +913,9 @@ def get_dashboard_screen_html():
                             <style>
                                 @media print { @page { margin: 0.5in; } body { margin: 0; } }
                                 body { font-family: Arial, sans-serif; color:#222; padding:20px; }
+                                .print-shop-header { text-align:center; margin-bottom:14px; }
+                                .print-shop-name { font-size:19px; font-weight:800; letter-spacing:0.2px; color:#111; }
+                                .print-shop-line { font-size:12px; color:#444; margin-top:2px; }
                                 .header { text-align:center; margin-bottom:16px; border-bottom:2px solid #b22222; padding-bottom:8px; }
                                 .header h1 { margin:0 0 6px 0; color:#b22222; font-size:24px; }
                                 .header p { margin:0; color:#666; }
@@ -858,9 +924,11 @@ def get_dashboard_screen_html():
                                 tbody td { padding:8px; border-bottom:1px solid #eee; font-size:12px; }
                                 .num { text-align:right; }
                                 .line-break { height:1px; background:#444; margin:14px 0; }
+                                .service-order-tech-page { break-inside: avoid; page-break-inside: avoid; }
+                                .service-order-tech-page + .service-order-tech-page { break-before: page; page-break-before: always; }
                             </style>
                         </head>
-                        <body>${bodyHtml}</body>
+                        <body>${shopHeaderHtml}${bodyHtml}</body>
                     </html>
                 `);
                 printWindow.document.close();
@@ -1031,7 +1099,7 @@ def get_dashboard_screen_html():
                         });
                     }
 
-                    const sections = Array.from(sectionsByTech.entries()).map(([techName, techLines]) => {
+                    const sections = Array.from(sectionsByTech.entries()).map(([techName, techLines], sectionIndex) => {
                         const sortedLines = [...techLines].sort((a, b) => {
                             const aNum = popupExtractLineNumber(a.line_number);
                             const bNum = popupExtractLineNumber(b.line_number);
@@ -1051,7 +1119,7 @@ def get_dashboard_screen_html():
                         `).join('');
 
                         return `
-                            <div style="margin-top:18px;">
+                            <div class="service-order-tech-page" style="margin-top:18px;${sectionIndex > 0 ? ' page-break-before:always; break-before:page;' : ''}">
                                 <div style="font-size:16px; font-weight:700; margin-bottom:6px;">${escapePopupHtml(techName)}</div>
                                 <table>
                                     <thead>
@@ -1633,7 +1701,7 @@ def get_dashboard_screen_html():
                         <div style="font-weight:700; font-size:18px; margin-bottom:10px; color:#333;">Notes Log</div>
                         <div style="display:flex; gap:10px; margin-bottom:12px; align-items:flex-start;">
                             <textarea id="roPopupNoteInput" rows="3" style="flex:1; padding:10px; border:1px solid #ccc; border-radius:6px; resize:vertical;" placeholder="Add note..."></textarea>
-                            <button id="roPopupNoteSave" type="button" style="padding:10px 14px; background:#b22222; color:#fff; border:none; border-radius:6px; cursor:pointer; font-weight:700;">Save</button>
+                            <button id="roPopupNoteSave" type="button" aria-label="Save" title="Save" style="padding:10px 14px; background:#b22222; color:#fff; border:none; border-radius:6px; cursor:pointer; font-weight:700; display:inline-flex; align-items:center; justify-content:center;"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M5 4h11l3 3v13H5V4z" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round"/><path d="M8 4v6h8V4" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round"/><rect x="8" y="14" width="8" height="6" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round"/></svg></button>
                         </div>
                         <div id="roPopupNotesList" style="max-height:420px; overflow-y:auto;"></div>
                     </div>
@@ -2559,7 +2627,7 @@ def get_dashboard_screen_html():
                     <div class="ro-window-card">
                         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
                             <div id="roPopupPaymentsTitle" style="font-weight:700; font-size:18px; color:#333;">Payments - GRAND TOTAL: -</div>
-                            <button id="roPopupPaymentsSave" type="button" style="padding:9px 14px; background:#d32f2f; color:#fff; border:none; border-radius:6px; cursor:pointer; font-weight:700;">SAVE</button>
+                            <button id="roPopupPaymentsSave" type="button" aria-label="Save" title="Save" style="padding:9px 14px; background:#d32f2f; color:#fff; border:none; border-radius:6px; cursor:pointer; font-weight:700; display:inline-flex; align-items:center; justify-content:center;"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M5 4h11l3 3v13H5V4z" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round"/><path d="M8 4v6h8V4" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round"/><rect x="8" y="14" width="8" height="6" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round"/></svg></button>
                         </div>
                         <div id="roPopupPaymentsLog"><div style="color:#777;">Loading...</div></div>
                     </div>
