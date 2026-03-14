@@ -691,11 +691,11 @@ def get_dashboard_screen_html():
                 }
 
                 return `
-                    <div style="text-align:center; margin-bottom:10px;">
-                        ${name ? `<div style="font-size:18px; font-weight:800; line-height:1.2;">${name}</div>` : ''}
-                        ${address ? `<div style="font-size:12px; color:#444; margin-top:2px;">${address}</div>` : ''}
-                        ${cityStateZip ? `<div style="font-size:12px; color:#444; margin-top:2px;">${cityStateZip}</div>` : ''}
-                        ${phone ? `<div style="font-size:12px; color:#444; margin-top:2px;">${phone}</div>` : ''}
+                    <div style="position:absolute; left:50%; transform:translateX(-50%); top:26px; width:70%; text-align:center; z-index:2;">
+                        ${name ? `<div style="font-size:36px; font-weight:800; line-height:1.12;">${name}</div>` : ''}
+                        ${address ? `<div style="font-size:24px; color:#444; margin-top:4px; line-height:1.15;">${address}</div>` : ''}
+                        ${cityStateZip ? `<div style="font-size:24px; color:#444; margin-top:4px; line-height:1.15;">${cityStateZip}</div>` : ''}
+                        ${phone ? `<div style="font-size:24px; color:#444; margin-top:4px; line-height:1.15;">${phone}</div>` : ''}
                     </div>
                 `;
             }
@@ -954,7 +954,7 @@ def get_dashboard_screen_html():
                     roOpenPrintWindow(
                         `RO ${ro.ro} Bill`,
                         `
-                            <div class="header" style="text-align:left;">
+                            <div class="header" style="text-align:left; position:relative; min-height:170px;">
                                 ${shopHeaderHtml}
                                 <div style="font-size:72px; font-weight:800; line-height:1; margin-bottom:8px;">RO #${escapePopupHtml(ro.ro || '-')}</div>
                                 <div style="display:flex; justify-content:space-between; align-items:flex-end; gap:18px; margin-bottom:6px;">
@@ -1125,7 +1125,7 @@ def get_dashboard_screen_html():
                     roOpenPrintWindow(
                         `RO ${ro.ro} Service Order`,
                         `
-                            <div class="header" style="text-align:left;">
+                            <div class="header" style="text-align:left; position:relative; min-height:170px;">
                                 ${shopHeaderHtml}
                                 <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:18px; margin-bottom:6px;">
                                     <div style="font-size:72px; font-weight:800; line-height:1; margin-bottom:8px;">RO #${escapePopupHtml(ro.ro || '-')}</div>
@@ -1235,7 +1235,7 @@ def get_dashboard_screen_html():
                     roOpenPrintWindow(
                         `RO ${ro.ro} Parts`,
                         `
-                            <div class="header" style="text-align:left;">
+                            <div class="header" style="text-align:left; position:relative; min-height:170px;">
                                 ${shopHeaderHtml}
                                 <div style="font-size:72px; font-weight:800; line-height:1; margin-bottom:8px;">RO #${escapePopupHtml(ro.ro || '-')}</div>
                                 <div style="display:flex; justify-content:space-between; align-items:flex-end; gap:18px; margin-bottom:6px;">
