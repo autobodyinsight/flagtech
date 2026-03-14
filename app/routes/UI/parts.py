@@ -576,7 +576,6 @@ def get_parts_script():
 
             wrap.innerHTML = partsBuildVendorDetailHtml(vendor);
             partsSetVendorEditMode(vendorId, false);
-            partsLoadVendorInvoices(vendorId);
         }
 
         function partsBuildVendorDetailHtml(vendor) {
@@ -631,21 +630,6 @@ def get_parts_script():
                 </div>
                 <div style="text-align:right; margin:10px 0 14px 0;">
                     <button id="parts-vendor-edit-btn-${id}" data-mode="view" onclick="partsToggleVendorEdit(${id})" style="padding:8px 14px; background:#505050; color:#fff; border:none; border-radius:4px; cursor:pointer;">EDIT</button>
-                </div>
-                <div style="font-weight:bold; margin-bottom:8px;">Invoices</div>
-                <div style="overflow-x:auto;">
-                    <table style="width:100%; border-collapse:collapse;">
-                        <thead>
-                            <tr style="background:#f5f5f5; text-align:left;">
-                                <th style="padding:8px; border-bottom:1px solid #ddd;">DATE</th>
-                                <th style="padding:8px; border-bottom:1px solid #ddd;">INVOICE#</th>
-                                <th style="padding:8px; border-bottom:1px solid #ddd; text-align:right;">TOTAL</th>
-                            </tr>
-                        </thead>
-                        <tbody id="parts-vendor-invoices-${id}">
-                            <tr><td colspan="3" style="padding:8px; color:#777; text-align:center;">Loading...</td></tr>
-                        </tbody>
-                    </table>
                 </div>
             `;
         }
