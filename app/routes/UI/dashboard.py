@@ -1541,7 +1541,7 @@ def get_dashboard_screen_html():
                         <div style="font-weight:700; font-size:18px; margin-bottom:10px; color:#333;">Notes Log</div>
                         <div style="display:flex; gap:10px; margin-bottom:12px; align-items:flex-start;">
                             <textarea id="roPopupNoteInput" rows="3" style="flex:1; padding:10px; border:1px solid #ccc; border-radius:6px; resize:vertical;" placeholder="Add note..."></textarea>
-                            <button id="roPopupNoteSave" type="button" style="padding:10px 14px; background:#505050; color:#fff; border:none; border-radius:6px; cursor:pointer;">Save</button>
+                            <button id="roPopupNoteSave" type="button" style="padding:10px 14px; background:#b22222; color:#fff; border:none; border-radius:6px; cursor:pointer; font-weight:700;">Save</button>
                         </div>
                         <div id="roPopupNotesList" style="max-height:420px; overflow-y:auto;"></div>
                     </div>
@@ -1605,12 +1605,7 @@ def get_dashboard_screen_html():
 
             async function renderEstimateView() {
                 if (!roWindowContentEl) return;
-                roWindowContentEl.innerHTML = `
-                    <div class="ro-window-card">
-                        <div style="font-weight:700; font-size:18px; margin-bottom:10px; color:#333;">Estimate</div>
-                        <div id="roPopupEstimateContent" style="color:#444;"><div style="color:#777;">Loading...</div></div>
-                    </div>
-                `;
+                roWindowContentEl.innerHTML = '<div id="roPopupEstimateContent" style="color:#444;"><div style="color:#777;">Loading...</div></div>';
 
                 const contentEl = roWindowDoc.getElementById('roPopupEstimateContent');
                 if (!contentEl) return;
@@ -1713,7 +1708,7 @@ def get_dashboard_screen_html():
 
                     const unifiedHtml = unifiedLines.length
                         ? `
-                            <div style="background:#fff; border:1px solid #ddd; border-radius:8px; overflow:hidden;">
+                            <div class="dashboard-ro-table-wrap" style="overflow:hidden;">
                                 <div style="overflow-x:auto;">
                                     <table style="width:100%; border-collapse:collapse; table-layout:fixed;">
                                         <colgroup>
@@ -1726,14 +1721,14 @@ def get_dashboard_screen_html():
                                             <col style="width:8%;" />
                                         </colgroup>
                                         <thead>
-                                            <tr style="background:#f5f5f5; border-bottom:1px solid #ddd;">
-                                                <th style="padding:8px; text-align:left; white-space:nowrap;">Line #</th>
-                                                <th style="padding:8px; text-align:left; white-space:nowrap;">Description</th>
-                                                <th style="padding:8px; text-align:left; white-space:nowrap;">Part #</th>
-                                                <th style="padding:8px; text-align:right; white-space:nowrap;">Qty</th>
-                                                <th style="padding:8px; text-align:right; white-space:nowrap;">Labor</th>
-                                                <th style="padding:8px; text-align:right; white-space:nowrap;">Paint</th>
-                                                <th style="padding:8px; text-align:right; white-space:nowrap;">Price</th>
+                                            <tr class="dashboard-header-row">
+                                                <th class="dashboard-header-cell" style="padding:12px; text-align:left; white-space:nowrap;">Line #</th>
+                                                <th class="dashboard-header-cell" style="padding:12px; text-align:left; white-space:nowrap;">Description</th>
+                                                <th class="dashboard-header-cell" style="padding:12px; text-align:left; white-space:nowrap;">Part #</th>
+                                                <th class="dashboard-header-cell" style="padding:12px; text-align:right; white-space:nowrap;">Qty</th>
+                                                <th class="dashboard-header-cell" style="padding:12px; text-align:right; white-space:nowrap;">Labor</th>
+                                                <th class="dashboard-header-cell" style="padding:12px; text-align:right; white-space:nowrap;">Paint</th>
+                                                <th class="dashboard-header-cell" style="padding:12px; text-align:right; white-space:nowrap;">Price</th>
                                             </tr>
                                         </thead>
                                         <tbody>
@@ -1755,7 +1750,7 @@ def get_dashboard_screen_html():
                                                     : normalizeDisplayNumber(extendedPrice);
 
                                                 return `
-                                                    <tr style="border-bottom:1px solid #eee;">
+                                                    <tr style="border-bottom:1px solid rgba(0,0,0,0.06); background:#fff;">
                                                         <td style="padding:8px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${escapePopupHtml(lineNumber)}</td>
                                                         <td style="padding:8px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${escapePopupHtml(description)}</td>
                                                         <td style="padding:8px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${escapePopupHtml(partNumberDisplay)}</td>
@@ -2030,7 +2025,7 @@ def get_dashboard_screen_html():
                 if (!roWindowContentEl) return;
                 popupState.techSelectedIndices = [];
                 roWindowContentEl.innerHTML = `
-                    <div class="ro-window-card">
+                    <div>
                         <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; margin-bottom:10px;">
                             <div style="font-weight:700; font-size:18px; color:#333;">Tech Hours Assignment</div>
                             <button id="roPopupTechUnassignBtn" type="button" style="padding:8px 12px; background:#d32f2f; color:#fff; border:none; border-radius:6px; cursor:pointer; font-weight:700;" disabled>Unassign</button>
@@ -2154,13 +2149,14 @@ def get_dashboard_screen_html():
                     }
 
                     listEl.innerHTML = `
+                        <div class="dashboard-ro-table-wrap" style="overflow:hidden;">
                         <table style="width:100%; border-collapse:collapse;">
                             <thead>
-                                <tr style="background:#3c4142; border-bottom:2px solid #999;">
-                                    <th style="padding:8px 10px; text-align:center; font-weight:700; color:#fff; width:44px;">Sel</th>
-                                    <th style="padding:8px 12px; text-align:left; font-weight:700; color:#fff;">TECH</th>
-                                    <th style="padding:8px 12px; text-align:left; font-weight:700; color:#fff;">TYPE</th>
-                                    <th style="padding:8px 12px; text-align:right; font-weight:700; color:#fff;">HRS</th>
+                                <tr class="dashboard-header-row">
+                                    <th class="dashboard-header-cell" style="padding:12px 10px; text-align:center; width:44px;">Sel</th>
+                                    <th class="dashboard-header-cell" style="padding:12px; text-align:left;">TECH</th>
+                                    <th class="dashboard-header-cell" style="padding:12px; text-align:left;">TYPE</th>
+                                    <th class="dashboard-header-cell" style="padding:12px; text-align:right;">HRS</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -2170,7 +2166,7 @@ def get_dashboard_screen_html():
                                     const textColor = techLabel.toUpperCase() === 'PENDING' ? '#d32f2f' : '#333';
                                     const hrs = Number(item.hours || 0).toFixed(1);
                                     return `
-                                        <tr style="background:${index % 2 === 0 ? '#f2f0ef' : '#ffffff'}; border-bottom:1px solid #ddd;">
+                                        <tr style="background:#fff; border-bottom:1px solid rgba(0,0,0,0.06);">
                                             <td style="padding:8px 10px; text-align:center;"><input type="checkbox" class="roPopupTechRowCheckbox" data-tech-index="${index}" style="width:16px; height:16px; cursor:pointer;" /></td>
                                             <td style="padding:8px 12px; color:${textColor}; font-weight:700;"><button type="button" data-tech-index="${index}" class="roPopupTechAssignBtn" style="background:none; border:none; color:${textColor}; text-decoration:underline; cursor:pointer; padding:0; font:inherit; font-weight:700;">${techLabel}</button></td>
                                             <td style="padding:8px 12px; color:#333;">${typeLabel}</td>
@@ -2180,6 +2176,7 @@ def get_dashboard_screen_html():
                                 }).join('')}
                             </tbody>
                         </table>
+                        </div>
                     `;
 
                     roWindowDoc.querySelectorAll('.roPopupTechAssignBtn').forEach((button) => {
@@ -2202,8 +2199,7 @@ def get_dashboard_screen_html():
             async function renderPartsView() {
                 if (!roWindowContentEl) return;
                 roWindowContentEl.innerHTML = `
-                    <div class="ro-window-card">
-                        <div style="font-weight:700; font-size:18px; margin-bottom:10px; color:#333;">Parts</div>
+                    <div>
                         <div id="roPopupPartsStatus" style="margin-bottom:12px;"></div>
                         <div style="font-weight:700; color:#333; margin-bottom:6px;">Parts List</div>
                         <div id="roPopupPartsLines" style="margin-bottom:14px;"></div>
@@ -2295,21 +2291,21 @@ def get_dashboard_screen_html():
                         linesEl.innerHTML = '<div style="color:#777;">No parts lines found.</div>';
                     } else {
                         linesEl.innerHTML = `
-                            <div style="overflow:auto; border:1px solid #e2e2e2; border-radius:6px;">
+                            <div class="dashboard-ro-table-wrap" style="overflow:auto;">
                                 <table style="width:100%; border-collapse:collapse;">
                                     <thead>
-                                        <tr style="background:#3c4142; color:#fff; text-align:left;">
-                                            <th style="padding:8px;">Line</th>
-                                            <th style="padding:8px;">Description</th>
-                                            <th style="padding:8px;">Part #</th>
-                                            <th style="padding:8px; text-align:right;">List</th>
-                                            <th style="padding:8px; text-align:right;">Cost</th>
-                                            <th style="padding:8px; text-align:right;">QTY</th>
-                                            <th style="padding:8px;">Vendor</th>
-                                            <th style="padding:8px;">ETA</th>
-                                            <th style="padding:8px; text-align:center;">On Order</th>
-                                            <th style="padding:8px; text-align:center;">Arrived</th>
-                                            <th style="padding:8px; text-align:center;">Returned</th>
+                                        <tr class="dashboard-header-row">
+                                            <th class="dashboard-header-cell" style="padding:12px;">Line</th>
+                                            <th class="dashboard-header-cell" style="padding:12px;">Description</th>
+                                            <th class="dashboard-header-cell" style="padding:12px;">Part #</th>
+                                            <th class="dashboard-header-cell" style="padding:12px; text-align:right;">List</th>
+                                            <th class="dashboard-header-cell" style="padding:12px; text-align:right;">Cost</th>
+                                            <th class="dashboard-header-cell" style="padding:12px; text-align:right;">QTY</th>
+                                            <th class="dashboard-header-cell" style="padding:12px;">Vendor</th>
+                                            <th class="dashboard-header-cell" style="padding:12px;">ETA</th>
+                                            <th class="dashboard-header-cell" style="padding:12px; text-align:center;">On Order</th>
+                                            <th class="dashboard-header-cell" style="padding:12px; text-align:center;">Arrived</th>
+                                            <th class="dashboard-header-cell" style="padding:12px; text-align:center;">Returned</th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -2334,7 +2330,7 @@ def get_dashboard_screen_html():
                                             const isArrived = arrivedSet.has(idNum);
                                             const isReturned = returnedSet.has(idNum);
                                             return `
-                                                <tr style="background:${idx % 2 === 0 ? '#f2f0ef' : '#ffffff'}; border-bottom:1px solid #eee;">
+                                                <tr style="background:#fff; border-bottom:1px solid rgba(0,0,0,0.06);">
                                                     <td style="padding:8px;">${escapePopupHtml(line.line || '-')}</td>
                                                     <td style="padding:8px;">${escapePopupHtml(cleanDescription)}</td>
                                                     <td style="padding:8px;">${escapePopupHtml(linePartNumber || '-')}</td>
@@ -2368,14 +2364,14 @@ def get_dashboard_screen_html():
                         invoicesEl.innerHTML = '<div style="color:#777;">No invoice records.</div>';
                     } else {
                         invoicesEl.innerHTML = `
-                            <div style="overflow:auto; border:1px solid #e2e2e2; border-radius:6px;">
+                            <div class="dashboard-ro-table-wrap" style="overflow:auto;">
                                 <table style="width:100%; border-collapse:collapse;">
                                     <thead>
-                                        <tr style="background:#3c4142; color:#fff; text-align:left;">
-                                            <th style="padding:8px;">Invoice #</th>
-                                            <th style="padding:8px;">Vendor</th>
-                                            <th style="padding:8px;">Received</th>
-                                            <th style="padding:8px; text-align:right;">Total</th>
+                                        <tr class="dashboard-header-row">
+                                            <th class="dashboard-header-cell" style="padding:12px;">Invoice #</th>
+                                            <th class="dashboard-header-cell" style="padding:12px;">Vendor</th>
+                                            <th class="dashboard-header-cell" style="padding:12px;">Received</th>
+                                            <th class="dashboard-header-cell" style="padding:12px; text-align:right;">Total</th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -2394,7 +2390,7 @@ def get_dashboard_screen_html():
                                             const vendorDisplay = escapePopupHtml(vendorNames.join(', ') || '—');
                                             const key = escapePopupHtml(invoice);
                                             return `
-                                                <tr style="background:${idx % 2 === 0 ? '#f2f0ef' : '#fff'}; border-bottom:1px solid #eee; pointer-events:none;">
+                                                <tr style="background:#fff; border-bottom:1px solid rgba(0,0,0,0.06); pointer-events:none;">
                                                     <td style="padding:8px;">
                                                         <button type="button" class="roPopupInvoiceToggle" data-invoice-key="${key}" style="background:none; border:none; color:#0066cc; text-decoration:underline; cursor:pointer; padding:0; font:inherit; pointer-events:auto;">
                                                             ${key}
@@ -2443,7 +2439,7 @@ def get_dashboard_screen_html():
                                         <div style="font-weight:700; margin-bottom:6px; color:#333;">Invoice Details</div>
                                         <table style="width:100%; border-collapse:collapse;">
                                             <thead>
-                                                <tr style="background:#f7f7f7; text-align:left;">
+                                                <tr class="dashboard-header-row" style="text-align:left;">
                                                     <th style="padding:6px 8px; width:80px;">Line</th>
                                                     <th style="padding:6px 8px;">Description</th>
                                                     <th style="padding:6px 8px; width:120px; text-align:right;">Cost</th>
@@ -4293,7 +4289,17 @@ def get_dashboard_screen_html():
                     const claimDisplay = ro.claim_number || '-';
                     const phaseDisplay = formatPhaseDisplay(ro.phase);
                     const phaseSelectOptions = getPhaseDropdownOptions(ro.phase);
-                    const vinDisplay = ro.vin || '-';
+                    const vinRaw = String(ro.vin || '-');
+                    const vinDisplay = (() => {
+                        const safeVin = escapeHtml(vinRaw);
+                        if (!safeVin || safeVin === '-') return safeVin || '-';
+                        if (safeVin.length <= 8) {
+                            return `<span style="text-decoration:underline;">${safeVin}</span>`;
+                        }
+                        const head = safeVin.slice(0, safeVin.length - 8);
+                        const tail = safeVin.slice(-8);
+                        return `${head}<span style="text-decoration:underline;">${tail}</span>`;
+                    })();
                     const phoneNumbers = normalizePhoneList(ro.phone_numbers);
                     if (phoneNumbers.length === 0 && phoneDisplay && phoneDisplay !== '-') {
                         phoneNumbers.push(phoneDisplay);
@@ -4470,7 +4476,7 @@ def get_dashboard_screen_html():
                                     <div id="notes-list-${rowId}" style="max-height:180px; overflow-y:auto; margin-bottom:10px;"></div>
                                     <div style="display:flex; gap:10px;">
                                         <textarea id="notes-input-${rowId}" rows="2" style="flex:1; padding:8px; resize:vertical;" placeholder="Add note..."></textarea>
-                                        <button onclick="saveRoNote('${ro.ro}')" style="padding:8px 14px; background:#505050; color:#fff; border:none; border-radius:4px; cursor:pointer;">Save</button>
+                                        <button onclick="saveRoNote('${ro.ro}')" style="padding:8px 14px; background:#b22222; color:#fff; border:none; border-radius:4px; cursor:pointer; font-weight:700;">Save</button>
                                     </div>
                                 </div>
                             </td>

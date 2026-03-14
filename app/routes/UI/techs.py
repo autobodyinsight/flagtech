@@ -16,8 +16,10 @@ def get_techs_screen_html():
         </div>
 
         <div style="margin-top:40px;">
-            <h2 style="margin-bottom:20px;">Technicians</h2>
-            <div id="techsTableContainer" style="width:100%; border:1px solid #ddd; border-radius:4px; overflow:visible;">
+            <div style="display:flex; align-items:flex-end; justify-content:space-between; margin-bottom:0; position:relative;">
+                <h2 class="dashboard-ro-title-tab" style="margin:0; color:#333;">Technicians</h2>
+            </div>
+            <div id="techsTableContainer" class="dashboard-ro-table-wrap" style="width:100%; overflow:visible;">
                 <div class="techs-header-bar" style="display:flex; justify-content:space-between; align-items:center; padding:12px; border-bottom:2px solid #ddd; font-weight:bold; position:sticky; top:0; z-index:5;">
                     <div style="flex:0.6; text-align:left;">Status</div>
                     <div style="flex:1.4; text-align:left;">Tech Name</div>
@@ -61,20 +63,41 @@ def get_techs_screen_html():
         </div>
 
         <style>
+            #tech .dashboard-ro-title-tab {
+                display: inline-flex;
+                align-items: center;
+                background: rgba(0,0,0,0.03);
+                color: #000000;
+                font-weight: 700;
+                padding: 10px 14px;
+                border-radius: 8px 8px 0 0;
+                box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+                margin-bottom: -1px;
+            }
+            #tech .dashboard-ro-table-wrap {
+                background: #ffffff;
+                border-radius: 4px;
+                overflow: hidden;
+            }
             .techs-header-bar {
-                background:#3c4142;
-                color:#fff;
+                font-family: "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+                font-size: 15px;
+                font-weight: 600;
+                background: rgba(0,0,0,0.03) !important;
+                color: #000;
+                border-bottom: 1px solid #b22222 !important;
+                box-shadow: 0 2px 8px rgba(0,0,0,0.08);
             }
             .tech-row {
                 display:flex;
                 justify-content:space-between;
                 align-items:center;
                 padding:12px;
-                border-bottom:1px solid #eee;
+                border-bottom:1px solid rgba(0,0,0,0.06);
                 background:#fff;
             }
             .tech-row:hover {
-                background:#f7f7f7;
+                background:rgba(0,0,0,0.04);
             }
             .tech-link {
                 background:none;

@@ -1573,7 +1573,7 @@ def get_reports_screen_html():
                     <div style="font-weight:700; font-size:18px; margin-bottom:10px; color:#333;">Notes Log</div>
                     <div style="display:flex; gap:10px; margin-bottom:12px; align-items:flex-start;">
                         <textarea id="roPopupNoteInput" rows="3" style="flex:1; padding:10px; border:1px solid #ccc; border-radius:6px; resize:vertical;" placeholder="Add note..."></textarea>
-                        <button id="roPopupNoteSave" type="button" style="padding:10px 14px; background:#505050; color:#fff; border:none; border-radius:6px; cursor:pointer;">Save</button>
+                        <button id="roPopupNoteSave" type="button" style="padding:10px 14px; background:#b22222; color:#fff; border:none; border-radius:6px; cursor:pointer; font-weight:700;">Save</button>
                     </div>
                     <div id="roPopupNotesList" style="max-height:420px; overflow-y:auto;"></div>
                 </div>
@@ -1627,7 +1627,7 @@ def get_reports_screen_html():
 
         async function renderEstimateView() {
             if (!contentEl) return;
-            contentEl.innerHTML = `<div class="ro-window-card"><div style="font-weight:700; font-size:18px; margin-bottom:10px; color:#333;">Estimate</div><div id="roPopupEstimateContent" style="color:#444;"><div style="color:#777;">Loading...</div></div></div>`;
+            contentEl.innerHTML = '<div id="roPopupEstimateContent" style="color:#444;"><div style="color:#777;">Loading...</div></div>';
             const content = roDoc.getElementById('roPopupEstimateContent');
             try {
                 const res = await popupFetchJson(`/api/ro-estimate?ro=${encodeURIComponent(roKey)}`);
@@ -1641,7 +1641,21 @@ def get_reports_screen_html():
                         <td style="padding:8px; border-bottom:1px solid #eee; text-align:right;">${popupEsc(line.paint ?? 0)}</td>
                     </tr>
                 `).join('');
-                content.innerHTML = `<table style="width:100%; border-collapse:collapse;"><thead><tr><th style="text-align:left; padding:8px;">Line</th><th style="text-align:left; padding:8px;">Description</th><th style="text-align:right; padding:8px;">Labor</th><th style="text-align:right; padding:8px;">Paint</th></tr></thead><tbody>${rowsHtml || '<tr><td colspan="4" style="padding:12px; color:#777;">No estimate lines.</td></tr>'}</tbody></table>`;
+                content.innerHTML = `
+                    <div class="dashboard-ro-table-wrap" style="overflow:hidden;">
+                        <table style="width:100%; border-collapse:collapse;">
+                            <thead>
+                                <tr class="dashboard-header-row">
+                                    <th class="dashboard-header-cell" style="text-align:left; padding:12px;">Line</th>
+                                    <th class="dashboard-header-cell" style="text-align:left; padding:12px;">Description</th>
+                                    <th class="dashboard-header-cell" style="text-align:right; padding:12px;">Labor</th>
+                                    <th class="dashboard-header-cell" style="text-align:right; padding:12px;">Paint</th>
+                                </tr>
+                            </thead>
+                            <tbody>${rowsHtml || '<tr><td colspan="4" style="padding:12px; color:#777;">No estimate lines.</td></tr>'}</tbody>
+                        </table>
+                    </div>
+                `;
             } catch (err) {
                 content.innerHTML = '<div style="color:#c62828;">Error loading estimate.</div>';
             }
@@ -1649,12 +1663,21 @@ def get_reports_screen_html():
 
         async function renderTechView() {
             if (!contentEl) return;
-            contentEl.innerHTML = `<div class="ro-window-card"><div style="font-weight:700; font-size:18px; margin-bottom:10px; color:#333;">Tech</div><div id="roPopupTechContent" style="color:#444;"><div style="color:#777;">Loading...</div></div></div>`;
+            contentEl.innerHTML = '<div id="roPopupTechContent" style="color:#444;"><div style="color:#777;">Loading...</div></div>';
             const content = roDoc.getElementById('roPopupTechContent');
             try {
                 const res = await popupFetchJson(`/api/ro-tech-lines?ro=${encodeURIComponent(roKey)}`);
                 const items = Array.isArray(res.tech_lines) ? res.tech_lines : [];
-                content.innerHTML = items.map((item) => `<div style="padding:8px 0; border-bottom:1px solid #eee;"><strong>${popupEsc(item.tech || item.tech_name || 'Unassigned')}</strong> - ${popupEsc(item.repair_type || item.type || '')} (${popupEsc(item.hours || 0)} hrs)</div>`).join('') || '<div style="color:#777;">No tech assignments.</div>';
+                const rowsHtml = items.map((item) => `
+                    <tr style="background:#fff; border-bottom:1px solid rgba(0,0,0,0.06);">
+                        <td style="padding:8px 12px; font-weight:700;">${popupEsc(item.tech || item.tech_name || 'Unassigned')}</td>
+                        <td style="padding:8px 12px;">${popupEsc(item.repair_type || item.type || '')}</td>
+                        <td style="padding:8px 12px; text-align:right; font-weight:700;">${popupEsc(item.hours || 0)} hrs</td>
+                    </tr>
+                `).join('');
+                content.innerHTML = rowsHtml
+                    ? `<div class="dashboard-ro-table-wrap" style="overflow:hidden;"><table style="width:100%; border-collapse:collapse;"><thead><tr class="dashboard-header-row"><th class="dashboard-header-cell" style="text-align:left; padding:12px;">TECH</th><th class="dashboard-header-cell" style="text-align:left; padding:12px;">TYPE</th><th class="dashboard-header-cell" style="text-align:right; padding:12px;">HRS</th></tr></thead><tbody>${rowsHtml}</tbody></table></div>`
+                    : '<div style="color:#777;">No tech assignments.</div>';
             } catch (err) {
                 content.innerHTML = '<div style="color:#c62828;">Error loading tech data.</div>';
             }
@@ -1662,12 +1685,21 @@ def get_reports_screen_html():
 
         async function renderPartsView() {
             if (!contentEl) return;
-            contentEl.innerHTML = `<div class="ro-window-card"><div style="font-weight:700; font-size:18px; margin-bottom:10px; color:#333;">Parts</div><div id="roPopupPartsContent" style="color:#444;"><div style="color:#777;">Loading...</div></div></div>`;
+            contentEl.innerHTML = '<div id="roPopupPartsContent" style="color:#444;"><div style="color:#777;">Loading...</div></div>';
             const content = roDoc.getElementById('roPopupPartsContent');
             try {
                 const res = await popupFetchJson(`/api/parts/ro-lines?ro=${encodeURIComponent(roKey)}`);
                 const lines = Array.isArray(res.lines) ? res.lines : [];
-                content.innerHTML = lines.map((line) => `<div style="padding:8px 0; border-bottom:1px solid #eee;">Line ${popupEsc(line.line || '-')}: ${popupEsc(line.description || '-')} (${popupEsc(line.qty || 0)} qty)</div>`).join('') || '<div style="color:#777;">No parts lines.</div>';
+                const rowsHtml = lines.map((line) => `
+                    <tr style="background:#fff; border-bottom:1px solid rgba(0,0,0,0.06);">
+                        <td style="padding:8px 12px;">${popupEsc(line.line || '-')}</td>
+                        <td style="padding:8px 12px;">${popupEsc(line.description || '-')}</td>
+                        <td style="padding:8px 12px; text-align:right;">${popupEsc(line.qty || 0)}</td>
+                    </tr>
+                `).join('');
+                content.innerHTML = rowsHtml
+                    ? `<div class="dashboard-ro-table-wrap" style="overflow:hidden;"><table style="width:100%; border-collapse:collapse;"><thead><tr class="dashboard-header-row"><th class="dashboard-header-cell" style="text-align:left; padding:12px;">LINE</th><th class="dashboard-header-cell" style="text-align:left; padding:12px;">DESCRIPTION</th><th class="dashboard-header-cell" style="text-align:right; padding:12px;">QTY</th></tr></thead><tbody>${rowsHtml}</tbody></table></div>`
+                    : '<div style="color:#777;">No parts lines.</div>';
             } catch (err) {
                 content.innerHTML = '<div style="color:#c62828;">Error loading parts data.</div>';
             }
