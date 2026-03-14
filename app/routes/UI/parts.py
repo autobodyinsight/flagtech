@@ -1764,7 +1764,18 @@ def get_parts_script():
                 const firstCell = row.querySelector('td');
                 return String(firstCell?.textContent || '').trim() === ro;
             });
-            const estimatorName = String(roRow?.children?.[2]?.textContent || '').trim();
+            let estimatorName = '';
+            try {
+                const roResp = await fetch('/api/parts/ros', { credentials: 'include' });
+                const roData = await roResp.json();
+                const matchedRo = (Array.isArray(roData?.ros) ? roData.ros : []).find((item) => String(item?.ro || '').trim() === ro);
+                estimatorName = String(matchedRo?.estimator || '').trim();
+            } catch (error) {
+                estimatorName = '';
+            }
+            if (!estimatorName) {
+                estimatorName = String(roRow?.children?.[2]?.textContent || '').trim();
+            }
             const userEmail = String(appUiState?.currentUser?.email || appUiState?.sessionUser?.email || '').trim();
 
             let shopInfo = (typeof setupShopData !== 'undefined' && setupShopData) ? setupShopData : null;

@@ -13,13 +13,13 @@ def get_flagtech_screen_html():
         </div>
 
         <div style="margin-top:20px;">
-            <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:16px;">
-                <h2 style="margin:0;">Tech List</h2>
+            <div style="display:flex; align-items:flex-end; justify-content:space-between; margin-bottom:0; position:relative;">
+                <h2 class="flagout-list-title-tab" style="margin:0;">Tech List</h2>
                 <button id="flagoutPayoutBtn" onclick="openFlagoutPayoutConfirm()" style="display:none; padding:10px 20px; background:#d32f2f; color:#fff; border:none; border-radius:4px; cursor:pointer; font-weight:bold;">
                     payout
                 </button>
             </div>
-            <div id="flagoutTechTable" style="width:100%; border:1px solid #ddd; border-radius:4px; overflow:hidden; background:#fff;">
+            <div id="flagoutTechTable" class="flagout-table-wrap" style="width:100%; overflow:hidden; background:#fff;">
                 <div class="flagout-header-bar" style="display:flex; justify-content:space-between; align-items:center; padding:12px; border-bottom:2px solid #ddd; font-weight:bold;">
                     <div style="flex:1.8; text-align:left;">Tech Name</div>
                     <div style="flex:1; text-align:center;">Role</div>
@@ -56,19 +56,49 @@ def get_flagtech_screen_html():
         </div>
 
         <style>
+            .flagout-list-title-tab {
+                display: inline-flex;
+                align-items: center;
+                background: rgba(0,0,0,0.03);
+                color: #000000;
+                font-weight: 700;
+                padding: 10px 14px;
+                border-radius: 8px 8px 0 0;
+                box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+                margin-bottom: -1px;
+                font-size: 18px;
+            }
+            .flagout-table-wrap {
+                background: #ffffff;
+                border-radius: 4px;
+                overflow: hidden;
+            }
             .flagout-header-bar {
-                background:#3c4142;
-                color:#fff;
+                font-family: "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+                font-size: 15px;
+                font-weight: 600;
+                background: rgba(0,0,0,0.03) !important;
+                color: #000000;
+                text-align: left;
+                border: none !important;
+                border-bottom: 1px solid #b22222 !important;
+                padding-top: 14px !important;
+                padding-bottom: 14px !important;
+                box-shadow: 0 2px 8px rgba(0,0,0,0.08);
             }
             .flagout-tech-row {
                 display:flex;
                 justify-content:space-between;
                 align-items:center;
                 padding:12px;
-                border-bottom:1px solid #eee;
+                border-bottom: 1px solid rgba(0,0,0,0.06);
+                min-height: 48px;
+                font-family: "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+                font-size: 14px;
+                background-clip: padding-box;
             }
             .flagout-tech-row:hover {
-                background:#fafafa;
+                background: rgba(0,0,0,0.04) !important;
             }
             .flagout-tech-toggle {
                 background:none;
@@ -83,29 +113,35 @@ def get_flagtech_screen_html():
             .flagout-ros-wrap {
                 display:none;
                 padding:12px 16px;
-                border-bottom:1px solid #eee;
+                border-bottom: 1px solid rgba(0,0,0,0.06);
                 background:#fafafa;
             }
             .flagout-ros-panel {
-                border:1px solid #ddd;
-                border-radius:6px;
+                border:none;
+                border-radius:4px;
                 background:#fff;
                 overflow:hidden;
+                box-shadow: 0 1px 4px rgba(0,0,0,0.08);
             }
             .flagout-ros-table {
                 width:100%;
                 border-collapse:collapse;
+                font-family: "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+                font-size: 14px;
             }
             .flagout-ros-table thead tr {
-                background:#3c4142;
-                border-bottom:2px solid #999;
-                color:#fff;
+                background: rgba(0,0,0,0.03);
+                border-bottom: 1px solid #b22222;
+                color:#000000;
             }
             .flagout-ros-table th,
             .flagout-ros-table td {
-                padding:8px 12px;
-                border-bottom:1px solid #eee;
+                padding:10px 12px;
+                border-bottom: 1px solid rgba(0,0,0,0.06);
                 text-align:left;
+            }
+            .flagout-ros-table tbody tr:hover {
+                background: rgba(0,0,0,0.03);
             }
             .flagout-ros-table th:nth-child(2),
             .flagout-ros-table td:nth-child(2) {
