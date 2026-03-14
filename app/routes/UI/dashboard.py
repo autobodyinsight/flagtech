@@ -405,9 +405,20 @@ def get_dashboard_screen_html():
                 return dateMatch ? dateMatch[1] : '';
             };
 
+            const formatIsoDateForHeader = (isoDate) => {
+                const value = String(isoDate || '').trim();
+                if (!value) return '-';
+                const match = value.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+                if (!match) return value;
+                return `${match[2]}/${match[3]}/${match[1]}`;
+            };
+
             const inDateValue = normalizeIsoDateForInput(ro.in_date);
             const ecdDateValue = normalizeIsoDateForInput(ro.ecd_date);
             const pickedUpDateValue = normalizeIsoDateForInput(ro.picked_up);
+            const inDateDisplay = formatIsoDateForHeader(inDateValue);
+            const ecdDateDisplay = formatIsoDateForHeader(ecdDateValue);
+            const pickedUpDateDisplay = formatIsoDateForHeader(pickedUpDateValue);
             const insuranceHeaderValue = (() => {
                 const text = String(ro.insurance || '').trim();
                 if (!text) return '-';
@@ -476,14 +487,17 @@ def get_dashboard_screen_html():
                             <div class="ro-header-item"><span class="ro-header-label">Claim#:</span> <span class="ro-header-value">${ro.claim_number || '-'}</span></div>
                             <div class="ro-header-item ro-header-date-row">
                                 <span class="ro-header-label">In Date:</span>
+                                <span id="roHeaderInDateDisplay" class="ro-header-date-display">${inDateDisplay}</span>
                                 <input type="date" id="roHeaderInDate" class="ro-header-date-input" value="${inDateValue}" data-field="in_date" data-ro="${ro.ro || ''}" />
                             </div>
                             <div class="ro-header-item ro-header-date-row">
                                 <span class="ro-header-label">ECD Date:</span>
+                                <span id="roHeaderEcdDateDisplay" class="ro-header-date-display">${ecdDateDisplay}</span>
                                 <input type="date" id="roHeaderEcdDate" class="ro-header-date-input" value="${ecdDateValue}" data-field="ecd_date" data-ro="${ro.ro || ''}" />
                             </div>
                             <div class="ro-header-item ro-header-date-row">
                                 <span class="ro-header-label">Pick Up Date:</span>
+                                <span id="roHeaderPickedUpDateDisplay" class="ro-header-date-display">${pickedUpDateDisplay}</span>
                                 <input type="date" id="roHeaderPickedUpDate" class="ro-header-date-input" value="${pickedUpDateValue}" data-field="picked_up" data-ro="${ro.ro || ''}" />
                             </div>
                         </div>
@@ -539,34 +553,31 @@ def get_dashboard_screen_html():
                 .ro-header-label { color:#d32f2f; font-weight:700; margin-right:6px; white-space:nowrap; }
                 .ro-header-value { color:#fff; font-weight:600; word-break:break-word; }
                 .ro-header-date-row { display:flex; align-items:center; gap:8px; }
-                .ro-header-date-input {
-                    height:24px;
-                    min-width:96px;
-                    width:100%;
-                    border:none;
-                    border-radius:0;
-                    background:transparent;
+                .ro-header-date-display {
                     color:#fff;
-                    padding:0;
+                    font-weight:600;
+                    cursor:pointer;
+                    text-decoration:underline;
+                    text-underline-offset:2px;
+                    white-space:nowrap;
+                }
+                .ro-header-date-input {
+                    display:none;
+                    height:30px;
+                    min-width:146px;
+                    width:146px;
+                    border:1px solid #d0d0d0;
+                    border-radius:4px;
+                    background:#fff;
+                    color:#111;
+                    padding:2px 6px;
                     font-size:14px;
                     cursor:pointer;
-                    -webkit-appearance: none;
-                    appearance: none;
                 }
+                .ro-header-date-input.editing { display:inline-block; }
                 .ro-header-date-input:focus {
-                    outline:none;
+                    outline:2px solid rgba(178,34,34,0.35);
                     box-shadow:none;
-                }
-                .ro-header-date-input::-webkit-calendar-picker-indicator {
-                    opacity: 0;
-                    display: none;
-                    width: 0;
-                    margin: 0;
-                    padding: 0;
-                }
-                .ro-header-date-input::-webkit-inner-spin-button,
-                .ro-header-date-input::-webkit-clear-button {
-                    display: none;
                 }
                 .ro-sidebar-action {
                     opacity: 0.9;
@@ -1372,17 +1383,71 @@ def get_dashboard_screen_html():
                 const input = roWindowDoc.getElementById(inputId);
                 if (!input) return;
                 const errorLabel = options.errorLabel || 'date';
+                const display = options.displayId ? roWindowDoc.getElementById(options.displayId) : null;
                 input.dataset.lastValue = input.value || '';
+
+                const formatDisplayDate = (value) => {
+                    const text = String(value || '').trim();
+                    if (!text) return '-';
+                    const match = text.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+                    if (!match) return text;
+                    return `${match[2]}/${match[3]}/${match[1]}`;
+                };
+
+                const syncDisplayText = () => {
+                    if (!display) return;
+                    display.textContent = formatDisplayDate(input.value || input.dataset.lastValue || '');
+                };
+
+                const exitEditMode = () => {
+                    input.classList.remove('editing');
+                    if (display) display.style.display = 'inline';
+                    syncDisplayText();
+                };
+
+                const enterEditMode = () => {
+                    input.classList.add('editing');
+                    if (display) display.style.display = 'none';
+                    try {
+                        input.focus();
+                        if (typeof input.showPicker === 'function') {
+                            input.showPicker();
+                        }
+                    } catch (_) {
+                    }
+                };
+
+                if (display) {
+                    display.addEventListener('click', () => {
+                        enterEditMode();
+                    });
+                }
 
                 input.addEventListener('change', async function() {
                     await saveRoHeaderDateInput(this, errorLabel);
+                    exitEditMode();
                 });
 
                 input.addEventListener('keydown', async function(event) {
-                    if (event.key !== 'Enter') return;
-                    event.preventDefault();
-                    await saveRoHeaderDateInput(this, errorLabel);
+                    if (event.key === 'Enter') {
+                        event.preventDefault();
+                        await saveRoHeaderDateInput(this, errorLabel);
+                        exitEditMode();
+                        return;
+                    }
+                    if (event.key === 'Escape') {
+                        event.preventDefault();
+                        input.value = input.dataset.lastValue || '';
+                        exitEditMode();
+                    }
                 });
+
+                input.addEventListener('blur', async function() {
+                    await saveRoHeaderDateInput(this, errorLabel);
+                    exitEditMode();
+                });
+
+                syncDisplayText();
             }
 
             function setActiveSidebar(view) {
@@ -2748,9 +2813,9 @@ def get_dashboard_screen_html():
                 roWindowContentEl.innerHTML = '<div class="ro-window-card" style="color:#777;">Select a sidebar item.</div>';
             }
 
-            bindDateAutosave('roHeaderInDate', { errorLabel: 'In Date' });
-            bindDateAutosave('roHeaderEcdDate', { errorLabel: 'ECD Date' });
-            bindDateAutosave('roHeaderPickedUpDate', { errorLabel: 'Pick Up Date' });
+            bindDateAutosave('roHeaderInDate', { errorLabel: 'In Date', displayId: 'roHeaderInDateDisplay' });
+            bindDateAutosave('roHeaderEcdDate', { errorLabel: 'ECD Date', displayId: 'roHeaderEcdDateDisplay' });
+            bindDateAutosave('roHeaderPickedUpDate', { errorLabel: 'Pick Up Date', displayId: 'roHeaderPickedUpDateDisplay' });
             bindRoPrintActions();
             bindSidebarButtons();
             bindCloseRoButton();
