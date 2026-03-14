@@ -47,7 +47,7 @@ def get_reports_screen_html():
                             <span id="reportsStatusLabel" style="font-weight:700; color:#333; min-width:68px;">CLOSED</span>
                         </label>
                     </div>
-                    <div style="display:flex; gap:10px; align-items:flex-end; flex-wrap:wrap;">
+                    <div style="display:flex; gap:12px; align-items:flex-end; flex-wrap:wrap;">
                         <label style="display:flex; flex-direction:column; gap:4px; font-size:12px; color:#555; font-weight:600;">
                             <span>Start Date</span>
                             <input id="reportsStartDate" type="date" style="padding:7px 8px; border:1px solid #ccc; border-radius:4px; min-width:130px;" />
@@ -56,26 +56,24 @@ def get_reports_screen_html():
                             <span>End Date</span>
                             <input id="reportsEndDate" type="date" style="padding:7px 8px; border:1px solid #ccc; border-radius:4px; min-width:130px;" />
                         </label>
-                    </div>
-                    <div class="reports-top-icons" style="display:flex; align-items:flex-end; gap:10px; padding-bottom:2px; margin-left:4px;">
-                        <button id="reportsSidebarBtn-main" class="reports-sidebar-btn active" data-view="main" title="Reports" onclick="reportsExtraSwitchView('main')" style="background:none; border:none; padding:0; cursor:pointer;" aria-label="Reports View">
-                            <svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="4" y="4" width="20" height="20" rx="3" stroke="currentColor" stroke-width="2"/><line x1="8" y1="10" x2="20" y2="10" stroke="currentColor" stroke-width="2"/><line x1="8" y1="15" x2="20" y2="15" stroke="currentColor" stroke-width="2"/><line x1="8" y1="20" x2="16" y2="20" stroke="currentColor" stroke-width="2"/></svg>
-                        </button>
-                        <button id="reportsSidebarBtn-tech" class="reports-sidebar-btn" data-view="tech" title="Tech" onclick="reportsExtraSwitchView('tech')" style="background:none; border:none; padding:0; cursor:pointer;" aria-label="Tech View">
-                            <svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="14" cy="9" r="4" stroke="currentColor" stroke-width="2"/><rect x="7" y="17" width="14" height="6" rx="3" stroke="currentColor" stroke-width="2"/><path d="M21 21l2.5 2.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M7 21l-2.5 2.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
-                        </button>
-                        <button id="reportsSidebarBtn-parts" class="reports-sidebar-btn" data-view="parts" title="Parts" onclick="reportsExtraSwitchView('parts')" style="background:none; border:none; padding:0; cursor:pointer;" aria-label="Parts View">
-                            <svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="10" cy="23" r="2" stroke="currentColor" stroke-width="2"/><circle cx="20" cy="23" r="2" stroke="currentColor" stroke-width="2"/><rect x="5" y="7" width="18" height="10" rx="2" stroke="currentColor" stroke-width="2"/><path d="M7 7V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v2" stroke="currentColor" stroke-width="2"/></svg>
-                        </button>
+                        <div class="reports-top-icons" style="display:flex; align-items:flex-end; gap:10px; padding-bottom:2px; margin-left:4px;">
+                            <button id="reportsSidebarBtn-main" class="reports-sidebar-btn active" data-view="main" title="Reports" onclick="reportsExtraSwitchView('main')" style="background:none; border:none; padding:0; cursor:pointer;" aria-label="Reports View">
+                                <svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="4" y="4" width="20" height="20" rx="3" stroke="currentColor" stroke-width="2"/><line x1="8" y1="10" x2="20" y2="10" stroke="currentColor" stroke-width="2"/><line x1="8" y1="15" x2="20" y2="15" stroke="currentColor" stroke-width="2"/><line x1="8" y1="20" x2="16" y2="20" stroke="currentColor" stroke-width="2"/></svg>
+                            </button>
+                            <button id="reportsSidebarBtn-tech" class="reports-sidebar-btn" data-view="tech" title="Tech" onclick="reportsExtraSwitchView('tech')" style="background:none; border:none; padding:0; cursor:pointer;" aria-label="Tech View">
+                                <svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="14" cy="9" r="4" stroke="currentColor" stroke-width="2"/><rect x="7" y="17" width="14" height="6" rx="3" stroke="currentColor" stroke-width="2"/><path d="M21 21l2.5 2.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M7 21l-2.5 2.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+                            </button>
+                            <button id="reportsSidebarBtn-parts" class="reports-sidebar-btn" data-view="parts" title="Parts" onclick="reportsExtraSwitchView('parts')" style="background:none; border:none; padding:0; cursor:pointer;" aria-label="Parts View">
+                                <svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="10" cy="23" r="2" stroke="currentColor" stroke-width="2"/><circle cx="20" cy="23" r="2" stroke="currentColor" stroke-width="2"/><rect x="5" y="7" width="18" height="10" rx="2" stroke="currentColor" stroke-width="2"/><path d="M7 7V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v2" stroke="currentColor" stroke-width="2"/></svg>
+                            </button>
+                        </div>
                     </div>
                 </div>
                 <div style="position:relative;">
                     <button id="reportsPrintTrigger" class="mini-popup-trigger" onclick="reportsOpenPrintOptionsModal()" style="padding:8px 10px; background:none; border:none; color:#b22222; cursor:pointer; display:inline-flex; align-items:center; justify-content:center;" aria-label="Print">
-                        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-                            <path d="M7 8V4H17V8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
-                            <rect x="5" y="14" width="14" height="6" rx="1" stroke="currentColor" stroke-width="1.8"/>
-                            <rect x="4" y="8" width="16" height="8" rx="2" stroke="currentColor" stroke-width="1.8"/>
-                            <circle cx="17" cy="11" r="1" fill="currentColor"/>
+                        <svg width="36" height="36" viewBox="0 0 16 16" fill="currentColor" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                            <path d="M2 7a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v3h-2v3H4v-3H2V7Zm3 5h6v-2H5v2Zm6-8H5v1h6V4Z"/>
+                            <path d="M3 8h2v1H3V8Zm8 0h2v1h-2V8Z"/>
                         </svg>
                     </button>
                     <div id="reportsPrintOptionsModal" class="mini-popup-panel" style="display:none; right:0; left:auto;">
