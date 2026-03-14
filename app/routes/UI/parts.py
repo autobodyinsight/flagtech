@@ -6,12 +6,47 @@ def get_parts_screen_html():
     return """
     <div id="parts" class="screen" style="padding:20px;">
         <style>
-            .parts-header-row {
-                background:#3c4142;
-                text-align:left;
+            #parts .dashboard-ro-title-tab {
+                display: inline-flex;
+                align-items: center;
+                background: rgba(0,0,0,0.03);
+                color: #000000;
+                font-weight: 700;
+                padding: 10px 14px;
+                border-radius: 8px 8px 0 0;
+                box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+                margin-bottom: -1px;
             }
-            .parts-header-row th {
-                color:#fff;
+            #parts .dashboard-ro-table-wrap {
+                background: #ffffff;
+                border-radius: 4px;
+                overflow: hidden;
+            }
+            #parts .dashboard-header-row th,
+            #parts .dashboard-header-cell {
+                font-family: "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+                font-size: 15px;
+                font-weight: 600;
+                background: rgba(0,0,0,0.03) !important;
+                color: #000000;
+                text-align: left;
+                border: none !important;
+                border-bottom: 1px solid #b22222 !important;
+                padding-top: 14px !important;
+                padding-bottom: 14px !important;
+                box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+            }
+            #partsRoBody tr.parts-ro-main-row td {
+                background: #ffffff;
+                border: none;
+                border-bottom: 1px solid rgba(0,0,0,0.06) !important;
+                min-height: 48px;
+                height: 48px;
+                vertical-align: middle;
+                color: #333;
+            }
+            #partsRoBody tr.parts-ro-main-row:hover td {
+                background: rgba(0,0,0,0.04) !important;
             }
         </style>
         <div style="display:flex; align-items:center; justify-content:center; gap:28px; margin-bottom:20px;">
@@ -21,20 +56,22 @@ def get_parts_screen_html():
             </div>
         </div>
 
-        <div style="background:#fff; padding:20px; border-radius:8px; box-shadow:0 2px 4px rgba(0,0,0,0.08);">
-            <h3 style="margin:0 0 20px 0; color:#333;">Repair Orders</h3>
-            <div style="overflow-x:auto;">
+        <div style="margin-top:8px;">
+            <div style="display:flex; align-items:flex-end; justify-content:space-between; margin-bottom:0; position:relative;">
+                <h3 class="dashboard-ro-title-tab" style="margin:0; color:#333;">Repair Orders</h3>
+            </div>
+            <div class="dashboard-ro-table-wrap" style="overflow-x:auto;">
                 <table id="partsRoTable" style="width:100%; border-collapse:collapse;">
                     <thead>
-                        <tr class="parts-header-row">
-                            <th style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold;">RO#</th>
-                            <th style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold;">Vehicle</th>
-                            <th style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold;">Estimator</th>
-                            <th style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold;">Tech</th>
-                            <th style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold;">Parts Qty</th>
-                            <th style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold;">On Order</th>
-                            <th style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold;">Arrived</th>
-                            <th style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold;">Returned</th>
+                        <tr class="dashboard-header-row">
+                            <th class="dashboard-header-cell" style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold;">RO#</th>
+                            <th class="dashboard-header-cell" style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold;">Vehicle</th>
+                            <th class="dashboard-header-cell" style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold;">Estimator</th>
+                            <th class="dashboard-header-cell" style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold;">Tech</th>
+                            <th class="dashboard-header-cell" style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold;">Parts Qty</th>
+                            <th class="dashboard-header-cell" style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold;">On Order</th>
+                            <th class="dashboard-header-cell" style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold;">Arrived</th>
+                            <th class="dashboard-header-cell" style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold;">Returned</th>
                         </tr>
                     </thead>
                     <tbody id="partsRoBody">
@@ -829,19 +866,18 @@ def get_parts_script():
                     }
 
                     tbody.innerHTML = res.ros.map((ro, idx) => {
-                        const rowBg = idx % 2 === 0 ? '#f2f0ef' : 'var(--list-row-white, #ffffff)';
                         return `
-                            <tr style="background:${rowBg};">
-                                <td style="padding:12px; border-bottom:1px solid #eee; color:#333;">${ro.ro}</td>
-                                <td style="padding:12px; border-bottom:1px solid #eee; color:#333;">${ro.vehicle || '—'}</td>
-                                <td style="padding:12px; border-bottom:1px solid #eee; color:#333;">${ro.estimator || '—'}</td>
-                                <td style="padding:12px; border-bottom:1px solid #eee; color:#333;">${ro.tech || '—'}</td>
-                                <td style="padding:12px; border-bottom:1px solid #eee; color:#333;">
+                            <tr class="parts-ro-main-row">
+                                <td style="padding:12px; border-bottom:1px solid #eee;">${ro.ro}</td>
+                                <td style="padding:12px; border-bottom:1px solid #eee;">${ro.vehicle || '—'}</td>
+                                <td style="padding:12px; border-bottom:1px solid #eee;">${ro.estimator || '—'}</td>
+                                <td style="padding:12px; border-bottom:1px solid #eee;">${ro.tech || '—'}</td>
+                                <td style="padding:12px; border-bottom:1px solid #eee;">
                                     <button class="link-button" onclick="openPartsOrderModal('${ro.ro}')" style="background:none; border:none; color:#0066cc; text-decoration:underline; cursor:pointer; padding:0;">
                                         ${ro.parts_qty || 0}
                                     </button>
                                 </td>
-                                <td style="padding:12px; border-bottom:1px solid #eee; color:#333;">
+                                <td style="padding:12px; border-bottom:1px solid #eee;">
                                     <div style="display:flex; align-items:center; justify-content:space-between; gap:8px;">
                                         <button class="link-button" onclick="openPartsOnOrderModal('${ro.ro}')" style="background:none; border:none; color:#0066cc; text-decoration:underline; cursor:pointer; padding:0;">
                                             ${ro.on_order || 0}
@@ -851,12 +887,12 @@ def get_parts_script():
                                             : ''}
                                     </div>
                                 </td>
-                                <td style="padding:12px; border-bottom:1px solid #eee; color:#333;">
+                                <td style="padding:12px; border-bottom:1px solid #eee;">
                                     <button class="link-button" onclick="openPartsArrivedModal('${ro.ro}')" style="background:none; border:none; color:#0066cc; text-decoration:underline; cursor:pointer; padding:0;">
                                         ${ro.arrived || 0}
                                     </button>
                                 </td>
-                                <td style="padding:12px; border-bottom:1px solid #eee; color:#333;">
+                                <td style="padding:12px; border-bottom:1px solid #eee;">
                                     <button class="link-button" onclick="openPartsReturnedModal('${ro.ro}')" style="background:none; border:none; color:#0066cc; text-decoration:underline; cursor:pointer; padding:0;">
                                         ${ro.returned || 0}
                                     </button>

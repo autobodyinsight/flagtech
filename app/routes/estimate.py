@@ -7256,20 +7256,20 @@ async def list_vendor_invoices(request: Request, vendor_id: int):
         if not vendor_name:
             return {"invoices": []}
 
-        cur.execute(
-            """
-            SELECT
-                ro AS invoice_number,
-                MAX(COALESCE(received_business_date, received_at::date)) AS invoice_date,
-                COALESCE(SUM(cost), 0) AS total_cost
-            FROM parts_received
-            WHERE domain = %s
-              AND LOWER(TRIM(vendor)) = LOWER(TRIM(%s))
-            GROUP BY ro
-            ORDER BY MAX(COALESCE(received_business_date, received_at::date)) DESC
-            """,
-            (domain, vendor_name),
-        )
+                cur.execute(
+                        """
+                        SELECT
+                                COALESCE(NULLIF(BTRIM(invoice_number), ''), ro) AS invoice_number,
+                                MAX(COALESCE(received_business_date, received_at::date)) AS invoice_date,
+                                COALESCE(SUM(cost), 0) AS total_cost
+                        FROM parts_received
+                        WHERE domain = %s
+                            AND LOWER(TRIM(vendor)) = LOWER(TRIM(%s))
+                        GROUP BY COALESCE(NULLIF(BTRIM(invoice_number), ''), ro)
+                        ORDER BY MAX(COALESCE(received_business_date, received_at::date)) DESC
+                        """,
+                        (domain, vendor_name),
+                )
         rows = cur.fetchall() or []
 
         invoices = [
@@ -7322,18 +7322,39 @@ async def list_vendor_invoice_parts(request: Request, vendor_id: int, invoice_nu
 
         cur.execute(
             """
-            SELECT parts_repairs
-            FROM saved_estimates
-            WHERE domain = %s AND ro = %s
-            ORDER BY saved_at DESC, id DESC
-            LIMIT 1
+            SELECT ro, line_id, cost, received_at
+            FROM parts_received
+            WHERE domain = %s
+              AND LOWER(TRIM(vendor)) = LOWER(TRIM(%s))
+              AND (
+                COALESCE(NULLIF(BTRIM(invoice_number), ''), ro) = %s
+                OR ro = %s
+              )
+            ORDER BY line_id
             """,
-            (domain, invoice_value),
+            (domain, vendor_name, invoice_value, invoice_value),
         )
-        estimate_row = cur.fetchone()
-        parts_repairs = _parse_json_field(estimate_row.get("parts_repairs")) if estimate_row else []
-        if not isinstance(parts_repairs, list):
-            parts_repairs = []
+        rows = cur.fetchall() or []
+
+        ro_candidates = [str(row.get("ro") or "").strip() for row in rows if str(row.get("ro") or "").strip()]
+        ro_for_lookup = ro_candidates[0] if ro_candidates else ""
+
+        parts_repairs = []
+        if ro_for_lookup:
+            cur.execute(
+                """
+                SELECT parts_repairs
+                FROM saved_estimates
+                WHERE domain = %s AND ro = %s
+                ORDER BY saved_at DESC, id DESC
+                LIMIT 1
+                """,
+                (domain, ro_for_lookup),
+            )
+            estimate_row = cur.fetchone()
+            parts_repairs = _parse_json_field(estimate_row.get("parts_repairs")) if estimate_row else []
+            if not isinstance(parts_repairs, list):
+                parts_repairs = []
 
         line_lookup = {}
         for idx, item in enumerate(parts_repairs, start=1):
@@ -7344,18 +7365,6 @@ async def list_vendor_invoice_parts(request: Request, vendor_id: int, invoice_nu
                 "description": item.get("description") or "",
             }
 
-        cur.execute(
-            """
-            SELECT line_id, cost, received_at
-            FROM parts_received
-            WHERE domain = %s
-              AND ro = %s
-              AND LOWER(TRIM(vendor)) = LOWER(TRIM(%s))
-            ORDER BY line_id
-            """,
-            (domain, invoice_value, vendor_name),
-        )
-        rows = cur.fetchall() or []
         parts = []
         for row in rows:
             line_id = int(row.get("line_id") or 0)
