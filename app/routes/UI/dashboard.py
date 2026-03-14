@@ -580,6 +580,22 @@ def get_dashboard_screen_html():
                                         50%, 100% { opacity: 0.25; }
                                 }
                                 .ro-window-card { background:#fafafa; border:1px solid #ddd; border-radius:8px; padding:14px; }
+                .dashboard-ro-table-wrap {
+                    background:#ffffff;
+                    border-radius:4px;
+                    overflow:hidden;
+                }
+                .dashboard-header-row th,
+                .dashboard-header-cell {
+                    font-family:"Segoe UI","Helvetica Neue",Arial,sans-serif;
+                    font-size:15px;
+                    font-weight:600;
+                    background:rgba(0,0,0,0.03) !important;
+                    color:#000000;
+                    border:none !important;
+                    border-bottom:1px solid #b22222 !important;
+                    box-shadow:0 2px 8px rgba(0,0,0,0.08);
+                }
                 @media (max-width: 700px) {
                                     #roSidebar { flex-basis:44px; }
                   #roSidebar svg { width:22px; height:22px; }
@@ -2200,8 +2216,8 @@ def get_dashboard_screen_html():
                 if (!roWindowContentEl) return;
                 roWindowContentEl.innerHTML = `
                     <div>
-                        <div id="roPopupPartsStatus" style="margin-bottom:12px;"></div>
                         <div style="font-weight:700; color:#333; margin-bottom:6px;">Parts List</div>
+                        <div id="roPopupPartsStatus" style="margin-bottom:12px;"></div>
                         <div id="roPopupPartsLines" style="margin-bottom:14px;"></div>
                         <div style="font-weight:700; color:#333; margin-bottom:6px;">Invoices</div>
                         <div id="roPopupPartsInvoices"></div>

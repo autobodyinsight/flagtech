@@ -1152,6 +1152,22 @@ def get_reports_screen_html():
             .ro-header-value { color:#fff; font-weight:600; }
             .ro-header-date-text { color:#fff; font-weight:600; min-width:110px; }
             .ro-window-card { background:#fafafa; border:1px solid #ddd; border-radius:8px; padding:14px; }
+            .dashboard-ro-table-wrap {
+                background:#ffffff;
+                border-radius:4px;
+                overflow:hidden;
+            }
+            .dashboard-header-row th,
+            .dashboard-header-cell {
+                font-family:"Segoe UI","Helvetica Neue",Arial,sans-serif;
+                font-size:15px;
+                font-weight:600;
+                background:rgba(0,0,0,0.03) !important;
+                color:#000000;
+                border:none !important;
+                border-bottom:1px solid #b22222 !important;
+                box-shadow:0 2px 8px rgba(0,0,0,0.08);
+            }
             .mini-popup-panel {
                 position: absolute;
                 top: 100%;
