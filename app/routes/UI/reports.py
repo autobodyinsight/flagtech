@@ -1077,17 +1077,19 @@ def get_reports_screen_html():
         };
 
         const sidebarHtml = `
-            <div id="roSidebar" style="position:fixed; left:0; top:var(--ro-header-height, 170px); height:calc(100vh - var(--ro-header-height, 170px)); width:64px; background:#23272a; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:38px; z-index:100; box-shadow:2px 0 8px rgba(0,0,0,0.08);">
-                <button class="ro-sidebar-btn active" data-view="notes" style="background:none; border:none; padding:0; cursor:pointer;">${icons.notepad}</button>
-                <button class="ro-sidebar-btn" data-view="estimate" style="background:none; border:none; padding:0; cursor:pointer;">${icons.estimate}</button>
-                <button class="ro-sidebar-btn" data-view="tech" style="background:none; border:none; padding:0; cursor:pointer;">${icons.tech}</button>
-                <button class="ro-sidebar-btn" data-view="parts" style="background:none; border:none; padding:0; cursor:pointer;">${icons.cart}</button>
-                <button class="ro-sidebar-btn" data-view="payments" style="background:none; border:none; padding:0; cursor:pointer;">${icons.credit}</button>
+            <div id="roSidebar" style="position:relative; flex:0 0 64px; height:100%; background:linear-gradient(180deg, #000 0%, #b22222 100%); display:flex; flex-direction:column; align-items:center; justify-content:center; box-shadow:2px 0 8px rgba(0,0,0,0.08);">
+                <div style="display:flex; flex-direction:column; align-items:center; justify-content:center; gap:18px; flex:1 1 auto; height:100%; width:100%; padding:10px 0; transform:translateY(-30%);">
+                    <button class="ro-sidebar-btn active" data-view="notes" style="background:none; border:none; padding:0; cursor:pointer;">${icons.notepad}</button>
+                    <button class="ro-sidebar-btn" data-view="estimate" style="background:none; border:none; padding:0; cursor:pointer;">${icons.estimate}</button>
+                    <button class="ro-sidebar-btn" data-view="tech" style="background:none; border:none; padding:0; cursor:pointer;">${icons.tech}</button>
+                    <button class="ro-sidebar-btn" data-view="parts" style="background:none; border:none; padding:0; cursor:pointer;">${icons.cart}</button>
+                    <button class="ro-sidebar-btn" data-view="payments" style="background:none; border:none; padding:0; cursor:pointer;">${icons.credit}</button>
+                </div>
             </div>
         `;
 
         const bannerHtml = `
-            <div id="roHeaderBar" style="background:#23272a; color:#fff; padding:16px 24px 18px 24px; border-bottom:3px solid #d32f2f; position:relative; min-height:132px; z-index:120;">
+            <div id="roHeaderBar" style="background:linear-gradient(90deg, #111 0%, #23272a 48%, #d32f2f 100%); color:#fff; padding:12px 24px; border-bottom:none; position:relative; min-height:132px; z-index:120;">
                 <div style="font-size:20px; font-weight:bold; margin-bottom:10px;">RO Window</div>
                 <div style="position:absolute; top:14px; left:50%; transform:translateX(-50%); font-weight:900; letter-spacing:1.5px; font-size:20px; color:#fff;">CLOSED</div>
                 <div style="position:absolute; top:58px; right:24px; display:flex; flex-direction:column; align-items:flex-start; gap:6px; z-index:10;">
@@ -1129,7 +1131,10 @@ def get_reports_screen_html():
                     </div>
                 </div>
             </div>
-            <div id="roWindowContent" style="padding:32px 32px 32px 88px; min-height:180px; background:#fff; color:#23272a; font-size:18px;"></div>
+        `;
+
+        const contentHtml = `
+            <div id="roWindowContent" style="padding:32px; min-height:180px; background:#fff; color:#23272a; font-size:18px; flex:1 1 auto; overflow:auto;"></div>
         `;
 
         const win = window.open('', `Reports_Closed_RO_${roKey}`, 'width=900,height=640,scrollbars=yes,resizable=yes');
@@ -1139,15 +1144,16 @@ def get_reports_screen_html():
         }
 
         win.document.title = `Closed RO Window - ${roKey}`;
-        win.document.body.innerHTML = `<div style='display:flex; flex-direction:row; height:100vh; width:100vw; background:#f2f2f2;'>${sidebarHtml}<div style='flex:1; display:flex; flex-direction:column; min-width:0;'>${bannerHtml}</div></div>`;
+        win.document.body.innerHTML = `<div id='roPopupRoot' style='display:flex; flex-direction:column; height:100vh; width:100vw; background:#f2f2f2; overflow:hidden;'>${bannerHtml}<div id='roPopupLowerLayout' style='display:flex; flex:1 1 auto; min-height:0;'>${sidebarHtml}<div style='flex:1 1 auto; min-width:0; display:flex; flex-direction:column; min-height:0;'>${contentHtml}</div></div></div>`;
 
         const style = win.document.createElement('style');
         style.textContent = `
             body { margin:0; font-family:Segoe UI,Arial,sans-serif; background:#f2f2f2; }
             #roSidebar svg { display:block; margin:0 auto; }
-            .ro-sidebar-btn { opacity:0.72; transition:opacity 0.15s ease, transform 0.15s ease; }
-            .ro-sidebar-btn:hover { opacity:1; transform:translateY(-1px); }
-            .ro-sidebar-btn.active { opacity:1; }
+            #roSidebar .ro-sidebar-btn { opacity:0.72; transition:opacity 0.15s ease, transform 0.15s ease; width:100%; display:flex; align-items:center; justify-content:center; }
+            #roSidebar .ro-sidebar-btn:hover { opacity:1; transform:translateY(-1px); }
+            #roSidebar .ro-sidebar-btn.active { opacity:1; }
+            #roSidebar { box-shadow:2px 0 8px rgba(0,0,0,0.08); min-height:0; flex-shrink:0; }
             .ro-header-label { color:#d32f2f; font-weight:700; margin-right:6px; white-space:nowrap; }
             .ro-header-value { color:#fff; font-weight:600; }
             .ro-header-date-text { color:#fff; font-weight:600; min-width:110px; }
@@ -1190,6 +1196,10 @@ def get_reports_screen_html():
                 opacity: 1;
                 transform: translateY(0);
                 pointer-events: auto;
+            }
+            @media (max-width: 700px) {
+                #roSidebar { flex-basis:44px; }
+                #roSidebar svg { width:22px; height:22px; }
             }
         `;
         win.document.head.appendChild(style);
