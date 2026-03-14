@@ -37,14 +37,33 @@ def get_setup_screen_html():
                 overflow-y: auto;
                 padding-right: 4px;
             }
+            #setup .setup-users-title-tab {
+                display: inline-flex;
+                align-items: center;
+                background: rgba(0,0,0,0.03);
+                color: #000000;
+                font-weight: 700;
+                padding: 10px 14px;
+                border-radius: 8px 8px 0 0;
+                box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+                margin-bottom: -1px;
+                font-size: 20px;
+                line-height: 1.2;
+            }
+            #setup .setup-users-table-wrap {
+                background: #ffffff;
+                border-radius: 4px;
+                overflow: hidden;
+            }
             #setup #setupUsersBody td,
             #setup #setupUsersBody span,
             #setup #setupUsersBody input,
             #setup #setupUsersBody select {
-                font-size: 24px;
+                font-size: 14px;
+                font-family: "Segoe UI", "Helvetica Neue", Arial, sans-serif;
             }
             #setup #setupUsersBody tr:hover td {
-                background: #ece7e4 !important;
+                background: rgba(0,0,0,0.04) !important;
             }
             #setup .setup-action-btn {
                 padding: 10px 16px;
@@ -56,20 +75,26 @@ def get_setup_screen_html():
             }
             #setup #setupUsersTable {
                 width: 100%;
-                border-collapse: separate;
+                border-collapse: collapse;
                 border-spacing: 0;
                 overflow: hidden;
-                border-radius: 10px;
+                border-radius: 0;
+                border: none;
+                font-family: "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+                font-size: 14px;
             }
             #setup #setupUsersTable thead tr {
-                background: #1f2326;
-                color: #fff;
+                background: rgba(0,0,0,0.03) !important;
+                color: #000;
                 text-align: left;
             }
             #setup #setupUsersTable thead th {
-                padding: 12px;
-                border-bottom: 2px solid #ddd;
-                font-size: 24px;
+                padding: 14px 12px;
+                border: none !important;
+                border-bottom: 1px solid #b22222 !important;
+                font-size: 15px;
+                font-weight: 600;
+                box-shadow: 0 2px 8px rgba(0,0,0,0.08);
             }
             @media (max-width: 980px) {
                 #setup #setupLayout {
@@ -110,9 +135,9 @@ def get_setup_screen_html():
                     </div>
                 </div>
 
-                <h4 style="margin:0 0 14px 0; color:#333; font-size:28px;">Users</h4>
+                <h4 class="setup-users-title-tab" style="margin:0; color:#333;">Users</h4>
 
-                <div style="overflow-x:auto;">
+                <div class="setup-users-table-wrap" style="overflow-x:auto;">
                     <table id="setupUsersTable">
                         <thead>
                             <tr>
@@ -594,7 +619,6 @@ def get_setup_script():
             }
 
             body.innerHTML = users.map((user, idx) => {
-                    const rowBg = idx % 2 === 0 ? '#f2f0ef' : '#ffffff';
                     const userId = Number(user.id || 0);
                     const roleLocked = !!user.role_locked;
                     const rowWeight = roleLocked && setupIsArchitect ? '800' : '400';
@@ -606,32 +630,32 @@ def get_setup_script():
                     const lastText = setupEscape(user.last_name || '');
                     const emailText = setupEscape(user.email || '');
                     const firstCell = (setupEditMode && !roleLocked)
-                        ? `<input class="setup-user-first" data-user-id="${userId}" value="${firstText}" style="width:100%; padding:8px; font-size:24px;" />`
-                        : `<span style="font-size:24px; color:#111; font-weight:${rowWeight};">${firstText}</span>`;
+                        ? `<input class="setup-user-first" data-user-id="${userId}" value="${firstText}" style="width:100%; padding:8px; font-size:14px; border:1px solid #ddd; border-radius:4px;" />`
+                        : `<span style="font-size:14px; color:#111; font-weight:${rowWeight};">${firstText}</span>`;
                     const lastCell = (setupEditMode && !roleLocked)
-                        ? `<input class="setup-user-last" data-user-id="${userId}" value="${lastText}" style="width:100%; padding:8px; font-size:24px;" />`
-                        : `<span style="font-size:24px; color:#111; font-weight:${rowWeight};">${lastText}</span>`;
+                        ? `<input class="setup-user-last" data-user-id="${userId}" value="${lastText}" style="width:100%; padding:8px; font-size:14px; border:1px solid #ddd; border-radius:4px;" />`
+                        : `<span style="font-size:14px; color:#111; font-weight:${rowWeight};">${lastText}</span>`;
                     const emailCell = (setupEditMode && !roleLocked)
-                        ? `<input class="setup-user-email" data-user-id="${userId}" value="${emailText}" style="width:100%; padding:8px; font-size:24px;" />`
-                        : `<span style="font-size:24px; color:#111; font-weight:${rowWeight};">${emailText}</span>`;
+                        ? `<input class="setup-user-email" data-user-id="${userId}" value="${emailText}" style="width:100%; padding:8px; font-size:14px; border:1px solid #ddd; border-radius:4px;" />`
+                        : `<span style="font-size:14px; color:#111; font-weight:${rowWeight};">${emailText}</span>`;
                     const roleCell = (setupEditMode && !roleLocked)
-                        ? `<select class="setup-user-role" data-user-id="${userId}" style="width:100%; padding:8px; font-size:24px;">${roleOptions}</select>`
-                        : `<span style="font-size:24px; color:#111; font-weight:${rowWeight};">${roleText}</span>`;
+                        ? `<select class="setup-user-role" data-user-id="${userId}" style="width:100%; padding:8px; font-size:14px; border:1px solid #ddd; border-radius:4px;">${roleOptions}</select>`
+                        : `<span style="font-size:14px; color:#111; font-weight:${rowWeight};">${roleText}</span>`;
                     return `
-                        <tr>
-                            <td style="padding:12px; border-bottom:1px solid #eee; background:${rowBg}; text-align:center;">
+                        <tr class="setup-users-main-row">
+                            <td style="padding:12px; border-bottom:1px solid rgba(0,0,0,0.06); background:#fff; text-align:center; min-height:48px; height:48px; vertical-align:middle;">
                                 <input type="checkbox" class="setup-user-select" data-user-id="${userId}" />
                             </td>
-                            <td style="padding:12px; border-bottom:1px solid #eee; background:${rowBg};">
+                            <td style="padding:12px; border-bottom:1px solid rgba(0,0,0,0.06); background:#fff; min-height:48px; height:48px; vertical-align:middle;">
                                 ${firstCell}
                             </td>
-                            <td style="padding:12px; border-bottom:1px solid #eee; background:${rowBg};">
+                            <td style="padding:12px; border-bottom:1px solid rgba(0,0,0,0.06); background:#fff; min-height:48px; height:48px; vertical-align:middle;">
                                 ${lastCell}
                             </td>
-                            <td style="padding:12px; border-bottom:1px solid #eee; background:${rowBg};">
+                            <td style="padding:12px; border-bottom:1px solid rgba(0,0,0,0.06); background:#fff; min-height:48px; height:48px; vertical-align:middle;">
                                 ${emailCell}
                             </td>
-                            <td style="padding:12px; border-bottom:1px solid #eee; background:${rowBg};">
+                            <td style="padding:12px; border-bottom:1px solid rgba(0,0,0,0.06); background:#fff; min-height:48px; height:48px; vertical-align:middle;">
                                 ${roleCell}
                             </td>
                         </tr>
