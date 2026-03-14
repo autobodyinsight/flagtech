@@ -1772,15 +1772,27 @@ def get_parts_script():
 
             let estimatorName = String(options?.estimatorName || '').trim();
             try {
-                const roResp = await fetch('/api/parts/ros', { credentials: 'include' });
-                const roData = await roResp.json();
-                const matchedRo = (Array.isArray(roData?.ros) ? roData.ros : []).find((item) => String(item?.ro || '').trim() === ro);
-                const apiEstimator = String(matchedRo?.estimator || '').trim();
-                if (apiEstimator && apiEstimator !== '—') {
-                    estimatorName = apiEstimator;
+                const snapshotResp = await fetch(`/api/ro-estimate?ro=${encodeURIComponent(ro)}`, { credentials: 'include' });
+                const snapshotData = await snapshotResp.json();
+                const snapshotEstimator = String(snapshotData?.estimate?.header?.estimator || '').trim();
+                if (snapshotEstimator && snapshotEstimator !== '—') {
+                    estimatorName = snapshotEstimator;
                 }
             } catch (error) {
                 // keep estimatorName fallback from options/table when API read fails
+            }
+            if (!estimatorName || estimatorName === '—') {
+                try {
+                    const roResp = await fetch('/api/parts/ros', { credentials: 'include' });
+                    const roData = await roResp.json();
+                    const matchedRo = (Array.isArray(roData?.ros) ? roData.ros : []).find((item) => String(item?.ro || '').trim() === ro);
+                    const apiEstimator = String(matchedRo?.estimator || '').trim();
+                    if (apiEstimator && apiEstimator !== '—') {
+                        estimatorName = apiEstimator;
+                    }
+                } catch (error) {
+                    // keep fallback chain
+                }
             }
             if (!estimatorName) {
                 estimatorName = partsGetRoEstimatorFromTable(ro);
