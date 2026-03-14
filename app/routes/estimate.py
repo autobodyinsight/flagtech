@@ -16,7 +16,7 @@ from psycopg2 import sql
 
 router = APIRouter()
 
-_ARCHITECT_EMAIL_SHA256 = "917f190f8d76d0c809735eb80cea65722f95098cbb972441ec301a6de54e2664"
+_ARCHITECT_EMAIL = "jorge@autobodyinsight.com"
 
 
 def _resolve_request_user_email(request: Request) -> str:
@@ -37,10 +37,7 @@ def _resolve_request_user_email(request: Request) -> str:
 
 def _is_architect_email(email: str) -> bool:
     normalized = str(email or "").strip().lower()
-    if not normalized:
-        return False
-    digest = hashlib.sha256(normalized.encode("utf-8")).hexdigest()
-    return digest == _ARCHITECT_EMAIL_SHA256
+    return bool(normalized) and normalized == _ARCHITECT_EMAIL
 
 
 def _build_cookie_secure_flag(request: Request) -> bool:
@@ -66,6 +63,212 @@ def _resolve_setup_scope_domain(request: Request, fallback_domain: str, requeste
     return str(fallback_domain or "").strip().lower()
 
 
+def _ensure_shops_table(cur) -> None:
+    cur.execute(
+        """
+        CREATE TABLE IF NOT EXISTS shops (
+            id SERIAL PRIMARY KEY,
+            domain VARCHAR(255) NOT NULL UNIQUE,
+            name VARCHAR(255),
+            address TEXT,
+            city VARCHAR(120),
+            state VARCHAR(120),
+            zip VARCHAR(20),
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+        """
+    )
+    cur.execute("ALTER TABLE shops ADD COLUMN IF NOT EXISTS domain VARCHAR(255)")
+    cur.execute("ALTER TABLE shops ADD COLUMN IF NOT EXISTS name VARCHAR(255)")
+    cur.execute("ALTER TABLE shops ADD COLUMN IF NOT EXISTS address TEXT")
+    cur.execute("ALTER TABLE shops ADD COLUMN IF NOT EXISTS city VARCHAR(120)")
+    cur.execute("ALTER TABLE shops ADD COLUMN IF NOT EXISTS state VARCHAR(120)")
+    cur.execute("ALTER TABLE shops ADD COLUMN IF NOT EXISTS zip VARCHAR(20)")
+    cur.execute("ALTER TABLE shops ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP")
+    cur.execute("ALTER TABLE shops ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP")
+    cur.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_shops_domain_unique ON shops(domain)")
+
+
+def _sync_shop_id_bindings(cur) -> None:
+    _ensure_shops_table(cur)
+    _ensure_shop_settings_table(cur)
+    _ensure_shop_users_table(cur)
+
+    cur.execute(
+        """
+        INSERT INTO shops (domain, name, address, city, state, zip, updated_at)
+        SELECT
+            ss.domain,
+            NULLIF(ss.shop_name, ''),
+            NULLIF(ss.address, ''),
+            NULLIF(ss.city, ''),
+            NULLIF(ss.state, ''),
+            NULLIF(ss.zip_code, ''),
+            CURRENT_TIMESTAMP
+        FROM shop_settings ss
+        WHERE COALESCE(ss.domain, '') <> ''
+        ON CONFLICT (domain)
+        DO UPDATE SET
+            name = COALESCE(NULLIF(EXCLUDED.name, ''), shops.name),
+            address = COALESCE(NULLIF(EXCLUDED.address, ''), shops.address),
+            city = COALESCE(NULLIF(EXCLUDED.city, ''), shops.city),
+            state = COALESCE(NULLIF(EXCLUDED.state, ''), shops.state),
+            zip = COALESCE(NULLIF(EXCLUDED.zip, ''), shops.zip),
+            updated_at = CURRENT_TIMESTAMP
+        """
+    )
+
+    cur.execute(
+        """
+        INSERT INTO shops (domain, updated_at)
+        SELECT DISTINCT su.domain, CURRENT_TIMESTAMP
+        FROM shop_users su
+        WHERE COALESCE(su.domain, '') <> ''
+        ON CONFLICT (domain) DO NOTHING
+        """
+    )
+
+    cur.execute(
+        """
+        UPDATE shop_settings ss
+        SET shop_id = s.id
+        FROM shops s
+        WHERE ss.shop_id IS DISTINCT FROM s.id
+          AND s.domain = ss.domain
+        """
+    )
+    cur.execute(
+        """
+        UPDATE shop_users su
+        SET shop_id = s.id
+        FROM shops s
+        WHERE su.shop_id IS DISTINCT FROM s.id
+          AND s.domain = su.domain
+        """
+    )
+
+
+def _ensure_shop_id_columns_for_domain_tables(cur) -> None:
+    _ensure_shops_table(cur)
+    cur.execute(
+        """
+                SELECT DISTINCT c.table_name
+                FROM information_schema.columns c
+                JOIN information_schema.tables t
+                    ON t.table_schema = c.table_schema
+                 AND t.table_name = c.table_name
+                WHERE c.table_schema = 'public'
+                    AND c.column_name = 'domain'
+                    AND t.table_type = 'BASE TABLE'
+        """
+    )
+    table_rows = cur.fetchall() or []
+    for row in table_rows:
+        table_name = str(row.get("table_name") or "").strip()
+        if not table_name:
+            continue
+        if table_name == "shops":
+            continue
+        cur.execute(sql.SQL("ALTER TABLE {} ADD COLUMN IF NOT EXISTS shop_id INTEGER").format(sql.Identifier(table_name)))
+        cur.execute(
+            sql.SQL(
+                """
+                UPDATE {table_name} t
+                SET shop_id = s.id
+                FROM shops s
+                WHERE t.shop_id IS NULL
+                  AND COALESCE(t.domain, '') <> ''
+                  AND s.domain = t.domain
+                """
+            ).format(table_name=sql.Identifier(table_name))
+        )
+        cur.execute(
+            sql.SQL("CREATE INDEX IF NOT EXISTS {} ON {}(shop_id)").format(
+                sql.Identifier(f"idx_{table_name}_shop_id"),
+                sql.Identifier(table_name),
+            )
+        )
+
+
+def _ensure_shop_id_sync_triggers(cur) -> None:
+    _ensure_shops_table(cur)
+    cur.execute(
+        """
+        CREATE OR REPLACE FUNCTION set_shop_scope_fields()
+        RETURNS TRIGGER AS $$
+        BEGIN
+            IF NEW.shop_id IS NULL AND NEW.domain IS NOT NULL THEN
+                SELECT id INTO NEW.shop_id FROM shops WHERE domain = NEW.domain LIMIT 1;
+            END IF;
+            IF (NEW.domain IS NULL OR NEW.domain = '') AND NEW.shop_id IS NOT NULL THEN
+                SELECT domain INTO NEW.domain FROM shops WHERE id = NEW.shop_id LIMIT 1;
+            END IF;
+            RETURN NEW;
+        END;
+        $$ LANGUAGE plpgsql;
+        """
+    )
+
+    cur.execute(
+        """
+                SELECT DISTINCT c.table_name
+                FROM information_schema.columns c
+                JOIN information_schema.tables t
+                    ON t.table_schema = c.table_schema
+                 AND t.table_name = c.table_name
+                WHERE c.table_schema = 'public'
+                    AND c.column_name = 'domain'
+                    AND t.table_type = 'BASE TABLE'
+        """
+    )
+    table_rows = cur.fetchall() or []
+    for row in table_rows:
+        table_name = str(row.get("table_name") or "").strip()
+        if not table_name or table_name == "shops":
+            continue
+        trigger_name = f"trg_{table_name}_shop_scope"
+        cur.execute(sql.SQL("DROP TRIGGER IF EXISTS {} ON {}").format(sql.Identifier(trigger_name), sql.Identifier(table_name)))
+        cur.execute(
+            sql.SQL(
+                """
+                CREATE TRIGGER {trigger_name}
+                BEFORE INSERT OR UPDATE ON {table_name}
+                FOR EACH ROW
+                EXECUTE FUNCTION set_shop_scope_fields()
+                """
+            ).format(
+                trigger_name=sql.Identifier(trigger_name),
+                table_name=sql.Identifier(table_name),
+            )
+        )
+
+
+def _resolve_request_shop_id(request: Request, cur, domain: str | None = None) -> int | None:
+    if _request_is_architect(request):
+        requested = str(request.query_params.get("shop_id") or request.headers.get("x-shop-id") or request.cookies.get("user_shop_id") or "").strip()
+        if requested.isdigit():
+            return int(requested)
+
+    domain_value = str(domain or get_user_domain(request) or "").strip().lower()
+    if not domain_value:
+        return None
+
+    _sync_shop_id_bindings(cur)
+    cur.execute("SELECT id FROM shops WHERE domain = %s LIMIT 1", (domain_value,))
+    row = cur.fetchone() or {}
+    try:
+        return int(row.get("id") or 0) or None
+    except Exception:
+        return None
+
+
+def _ensure_shop_isolation_infrastructure(cur) -> None:
+    _sync_shop_id_bindings(cur)
+    _ensure_shop_id_columns_for_domain_tables(cur)
+    _ensure_shop_id_sync_triggers(cur)
+
+
 @router.post("/auth/login")
 async def auth_login(request: Request):
     data = await request.json()
@@ -81,9 +284,10 @@ async def auth_login(request: Request):
     cur = conn.cursor()
     try:
         _ensure_shop_users_table(cur)
+        _ensure_shop_isolation_infrastructure(cur)
         cur.execute(
             """
-            SELECT id, first_name, last_name, email, role, domain
+            SELECT id, first_name, last_name, email, role, domain, shop_id
             FROM shop_users
             WHERE LOWER(email) = %s
               AND password_hash = %s
@@ -101,8 +305,9 @@ async def auth_login(request: Request):
         user_domain = str(row.get("domain") or "").strip().lower()
         first_name = str(row.get("first_name") or "").strip()
         last_name = str(row.get("last_name") or "").strip()
+        user_shop_id = int(row.get("shop_id") or 0)
 
-        if not user_email or not user_domain:
+        if not user_email or not user_domain or not user_shop_id:
             return JSONResponse(status_code=401, content={"error": "Invalid user record"})
 
         secure = _build_cookie_secure_flag(request)
@@ -110,10 +315,12 @@ async def auth_login(request: Request):
             content={
                 "status": "ok",
                 "user": {
+                    "id": int(row.get("id") or 0),
                     "email": user_email,
                     "first_name": first_name,
                     "last_name": last_name,
                     "domain": user_domain,
+                    "shop_id": user_shop_id,
                 },
             }
         )
@@ -135,6 +342,15 @@ async def auth_login(request: Request):
             max_age=60 * 60 * 12,
             path="/",
         )
+        response.set_cookie(
+            key="user_shop_id",
+            value=str(user_shop_id),
+            httponly=True,
+            secure=secure,
+            samesite="lax",
+            max_age=60 * 60 * 12,
+            path="/",
+        )
         return response
     finally:
         cur.close()
@@ -146,6 +362,7 @@ async def auth_logout(request: Request):
     response = JSONResponse(content={"status": "ok"})
     response.delete_cookie("user_email", path="/", secure=secure, samesite="lax")
     response.delete_cookie("user_domain", path="/", secure=secure, samesite="lax")
+    response.delete_cookie("user_shop_id", path="/", secure=secure, samesite="lax")
     return response
 
 
@@ -156,11 +373,37 @@ async def auth_session(request: Request):
     if not email or not domain:
         return JSONResponse(status_code=401, content={"authenticated": False})
 
+    shop_id_cookie = str(request.cookies.get("user_shop_id") or "").strip()
+    shop_id = int(shop_id_cookie) if shop_id_cookie.isdigit() else None
+    if not shop_id:
+        conn = get_conn()
+        cur = conn.cursor()
+        try:
+            _ensure_shop_users_table(cur)
+            _ensure_shop_isolation_infrastructure(cur)
+            cur.execute(
+                """
+                SELECT shop_id
+                FROM shop_users
+                WHERE domain = %s
+                  AND LOWER(email) = %s
+                  AND active = TRUE
+                ORDER BY created_at DESC, id DESC
+                LIMIT 1
+                """,
+                (str(domain).strip().lower(), str(email).strip().lower()),
+            )
+            row = cur.fetchone() or {}
+            shop_id = int(row.get("shop_id") or 0) or None
+        finally:
+            cur.close()
+
     return {
         "authenticated": True,
         "user": {
             "email": email,
             "domain": domain,
+            "shop_id": shop_id,
             "access_level": _resolve_internal_access_level(request),
         },
     }
@@ -476,11 +719,13 @@ def _ensure_parts_vendors_table(cur) -> None:
 
 
 def _ensure_shop_settings_table(cur) -> None:
+    _ensure_shops_table(cur)
     cur.execute(
         """
         CREATE TABLE IF NOT EXISTS shop_settings (
             id SERIAL PRIMARY KEY,
             domain VARCHAR(255) NOT NULL,
+            shop_id INTEGER,
             shop_name VARCHAR(255),
             address TEXT,
             city VARCHAR(120),
@@ -492,6 +737,7 @@ def _ensure_shop_settings_table(cur) -> None:
         )
         """
     )
+    cur.execute("ALTER TABLE shop_settings ADD COLUMN IF NOT EXISTS shop_id INTEGER")
     cur.execute("ALTER TABLE shop_settings ADD COLUMN IF NOT EXISTS shop_name VARCHAR(255)")
     cur.execute("ALTER TABLE shop_settings ADD COLUMN IF NOT EXISTS address TEXT")
     cur.execute("ALTER TABLE shop_settings ADD COLUMN IF NOT EXISTS city VARCHAR(120)")
@@ -501,9 +747,11 @@ def _ensure_shop_settings_table(cur) -> None:
     cur.execute("ALTER TABLE shop_settings ADD COLUMN IF NOT EXISTS email VARCHAR(255)")
     cur.execute("ALTER TABLE shop_settings ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP")
     cur.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_shop_settings_domain_unique ON shop_settings(domain)")
+    cur.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_shop_settings_shop_id_unique ON shop_settings(shop_id)")
 
 
 def _ensure_shop_users_table(cur) -> None:
+    _ensure_shops_table(cur)
     cur.execute(
         """
         CREATE TABLE IF NOT EXISTS shop_users (
@@ -514,6 +762,7 @@ def _ensure_shop_users_table(cur) -> None:
             role VARCHAR(64) NOT NULL,
             password_hash VARCHAR(255) NOT NULL,
             domain VARCHAR(255) NOT NULL,
+            shop_id INTEGER,
             active BOOLEAN DEFAULT TRUE,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
@@ -525,10 +774,13 @@ def _ensure_shop_users_table(cur) -> None:
     cur.execute("ALTER TABLE shop_users ADD COLUMN IF NOT EXISTS role VARCHAR(64)")
     cur.execute("ALTER TABLE shop_users ADD COLUMN IF NOT EXISTS password_hash VARCHAR(255)")
     cur.execute("ALTER TABLE shop_users ADD COLUMN IF NOT EXISTS domain VARCHAR(255)")
+    cur.execute("ALTER TABLE shop_users ADD COLUMN IF NOT EXISTS shop_id INTEGER")
     cur.execute("ALTER TABLE shop_users ADD COLUMN IF NOT EXISTS active BOOLEAN DEFAULT TRUE")
     cur.execute("ALTER TABLE shop_users ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP")
     cur.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_shop_users_domain_email_unique ON shop_users(domain, email)")
+    cur.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_shop_users_shop_id_email_unique ON shop_users(shop_id, email)")
     cur.execute("CREATE INDEX IF NOT EXISTS idx_shop_users_domain_active ON shop_users(domain, active)")
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_shop_users_shop_id_active ON shop_users(shop_id, active)")
 
 
 def _ensure_chat_messages_table(cur) -> None:
@@ -569,7 +821,7 @@ def _resolve_current_user_row(request: Request, cur, domain: str) -> dict | None
     _ensure_shop_users_table(cur)
     cur.execute(
         """
-        SELECT id, first_name, last_name, email
+                SELECT id, first_name, last_name, email, shop_id
         FROM shop_users
         WHERE domain = %s
           AND LOWER(email) = %s
@@ -1889,9 +2141,10 @@ async def get_setup_shop(request: Request):
     cur = conn.cursor()
     try:
         _ensure_shop_settings_table(cur)
+        _ensure_shop_isolation_infrastructure(cur)
         cur.execute(
             """
-            SELECT shop_name, address, city, state, zip_code, phone, email
+            SELECT shop_id, shop_name, address, city, state, zip_code, phone, email
             FROM shop_settings
             WHERE domain = %s
             LIMIT 1
@@ -1901,6 +2154,7 @@ async def get_setup_shop(request: Request):
         row = cur.fetchone() or {}
         return {
             "shop": {
+                "shop_id": int(row.get("shop_id") or 0) or None,
                 "shop_name": str(row.get("shop_name") or "").strip(),
                 "address": str(row.get("address") or "").strip(),
                 "city": str(row.get("city") or "").strip(),
@@ -1930,16 +2184,26 @@ async def save_setup_shop(request: Request):
     phone = str(data.get("phone") or "").strip()
     email = str(data.get("email") or "").strip()
 
+    if not shop_name or not address or not city or not state or not zip_code:
+        return JSONResponse(status_code=400, content={"error": "shop_name, address, city, state, and zip_code are required"})
+
     conn = get_conn()
     cur = conn.cursor()
     try:
         _ensure_shop_settings_table(cur)
+        _ensure_shop_isolation_infrastructure(cur)
+        cur.execute("SELECT id FROM shops WHERE domain = %s LIMIT 1", (selected_domain,))
+        shop_row = cur.fetchone() or {}
+        selected_shop_id = int(shop_row.get("id") or 0)
+        if not selected_shop_id:
+            return JSONResponse(status_code=400, content={"error": "Unable to resolve shop scope"})
         cur.execute(
             """
-            INSERT INTO shop_settings (domain, shop_name, address, city, state, zip_code, phone, email, updated_at)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, CURRENT_TIMESTAMP)
+            INSERT INTO shop_settings (domain, shop_id, shop_name, address, city, state, zip_code, phone, email, updated_at)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, CURRENT_TIMESTAMP)
             ON CONFLICT (domain)
             DO UPDATE SET
+                shop_id = EXCLUDED.shop_id,
                 shop_name = EXCLUDED.shop_name,
                 address = EXCLUDED.address,
                 city = EXCLUDED.city,
@@ -1951,6 +2215,7 @@ async def save_setup_shop(request: Request):
             """,
             (
                 selected_domain,
+                selected_shop_id,
                 shop_name or None,
                 address or None,
                 city or None,
@@ -1959,6 +2224,19 @@ async def save_setup_shop(request: Request):
                 phone or None,
                 email or None,
             ),
+        )
+        cur.execute(
+            """
+            UPDATE shops
+            SET name = %s,
+                address = %s,
+                city = %s,
+                state = %s,
+                zip = %s,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE id = %s
+            """,
+            (shop_name or None, address or None, city or None, state or None, zip_code or None, selected_shop_id),
         )
         conn.commit()
         return {"status": "ok"}
@@ -1972,9 +2250,17 @@ async def get_setup_context(request: Request):
     if not domain:
         return JSONResponse(status_code=401, content={"error": "Not authenticated"})
 
+    conn = get_conn()
+    cur = conn.cursor()
+    try:
+        shop_id = _resolve_request_shop_id(request, cur, domain)
+    finally:
+        cur.close()
+
     return {
         "is_architect": _request_is_architect(request),
         "default_domain": str(domain or "").strip().lower(),
+        "default_shop_id": shop_id,
     }
 
 
@@ -2003,21 +2289,26 @@ async def chat_send(request: Request):
     try:
         _ensure_shop_users_table(cur)
         _ensure_chat_messages_table(cur)
+        _ensure_shop_isolation_infrastructure(cur)
 
         sender = _resolve_current_user_row(request, cur, domain)
         if not sender:
             return JSONResponse(status_code=401, content={"error": "Not authenticated"})
+        sender_shop_id = int(sender.get("shop_id") or 0)
+        if not sender_shop_id:
+            return JSONResponse(status_code=403, content={"error": "Shop scope not resolved"})
 
         cur.execute(
             """
             SELECT id
             FROM shop_users
             WHERE id = %s
+              AND shop_id = %s
               AND domain = %s
               AND active = TRUE
             LIMIT 1
             """,
-            (recipient_user_id, domain),
+            (recipient_user_id, sender_shop_id, domain),
         )
         recipient = cur.fetchone() or {}
         if not recipient:
@@ -2025,11 +2316,11 @@ async def chat_send(request: Request):
 
         cur.execute(
             """
-            INSERT INTO chat_messages (domain, sender_user_id, recipient_user_id, kind, body)
-            VALUES (%s, %s, %s, %s, %s)
+            INSERT INTO chat_messages (domain, shop_id, sender_user_id, recipient_user_id, kind, body)
+            VALUES (%s, %s, %s, %s, %s, %s)
             RETURNING id, created_at
             """,
-            (domain, int(sender.get("id") or 0), recipient_user_id, kind, body),
+            (domain, sender_shop_id, int(sender.get("id") or 0), recipient_user_id, kind, body),
         )
         row = cur.fetchone() or {}
         conn.commit()
@@ -2062,11 +2353,15 @@ async def chat_messages(request: Request):
     try:
         _ensure_shop_users_table(cur)
         _ensure_chat_messages_table(cur)
+        _ensure_shop_isolation_infrastructure(cur)
 
         current_user = _resolve_current_user_row(request, cur, domain)
         if not current_user:
             return JSONResponse(status_code=401, content={"error": "Not authenticated"})
         current_user_id = int(current_user.get("id") or 0)
+        current_shop_id = int(current_user.get("shop_id") or 0)
+        if not current_shop_id:
+            return JSONResponse(status_code=403, content={"error": "Shop scope not resolved"})
 
         cur.execute(
             """
@@ -2091,11 +2386,12 @@ async def chat_messages(request: Request):
                 ON ru.id = m.recipient_user_id
                AND ru.domain = m.domain
             WHERE m.domain = %s
+                            AND m.shop_id = %s
               AND (m.sender_user_id = %s OR m.recipient_user_id = %s)
             ORDER BY m.created_at ASC, m.id ASC
             LIMIT 3000
             """,
-            (domain, current_user_id, current_user_id),
+                        (domain, current_shop_id, current_user_id, current_user_id),
         )
         rows = cur.fetchall() or []
 
@@ -2141,21 +2437,27 @@ async def chat_mark_read(request: Request):
     cur = conn.cursor()
     try:
         _ensure_chat_messages_table(cur)
+                _ensure_shop_users_table(cur)
+                _ensure_shop_isolation_infrastructure(cur)
         current_user = _resolve_current_user_row(request, cur, domain)
         if not current_user:
             return JSONResponse(status_code=401, content={"error": "Not authenticated"})
         current_user_id = int(current_user.get("id") or 0)
+                current_shop_id = int(current_user.get("shop_id") or 0)
+                if not current_shop_id:
+                        return JSONResponse(status_code=403, content={"error": "Shop scope not resolved"})
 
         cur.execute(
             """
             UPDATE chat_messages
             SET read_at = CURRENT_TIMESTAMP
             WHERE domain = %s
+                            AND shop_id = %s
               AND recipient_user_id = %s
               AND sender_user_id = %s
               AND read_at IS NULL
             """,
-            (domain, current_user_id, with_user_id),
+                        (domain, current_shop_id, current_user_id, with_user_id),
         )
         updated = int(cur.rowcount or 0)
         conn.commit()
@@ -2180,10 +2482,15 @@ async def chat_complete_task(request: Request):
     cur = conn.cursor()
     try:
         _ensure_chat_messages_table(cur)
+                _ensure_shop_users_table(cur)
+                _ensure_shop_isolation_infrastructure(cur)
         current_user = _resolve_current_user_row(request, cur, domain)
         if not current_user:
             return JSONResponse(status_code=401, content={"error": "Not authenticated"})
         current_user_id = int(current_user.get("id") or 0)
+                current_shop_id = int(current_user.get("shop_id") or 0)
+                if not current_shop_id:
+                        return JSONResponse(status_code=403, content={"error": "Shop scope not resolved"})
 
         cur.execute(
             """
@@ -2192,10 +2499,11 @@ async def chat_complete_task(request: Request):
                 read_at = COALESCE(read_at, CURRENT_TIMESTAMP)
             WHERE id = %s
               AND domain = %s
+                            AND shop_id = %s
               AND recipient_user_id = %s
               AND kind = 'task'
             """,
-            (task_id, domain, current_user_id),
+                        (task_id, domain, current_shop_id, current_user_id),
         )
         updated = int(cur.rowcount or 0)
         conn.commit()
@@ -2219,6 +2527,7 @@ async def list_setup_shops(request: Request):
     try:
         _ensure_shop_settings_table(cur)
         _ensure_shop_users_table(cur)
+        _ensure_shop_isolation_infrastructure(cur)
         cur.execute(
             """
             WITH all_domains AS (
@@ -2227,17 +2536,19 @@ async def list_setup_shops(request: Request):
                 SELECT DISTINCT domain FROM shop_users
             )
             SELECT
+                sh.id AS shop_id,
                 d.domain,
-                s.shop_name,
-                s.address,
-                s.city,
-                s.state,
-                s.zip_code,
+                COALESCE(s.shop_name, sh.name) AS shop_name,
+                COALESCE(s.address, sh.address) AS address,
+                COALESCE(s.city, sh.city) AS city,
+                COALESCE(s.state, sh.state) AS state,
+                COALESCE(s.zip_code, sh.zip) AS zip_code,
                 s.phone,
                 s.email
             FROM all_domains d
+            LEFT JOIN shops sh ON sh.domain = d.domain
             LEFT JOIN shop_settings s ON s.domain = d.domain
-            ORDER BY LOWER(COALESCE(NULLIF(s.shop_name, ''), d.domain)) ASC
+            ORDER BY LOWER(COALESCE(NULLIF(s.shop_name, ''), NULLIF(sh.name, ''), d.domain)) ASC
             """
         )
         rows = cur.fetchall() or []
@@ -2245,6 +2556,7 @@ async def list_setup_shops(request: Request):
         for row in rows:
             shops.append(
                 {
+                    "id": int(row.get("shop_id") or 0) or None,
                     "domain": str(row.get("domain") or "").strip().lower(),
                     "shop_name": str(row.get("shop_name") or "").strip(),
                     "address": str(row.get("address") or "").strip(),
@@ -2291,6 +2603,12 @@ async def update_setup_user(request: Request):
     cur = conn.cursor()
     try:
         _ensure_shop_users_table(cur)
+        _ensure_shop_isolation_infrastructure(cur)
+        cur.execute("SELECT id FROM shops WHERE domain = %s LIMIT 1", (selected_domain,))
+        shop_row = cur.fetchone() or {}
+        selected_shop_id = int(shop_row.get("id") or 0)
+        if not selected_shop_id:
+            return JSONResponse(status_code=400, content={"error": "Unable to resolve shop scope"})
         cur.execute(
             """
             UPDATE shop_users
@@ -2299,11 +2617,12 @@ async def update_setup_user(request: Request):
                 email = %s,
                 role = %s
             WHERE id = %s
+              AND shop_id = %s
               AND domain = %s
               AND active = TRUE
-            RETURNING id, first_name, last_name, email, role, created_at
+            RETURNING id, first_name, last_name, email, role, shop_id, created_at
             """,
-                        (first_name, last_name, email, role, user_id, selected_domain),
+            (first_name, last_name, email, role, user_id, selected_shop_id, selected_domain),
         )
         row = cur.fetchone() or {}
         conn.commit()
@@ -2320,6 +2639,7 @@ async def update_setup_user(request: Request):
                 "last_name": str(row.get("last_name") or "").strip(),
                 "email": str(row.get("email") or "").strip(),
                 "role": str(row.get("role") or "").strip(),
+                "shop_id": int(row.get("shop_id") or 0) or None,
                 "created_at": created_at.isoformat() if isinstance(created_at, datetime) else None,
             },
         }
@@ -2361,15 +2681,22 @@ async def reset_setup_user_password(request: Request):
     cur = conn.cursor()
     try:
         _ensure_shop_users_table(cur)
+        _ensure_shop_isolation_infrastructure(cur)
+        cur.execute("SELECT id FROM shops WHERE domain = %s LIMIT 1", (selected_domain,))
+        shop_row = cur.fetchone() or {}
+        selected_shop_id = int(shop_row.get("id") or 0)
+        if not selected_shop_id:
+            return JSONResponse(status_code=400, content={"error": "Unable to resolve shop scope"})
         cur.execute(
             """
             UPDATE shop_users
             SET password_hash = %s
             WHERE domain = %s
+              AND shop_id = %s
               AND active = TRUE
               AND id = ANY(%s)
             """,
-                        (password_hash, selected_domain, user_ids),
+            (password_hash, selected_domain, selected_shop_id, user_ids),
         )
         updated_count = int(cur.rowcount or 0)
         conn.commit()
@@ -2392,15 +2719,22 @@ async def list_setup_users(request: Request):
     cur = conn.cursor()
     try:
         _ensure_shop_users_table(cur)
+        _ensure_shop_isolation_infrastructure(cur)
+        cur.execute("SELECT id FROM shops WHERE domain = %s LIMIT 1", (selected_domain,))
+        shop_row = cur.fetchone() or {}
+        selected_shop_id = int(shop_row.get("id") or 0)
+        if not selected_shop_id and not requester_is_architect:
+            return JSONResponse(status_code=403, content={"error": "Shop scope not resolved", "users": []})
         cur.execute(
             """
-            SELECT id, first_name, last_name, email, role, created_at
+            SELECT id, first_name, last_name, email, role, shop_id, created_at
             FROM shop_users
             WHERE domain = %s
+              AND shop_id = %s
               AND active = TRUE
             ORDER BY created_at DESC, id DESC
             """,
-                        (selected_domain,),
+            (selected_domain, selected_shop_id),
         )
         rows = cur.fetchall() or []
         users = []
@@ -2411,7 +2745,6 @@ async def list_setup_users(request: Request):
             display_role = str(row.get("role") or "").strip()
             role_locked = False
             if requester_is_architect and _is_architect_email(requester_email) and row_is_architect_user:
-                display_role = "ARCHITECT"
                 role_locked = True
             users.append(
                 {
@@ -2420,6 +2753,7 @@ async def list_setup_users(request: Request):
                     "last_name": str(row.get("last_name") or "").strip(),
                     "email": str(row.get("email") or "").strip(),
                     "role": display_role,
+                    "shop_id": int(row.get("shop_id") or 0) or None,
                     "role_locked": role_locked,
                     "created_at": created_at.isoformat() if isinstance(created_at, datetime) else None,
                 }
@@ -2457,20 +2791,27 @@ async def create_setup_user(request: Request):
     cur = conn.cursor()
     try:
         _ensure_shop_users_table(cur)
+        _ensure_shop_isolation_infrastructure(cur)
+        cur.execute("SELECT id FROM shops WHERE domain = %s LIMIT 1", (selected_domain,))
+        shop_row = cur.fetchone() or {}
+        selected_shop_id = int(shop_row.get("id") or 0)
+        if not selected_shop_id:
+            return JSONResponse(status_code=400, content={"error": "Unable to resolve shop scope"})
         cur.execute(
             """
-            INSERT INTO shop_users (first_name, last_name, email, role, password_hash, domain, active)
-            VALUES (%s, %s, %s, %s, %s, %s, TRUE)
+            INSERT INTO shop_users (first_name, last_name, email, role, password_hash, domain, shop_id, active)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, TRUE)
             ON CONFLICT (domain, email)
             DO UPDATE SET
                 first_name = EXCLUDED.first_name,
                 last_name = EXCLUDED.last_name,
                 role = EXCLUDED.role,
+                shop_id = EXCLUDED.shop_id,
                 password_hash = EXCLUDED.password_hash,
                 active = TRUE
-            RETURNING id, first_name, last_name, email, role, created_at
+            RETURNING id, first_name, last_name, email, role, shop_id, created_at
             """,
-            (first_name, last_name, email, role, password_hash, selected_domain),
+            (first_name, last_name, email, role, password_hash, selected_domain, selected_shop_id),
         )
         row = cur.fetchone() or {}
         conn.commit()
@@ -2484,6 +2825,7 @@ async def create_setup_user(request: Request):
                 "last_name": str(row.get("last_name") or "").strip(),
                 "email": str(row.get("email") or "").strip(),
                 "role": str(row.get("role") or "").strip(),
+                "shop_id": int(row.get("shop_id") or 0) or None,
                 "created_at": created_at.isoformat() if isinstance(created_at, datetime) else None,
             },
         }
