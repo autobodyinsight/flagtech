@@ -179,6 +179,8 @@ def get_dashboard_screen_html():
                             <button onclick="printRoList('insurance')" style="padding:10px 12px; background:#f5f5f5; color:#333; border:1px solid #ddd; border-radius:4px; cursor:pointer; text-align:left; font-size:14px;">Insurance</button>
                             <button onclick="printRoList('in_date')" style="padding:10px 12px; background:#f5f5f5; color:#333; border:1px solid #ddd; border-radius:4px; cursor:pointer; text-align:left; font-size:14px;">In date</button>
                             <button onclick="printRoList('ecd_date')" style="padding:10px 12px; background:#f5f5f5; color:#333; border:1px solid #ddd; border-radius:4px; cursor:pointer; text-align:left; font-size:14px;">ECD</button>
+                            <button onclick="printRoList('tech')" style="padding:10px 12px; background:#f5f5f5; color:#333; border:1px solid #ddd; border-radius:4px; cursor:pointer; text-align:left; font-size:14px;">Techs</button>
+                            <button onclick="printRoList('phase')" style="padding:10px 12px; background:#f5f5f5; color:#333; border:1px solid #ddd; border-radius:4px; cursor:pointer; text-align:left; font-size:14px;">Roadmap</button>
                         </div>
                     </div>
                 </div>
@@ -446,7 +448,7 @@ def get_dashboard_screen_html():
                         <button id="roSidebarBtn-payments" class="ro-sidebar-btn" data-view="payments" title="Payments" style="background:none; border:none; padding:0; cursor:pointer;">${icons.credit}</button>
                         <div style="position:relative; display:flex; justify-content:center; width:100%;">
                             <button id="roPrintTrigger" class="ro-sidebar-btn ro-sidebar-action mini-popup-trigger" type="button" aria-label="Print" title="Print" style="background:none; border:none; padding:0; cursor:pointer;">${icons.print}</button>
-                            <div id="roPrintOptionsModal" class="mini-popup-panel ro-print-options-modal" style="display:none; left:calc(100% + 10px); right:auto; top:0;">
+                            <div id="roPrintOptionsModal" class="mini-popup-panel" style="display:none; left:calc(100% + 10px); right:auto; top:0;">
                                 <h2 style="margin:0 0 14px 0; color:#333; font-size:18px;">Print RO</h2>
                                 <p style="margin:0 0 12px 0; font-weight:bold; color:#555;">Print by:</p>
                                 <div style="display:flex; flex-direction:column; gap:8px;">
@@ -463,18 +465,6 @@ def get_dashboard_screen_html():
                                     </select>
                                     <button id="roPrintServiceOrderGo" type="button" style="padding:10px 12px; width:100%; background:#d32f2f; color:#fff; border:none; border-radius:4px; cursor:pointer; font-size:14px; font-weight:700;">Print Service Order</button>
                                 </div>
-                                <div id="roPrintPreviewWrap" style="display:none; margin-top:14px; padding-top:14px; border-top:1px solid #eee;">
-                                    <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:10px;">
-                                        <div id="roPrintPreviewTitle" style="font-size:15px; font-weight:800; color:#222;">Preview</div>
-                                        <div id="roPrintPreviewStatus" style="font-size:12px; color:#777;">Preview updates here before printing.</div>
-                                    </div>
-                                    <div id="roPrintPreviewBody" style="background:#d9d9d9; border:1px solid #cfcfcf; border-radius:8px; padding:18px; min-height:220px; max-height:56vh; overflow:auto;"></div>
-                                    <div id="roPrintPreviewActions" style="display:none; margin-top:12px; align-items:center; justify-content:flex-end; gap:10px;">
-                                        <button id="roPrintPreviewClear" type="button" style="padding:10px 14px; background:#f5f5f5; color:#333; border:1px solid #ddd; border-radius:4px; cursor:pointer; font-size:14px;">Clear Preview</button>
-                                        <button id="roPrintPreviewGo" type="button" style="padding:10px 16px; background:#d32f2f; color:#fff; border:none; border-radius:4px; cursor:pointer; font-size:14px; font-weight:700;">Print</button>
-                                    </div>
-                                </div>
-                                <iframe id="roPrintFrame" title="RO Print Frame" style="position:absolute; width:0; height:0; border:0; opacity:0; pointer-events:none; left:-9999px; top:-9999px;"></iframe>
                             </div>
                         </div>
                         <button id="roCloseButton" class="ro-sidebar-btn ro-sidebar-action" type="button" aria-label="Close RO" title="Close RO" style="background:none; border:none; padding:0; cursor:pointer;">${icons.close}</button>
@@ -561,63 +551,6 @@ def get_dashboard_screen_html():
                     transform: translateY(0);
                     pointer-events: auto;
                 }
-                .ro-print-options-modal {
-                    width: min(760px, calc(100vw - 140px));
-                    max-width: min(760px, calc(100vw - 140px));
-                    max-height: calc(100vh - 48px);
-                    overflow-y: auto;
-                }
-                .ro-print-preview-sheet {
-                    width: 8.5in;
-                    min-height: 11in;
-                    margin: 0 auto;
-                    background: #fff;
-                    color: #222;
-                    padding: 0.5in;
-                    box-shadow: 0 10px 28px rgba(0,0,0,0.16);
-                    box-sizing: border-box;
-                    font-family: Arial, sans-serif;
-                }
-                .ro-print-preview-sheet .header {
-                    text-align: center;
-                    margin-bottom: 16px;
-                    border-bottom: 2px solid #b22222;
-                    padding-bottom: 8px;
-                }
-                .ro-print-preview-sheet .header h1 {
-                    margin: 0 0 6px 0;
-                    color: #b22222;
-                    font-size: 24px;
-                }
-                .ro-print-preview-sheet .header p {
-                    margin: 0;
-                    color: #666;
-                }
-                .ro-print-preview-sheet table {
-                    width: 100%;
-                    border-collapse: collapse;
-                    margin-top: 10px;
-                }
-                .ro-print-preview-sheet thead th {
-                    background: #3c4142;
-                    color: #fff;
-                    text-align: left;
-                    padding: 8px;
-                    font-size: 12px;
-                }
-                .ro-print-preview-sheet tbody td {
-                    padding: 8px;
-                    border-bottom: 1px solid #eee;
-                    font-size: 12px;
-                }
-                .ro-print-preview-sheet .num {
-                    text-align: right;
-                }
-                .ro-print-preview-sheet .line-break {
-                    height: 1px;
-                    background: #444;
-                    margin: 14px 0;
-                }
                 .ro-header-item { font-size:15px; line-height:1.25; min-width:0; }
                 .ro-header-label { color:#d32f2f; font-weight:700; margin-right:6px; white-space:nowrap; }
                 .ro-header-value { color:#fff; font-weight:600; word-break:break-word; }
@@ -693,8 +626,7 @@ def get_dashboard_screen_html():
                 techAssignLines: [],
                 techAssignManualLines: [],
                 techAssignNextManualId: 1,
-                roPrintTechOptions: [],
-                roPrintDocumentReady: false
+                roPrintTechOptions: []
             };
 
             function escapePopupHtml(value) {
@@ -902,18 +834,22 @@ def get_dashboard_screen_html():
                 panel.style.display = 'none';
                 const wrap = roWindowDoc.getElementById('roPrintServiceOrderWrap');
                 if (wrap) wrap.style.display = 'none';
-                roClearPrintPreview();
             }
 
-            function roBuildPrintDocument(title, bodyHtml) {
-                return `
+            function roOpenPrintWindow(title, bodyHtml, options = {}) {
+                const printWindow = window.open('', '_blank');
+                if (!printWindow) {
+                    alert('Unable to open print preview. Please allow pop-ups for this site.');
+                    return;
+                }
+                printWindow.document.write(`
                     <!DOCTYPE html>
                     <html>
                         <head>
                             <title>${escapePopupHtml(title)}</title>
                             <style>
                                 @media print { @page { margin: 0.5in; } body { margin: 0; } }
-                                body { font-family: Arial, sans-serif; color:#222; padding:20px; background:#fff; }
+                                body { font-family: Arial, sans-serif; color:#222; padding:20px; }
                                 .header { text-align:center; margin-bottom:16px; border-bottom:2px solid #b22222; padding-bottom:8px; }
                                 .header h1 { margin:0 0 6px 0; color:#b22222; font-size:24px; }
                                 .header p { margin:0; color:#666; }
@@ -926,85 +862,18 @@ def get_dashboard_screen_html():
                         </head>
                         <body>${bodyHtml}</body>
                     </html>
-                `;
-            }
-
-            function roClearPrintPreview() {
-                const previewWrap = roWindowDoc.getElementById('roPrintPreviewWrap');
-                const previewBody = roWindowDoc.getElementById('roPrintPreviewBody');
-                const previewTitle = roWindowDoc.getElementById('roPrintPreviewTitle');
-                const previewStatus = roWindowDoc.getElementById('roPrintPreviewStatus');
-                const previewActions = roWindowDoc.getElementById('roPrintPreviewActions');
-                const frame = roWindowDoc.getElementById('roPrintFrame');
-
-                if (previewWrap) previewWrap.style.display = 'none';
-                if (previewBody) previewBody.innerHTML = '';
-                if (previewTitle) previewTitle.textContent = 'Preview';
-                if (previewStatus) previewStatus.textContent = 'Preview updates here before printing.';
-                if (previewActions) previewActions.style.display = 'none';
-                if (frame && frame.contentWindow) {
-                    const frameDoc = frame.contentWindow.document;
-                    frameDoc.open();
-                    frameDoc.write('<!DOCTYPE html><html><head><title></title></head><body></body></html>');
-                    frameDoc.close();
-                }
-                popupState.roPrintDocumentReady = false;
-            }
-
-            function roSetPrintPreviewLoading(label) {
-                const previewWrap = roWindowDoc.getElementById('roPrintPreviewWrap');
-                const previewBody = roWindowDoc.getElementById('roPrintPreviewBody');
-                const previewTitle = roWindowDoc.getElementById('roPrintPreviewTitle');
-                const previewStatus = roWindowDoc.getElementById('roPrintPreviewStatus');
-                const previewActions = roWindowDoc.getElementById('roPrintPreviewActions');
-
-                if (previewWrap) previewWrap.style.display = 'block';
-                if (previewTitle) previewTitle.textContent = label;
-                if (previewStatus) previewStatus.textContent = 'Generating preview...';
-                if (previewBody) {
-                    previewBody.innerHTML = '<div style="display:flex; align-items:center; justify-content:center; min-height:180px; color:#666; font-weight:600;">Building print preview...</div>';
-                }
-                if (previewActions) previewActions.style.display = 'none';
-                popupState.roPrintDocumentReady = false;
-            }
-
-            function roOpenPrintWindow(title, bodyHtml) {
-                const previewWrap = roWindowDoc.getElementById('roPrintPreviewWrap');
-                const previewBody = roWindowDoc.getElementById('roPrintPreviewBody');
-                const previewTitle = roWindowDoc.getElementById('roPrintPreviewTitle');
-                const previewStatus = roWindowDoc.getElementById('roPrintPreviewStatus');
-                const previewActions = roWindowDoc.getElementById('roPrintPreviewActions');
-                const frame = roWindowDoc.getElementById('roPrintFrame');
-                if (!previewWrap || !previewBody || !previewTitle || !previewStatus || !previewActions || !frame || !frame.contentWindow) {
-                    alert('Unable to render print preview.');
+                `);
+                printWindow.document.close();
+                printWindow.focus();
+                if (options && options.immediatePrint) {
+                    printWindow.print();
                     return;
                 }
-
-                previewWrap.style.display = 'block';
-                previewTitle.textContent = title;
-                previewStatus.textContent = 'Preview the document below, then click Print.';
-                previewBody.innerHTML = `<div class="ro-print-preview-sheet">${bodyHtml}</div>`;
-                previewActions.style.display = 'flex';
-
-                const frameDoc = frame.contentWindow.document;
-                frameDoc.open();
-                frameDoc.write(roBuildPrintDocument(title, bodyHtml));
-                frameDoc.close();
-                popupState.roPrintDocumentReady = true;
-            }
-
-            function roPrintCurrentPreview() {
-                const frame = roWindowDoc.getElementById('roPrintFrame');
-                if (!frame || !frame.contentWindow || !popupState.roPrintDocumentReady) {
-                    alert('Generate a print preview first.');
-                    return;
-                }
-                frame.contentWindow.focus();
-                setTimeout(() => frame.contentWindow.print(), 60);
+                setTimeout(() => printWindow.print(), 250);
             }
 
             async function roPrintBill() {
-                roSetPrintPreviewLoading('Bill Preview');
+                roClosePrintOptionsModal();
                 try {
                     const res = await popupFetchJson(`/api/ro-estimate?ro=${encodeURIComponent(ro.ro)}`);
                     const estimate = res.estimate || {};
@@ -1095,7 +964,6 @@ def get_dashboard_screen_html():
                 const wrap = roWindowDoc.getElementById('roPrintServiceOrderWrap');
                 const selectEl = roWindowDoc.getElementById('roPrintTechSelect');
                 if (!wrap || !selectEl) return;
-                roClearPrintPreview();
                 wrap.style.display = 'block';
                 try {
                     const data = await popupFetchJson(`/api/ro-tech-lines?ro=${encodeURIComponent(ro.ro)}`);
@@ -1121,7 +989,7 @@ def get_dashboard_screen_html():
                 const selectEl = roWindowDoc.getElementById('roPrintTechSelect');
                 if (!selectEl) return;
                 const selectedValue = String(selectEl.value || 'all');
-                roSetPrintPreviewLoading('Service Order Preview');
+                roClosePrintOptionsModal();
 
                 try {
                     let targets = popupState.roPrintTechOptions || [];
@@ -1236,7 +1104,7 @@ def get_dashboard_screen_html():
             }
 
             async function roPrintParts() {
-                roSetPrintPreviewLoading('Parts Preview');
+                roClosePrintOptionsModal();
                 try {
                     const [linesRes, onOrderRes, arrivedRes, returnedRes, receivedRes] = await Promise.all([
                         popupFetchJson(`/api/parts/ro-lines?ro=${encodeURIComponent(ro.ro)}`),
@@ -1340,7 +1208,8 @@ def get_dashboard_screen_html():
                                 </thead>
                                 <tbody>${rowsHtml || '<tr><td colspan="11" style="text-align:center; color:#777;">No parts lines found.</td></tr>'}</tbody>
                             </table>
-                        `
+                        `,
+                        { immediatePrint: true }
                     );
                 } catch (error) {
                     console.error('Error printing parts:', error);
@@ -1349,7 +1218,7 @@ def get_dashboard_screen_html():
             }
 
             function roPrintServiceTag() {
-                roSetPrintPreviewLoading('Service Tag Preview');
+                roClosePrintOptionsModal();
                 const checkpoints = [
                     'Parts Verified',
                     'Bodywork Passed',
@@ -1398,7 +1267,7 @@ def get_dashboard_screen_html():
             }
 
             async function roPrintServiceCover() {
-                roSetPrintPreviewLoading('Service Cover Preview');
+                roClosePrintOptionsModal();
                 try {
                     const printData = await popupFetchJson(`/api/ro-print-data?ro=${encodeURIComponent(ro.ro)}`);
                     const inDateText = escapePopupHtml(popupFormatDate(printData?.in_date || ro.in_date));
@@ -1461,8 +1330,6 @@ def get_dashboard_screen_html():
                 const serviceTagBtn = roWindowDoc.getElementById('roPrintOptionServiceTag');
                 const serviceCoverBtn = roWindowDoc.getElementById('roPrintOptionServiceCover');
                 const serviceOrderGoBtn = roWindowDoc.getElementById('roPrintServiceOrderGo');
-                const previewPrintBtn = roWindowDoc.getElementById('roPrintPreviewGo');
-                const previewClearBtn = roWindowDoc.getElementById('roPrintPreviewClear');
 
                 if (trigger && panel) {
                     trigger.addEventListener('click', (event) => {
@@ -1476,8 +1343,6 @@ def get_dashboard_screen_html():
                 if (partsBtn) partsBtn.addEventListener('click', () => { roPrintParts(); });
                 if (serviceTagBtn) serviceTagBtn.addEventListener('click', () => { roPrintServiceTag(); });
                 if (serviceCoverBtn) serviceCoverBtn.addEventListener('click', () => { roPrintServiceCover(); });
-                if (previewPrintBtn) previewPrintBtn.addEventListener('click', () => { roPrintCurrentPreview(); });
-                if (previewClearBtn) previewClearBtn.addEventListener('click', () => { roClearPrintPreview(); });
 
                 roWindowDoc.addEventListener('click', (event) => {
                     if (!panel || !panel.classList.contains('open')) return;
@@ -4348,6 +4213,140 @@ def get_dashboard_screen_html():
                 toggleMiniPopup(panel);
             }
 
+            function getDashboardPrintGroupMeta(sortKey) {
+                const normalized = String(sortKey || 'ro').toLowerCase();
+                const meta = {
+                    ro: { heading: 'RO #', grouped: false },
+                    insurance: { heading: 'Insurance', grouped: true },
+                    in_date: { heading: 'In Date', grouped: true },
+                    ecd_date: { heading: 'ECD', grouped: true },
+                    tech: { heading: 'Techs', grouped: true },
+                    phase: { heading: 'Roadmap', grouped: true },
+                };
+                return meta[normalized] || meta.ro;
+            }
+
+            function getDashboardPrintGroupValue(ro, sortKey) {
+                const item = ro || {};
+                if (sortKey === 'in_date' || sortKey === 'ecd_date') {
+                    return String(item[sortKey] || '').trim();
+                }
+                if (sortKey === 'phase') {
+                    return String(formatPhaseDisplay(item.phase || '') || '').trim();
+                }
+                if (sortKey === 'tech') {
+                    return String(item.tech || '').trim();
+                }
+                if (sortKey === 'insurance') {
+                    return String(item.insurance || '').trim();
+                }
+                return String(item[sortKey] || '').trim();
+            }
+
+            function getDashboardPrintGroupLabel(ro, sortKey) {
+                const rawValue = getDashboardPrintGroupValue(ro, sortKey);
+                if (sortKey === 'in_date') {
+                    return rawValue ? formatShortDate(rawValue) : 'No In Date';
+                }
+                if (sortKey === 'ecd_date') {
+                    return rawValue ? formatShortDate(rawValue) : 'No ECD';
+                }
+                if (sortKey === 'tech') {
+                    return rawValue || 'Unassigned';
+                }
+                if (sortKey === 'phase') {
+                    return rawValue || 'No Roadmap';
+                }
+                if (sortKey === 'insurance') {
+                    return rawValue || 'No Insurance';
+                }
+                return rawValue || '-';
+            }
+
+            function compareDashboardPrintGroupKeys(leftKey, rightKey, sortKey) {
+                if (sortKey === 'in_date' || sortKey === 'ecd_date') {
+                    const leftDate = Date.parse(leftKey || '') || 0;
+                    const rightDate = Date.parse(rightKey || '') || 0;
+                    return leftDate - rightDate;
+                }
+                return String(leftKey || '').localeCompare(String(rightKey || ''), undefined, { numeric: true, sensitivity: 'base' });
+            }
+
+            function compareDashboardPrintRows(left, right) {
+                const leftRo = String(left?.ro || '');
+                const rightRo = String(right?.ro || '');
+                return leftRo.localeCompare(rightRo, undefined, { numeric: true, sensitivity: 'base' });
+            }
+
+            function buildDashboardPrintRows(rows) {
+                return rows.map((ro) => {
+                    const roNumber = escapeHtml(String(ro?.ro || '-'));
+                    const vehicle = escapeHtml(String(ro?.vehicle || '-'));
+                    const customer = escapeHtml(String(ro?.customer || '-'));
+                    const insurance = escapeHtml(String(ro?.insurance || '-'));
+                    const roadmap = escapeHtml(formatPhaseDisplay(ro?.phase || ''));
+                    const inDate = escapeHtml(formatShortDate(ro?.in_date || ''));
+                    const ecdDate = escapeHtml(formatShortDate(ro?.ecd_date || ''));
+                    const tech = escapeHtml(String(ro?.tech || 'Unassigned'));
+                    const hoursValue = Number(ro?.hours || 0);
+                    const totalValue = Number(ro?.total || 0);
+
+                    return `
+                        <tr class="dashboard-print-row">
+                            <td>${roNumber}</td>
+                            <td>${vehicle}</td>
+                            <td>${customer}</td>
+                            <td>${insurance}</td>
+                            <td>${roadmap}</td>
+                            <td>${tech}</td>
+                            <td class="center-cell">${inDate}</td>
+                            <td class="center-cell">${ecdDate}</td>
+                            <td class="num-cell">${hoursValue.toFixed(1)}</td>
+                            <td class="num-cell">$${totalValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                        </tr>
+                    `;
+                }).join('');
+            }
+
+            function buildDashboardPrintTable(rows) {
+                const rowsHtml = buildDashboardPrintRows(rows);
+                return `
+                    <div class="dashboard-print-table-wrap">
+                        <table class="dashboard-print-table">
+                            <thead>
+                                <tr class="dashboard-print-header-row">
+                                    <th>RO#</th>
+                                    <th>Vehicle</th>
+                                    <th>Customer</th>
+                                    <th>Insurance</th>
+                                    <th>Roadmap</th>
+                                    <th>Tech</th>
+                                    <th class="center-cell">In</th>
+                                    <th class="center-cell">ECD</th>
+                                    <th class="num-cell">HRS</th>
+                                    <th class="num-cell">Total</th>
+                                </tr>
+                            </thead>
+                            <tbody>${rowsHtml}</tbody>
+                        </table>
+                    </div>
+                `;
+            }
+
+            function buildDashboardPrintSection(title, rows) {
+                const label = escapeHtml(String(title || '-'));
+                const count = Array.isArray(rows) ? rows.length : 0;
+                return `
+                    <section class="dashboard-print-section">
+                        <div class="dashboard-print-section-header">
+                            <div class="dashboard-print-section-title">${label}</div>
+                            <div class="dashboard-print-section-count">${count} RO${count === 1 ? '' : 's'}</div>
+                        </div>
+                        ${buildDashboardPrintTable(rows)}
+                    </section>
+                `;
+            }
+
             function printRoList(sortBy) {
                 const panel = document.getElementById('printOptionsModal');
                 if (panel) {
@@ -4361,54 +4360,30 @@ def get_dashboard_screen_html():
                 }
 
                 const sortKey = String(sortBy || 'ro').toLowerCase();
-                const sorted = [...source].sort((a, b) => {
-                    const left = a || {};
-                    const right = b || {};
+                const meta = getDashboardPrintGroupMeta(sortKey);
+                let bodyHtml = '';
 
-                    if (sortKey === 'in_date' || sortKey === 'ecd_date') {
-                        const leftDate = Date.parse(left[sortKey] || '') || 0;
-                        const rightDate = Date.parse(right[sortKey] || '') || 0;
-                        return leftDate - rightDate;
-                    }
+                if (meta.grouped) {
+                    const grouped = new Map();
+                    source.forEach((item) => {
+                        const key = getDashboardPrintGroupValue(item, sortKey);
+                        if (!grouped.has(key)) grouped.set(key, []);
+                        grouped.get(key).push(item);
+                    });
 
-                    const leftText = String(left[sortKey] || '').toLowerCase();
-                    const rightText = String(right[sortKey] || '').toLowerCase();
-                    return leftText.localeCompare(rightText, undefined, { numeric: true, sensitivity: 'base' });
-                });
+                    const orderedKeys = Array.from(grouped.keys()).sort((leftKey, rightKey) => {
+                        return compareDashboardPrintGroupKeys(leftKey, rightKey, sortKey);
+                    });
 
-                const headingMap = {
-                    ro: 'RO #',
-                    insurance: 'Insurance',
-                    in_date: 'In Date',
-                    ecd_date: 'ECD',
-                };
-                const heading = headingMap[sortKey] || 'RO #';
-
-                const rowsHtml = sorted.map((ro) => {
-                    const roNumber = escapeHtml(String(ro?.ro || '-'));
-                    const vehicle = escapeHtml(String(ro?.vehicle || '-'));
-                    const customer = escapeHtml(String(ro?.customer || '-'));
-                    const insurance = escapeHtml(String(ro?.insurance || '-'));
-                    const roadmap = escapeHtml(formatPhaseDisplay(ro?.phase || ''));
-                    const inDate = escapeHtml(formatShortDate(ro?.in_date || ''));
-                    const ecdDate = escapeHtml(formatShortDate(ro?.ecd_date || ''));
-                    const hoursValue = Number(ro?.hours || 0);
-                    const totalValue = Number(ro?.total || 0);
-
-                    return `
-                        <tr>
-                            <td>${roNumber}</td>
-                            <td>${vehicle}</td>
-                            <td>${customer}</td>
-                            <td>${insurance}</td>
-                            <td>${roadmap}</td>
-                            <td style="text-align:center;">${inDate}</td>
-                            <td style="text-align:center;">${ecdDate}</td>
-                            <td style="text-align:right;">${hoursValue.toFixed(1)}</td>
-                            <td style="text-align:right;">$${totalValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                        </tr>
-                    `;
-                }).join('');
+                    bodyHtml = orderedKeys.map((groupKey) => {
+                        const groupRows = [...(grouped.get(groupKey) || [])].sort(compareDashboardPrintRows);
+                        const label = getDashboardPrintGroupLabel(groupRows[0] || {}, sortKey);
+                        return buildDashboardPrintSection(label, groupRows);
+                    }).join('');
+                } else {
+                    const sorted = [...source].sort(compareDashboardPrintRows);
+                    bodyHtml = buildDashboardPrintSection(meta.heading, sorted);
+                }
 
                 const printWindow = window.open('', '_blank');
                 if (!printWindow) return;
@@ -4419,33 +4394,91 @@ def get_dashboard_screen_html():
                     <head>
                         <title>Repair Orders</title>
                         <style>
-                            body { font-family: Arial, sans-serif; margin: 20px; color: #111; }
-                            h1 { margin: 0 0 6px 0; font-size: 20px; }
-                            .sub { margin: 0 0 14px 0; color: #555; font-size: 13px; }
-                            table { width: 100%; border-collapse: collapse; }
-                            th, td { border: 1px solid #ddd; padding: 8px; font-size: 12px; text-align: left; }
-                            th { background: #f5f5f5; font-weight: 700; }
+                            @media print {
+                                @page { margin: 0.45in; }
+                                body { margin: 0; }
+                                .dashboard-print-section { break-inside: avoid; }
+                            }
+                            body {
+                                font-family: "Segoe UI", Arial, sans-serif;
+                                margin: 20px;
+                                color: #111;
+                                background: #ffffff;
+                            }
+                            .dashboard-print-page-title {
+                                margin: 0;
+                                font-size: 28px;
+                                font-weight: 800;
+                                color: #111;
+                            }
+                            .dashboard-print-subtitle {
+                                margin: 8px 0 18px 0;
+                                color: #666;
+                                font-size: 13px;
+                            }
+                            .dashboard-print-section {
+                                margin: 0 0 20px 0;
+                            }
+                            .dashboard-print-section-header {
+                                display: flex;
+                                align-items: center;
+                                justify-content: space-between;
+                                gap: 12px;
+                                padding: 10px 14px;
+                                background: #f7f3ed;
+                                border-bottom: 3px solid #b22222;
+                                border-radius: 8px 8px 0 0;
+                            }
+                            .dashboard-print-section-title {
+                                font-size: 18px;
+                                font-weight: 800;
+                                color: #222;
+                            }
+                            .dashboard-print-section-count {
+                                font-size: 13px;
+                                font-weight: 700;
+                                color: #b22222;
+                                white-space: nowrap;
+                            }
+                            .dashboard-print-table-wrap {
+                                border: 1px solid #ddd;
+                                border-top: none;
+                                border-radius: 0 0 8px 8px;
+                                overflow: hidden;
+                            }
+                            .dashboard-print-table {
+                                width: 100%;
+                                border-collapse: collapse;
+                            }
+                            .dashboard-print-header-row th {
+                                background: #3b4041;
+                                color: #fff;
+                                text-align: left;
+                                padding: 11px 12px;
+                                font-size: 12px;
+                                font-weight: 800;
+                            }
+                            .dashboard-print-row td {
+                                padding: 11px 12px;
+                                font-size: 12px;
+                                border-top: 1px solid #ececec;
+                                background: #fff;
+                            }
+                            .dashboard-print-row:first-child td {
+                                border-top: none;
+                            }
+                            .center-cell {
+                                text-align: center;
+                            }
+                            .num-cell {
+                                text-align: right;
+                            }
                         </style>
                     </head>
                     <body>
-                        <h1>Repair Orders</h1>
-                        <p class="sub">Sorted by ${escapeHtml(heading)}</p>
-                        <table>
-                            <thead>
-                                <tr>
-                                    <th>RO#</th>
-                                    <th>Vehicle</th>
-                                    <th>Customer</th>
-                                    <th>Insurance</th>
-                                    <th>Roadmap</th>
-                                    <th style="text-align:center;">In</th>
-                                    <th style="text-align:center;">ECD</th>
-                                    <th style="text-align:right;">HRS</th>
-                                    <th style="text-align:right;">Total</th>
-                                </tr>
-                            </thead>
-                            <tbody>${rowsHtml}</tbody>
-                        </table>
+                        <h1 class="dashboard-print-page-title">Repair Orders</h1>
+                        <p class="dashboard-print-subtitle">Printed by ${escapeHtml(meta.heading)}</p>
+                        ${bodyHtml}
                     </body>
                     </html>
                 `);
