@@ -2437,15 +2437,15 @@ async def chat_mark_read(request: Request):
     cur = conn.cursor()
     try:
         _ensure_chat_messages_table(cur)
-                _ensure_shop_users_table(cur)
-                _ensure_shop_isolation_infrastructure(cur)
+        _ensure_shop_users_table(cur)
+        _ensure_shop_isolation_infrastructure(cur)
         current_user = _resolve_current_user_row(request, cur, domain)
         if not current_user:
             return JSONResponse(status_code=401, content={"error": "Not authenticated"})
         current_user_id = int(current_user.get("id") or 0)
-                current_shop_id = int(current_user.get("shop_id") or 0)
-                if not current_shop_id:
-                        return JSONResponse(status_code=403, content={"error": "Shop scope not resolved"})
+        current_shop_id = int(current_user.get("shop_id") or 0)
+        if not current_shop_id:
+            return JSONResponse(status_code=403, content={"error": "Shop scope not resolved"})
 
         cur.execute(
             """
@@ -2482,15 +2482,15 @@ async def chat_complete_task(request: Request):
     cur = conn.cursor()
     try:
         _ensure_chat_messages_table(cur)
-                _ensure_shop_users_table(cur)
-                _ensure_shop_isolation_infrastructure(cur)
+        _ensure_shop_users_table(cur)
+        _ensure_shop_isolation_infrastructure(cur)
         current_user = _resolve_current_user_row(request, cur, domain)
         if not current_user:
             return JSONResponse(status_code=401, content={"error": "Not authenticated"})
         current_user_id = int(current_user.get("id") or 0)
-                current_shop_id = int(current_user.get("shop_id") or 0)
-                if not current_shop_id:
-                        return JSONResponse(status_code=403, content={"error": "Shop scope not resolved"})
+        current_shop_id = int(current_user.get("shop_id") or 0)
+        if not current_shop_id:
+            return JSONResponse(status_code=403, content={"error": "Shop scope not resolved"})
 
         cur.execute(
             """
