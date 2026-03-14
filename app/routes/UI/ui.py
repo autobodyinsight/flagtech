@@ -250,74 +250,67 @@ async def home_screen(request: Request):
             background-color: #d3d3d3;
             margin: 0;
         }}
-        .app-header {{
-            height: 60px;
-            min-height: 60px;
-            width: 100%;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            padding: 0 16px;
-            background: linear-gradient(90deg, #000000 0%, #b22222 100%);
-            color: #fff;
-            position: relative;
-            z-index: 1200;
-        }}
-        .app-header-left {{
+        /* header removed — brand + user icon migrated into sidebar */
+        .side-brand-wrap {{
             display: flex;
             align-items: center;
             gap: 10px;
-            min-width: 0;
+            padding: 14px 10px 14px 10px;
+            border-bottom: 1px solid rgba(255,255,255,0.18);
+            margin-bottom: 6px;
+            flex: 0 0 auto;
+            overflow: hidden;
         }}
-        .app-header-right {{
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }}
-        .header-icon-btn {{
-            width: 40px;
-            height: 40px;
-            border: 1px solid rgba(255,255,255,0.35);
-            border-radius: 10px;
-            background: rgba(255,255,255,0.08);
-            color: #fff;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            cursor: pointer;
-            padding: 0;
-        }}
-        .header-icon-btn:hover {{
-            background: rgba(255,255,255,0.16);
-        }}
-        .app-brand-logo {{
+        .side-brand-logo {{
             width: 32px;
             height: 32px;
             object-fit: contain;
             border-radius: 6px;
             background: rgba(255,255,255,0.92);
             padding: 2px;
+            flex: 0 0 32px;
         }}
-        .app-brand-text {{
-            font-size: 22px;
-            font-weight: 800;
-            letter-spacing: 0.4px;
-            white-space: nowrap;
+        .side-user-wrap {{
+            position: relative;
+            margin-top: 6px;
+            padding: 6px 0;
+            border-top: 1px solid rgba(255,255,255,0.18);
+            flex: 0 0 auto;
         }}
-        #headerUserButton {{
-            width: 40px;
-            height: 40px;
+        .side-user-initials {{
+            width: 32px;
+            height: 32px;
             border-radius: 999px;
-            border: 1px solid rgba(255,255,255,0.35);
+            border: 1.5px solid rgba(255,255,255,0.5);
             background: rgba(255,255,255,0.14);
             color: #fff;
             font-weight: 800;
+            font-size: 12px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            flex: 0 0 32px;
+        }}
+        #headerUserButton {{
+            width: 100%;
+            border: none;
+            background: transparent !important;
+            color: #fff;
+            border-radius: 10px;
+            padding: 10px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
             cursor: pointer;
+            text-align: left;
+        }}
+        #headerUserButton:hover {{
+            background: #9f1e1e !important;
         }}
         #headerUserDropdown {{
             position: absolute;
-            top: 48px;
-            right: 0;
+            bottom: 0;
+            left: calc(100% + 6px);
             min-width: 170px;
             background: #fff;
             border: 1px solid #ddd;
@@ -343,17 +336,18 @@ async def home_screen(request: Request):
         }}
         #sideNavSidebar {{
             position: fixed;
-            top: 60px;
+            top: 0;
             left: 0;
             width: 64px;
-            height: calc(100vh - 60px);
+            height: 100vh;
             background: #971d1d;
             box-shadow: 2px 0 18px rgba(0,0,0,0.2);
             transition: width 0.22s ease;
             z-index: 1210;
-            padding: 14px 8px;
-            overflow-y: auto;
-            overflow-x: hidden;
+            padding: 0 8px 8px 8px;
+            overflow: visible;
+            display: flex;
+            flex-direction: column;
         }}
         #sideNavSidebar.expanded {{
             width: 240px;
@@ -361,6 +355,11 @@ async def home_screen(request: Request):
         .side-menu-list {{
             display: grid;
             gap: 6px;
+            flex: 1;
+            overflow-y: auto;
+            overflow-x: hidden;
+            align-content: start;
+            padding-top: 6px;
         }}
         .side-menu-item {{
             width: 100%;
@@ -392,16 +391,16 @@ async def home_screen(request: Request):
             height: 22px;
             display: block;
         }}
-        .side-menu-item .nav-label {{
+        .nav-label {{
             opacity: 0;
             max-width: 0;
             white-space: nowrap;
             overflow: hidden;
             transition: opacity 0.16s ease, max-width 0.2s ease;
         }}
-        #sideNavSidebar.expanded .side-menu-item .nav-label {{
+        #sideNavSidebar.expanded .nav-label {{
             opacity: 1;
-            max-width: 160px;
+            max-width: 200px;
         }}
         .side-menu-item:hover {{
             background: #9f1e1e;
@@ -690,7 +689,6 @@ async def home_screen(request: Request):
         }}
         @media (max-width: 840px) {{
             .content-area {{ padding: 18px; }}
-            .app-brand-text {{ font-size: 18px; }}
             #sideNavSidebar {{ width: 56px; }}
             #sideNavSidebar.expanded {{ width: 220px; }}
             .content-area {{ margin-left: 56px; }}
@@ -854,23 +852,11 @@ async def home_screen(request: Request):
     </style>
 </head>
 <body>
-    <header class="app-header">
-        <div class="app-header-left">
-            <img class="app-brand-logo" src="/static/autobodyos.png" alt="AutobodyOS logo" />
-            <div class="app-brand-text">AutobodyOS</div>
-        </div>
-        <div class="app-header-right">
-            <div style="position:relative;">
-                <button id="headerUserButton" type="button" aria-label="Open user menu">--</button>
-                <div id="headerUserDropdown">
-                    <button type="button" class="header-menu-action" onclick="openProfileModal()">Profile</button>
-                    <button type="button" class="header-menu-action" onclick="logoutApp()">Log Out</button>
-                </div>
-            </div>
-        </div>
-    </header>
-
     <aside id="sideNavSidebar" aria-label="Primary navigation">
+        <div class="side-brand-wrap">
+            <img class="side-brand-logo" src="/static/autobodyos.png" alt="AutobodyOS logo" />
+            <span class="nav-label" style="font-size:18px; font-weight:800; letter-spacing:0.4px; color:#fff;">AutobodyOS</span>
+        </div>
         <div class="side-menu-list">
             <button type="button" class="side-menu-item active" data-screen="dashboard" aria-label="Dashboard"><span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M4 13h6v7H4v-7zm10-9h6v16h-6V4zM4 4h6v7H4V4z" stroke="currentColor" stroke-width="1.8"/></svg></span><span class="nav-label">Dashboard</span></button>
             <button type="button" class="side-menu-item" data-screen="upload" aria-label="Upload"><span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 16V4m0 0l-4 4m4-4l4 4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M4 20h16" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></span><span class="nav-label">Upload</span></button>
@@ -881,6 +867,16 @@ async def home_screen(request: Request):
             <button type="button" class="side-menu-item" data-screen="reports" aria-label="Reports"><span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M5 5h14v14H5z" stroke="currentColor" stroke-width="1.8"/><path d="M8 9h8M8 13h8M8 17h5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></span><span class="nav-label">Reports</span></button>
             <button type="button" class="side-menu-item" data-screen="setup" aria-label="Setup"><span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M5 19l6-6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M10.2 7.8a2.8 2.8 0 0 1-3.9 3.9L3.8 14.2a1.4 1.4 0 0 0 2 2l2.5-2.5a2.8 2.8 0 0 1 3.9-3.9" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M19 5l-6 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M13.8 16.2a2.8 2.8 0 0 1 3.9-3.9l2.5-2.5a1.4 1.4 0 1 0-2-2l-2.5 2.5a2.8 2.8 0 0 1-3.9 3.9" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span class="nav-label">Setup</span></button>
             <button type="button" class="side-menu-item" data-action="chat" aria-label="Chat"><span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M4 5h16v10H8l-4 4V5z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg></span><span class="nav-label">Chat</span></button>
+        </div>
+        <div class="side-user-wrap">
+            <button id="headerUserButton" type="button" aria-label="Open user menu">
+                <span class="side-user-initials" id="sideUserInitials">--</span>
+                <span class="nav-label" id="sideUserLabel">Account</span>
+            </button>
+            <div id="headerUserDropdown">
+                <button type="button" class="header-menu-action" onclick="openProfileModal()">Profile</button>
+                <button type="button" class="header-menu-action" onclick="logoutApp()">Log Out</button>
+            </div>
         </div>
     </aside>
 
@@ -1458,8 +1454,10 @@ async def home_screen(request: Request):
                 const role = String(appUiState.currentUser?.role || appUiState.sessionUser?.access_level || '-');
                 const email = String(appUiState.currentUser?.email || appUiState.sessionUser?.email || '-');
 
-                const bubble = document.getElementById('headerUserButton');
-                if (bubble) bubble.textContent = initials;
+                const initialsEl = document.getElementById('sideUserInitials');
+                if (initialsEl) initialsEl.textContent = initials;
+                const userLabelEl = document.getElementById('sideUserLabel');
+                if (userLabelEl && (firstName || lastName)) userLabelEl.textContent = (firstName + ' ' + lastName).trim();
 
                 const shopText = document.getElementById('profileShopText');
                 const roleText = document.getElementById('profileRoleText');
