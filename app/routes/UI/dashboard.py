@@ -446,7 +446,7 @@ def get_dashboard_screen_html():
                         <button id="roSidebarBtn-payments" class="ro-sidebar-btn" data-view="payments" title="Payments" style="background:none; border:none; padding:0; cursor:pointer;">${icons.credit}</button>
                         <div style="position:relative; display:flex; justify-content:center; width:100%;">
                             <button id="roPrintTrigger" class="ro-sidebar-btn ro-sidebar-action mini-popup-trigger" type="button" aria-label="Print" title="Print" style="background:none; border:none; padding:0; cursor:pointer;">${icons.print}</button>
-                            <div id="roPrintOptionsModal" class="mini-popup-panel" style="display:none; left:calc(100% + 10px); right:auto; top:0;">
+                            <div id="roPrintOptionsModal" class="mini-popup-panel ro-print-options-modal" style="display:none; left:calc(100% + 10px); right:auto; top:0;">
                                 <h2 style="margin:0 0 14px 0; color:#333; font-size:18px;">Print RO</h2>
                                 <p style="margin:0 0 12px 0; font-weight:bold; color:#555;">Print by:</p>
                                 <div style="display:flex; flex-direction:column; gap:8px;">
@@ -463,6 +463,18 @@ def get_dashboard_screen_html():
                                     </select>
                                     <button id="roPrintServiceOrderGo" type="button" style="padding:10px 12px; width:100%; background:#d32f2f; color:#fff; border:none; border-radius:4px; cursor:pointer; font-size:14px; font-weight:700;">Print Service Order</button>
                                 </div>
+                                <div id="roPrintPreviewWrap" style="display:none; margin-top:14px; padding-top:14px; border-top:1px solid #eee;">
+                                    <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:10px;">
+                                        <div id="roPrintPreviewTitle" style="font-size:15px; font-weight:800; color:#222;">Preview</div>
+                                        <div id="roPrintPreviewStatus" style="font-size:12px; color:#777;">Preview updates here before printing.</div>
+                                    </div>
+                                    <div id="roPrintPreviewBody" style="background:#d9d9d9; border:1px solid #cfcfcf; border-radius:8px; padding:18px; min-height:220px; max-height:56vh; overflow:auto;"></div>
+                                    <div id="roPrintPreviewActions" style="display:none; margin-top:12px; align-items:center; justify-content:flex-end; gap:10px;">
+                                        <button id="roPrintPreviewClear" type="button" style="padding:10px 14px; background:#f5f5f5; color:#333; border:1px solid #ddd; border-radius:4px; cursor:pointer; font-size:14px;">Clear Preview</button>
+                                        <button id="roPrintPreviewGo" type="button" style="padding:10px 16px; background:#d32f2f; color:#fff; border:none; border-radius:4px; cursor:pointer; font-size:14px; font-weight:700;">Print</button>
+                                    </div>
+                                </div>
+                                <iframe id="roPrintFrame" title="RO Print Frame" style="position:absolute; width:0; height:0; border:0; opacity:0; pointer-events:none; left:-9999px; top:-9999px;"></iframe>
                             </div>
                         </div>
                         <button id="roCloseButton" class="ro-sidebar-btn ro-sidebar-action" type="button" aria-label="Close RO" title="Close RO" style="background:none; border:none; padding:0; cursor:pointer;">${icons.close}</button>
@@ -549,6 +561,63 @@ def get_dashboard_screen_html():
                     transform: translateY(0);
                     pointer-events: auto;
                 }
+                .ro-print-options-modal {
+                    width: min(760px, calc(100vw - 140px));
+                    max-width: min(760px, calc(100vw - 140px));
+                    max-height: calc(100vh - 48px);
+                    overflow-y: auto;
+                }
+                .ro-print-preview-sheet {
+                    width: 8.5in;
+                    min-height: 11in;
+                    margin: 0 auto;
+                    background: #fff;
+                    color: #222;
+                    padding: 0.5in;
+                    box-shadow: 0 10px 28px rgba(0,0,0,0.16);
+                    box-sizing: border-box;
+                    font-family: Arial, sans-serif;
+                }
+                .ro-print-preview-sheet .header {
+                    text-align: center;
+                    margin-bottom: 16px;
+                    border-bottom: 2px solid #b22222;
+                    padding-bottom: 8px;
+                }
+                .ro-print-preview-sheet .header h1 {
+                    margin: 0 0 6px 0;
+                    color: #b22222;
+                    font-size: 24px;
+                }
+                .ro-print-preview-sheet .header p {
+                    margin: 0;
+                    color: #666;
+                }
+                .ro-print-preview-sheet table {
+                    width: 100%;
+                    border-collapse: collapse;
+                    margin-top: 10px;
+                }
+                .ro-print-preview-sheet thead th {
+                    background: #3c4142;
+                    color: #fff;
+                    text-align: left;
+                    padding: 8px;
+                    font-size: 12px;
+                }
+                .ro-print-preview-sheet tbody td {
+                    padding: 8px;
+                    border-bottom: 1px solid #eee;
+                    font-size: 12px;
+                }
+                .ro-print-preview-sheet .num {
+                    text-align: right;
+                }
+                .ro-print-preview-sheet .line-break {
+                    height: 1px;
+                    background: #444;
+                    margin: 14px 0;
+                }
                 .ro-header-item { font-size:15px; line-height:1.25; min-width:0; }
                 .ro-header-label { color:#d32f2f; font-weight:700; margin-right:6px; white-space:nowrap; }
                 .ro-header-value { color:#fff; font-weight:600; word-break:break-word; }
@@ -624,7 +693,8 @@ def get_dashboard_screen_html():
                 techAssignLines: [],
                 techAssignManualLines: [],
                 techAssignNextManualId: 1,
-                roPrintTechOptions: []
+                roPrintTechOptions: [],
+                roPrintDocumentReady: false
             };
 
             function escapePopupHtml(value) {
@@ -832,22 +902,18 @@ def get_dashboard_screen_html():
                 panel.style.display = 'none';
                 const wrap = roWindowDoc.getElementById('roPrintServiceOrderWrap');
                 if (wrap) wrap.style.display = 'none';
+                roClearPrintPreview();
             }
 
-            function roOpenPrintWindow(title, bodyHtml, options = {}) {
-                const printWindow = window.open('', '_blank');
-                if (!printWindow) {
-                    alert('Unable to open print preview. Please allow pop-ups for this site.');
-                    return;
-                }
-                printWindow.document.write(`
+            function roBuildPrintDocument(title, bodyHtml) {
+                return `
                     <!DOCTYPE html>
                     <html>
                         <head>
                             <title>${escapePopupHtml(title)}</title>
                             <style>
                                 @media print { @page { margin: 0.5in; } body { margin: 0; } }
-                                body { font-family: Arial, sans-serif; color:#222; padding:20px; }
+                                body { font-family: Arial, sans-serif; color:#222; padding:20px; background:#fff; }
                                 .header { text-align:center; margin-bottom:16px; border-bottom:2px solid #b22222; padding-bottom:8px; }
                                 .header h1 { margin:0 0 6px 0; color:#b22222; font-size:24px; }
                                 .header p { margin:0; color:#666; }
@@ -860,18 +926,85 @@ def get_dashboard_screen_html():
                         </head>
                         <body>${bodyHtml}</body>
                     </html>
-                `);
-                printWindow.document.close();
-                printWindow.focus();
-                if (options && options.immediatePrint) {
-                    printWindow.print();
+                `;
+            }
+
+            function roClearPrintPreview() {
+                const previewWrap = roWindowDoc.getElementById('roPrintPreviewWrap');
+                const previewBody = roWindowDoc.getElementById('roPrintPreviewBody');
+                const previewTitle = roWindowDoc.getElementById('roPrintPreviewTitle');
+                const previewStatus = roWindowDoc.getElementById('roPrintPreviewStatus');
+                const previewActions = roWindowDoc.getElementById('roPrintPreviewActions');
+                const frame = roWindowDoc.getElementById('roPrintFrame');
+
+                if (previewWrap) previewWrap.style.display = 'none';
+                if (previewBody) previewBody.innerHTML = '';
+                if (previewTitle) previewTitle.textContent = 'Preview';
+                if (previewStatus) previewStatus.textContent = 'Preview updates here before printing.';
+                if (previewActions) previewActions.style.display = 'none';
+                if (frame && frame.contentWindow) {
+                    const frameDoc = frame.contentWindow.document;
+                    frameDoc.open();
+                    frameDoc.write('<!DOCTYPE html><html><head><title></title></head><body></body></html>');
+                    frameDoc.close();
+                }
+                popupState.roPrintDocumentReady = false;
+            }
+
+            function roSetPrintPreviewLoading(label) {
+                const previewWrap = roWindowDoc.getElementById('roPrintPreviewWrap');
+                const previewBody = roWindowDoc.getElementById('roPrintPreviewBody');
+                const previewTitle = roWindowDoc.getElementById('roPrintPreviewTitle');
+                const previewStatus = roWindowDoc.getElementById('roPrintPreviewStatus');
+                const previewActions = roWindowDoc.getElementById('roPrintPreviewActions');
+
+                if (previewWrap) previewWrap.style.display = 'block';
+                if (previewTitle) previewTitle.textContent = label;
+                if (previewStatus) previewStatus.textContent = 'Generating preview...';
+                if (previewBody) {
+                    previewBody.innerHTML = '<div style="display:flex; align-items:center; justify-content:center; min-height:180px; color:#666; font-weight:600;">Building print preview...</div>';
+                }
+                if (previewActions) previewActions.style.display = 'none';
+                popupState.roPrintDocumentReady = false;
+            }
+
+            function roOpenPrintWindow(title, bodyHtml) {
+                const previewWrap = roWindowDoc.getElementById('roPrintPreviewWrap');
+                const previewBody = roWindowDoc.getElementById('roPrintPreviewBody');
+                const previewTitle = roWindowDoc.getElementById('roPrintPreviewTitle');
+                const previewStatus = roWindowDoc.getElementById('roPrintPreviewStatus');
+                const previewActions = roWindowDoc.getElementById('roPrintPreviewActions');
+                const frame = roWindowDoc.getElementById('roPrintFrame');
+                if (!previewWrap || !previewBody || !previewTitle || !previewStatus || !previewActions || !frame || !frame.contentWindow) {
+                    alert('Unable to render print preview.');
                     return;
                 }
-                setTimeout(() => printWindow.print(), 250);
+
+                previewWrap.style.display = 'block';
+                previewTitle.textContent = title;
+                previewStatus.textContent = 'Preview the document below, then click Print.';
+                previewBody.innerHTML = `<div class="ro-print-preview-sheet">${bodyHtml}</div>`;
+                previewActions.style.display = 'flex';
+
+                const frameDoc = frame.contentWindow.document;
+                frameDoc.open();
+                frameDoc.write(roBuildPrintDocument(title, bodyHtml));
+                frameDoc.close();
+                popupState.roPrintDocumentReady = true;
+            }
+
+            function roPrintCurrentPreview() {
+                const frame = roWindowDoc.getElementById('roPrintFrame');
+                if (!frame || !frame.contentWindow || !popupState.roPrintDocumentReady) {
+                    alert('Generate a print preview first.');
+                    return;
+                }
+                frame.contentWindow.focus();
+                setTimeout(() => frame.contentWindow.print(), 60);
             }
 
             async function roPrintBill() {
-                roClosePrintOptionsModal();
+                roSetPrintPreviewLoading('Bill Preview');
                 try {
                     const res = await popupFetchJson(`/api/ro-estimate?ro=${encodeURIComponent(ro.ro)}`);
                     const estimate = res.estimate || {};
@@ -962,6 +1095,7 @@ def get_dashboard_screen_html():
                 const wrap = roWindowDoc.getElementById('roPrintServiceOrderWrap');
                 const selectEl = roWindowDoc.getElementById('roPrintTechSelect');
                 if (!wrap || !selectEl) return;
+                roClearPrintPreview();
                 wrap.style.display = 'block';
                 try {
                     const data = await popupFetchJson(`/api/ro-tech-lines?ro=${encodeURIComponent(ro.ro)}`);
@@ -987,7 +1121,7 @@ def get_dashboard_screen_html():
                 const selectEl = roWindowDoc.getElementById('roPrintTechSelect');
                 if (!selectEl) return;
                 const selectedValue = String(selectEl.value || 'all');
-                roClosePrintOptionsModal();
+                roSetPrintPreviewLoading('Service Order Preview');
 
                 try {
                     let targets = popupState.roPrintTechOptions || [];
@@ -1102,7 +1236,7 @@ def get_dashboard_screen_html():
             }
 
             async function roPrintParts() {
-                roClosePrintOptionsModal();
+                roSetPrintPreviewLoading('Parts Preview');
                 try {
                     const [linesRes, onOrderRes, arrivedRes, returnedRes, receivedRes] = await Promise.all([
                         popupFetchJson(`/api/parts/ro-lines?ro=${encodeURIComponent(ro.ro)}`),
@@ -1206,8 +1340,7 @@ def get_dashboard_screen_html():
                                 </thead>
                                 <tbody>${rowsHtml || '<tr><td colspan="11" style="text-align:center; color:#777;">No parts lines found.</td></tr>'}</tbody>
                             </table>
-                        `,
-                        { immediatePrint: true }
+                        `
                     );
                 } catch (error) {
                     console.error('Error printing parts:', error);
@@ -1216,7 +1349,7 @@ def get_dashboard_screen_html():
             }
 
             function roPrintServiceTag() {
-                roClosePrintOptionsModal();
+                roSetPrintPreviewLoading('Service Tag Preview');
                 const checkpoints = [
                     'Parts Verified',
                     'Bodywork Passed',
@@ -1265,7 +1398,7 @@ def get_dashboard_screen_html():
             }
 
             async function roPrintServiceCover() {
-                roClosePrintOptionsModal();
+                roSetPrintPreviewLoading('Service Cover Preview');
                 try {
                     const printData = await popupFetchJson(`/api/ro-print-data?ro=${encodeURIComponent(ro.ro)}`);
                     const inDateText = escapePopupHtml(popupFormatDate(printData?.in_date || ro.in_date));
@@ -1328,6 +1461,8 @@ def get_dashboard_screen_html():
                 const serviceTagBtn = roWindowDoc.getElementById('roPrintOptionServiceTag');
                 const serviceCoverBtn = roWindowDoc.getElementById('roPrintOptionServiceCover');
                 const serviceOrderGoBtn = roWindowDoc.getElementById('roPrintServiceOrderGo');
+                const previewPrintBtn = roWindowDoc.getElementById('roPrintPreviewGo');
+                const previewClearBtn = roWindowDoc.getElementById('roPrintPreviewClear');
 
                 if (trigger && panel) {
                     trigger.addEventListener('click', (event) => {
@@ -1341,6 +1476,8 @@ def get_dashboard_screen_html():
                 if (partsBtn) partsBtn.addEventListener('click', () => { roPrintParts(); });
                 if (serviceTagBtn) serviceTagBtn.addEventListener('click', () => { roPrintServiceTag(); });
                 if (serviceCoverBtn) serviceCoverBtn.addEventListener('click', () => { roPrintServiceCover(); });
+                if (previewPrintBtn) previewPrintBtn.addEventListener('click', () => { roPrintCurrentPreview(); });
+                if (previewClearBtn) previewClearBtn.addEventListener('click', () => { roClearPrintPreview(); });
 
                 roWindowDoc.addEventListener('click', (event) => {
                     if (!panel || !panel.classList.contains('open')) return;
