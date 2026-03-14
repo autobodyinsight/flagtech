@@ -508,6 +508,63 @@ async def home_screen(request: Request):
             border-bottom: 1px solid #ece6e3;
             background: #fcfbfb;
         }}
+        .chat-user-header-row {{
+            height: 54px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 14px;
+            font-size: 15px;
+            font-weight: 800;
+            letter-spacing: 0.2px;
+            color: #2b2b2b;
+            border-bottom: 1px solid #ece6e3;
+            background: #fcfbfb;
+        }}
+        .chat-view-toggle {{
+            display: inline-flex;
+            border: 1px solid #ddd6d2;
+            border-radius: 999px;
+            overflow: hidden;
+            margin-bottom: 8px;
+            width: fit-content;
+        }}
+        .chat-view-toggle-btn {{
+            border: none;
+            background: #f8f5f4;
+            color: #444;
+            padding: 6px 12px;
+            font-size: 12px;
+            font-weight: 700;
+            cursor: pointer;
+        }}
+        .chat-view-toggle-btn.active {{
+            background: #b22222;
+            color: #fff;
+        }}
+        .chat-audience-toggle {{
+            display: inline-flex;
+            gap: 6px;
+            align-items: center;
+        }}
+        .chat-audience-btn {{
+            width: 30px;
+            height: 30px;
+            border: 1px solid #d8d1ce;
+            border-radius: 999px;
+            background: #fff;
+            color: #555;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            padding: 0;
+        }}
+        .chat-audience-btn.active {{
+            background: #b22222;
+            border-color: #b22222;
+            color: #fff;
+        }}
         .chat-main-grid {{
             flex: 1;
             min-height: 0;
@@ -889,12 +946,32 @@ async def home_screen(request: Request):
             <div class="chat-main-grid">
                 <div class="chat-task-card" style="margin:0;">
                     <div class="chat-column-header" style="padding-left:0; padding-right:0; background:transparent; border-bottom:none; height:auto; margin-bottom:8px;">Task List</div>
+                    <div class="chat-view-toggle" role="tablist" aria-label="Task view toggle">
+                        <button type="button" id="chatTaskViewTasks" class="chat-view-toggle-btn active" onclick="setChatTaskView('tasks')">Tasks</button>
+                        <button type="button" id="chatTaskViewCompleted" class="chat-view-toggle-btn" onclick="setChatTaskView('completed')">Completed</button>
+                    </div>
                     <div class="chat-task-scroll" style="border-top:1px solid #ebe6e3; border-bottom:1px solid #ebe6e3; padding-top:6px; padding-bottom:6px;">
                         <div id="chatTaskList" style="display:flex; flex-direction:column; gap:8px; color:#333;">NO TASK</div>
                     </div>
                 </div>
                 <div class="chat-user-panel">
-                    <div class="chat-column-header">User List</div>
+                    <div class="chat-user-header-row">
+                        <span>User List</span>
+                        <div class="chat-audience-toggle">
+                            <button type="button" id="chatAudienceUserBtn" class="chat-audience-btn active" onclick="setChatAudienceMode('users')" title="Shop Users" aria-label="Shop Users">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                                    <circle cx="12" cy="8" r="3" stroke="currentColor" stroke-width="1.8"/>
+                                    <path d="M5 20c0-3.3 3.1-6 7-6s7 2.7 7 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+                                </svg>
+                            </button>
+                            <button type="button" id="chatAudienceVendorBtn" class="chat-audience-btn" onclick="setChatAudienceMode('vendors')" title="Vendors" aria-label="Vendors">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                                    <path d="M3 9l9-5 9 5v10a1.5 1.5 0 0 1-1.5 1.5H4.5A1.5 1.5 0 0 1 3 19V9z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>
+                                    <path d="M9 20v-6h6v6" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
                     <div id="chatUserList" class="chat-user-list"></div>
                     <select id="chatUserSelect" style="display:none;"></select>
                 </div>
@@ -919,12 +996,6 @@ async def home_screen(request: Request):
                         </div>
                     </div>
                     <div id="chatSendStatus" style="min-height:18px; margin:0 12px 10px 12px; font-size:12px; color:#444;"></div>
-                </div>
-            </div>
-            <div class="chat-bottom-strip">
-                <div style="font-weight:800; letter-spacing:0.6px; margin-bottom:8px;">COMPLETED</div>
-                <div class="chat-task-scroll">
-                    <div id="chatCompletedList" style="display:flex; flex-direction:column; gap:8px; color:#333;">NO COMPLETED TASKS</div>
                 </div>
             </div>
         </div>
@@ -1017,7 +1088,43 @@ async def home_screen(request: Request):
             chatLastActivityByUser: {{}},
             chatMessages: [],
             chatPollTimer: null,
+            chatTaskView: 'tasks',
+            chatAudienceMode: 'users',
         }};
+
+        function getChatAudienceUsers() {{
+            const currentUserId = String(appUiState.currentUser?.id || '');
+            const users = Array.isArray(appUiState.users)
+                ? appUiState.users.filter((u) => String(u?.id || '') !== currentUserId)
+                : [];
+            const isVendor = (u) => String(u?.role || '').trim().toLowerCase().includes('vendor');
+            if (appUiState.chatAudienceMode === 'vendors') return users.filter(isVendor);
+            return users.filter((u) => !isVendor(u));
+        }}
+
+        function setChatTaskView(view) {{
+            appUiState.chatTaskView = view === 'completed' ? 'completed' : 'tasks';
+            const tasksBtn = document.getElementById('chatTaskViewTasks');
+            const completedBtn = document.getElementById('chatTaskViewCompleted');
+            if (tasksBtn) tasksBtn.classList.toggle('active', appUiState.chatTaskView === 'tasks');
+            if (completedBtn) completedBtn.classList.toggle('active', appUiState.chatTaskView === 'completed');
+            renderChatTaskPanels();
+        }}
+
+        function setChatAudienceMode(mode) {{
+            appUiState.chatAudienceMode = mode === 'vendors' ? 'vendors' : 'users';
+            const userBtn = document.getElementById('chatAudienceUserBtn');
+            const vendorBtn = document.getElementById('chatAudienceVendorBtn');
+            if (userBtn) userBtn.classList.toggle('active', appUiState.chatAudienceMode === 'users');
+            if (vendorBtn) vendorBtn.classList.toggle('active', appUiState.chatAudienceMode === 'vendors');
+
+            const visibleUsers = getChatAudienceUsers();
+            const selectedStillVisible = visibleUsers.some((u) => String(u?.id || '') === String(appUiState.chatSelectedUserId || ''));
+            if (!selectedStillVisible) appUiState.chatSelectedUserId = visibleUsers.length ? String(visibleUsers[0]?.id || '') : '';
+
+            renderChatUserList();
+            renderChatConversation();
+        }}
 
         async function fetchChatMessages() {{
             const response = await fetch('/api/chat/messages', {{ credentials: 'include' }});
@@ -1094,7 +1201,7 @@ async def home_screen(request: Request):
             appUiState.chatTasks = openTasks;
             appUiState.completedTasks = doneTasks;
 
-            if (appUiState.chatSelectedUserId && !appUiState.users.some((u) => String(u?.id || '') === String(appUiState.chatSelectedUserId))) {{
+            if (appUiState.chatSelectedUserId && !getChatAudienceUsers().some((u) => String(u?.id || '') === String(appUiState.chatSelectedUserId))) {{
                 appUiState.chatSelectedUserId = '';
             }}
         }}
@@ -1153,34 +1260,36 @@ async def home_screen(request: Request):
 
         function renderChatTaskPanels() {{
             const listEl = document.getElementById('chatTaskList');
-            const completedEl = document.getElementById('chatCompletedList');
-            if (!listEl || !completedEl) return;
+            if (!listEl) return;
 
-            if (!Array.isArray(appUiState.chatTasks) || appUiState.chatTasks.length === 0) {{
-                listEl.innerHTML = '<div style="color:#666; font-weight:700;">NO TASK</div>';
+            const showingCompleted = appUiState.chatTaskView === 'completed';
+            const taskRows = showingCompleted ? appUiState.completedTasks : appUiState.chatTasks;
+
+            if (!Array.isArray(taskRows) || taskRows.length === 0) {{
+                listEl.innerHTML = showingCompleted
+                    ? '<div style="color:#666; font-weight:700;">NO COMPLETED TASKS</div>'
+                    : '<div style="color:#666; font-weight:700;">NO TASK</div>';
             }} else {{
-                listEl.innerHTML = appUiState.chatTasks.map((task, index) => `
-                    <label style="display:flex; align-items:flex-start; gap:10px; padding:8px 6px; border-bottom:1px solid #ececec; cursor:pointer;">
-                        <input type="checkbox" data-task-index="${{index}}" style="margin-top:2px; width:16px; height:16px; cursor:pointer;" />
-                        <span style="line-height:1.4;">${{headerEscapeHtml(task?.text || '')}}</span>
-                    </label>
-                `).join('');
+                if (showingCompleted) {{
+                    listEl.innerHTML = taskRows.map((task) => `
+                        <div style="padding:8px 6px; border-bottom:1px solid #ececec; color:#444;">${{headerEscapeHtml(task?.text || '')}}</div>
+                    `).join('');
+                }} else {{
+                    listEl.innerHTML = taskRows.map((task, index) => `
+                        <label style="display:flex; align-items:flex-start; gap:10px; padding:8px 6px; border-bottom:1px solid #ececec; cursor:pointer;">
+                            <input type="checkbox" data-task-index="${{index}}" style="margin-top:2px; width:16px; height:16px; cursor:pointer;" />
+                            <span style="line-height:1.4;">${{headerEscapeHtml(task?.text || '')}}</span>
+                        </label>
+                    `).join('');
 
-                listEl.querySelectorAll('input[type="checkbox"][data-task-index]').forEach((checkbox) => {{
-                    checkbox.addEventListener('change', async (event) => {{
-                        if (!event.target.checked) return;
-                        const idx = Number(event.target.getAttribute('data-task-index'));
-                        await completeChatTaskAt(idx);
+                    listEl.querySelectorAll('input[type="checkbox"][data-task-index]').forEach((checkbox) => {{
+                        checkbox.addEventListener('change', async (event) => {{
+                            if (!event.target.checked) return;
+                            const idx = Number(event.target.getAttribute('data-task-index'));
+                            await completeChatTaskAt(idx);
+                        }});
                     }});
-                }});
-            }}
-
-            if (!Array.isArray(appUiState.completedTasks) || appUiState.completedTasks.length === 0) {{
-                completedEl.innerHTML = '<div style="color:#666;">NO COMPLETED TASKS</div>';
-            }} else {{
-                completedEl.innerHTML = appUiState.completedTasks.map((task) => `
-                    <div style="padding:8px 6px; border-bottom:1px solid #ececec; color:#444;">${{headerEscapeHtml(task?.text || '')}}</div>
-                `).join('');
+                }}
             }}
         }}
 
@@ -1188,10 +1297,7 @@ async def home_screen(request: Request):
             const wrap = document.getElementById('chatUserList');
             if (!wrap) return;
 
-            const currentUserId = String(appUiState.currentUser?.id || '');
-            const orderedUsers = Array.isArray(appUiState.users)
-                ? appUiState.users.filter((u) => String(u?.id || '') !== currentUserId)
-                : [];
+            const orderedUsers = getChatAudienceUsers();
             orderedUsers.sort((a, b) => {{
                 const aid = String(a?.id || '');
                 const bid = String(b?.id || '');
@@ -1205,8 +1311,21 @@ async def home_screen(request: Request):
             }});
 
             if (!orderedUsers.length) {{
-                wrap.innerHTML = '<div style="padding:10px 8px; color:#666;">No users found.</div>';
+                appUiState.chatSelectedUserId = '';
+                const hiddenSelect = document.getElementById('chatUserSelect');
+                if (hiddenSelect) hiddenSelect.innerHTML = '';
+                wrap.innerHTML = appUiState.chatAudienceMode === 'vendors'
+                    ? '<div style="padding:10px 8px; color:#666;">No vendors found.</div>'
+                    : '<div style="padding:10px 8px; color:#666;">No users found.</div>';
                 return;
+            }}
+
+            const hiddenSelect = document.getElementById('chatUserSelect');
+            if (hiddenSelect) {{
+                hiddenSelect.innerHTML = orderedUsers.map((u) => `
+                    <option value="${{headerEscapeHtml(String(u?.id || ''))}}">${{headerEscapeHtml(`${{String(u?.first_name || '').trim()}} ${{String(u?.last_name || '').trim()}}`.trim() || String(u?.email || 'Selected user'))}}</option>
+                `).join('');
+                if (appUiState.chatSelectedUserId) hiddenSelect.value = String(appUiState.chatSelectedUserId);
             }}
 
             wrap.innerHTML = orderedUsers.map((u) => {{
@@ -1248,7 +1367,8 @@ async def home_screen(request: Request):
                 return;
             }}
 
-            const selectedUser = (appUiState.users || []).find((u) => String(u?.id || '') === selectedId);
+            const selectedUser = (getChatAudienceUsers() || []).find((u) => String(u?.id || '') === selectedId)
+                || (appUiState.users || []).find((u) => String(u?.id || '') === selectedId);
             const selectedName = `${{String(selectedUser?.first_name || '').trim()}} ${{String(selectedUser?.last_name || '').trim()}}`.trim() || String(selectedUser?.email || 'Selected user');
             titleEl.textContent = selectedName;
 
@@ -1305,6 +1425,8 @@ async def home_screen(request: Request):
             renderChatTaskPanels();
             renderChatUserList();
             renderChatConversation();
+            setChatTaskView(appUiState.chatTaskView || 'tasks');
+            setChatAudienceMode(appUiState.chatAudienceMode || 'users');
 
             if (appUiState.chatPollTimer) clearInterval(appUiState.chatPollTimer);
             appUiState.chatPollTimer = setInterval(async () => {{
@@ -1479,6 +1601,8 @@ async def home_screen(request: Request):
                 if (!chatUsers.some((u) => String(u?.id || '') === String(appUiState.chatSelectedUserId || ''))) {{
                     appUiState.chatSelectedUserId = chatUsers.length ? String(chatUsers[0]?.id || '') : '';
                 }}
+                appUiState.chatTaskView = appUiState.chatTaskView || 'tasks';
+                appUiState.chatAudienceMode = appUiState.chatAudienceMode || 'users';
                 renderChatUserList();
                 renderChatConversation();
                 renderChatTaskPanels();
