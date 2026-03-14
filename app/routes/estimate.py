@@ -7256,20 +7256,20 @@ async def list_vendor_invoices(request: Request, vendor_id: int):
         if not vendor_name:
             return {"invoices": []}
 
-                cur.execute(
-                        """
-                        SELECT
-                                COALESCE(NULLIF(BTRIM(invoice_number), ''), ro) AS invoice_number,
-                                MAX(COALESCE(received_business_date, received_at::date)) AS invoice_date,
-                                COALESCE(SUM(cost), 0) AS total_cost
-                        FROM parts_received
-                        WHERE domain = %s
-                            AND LOWER(TRIM(vendor)) = LOWER(TRIM(%s))
-                        GROUP BY COALESCE(NULLIF(BTRIM(invoice_number), ''), ro)
-                        ORDER BY MAX(COALESCE(received_business_date, received_at::date)) DESC
-                        """,
-                        (domain, vendor_name),
-                )
+        cur.execute(
+            """
+            SELECT
+                COALESCE(NULLIF(BTRIM(invoice_number), ''), ro) AS invoice_number,
+                MAX(COALESCE(received_business_date, received_at::date)) AS invoice_date,
+                COALESCE(SUM(cost), 0) AS total_cost
+            FROM parts_received
+            WHERE domain = %s
+              AND LOWER(TRIM(vendor)) = LOWER(TRIM(%s))
+            GROUP BY COALESCE(NULLIF(BTRIM(invoice_number), ''), ro)
+            ORDER BY MAX(COALESCE(received_business_date, received_at::date)) DESC
+            """,
+            (domain, vendor_name),
+        )
         rows = cur.fetchall() or []
 
         invoices = [
