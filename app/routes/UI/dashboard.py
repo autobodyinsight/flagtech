@@ -1365,17 +1365,21 @@ def get_dashboard_screen_html():
                 const nextValue = input.value || '';
                 const prevValue = input.dataset.lastValue || '';
                 if (!roNumber || !field || !nextValue || nextValue === prevValue) return;
+                if (input.dataset.saving === '1') return;
 
+                input.dataset.saving = '1';
                 input.disabled = true;
                 try {
                     await patchRoDate(roNumber, field, nextValue);
                     input.dataset.lastValue = nextValue;
+                    ro[field] = nextValue;
                 } catch (error) {
                     console.error('Error updating RO date:', error);
                     input.value = prevValue;
                     alert(`Unable to save ${errorLabel}.`);
                 } finally {
                     input.disabled = false;
+                    input.dataset.saving = '0';
                 }
             }
 
@@ -1426,6 +1430,11 @@ def get_dashboard_screen_html():
                 input.addEventListener('change', async function() {
                     await saveRoHeaderDateInput(this, errorLabel);
                     exitEditMode();
+                });
+
+                // Date picker selections fire input as the value changes; save immediately.
+                input.addEventListener('input', async function() {
+                    await saveRoHeaderDateInput(this, errorLabel);
                 });
 
                 input.addEventListener('keydown', async function(event) {
