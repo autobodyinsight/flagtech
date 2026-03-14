@@ -626,7 +626,9 @@ def get_dashboard_screen_html():
                 techAssignLines: [],
                 techAssignManualLines: [],
                 techAssignNextManualId: 1,
-                roPrintTechOptions: []
+                roPrintTechOptions: [],
+                roPrintShopInfo: null,
+                roPrintShopInfoLoaded: false
             };
 
             function escapePopupHtml(value) {
@@ -657,6 +659,45 @@ def get_dashboard_screen_html():
                     return `${parts[1]}/${parts[2]}/${parts[0]}`;
                 }
                 return popupFormatDateTime(value);
+            }
+
+            async function getRoPrintShopInfo() {
+                if (popupState.roPrintShopInfoLoaded) {
+                    return popupState.roPrintShopInfo || {};
+                }
+                popupState.roPrintShopInfoLoaded = true;
+                try {
+                    const data = await popupFetchJson('/api/setup/shop');
+                    popupState.roPrintShopInfo = (data && typeof data.shop === 'object' && data.shop) ? data.shop : {};
+                } catch (error) {
+                    console.warn('Unable to load shop info for print header:', error);
+                    popupState.roPrintShopInfo = {};
+                }
+                return popupState.roPrintShopInfo || {};
+            }
+
+            function buildRoPrintShopHeaderHtml(shopData) {
+                const shop = shopData && typeof shopData === 'object' ? shopData : {};
+                const name = escapePopupHtml(String(shop.shop_name || '').trim());
+                const address = escapePopupHtml(String(shop.address || '').trim());
+                const city = escapePopupHtml(String(shop.city || '').trim());
+                const state = escapePopupHtml(String(shop.state || '').trim());
+                const zip = escapePopupHtml(String(shop.zip_code || '').trim());
+                const phone = escapePopupHtml(String(shop.phone || '').trim());
+                const cityStateZip = [city, state, zip].filter(Boolean).join(', ').replace(/,\s([^,]+)$/, ' $1');
+
+                if (!name && !address && !cityStateZip && !phone) {
+                    return '';
+                }
+
+                return `
+                    <div style="text-align:center; margin-bottom:10px;">
+                        ${name ? `<div style="font-size:18px; font-weight:800; line-height:1.2;">${name}</div>` : ''}
+                        ${address ? `<div style="font-size:12px; color:#444; margin-top:2px;">${address}</div>` : ''}
+                        ${cityStateZip ? `<div style="font-size:12px; color:#444; margin-top:2px;">${cityStateZip}</div>` : ''}
+                        ${phone ? `<div style="font-size:12px; color:#444; margin-top:2px;">${phone}</div>` : ''}
+                    </div>
+                `;
             }
 
             function extractPartNumberAndDescription(rawDescription, explicitPartNumber) {
@@ -875,6 +916,7 @@ def get_dashboard_screen_html():
             async function roPrintBill() {
                 roClosePrintOptionsModal();
                 try {
+                    const shopHeaderHtml = buildRoPrintShopHeaderHtml(await getRoPrintShopInfo());
                     const res = await popupFetchJson(`/api/ro-estimate?ro=${encodeURIComponent(ro.ro)}`);
                     const estimate = res.estimate || {};
                     const lines = popupGetUnifiedEstimateLines(estimate);
@@ -913,6 +955,7 @@ def get_dashboard_screen_html():
                         `RO ${ro.ro} Bill`,
                         `
                             <div class="header" style="text-align:left;">
+                                ${shopHeaderHtml}
                                 <div style="font-size:72px; font-weight:800; line-height:1; margin-bottom:8px;">RO #${escapePopupHtml(ro.ro || '-')}</div>
                                 <div style="display:flex; justify-content:space-between; align-items:flex-end; gap:18px; margin-bottom:6px;">
                                     <div style="font-size:24px; font-weight:600;">Vehicle: ${escapePopupHtml(ro.vehicle || '-')}</div>
@@ -992,6 +1035,7 @@ def get_dashboard_screen_html():
                 roClosePrintOptionsModal();
 
                 try {
+                    const shopHeaderHtml = buildRoPrintShopHeaderHtml(await getRoPrintShopInfo());
                     let targets = popupState.roPrintTechOptions || [];
                     if (selectedValue !== 'all') {
                         targets = targets.filter((item) => String(item.tech_id) === selectedValue);
@@ -1082,6 +1126,7 @@ def get_dashboard_screen_html():
                         `RO ${ro.ro} Service Order`,
                         `
                             <div class="header" style="text-align:left;">
+                                ${shopHeaderHtml}
                                 <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:18px; margin-bottom:6px;">
                                     <div style="font-size:72px; font-weight:800; line-height:1; margin-bottom:8px;">RO #${escapePopupHtml(ro.ro || '-')}</div>
                                     <div style="text-align:right;">
@@ -1106,6 +1151,7 @@ def get_dashboard_screen_html():
             async function roPrintParts() {
                 roClosePrintOptionsModal();
                 try {
+                    const shopHeaderHtml = buildRoPrintShopHeaderHtml(await getRoPrintShopInfo());
                     const [linesRes, onOrderRes, arrivedRes, returnedRes, receivedRes] = await Promise.all([
                         popupFetchJson(`/api/parts/ro-lines?ro=${encodeURIComponent(ro.ro)}`),
                         popupFetchJson(`/api/parts/on-order-lines?ro=${encodeURIComponent(ro.ro)}`),
@@ -1190,6 +1236,7 @@ def get_dashboard_screen_html():
                         `RO ${ro.ro} Parts`,
                         `
                             <div class="header" style="text-align:left;">
+                                ${shopHeaderHtml}
                                 <div style="font-size:72px; font-weight:800; line-height:1; margin-bottom:8px;">RO #${escapePopupHtml(ro.ro || '-')}</div>
                                 <div style="display:flex; justify-content:space-between; align-items:flex-end; gap:18px; margin-bottom:6px;">
                                     <div style="font-size:24px; font-weight:600;">Vehicle: ${vehicleText}</div>
@@ -1633,7 +1680,7 @@ def get_dashboard_screen_html():
                         <div style="font-weight:700; font-size:18px; margin-bottom:10px; color:#333;">Notes Log</div>
                         <div style="display:flex; gap:10px; margin-bottom:12px; align-items:flex-start;">
                             <textarea id="roPopupNoteInput" rows="3" style="flex:1; padding:10px; border:1px solid #ccc; border-radius:6px; resize:vertical;" placeholder="Add note..."></textarea>
-                            <span id="roPopupNoteSave" role="button" aria-label="Save" title="Save" style="display:inline-flex; align-items:center; justify-content:center; width:34px; height:34px; color:#b22222; cursor:pointer;"><svg width="22" height="22" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M5 3h11l3 3v15H5V3z" fill="currentColor"/><rect x="8" y="4" width="8" height="5" fill="#ffffff"/><rect x="8" y="14" width="8" height="6" fill="#ffffff"/></svg></span>
+                            <span id="roPopupNoteSave" role="button" aria-label="Save" title="Save" style="display:inline-flex; align-items:center; justify-content:center; width:68px; height:68px; color:#b22222; cursor:pointer;"><svg width="44" height="44" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M5 3h11l3 3v15H5V3z" fill="currentColor"/><rect x="8" y="4" width="8" height="5" fill="#ffffff"/><rect x="8" y="14" width="8" height="6" fill="#ffffff"/></svg></span>
                         </div>
                         <div id="roPopupNotesList" style="max-height:420px; overflow-y:auto;"></div>
                     </div>
@@ -2559,7 +2606,7 @@ def get_dashboard_screen_html():
                     <div class="ro-window-card">
                         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
                             <div id="roPopupPaymentsTitle" style="font-weight:700; font-size:18px; color:#333;">Payments - GRAND TOTAL: -</div>
-                            <span id="roPopupPaymentsSave" role="button" aria-label="Save" title="Save" style="display:inline-flex; align-items:center; justify-content:center; width:34px; height:34px; color:#d32f2f; cursor:pointer;"><svg width="22" height="22" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M5 3h11l3 3v15H5V3z" fill="currentColor"/><rect x="8" y="4" width="8" height="5" fill="#ffffff"/><rect x="8" y="14" width="8" height="6" fill="#ffffff"/></svg></span>
+                            <span id="roPopupPaymentsSave" role="button" aria-label="Save" title="Save" style="display:inline-flex; align-items:center; justify-content:center; width:68px; height:68px; color:#d32f2f; cursor:pointer;"><svg width="44" height="44" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M5 3h11l3 3v15H5V3z" fill="currentColor"/><rect x="8" y="4" width="8" height="5" fill="#ffffff"/><rect x="8" y="14" width="8" height="6" fill="#ffffff"/></svg></span>
                         </div>
                         <div id="roPopupPaymentsLog"><div style="color:#777;">Loading...</div></div>
                     </div>
