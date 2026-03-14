@@ -9,7 +9,6 @@ from .dashboard import get_dashboard_screen_html
 from .techs import get_techs_screen_html
 from .phase import get_phase_screen_html
 from .reports import get_reports_screen_html
-from .records import get_records_screen_html
 from .setup import get_setup_screen_html, get_setup_script
 
 try:
@@ -961,7 +960,6 @@ async def home_screen(request: Request):
         {get_phase_screen_html()}
         {get_flagtech_screen_html()}
         {get_reports_screen_html()}
-        {get_records_screen_html()}
         {get_setup_screen_html()}
     </div>
     
@@ -1578,10 +1576,6 @@ async def home_screen(request: Request):
 
             if (screenName === 'reports' && typeof loadReportsData === 'function') {{
                 loadReportsData();
-            }}
-
-            if (screenName === 'records' && typeof loadRecordsData === 'function') {{
-                loadRecordsData();
             }}
 
             if (screenName === 'setup' && typeof setupLoadData === 'function') {{
