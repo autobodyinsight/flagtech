@@ -312,10 +312,11 @@ def get_setup_screen_html():
                                 <th style="padding:12px 10px; text-align:left; border-bottom:2px solid #b22222;">Last</th>
                                 <th style="padding:12px 10px; text-align:left; border-bottom:2px solid #b22222;">Email</th>
                                 <th style="padding:12px 10px; text-align:left; border-bottom:2px solid #b22222;">Shop</th>
+                                <th style="padding:12px 10px; text-align:left; border-bottom:2px solid #b22222;">Role</th>
                             </tr>
                         </thead>
                         <tbody id="setupManageUsersBody">
-                            <tr><td colspan="5" style="padding:18px; text-align:center; color:#999;">Loading...</td></tr>
+                            <tr><td colspan="6" style="padding:18px; text-align:center; color:#999;">Loading...</td></tr>
                         </tbody>
                     </table>
                 </div>
@@ -1094,7 +1095,7 @@ def get_setup_script():
             const deleteBtn = document.getElementById('setupManageUsersDeleteBtn');
             if (deleteBtn) deleteBtn.style.display = setupCanManageUsers ? 'inline-block' : 'none';
             const body = document.getElementById('setupManageUsersBody');
-            if (body) body.innerHTML = '<tr><td colspan="5" style="padding:18px; text-align:center; color:#999;">Loading...</td></tr>';
+            if (body) body.innerHTML = '<tr><td colspan="6" style="padding:18px; text-align:center; color:#999;">Loading...</td></tr>';
             try {
                 const usersUrl = `/api/setup/users${setupBuildScopeQuery()}`;
                 const [uData, sData] = await Promise.all([
@@ -1219,7 +1220,7 @@ def get_setup_script():
             if (!body) return;
             const users = setupManageAllUsersData || [];
             if (!users.length) {
-                body.innerHTML = '<tr><td colspan="5" style="padding:18px; text-align:center; color:#999;">No users found.</td></tr>';
+                body.innerHTML = '<tr><td colspan="6" style="padding:18px; text-align:center; color:#999;">No users found.</td></tr>';
                 return;
             }
             const shopOptions = (setupManageAllShopsData || []).map((s) => {
@@ -1234,8 +1235,9 @@ def get_setup_script():
                 const first = setupEscape(user.first_name || '');
                 const last = setupEscape(user.last_name || '');
                 const email = setupEscape(user.email || '');
-                const shopName = setupEscape(user.shop_name || '');
                 const userShopId = Number(user.shop_id || 0);
+                const _shopEntry = (setupManageAllShopsData || []).find((s) => Number(s.id || s.shop_id || 0) === userShopId) || {};
+                const shopName = setupEscape(user.shop_name || _shopEntry.shop_name || _shopEntry.domain || '');
                 const roleLocked = !!user.role_locked;
                 const rowBg = roleLocked ? 'rgba(178,34,34,0.04)' : '#fff';
                 const fontWeight = roleLocked ? '700' : '400';
@@ -1264,14 +1266,15 @@ def get_setup_script():
                                 <input id="muemail_${userId}" value="${email}" style="width:100%; padding:6px 8px; border:1px solid #ccc; border-radius:4px; font-size:13px;" />
                             </td>
                             <td style="padding:8px 10px; border-bottom:1px solid rgba(0,0,0,0.06);">
-                                <div style="display:flex; flex-direction:column; gap:4px;">
-                                    <select id="mushop_${userId}" style="padding:6px 8px; border:1px solid #ccc; border-radius:4px; font-size:13px;">${shopSelectOpts}</select>
-                                    <select id="murole_${userId}" style="padding:6px 8px; border:1px solid #ccc; border-radius:4px; font-size:13px;">${roleOpts}</select>
-                                </div>
+                                <select id="mushop_${userId}" style="width:100%; padding:6px 8px; border:1px solid #ccc; border-radius:4px; font-size:13px;">${shopSelectOpts}</select>
+                            </td>
+                            <td style="padding:8px 10px; border-bottom:1px solid rgba(0,0,0,0.06);">
+                                <select id="murole_${userId}" style="width:100%; padding:6px 8px; border:1px solid #ccc; border-radius:4px; font-size:13px;">${roleOpts}</select>
                             </td>
                         </tr>
                     `;
                 }
+                const roleText = setupEscape(user.role || '');
                 return `
                     <tr style="background:${rowBg};">
                         <td style="padding:10px; border-bottom:1px solid rgba(0,0,0,0.06); text-align:center;">
@@ -1281,6 +1284,7 @@ def get_setup_script():
                         <td style="padding:10px; border-bottom:1px solid rgba(0,0,0,0.06); font-weight:${fontWeight}; color:#222;">${last || '<span style="color:#aaa;">—</span>'}</td>
                         <td style="padding:10px; border-bottom:1px solid rgba(0,0,0,0.06); color:#444;">${email || '<span style="color:#aaa;">—</span>'}</td>
                         <td style="padding:10px; border-bottom:1px solid rgba(0,0,0,0.06); color:#444;">${shopName || '<span style="color:#aaa;">—</span>'}</td>
+                        <td style="padding:10px; border-bottom:1px solid rgba(0,0,0,0.06); color:#444;">${roleText || '<span style="color:#aaa;">—</span>'}</td>
                     </tr>
                 `;
             }).join('');
