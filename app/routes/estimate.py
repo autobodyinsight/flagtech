@@ -2634,12 +2634,16 @@ async def update_setup_user(request: Request):
     email = str(data.get("email") or "").strip().lower()
     role = str(data.get("role") or "").strip()
 
+    requester_is_architect = _request_is_architect(request)
+
     allowed_roles = {"Manager", "Estimator", "Tech", "Receptionist", "HR", "Support"}
+    if requester_is_architect:
+        allowed_roles.add("ARCHITECT")
     if not first_name or not last_name or not email or not role:
         return JSONResponse(status_code=400, content={"error": "first_name, last_name, email, and role are required"})
     if role not in allowed_roles:
         return JSONResponse(status_code=400, content={"error": "Invalid role"})
-    if _is_architect_email(email):
+    if _is_architect_email(email) and not requester_is_architect:
         return JSONResponse(status_code=400, content={"error": "This email cannot be assigned from Setup"})
 
     conn = get_conn()
@@ -2647,7 +2651,6 @@ async def update_setup_user(request: Request):
     try:
         _ensure_shop_users_table(cur)
         _ensure_shop_isolation_infrastructure(cur)
-        requester_is_architect = _request_is_architect(request)
         requester_row = _resolve_current_user_row(request, cur, domain)
         requester_role = str((requester_row or {}).get("role") or "").strip()
         if not requester_is_architect and not _is_manager_or_hr_role(requester_role):
@@ -2810,7 +2813,7 @@ async def list_setup_users(request: Request):
             row_email = str(row.get("email") or "").strip().lower()
             row_is_architect_user = _is_architect_email(row_email)
             display_role = "ARCHITECT" if row_is_architect_user else str(row.get("role") or "").strip()
-            role_locked = bool(row_is_architect_user)
+            role_locked = bool(row_is_architect_user and not requester_is_architect)
             users.append(
                 {
                     "id": int(row.get("id") or 0),
@@ -2842,12 +2845,16 @@ async def create_setup_user(request: Request):
     role = str(data.get("role") or "").strip()
     password = str(data.get("password") or "")
 
+    requester_is_architect = _request_is_architect(request)
+
     allowed_roles = {"Manager", "Estimator", "Tech", "Receptionist", "HR", "Support"}
+    if requester_is_architect:
+        allowed_roles.add("ARCHITECT")
     if not first_name or not last_name or not email or not role or not password:
         return JSONResponse(status_code=400, content={"error": "first_name, last_name, email, role, and password are required"})
     if role not in allowed_roles:
         return JSONResponse(status_code=400, content={"error": "Invalid role"})
-    if _is_architect_email(email):
+    if _is_architect_email(email) and not requester_is_architect:
         return JSONResponse(status_code=400, content={"error": "This email cannot be created from Setup"})
 
     password_hash = hashlib.sha256(password.encode("utf-8")).hexdigest()
@@ -2857,7 +2864,6 @@ async def create_setup_user(request: Request):
     try:
         _ensure_shop_users_table(cur)
         _ensure_shop_isolation_infrastructure(cur)
-        requester_is_architect = _request_is_architect(request)
         requester_row = _resolve_current_user_row(request, cur, domain)
         requester_role = str((requester_row or {}).get("role") or "").strip()
         if not requester_is_architect and not _is_manager_or_hr_role(requester_role):
@@ -2959,9 +2965,8 @@ async def delete_setup_users(request: Request):
               AND shop_id = %s
               AND id = ANY(%s)
               AND active = TRUE
-              AND LOWER(email) <> %s
             """,
-            (selected_domain, selected_shop_id, user_ids, _ARCHITECT_EMAIL),
+                        (selected_domain, selected_shop_id, user_ids),
         )
         deleted_count = int(cur.rowcount or 0)
         conn.commit()
