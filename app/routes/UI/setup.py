@@ -1124,13 +1124,18 @@ def get_setup_script():
             const body = document.getElementById('setupManageUsersBody');
             if (body) body.innerHTML = '<tr><td colspan="5" style="padding:18px; text-align:center; color:#999;">Loading...</td></tr>';
             try {
+                const usersUrl = `/api/setup/users${setupBuildScopeQuery()}`;
                 const [uResp, sResp] = await Promise.all([
-                    fetch('/api/setup/users/all', { credentials: 'include' }),
+                    fetch(usersUrl, { credentials: 'include' }),
                     fetch('/api/setup/shops', { credentials: 'include' }),
                 ]);
                 const uData = await uResp.json();
                 const sData = await sResp.json();
-                setupManageAllUsersData = Array.isArray(uData.users) ? uData.users : [];
+                const selectedShopId = Number(setupSelectedShopId || 0);
+                const fetchedUsers = Array.isArray(uData.users) ? uData.users : [];
+                setupManageAllUsersData = selectedShopId > 0
+                    ? fetchedUsers.filter((user) => Number(user.shop_id || 0) === selectedShopId)
+                    : fetchedUsers;
                 setupManageAllShopsData = Array.isArray(sData.shops) ? sData.shops : [];
             } catch (e) {
                 setupManageAllUsersData = [];

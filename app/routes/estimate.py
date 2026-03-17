@@ -3220,58 +3220,6 @@ async def delete_setup_shop(request: Request):
         cur.close()
 
 
-@router.get("/setup/users/all")
-async def get_all_setup_users(request: Request):
-    domain = get_user_domain(request)
-    if not domain:
-        return JSONResponse(status_code=401, content={"error": "Not authenticated", "users": []})
-    if not _request_is_architect(request):
-        return JSONResponse(status_code=403, content={"error": "Forbidden", "users": []})
-
-    conn = get_conn()
-    cur = conn.cursor()
-    try:
-        _ensure_shop_users_table(cur)
-        _ensure_shop_isolation_infrastructure(cur)
-        cur.execute(
-            """
-            SELECT
-                su.id,
-                su.email,
-                su.first_name,
-                su.last_name,
-                su.role,
-                su.shop_id,
-                su.role_locked,
-                COALESCE(NULLIF(ss.shop_name, ''), NULLIF(sh.name, ''), sh.domain, '') AS shop_name
-            FROM shop_users su
-            LEFT JOIN shops sh ON sh.id = su.shop_id
-            LEFT JOIN shop_settings ss ON ss.shop_id = su.shop_id
-            WHERE su.active = TRUE
-            ORDER BY
-                LOWER(COALESCE(NULLIF(ss.shop_name, ''), NULLIF(sh.name, ''), sh.domain)) ASC,
-                LOWER(su.last_name) ASC,
-                LOWER(su.first_name) ASC
-            """
-        )
-        rows = cur.fetchall() or []
-        users = []
-        for row in rows:
-            users.append({
-                "id": int(row.get("id") or 0),
-                "email": str(row.get("email") or "").strip(),
-                "first_name": str(row.get("first_name") or "").strip(),
-                "last_name": str(row.get("last_name") or "").strip(),
-                "role": str(row.get("role") or "").strip(),
-                "shop_id": int(row.get("shop_id") or 0),
-                "shop_name": str(row.get("shop_name") or "").strip(),
-                "role_locked": bool(row.get("role_locked")),
-            })
-        return {"users": users}
-    finally:
-        cur.close()
-
-
 @router.post("/setup/users/admin-update")
 async def admin_update_setup_user(request: Request):
     domain = get_user_domain(request)
