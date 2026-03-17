@@ -915,6 +915,55 @@ def _is_manager_or_hr_role(role: str | None) -> bool:
     return normalized in {"manager", "hr"}
 
 
+def _can_manage_users(requester_is_architect: bool, requester_role: str | None) -> bool:
+    return bool(requester_is_architect or _is_manager_or_hr_role(requester_role))
+
+
+def _is_architect_user_row(row: dict | None) -> bool:
+    row_data = row or {}
+    row_email = str(row_data.get("email") or "").strip().lower()
+    row_role = str(row_data.get("role") or "").strip().upper()
+    return _is_architect_email(row_email) or row_role == "ARCHITECT"
+
+
+def _ensure_single_architect_account(cur, target_email: str, excluding_user_id: int | None = None) -> None:
+    normalized_email = str(target_email or "").strip().lower()
+    if not _is_architect_email(normalized_email):
+        raise ValueError("Architect role can only be assigned to the architect account")
+
+    if excluding_user_id:
+        cur.execute(
+            """
+            SELECT id, email
+            FROM shop_users
+            WHERE active = TRUE
+              AND id <> %s
+              AND (LOWER(email) = %s OR UPPER(COALESCE(role, '')) = 'ARCHITECT')
+            LIMIT 1
+            """,
+            (excluding_user_id, _ARCHITECT_EMAIL.lower()),
+        )
+    else:
+        cur.execute(
+            """
+            SELECT id, email
+            FROM shop_users
+            WHERE active = TRUE
+              AND (LOWER(email) = %s OR UPPER(COALESCE(role, '')) = 'ARCHITECT')
+            LIMIT 1
+            """,
+            (_ARCHITECT_EMAIL.lower(),),
+        )
+
+    existing = cur.fetchone() or {}
+    if not existing:
+        return
+
+    existing_email = str(existing.get("email") or "").strip().lower()
+    if existing_email and existing_email != normalized_email:
+        raise ValueError("Only one Architect account is allowed at a time")
+
+
 def _parse_int(value) -> int | None:
     try:
         parsed = int(value)
@@ -2450,12 +2499,23 @@ async def get_setup_context(request: Request):
     conn = get_conn()
     cur = conn.cursor()
     try:
+        _ensure_shop_users_table(cur)
         shop_id = _resolve_request_shop_id(request, cur, domain)
+        requester_row = _resolve_current_user_row(request, cur, domain)
     finally:
         cur.close()
 
+    requester_role = str((requester_row or {}).get("role") or "").strip()
+    requester_is_architect = _request_is_architect(request)
+    can_manage_users = _can_manage_users(requester_is_architect, requester_role)
+    can_add_users = can_manage_users
+
     return {
-        "is_architect": _request_is_architect(request),
+        "is_architect": requester_is_architect,
+        "requester_role": "ARCHITECT" if requester_is_architect else requester_role,
+        "can_manage_users": can_manage_users,
+        "can_add_users": can_add_users,
+        "can_assign_architect": requester_is_architect,
         "default_domain": str(domain or "").strip().lower(),
         "default_shop_id": shop_id,
     }
@@ -3034,7 +3094,7 @@ async def create_setup_user(request: Request):
             requested_domain=requested_domain,
         )
         requester_role = str((requester_row or {}).get("role") or "").strip()
-        if not requester_is_architect and not _is_manager_or_hr_role(requester_role):
+        if not _can_manage_users(requester_is_architect, requester_role):
             return JSONResponse(status_code=403, content={"error": "Forbidden"})
         requester_shop_id = _parse_int((requester_row or {}).get("shop_id"))
         if not requester_is_architect and selected_shop_id and requester_shop_id != selected_shop_id:
@@ -3046,6 +3106,15 @@ async def create_setup_user(request: Request):
             selected_domain = str((cur.fetchone() or {}).get("domain") or "").strip().lower()
             if not selected_domain:
                 return JSONResponse(status_code=400, content={"error": "Unable to resolve shop domain"})
+
+        if role == "ARCHITECT":
+            if not requester_is_architect:
+                return JSONResponse(status_code=403, content={"error": "Forbidden"})
+            try:
+                _ensure_single_architect_account(cur, email)
+            except ValueError as exc:
+                return JSONResponse(status_code=400, content={"error": str(exc)})
+
         cur.execute(
             """
             INSERT INTO shop_users (first_name, last_name, email, role, password_hash, domain, shop_id, active)
@@ -3120,13 +3189,28 @@ async def delete_setup_users(request: Request):
             requested_domain=requested_domain,
         )
         requester_role = str((requester_row or {}).get("role") or "").strip()
-        if not requester_is_architect and not _is_manager_or_hr_role(requester_role):
+        if not _can_manage_users(requester_is_architect, requester_role):
             return JSONResponse(status_code=403, content={"error": "Forbidden"})
         requester_shop_id = _parse_int((requester_row or {}).get("shop_id"))
         if not requester_is_architect and selected_shop_id and requester_shop_id != selected_shop_id:
             return JSONResponse(status_code=403, content={"error": "Forbidden"})
         if not selected_shop_id:
             return JSONResponse(status_code=400, content={"error": "Unable to resolve shop scope"})
+
+        cur.execute(
+            """
+            SELECT id, email, role
+            FROM shop_users
+            WHERE shop_id = %s
+              AND id = ANY(%s)
+              AND active = TRUE
+            """,
+            (selected_shop_id, user_ids),
+        )
+        target_rows = cur.fetchall() or []
+        if not requester_is_architect:
+            if any(_is_architect_user_row(row) for row in target_rows):
+                return JSONResponse(status_code=403, content={"error": "Architect user cannot be deleted"})
 
         cur.execute(
             """
@@ -3225,10 +3309,10 @@ async def admin_update_setup_user(request: Request):
     domain = get_user_domain(request)
     if not domain:
         return JSONResponse(status_code=401, content={"error": "Not authenticated"})
-    if not _request_is_architect(request):
-        return JSONResponse(status_code=403, content={"error": "Forbidden"})
 
     data = await request.json()
+    requested_domain = data.get("shop_domain")
+    requested_shop_id = data.get("shop_id")
     user_id = data.get("id")
     try:
         user_id = int(user_id)
@@ -3244,34 +3328,80 @@ async def admin_update_setup_user(request: Request):
     if not first_name or not last_name or not email or not role:
         return JSONResponse(status_code=400, content={"error": "first_name, last_name, email, and role are required"})
 
-    allowed_roles = {"ARCHITECT", "Manager", "Estimator", "Tech", "Receptionist", "HR", "Support"}
-    if role not in allowed_roles:
-        return JSONResponse(status_code=400, content={"error": "Invalid role"})
-
     conn = get_conn()
     cur = conn.cursor()
     try:
         _ensure_shop_users_table(cur)
-        if new_shop_id:
-            cur.execute(
-                """
-                UPDATE shop_users
-                SET first_name = %s, last_name = %s, email = %s, role = %s, shop_id = %s
-                WHERE id = %s AND active = TRUE
-                RETURNING id, first_name, last_name, email, role, shop_id
-                """,
-                (first_name, last_name, email, role, new_shop_id, user_id),
-            )
-        else:
-            cur.execute(
-                """
-                UPDATE shop_users
-                SET first_name = %s, last_name = %s, email = %s, role = %s
-                WHERE id = %s AND active = TRUE
-                RETURNING id, first_name, last_name, email, role, shop_id
-                """,
-                (first_name, last_name, email, role, user_id),
-            )
+        selected_shop_id, _, requester_row, requester_is_architect = _resolve_setup_scope_shop(
+            request,
+            cur,
+            domain,
+            requested_shop_id=requested_shop_id,
+            requested_domain=requested_domain,
+        )
+        requester_role = str((requester_row or {}).get("role") or "").strip()
+        if not _can_manage_users(requester_is_architect, requester_role):
+            return JSONResponse(status_code=403, content={"error": "Forbidden"})
+        requester_shop_id = _parse_int((requester_row or {}).get("shop_id"))
+        if not requester_is_architect and selected_shop_id and requester_shop_id != selected_shop_id:
+            return JSONResponse(status_code=403, content={"error": "Forbidden"})
+        if not selected_shop_id and not requester_is_architect:
+            return JSONResponse(status_code=400, content={"error": "Unable to resolve shop scope"})
+
+        allowed_roles = {"Manager", "Estimator", "Tech", "Receptionist", "HR", "Support"}
+        if requester_is_architect:
+            allowed_roles.add("ARCHITECT")
+        if role not in allowed_roles:
+            return JSONResponse(status_code=400, content={"error": "Invalid role"})
+
+        cur.execute(
+            """
+            SELECT id, email, role, shop_id
+            FROM shop_users
+            WHERE id = %s
+              AND active = TRUE
+            LIMIT 1
+            """,
+            (user_id,),
+        )
+        existing_row = cur.fetchone() or {}
+        if not existing_row:
+            return JSONResponse(status_code=404, content={"error": "User not found"})
+
+        existing_shop_id = _parse_int(existing_row.get("shop_id"))
+        if not requester_is_architect and requester_shop_id and existing_shop_id and existing_shop_id != requester_shop_id:
+            return JSONResponse(status_code=403, content={"error": "Forbidden"})
+        if not requester_is_architect and _is_architect_user_row(existing_row):
+            return JSONResponse(status_code=403, content={"error": "Architect account cannot be edited"})
+
+        if role == "ARCHITECT":
+            if not requester_is_architect:
+                return JSONResponse(status_code=403, content={"error": "Forbidden"})
+            try:
+                _ensure_single_architect_account(cur, email, excluding_user_id=user_id)
+            except ValueError as exc:
+                return JSONResponse(status_code=400, content={"error": str(exc)})
+
+        target_shop_id = new_shop_id or existing_shop_id
+        if not requester_is_architect:
+            if requester_shop_id and target_shop_id and requester_shop_id != target_shop_id:
+                return JSONResponse(status_code=403, content={"error": "Forbidden"})
+            target_shop_id = requester_shop_id or existing_shop_id
+
+        cur.execute(
+            """
+            UPDATE shop_users
+            SET first_name = %s,
+                last_name = %s,
+                email = %s,
+                role = %s,
+                shop_id = %s
+            WHERE id = %s
+              AND active = TRUE
+            RETURNING id, first_name, last_name, email, role, shop_id
+            """,
+            (first_name, last_name, email, role, target_shop_id, user_id),
+        )
         row = cur.fetchone() or {}
         if not row:
             return JSONResponse(status_code=404, content={"error": "User not found"})
