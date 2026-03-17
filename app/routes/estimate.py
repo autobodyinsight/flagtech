@@ -302,10 +302,17 @@ async def auth_login(request: Request):
             return JSONResponse(status_code=401, content={"error": "Invalid credentials"})
 
         user_email = str(row.get("email") or "").strip().lower()
-        user_domain = str(row.get("domain") or "").strip().lower()
         first_name = str(row.get("first_name") or "").strip()
         last_name = str(row.get("last_name") or "").strip()
         user_shop_id = int(row.get("shop_id") or 0)
+
+        user_domain = ""
+        if user_shop_id:
+            cur.execute("SELECT domain FROM shops WHERE id = %s LIMIT 1", (user_shop_id,))
+            shop_row = cur.fetchone() or {}
+            user_domain = str(shop_row.get("domain") or "").strip().lower()
+        if not user_domain:
+            user_domain = str(row.get("domain") or "").strip().lower()
 
         if not user_email or not user_domain or not user_shop_id:
             return JSONResponse(status_code=401, content={"error": "Invalid user record"})
@@ -906,6 +913,53 @@ def _resolve_current_user_row(request: Request, cur, domain: str) -> dict | None
 def _is_manager_or_hr_role(role: str | None) -> bool:
     normalized = str(role or "").strip().lower()
     return normalized in {"manager", "hr"}
+
+
+def _parse_int(value) -> int | None:
+    try:
+        parsed = int(value)
+    except (TypeError, ValueError):
+        return None
+    return parsed if parsed > 0 else None
+
+
+def _resolve_setup_scope_shop(
+    request: Request,
+    cur,
+    fallback_domain: str,
+    requested_shop_id=None,
+    requested_domain: str | None = None,
+) -> tuple[int | None, str, dict | None, bool]:
+    normalized_domain = str(fallback_domain or "").strip().lower()
+    _ensure_shop_isolation_infrastructure(cur)
+    requester_is_architect = _request_is_architect(request)
+    requester_row = _resolve_current_user_row(request, cur, normalized_domain)
+
+    selected_shop_id = None
+    selected_domain = normalized_domain
+
+    if requester_is_architect:
+        requested_id = _parse_int(requested_shop_id)
+        if requested_id:
+            selected_shop_id = requested_id
+        else:
+            scoped_domain = _resolve_setup_scope_domain(request, normalized_domain, requested_domain)
+            if scoped_domain:
+                selected_shop_id = _ensure_shop_scope_id(cur, scoped_domain)
+
+        if not selected_shop_id and requester_row:
+            selected_shop_id = _parse_int(requester_row.get("shop_id"))
+    else:
+        selected_shop_id = _parse_int((requester_row or {}).get("shop_id"))
+        if not selected_shop_id and normalized_domain:
+            selected_shop_id = _ensure_shop_scope_id(cur, normalized_domain)
+
+    if selected_shop_id:
+        cur.execute("SELECT domain FROM shops WHERE id = %s LIMIT 1", (selected_shop_id,))
+        shop_row = cur.fetchone() or {}
+        selected_domain = str(shop_row.get("domain") or selected_domain or "").strip().lower()
+
+    return selected_shop_id, selected_domain, requester_row, requester_is_architect
 
 
 def _ensure_saved_estimates_table(cur) -> None:
@@ -2209,18 +2263,26 @@ async def get_setup_shop(request: Request):
     if not domain:
         return JSONResponse(status_code=401, content={"error": "Not authenticated"})
 
-    selected_domain = _resolve_setup_scope_domain(request, domain, request.query_params.get("shop_domain"))
+    requested_shop_id = request.query_params.get("shop_id")
+    requested_domain = request.query_params.get("shop_domain")
 
     conn = get_conn()
     cur = conn.cursor()
     try:
         _ensure_shop_settings_table(cur)
-        _ensure_shop_isolation_infrastructure(cur)
-        _ensure_shop_scope_id(cur, selected_domain)
+        selected_shop_id, _, _, _ = _resolve_setup_scope_shop(
+            request,
+            cur,
+            domain,
+            requested_shop_id=requested_shop_id,
+            requested_domain=requested_domain,
+        )
+        if not selected_shop_id:
+            return {"shop": {"shop_id": None, "shop_name": "", "address": "", "city": "", "state": "", "zip_code": "", "phone": "", "email": ""}}
         cur.execute(
             """
             SELECT
-                COALESCE(ss.shop_id, s.id) AS shop_id,
+                s.id AS shop_id,
                 COALESCE(NULLIF(ss.shop_name, ''), NULLIF(s.name, '')) AS shop_name,
                 COALESCE(NULLIF(ss.address, ''), NULLIF(s.address, '')) AS address,
                 COALESCE(NULLIF(ss.city, ''), NULLIF(s.city, '')) AS city,
@@ -2229,11 +2291,11 @@ async def get_setup_shop(request: Request):
                 COALESCE(NULLIF(ss.phone, ''), '') AS phone,
                 COALESCE(NULLIF(ss.email, ''), '') AS email
             FROM shops s
-            LEFT JOIN shop_settings ss ON ss.domain = s.domain
-            WHERE s.domain = %s
+            LEFT JOIN shop_settings ss ON ss.shop_id = s.id
+            WHERE s.id = %s
             LIMIT 1
             """,
-            (selected_domain,),
+            (selected_shop_id,),
         )
         row = cur.fetchone() or {}
         return {
@@ -2259,7 +2321,8 @@ async def save_setup_shop(request: Request):
         return JSONResponse(status_code=401, content={"error": "Not authenticated"})
 
     data = await request.json()
-    selected_domain = _resolve_setup_scope_domain(request, domain, data.get("shop_domain"))
+    requested_domain = data.get("shop_domain")
+    requested_shop_id = data.get("shop_id")
     shop_name = str(data.get("shop_name") or "").strip()
     address = str(data.get("address") or "").strip()
     city = str(data.get("city") or "").strip()
@@ -2275,25 +2338,68 @@ async def save_setup_shop(request: Request):
     cur = conn.cursor()
     try:
         _ensure_shop_settings_table(cur)
-        _ensure_shop_isolation_infrastructure(cur)
-        requester_is_architect = _request_is_architect(request)
-        requester_row = _resolve_current_user_row(request, cur, domain)
+        _ensure_shops_table(cur)
+        selected_shop_id, selected_domain, requester_row, requester_is_architect = _resolve_setup_scope_shop(
+            request,
+            cur,
+            domain,
+            requested_shop_id=requested_shop_id,
+            requested_domain=requested_domain,
+        )
         requester_role = str((requester_row or {}).get("role") or "").strip()
         if not requester_is_architect and not _is_manager_or_hr_role(requester_role):
             return JSONResponse(status_code=403, content={"error": "Forbidden"})
-        if not requester_is_architect and selected_domain != str(domain or "").strip().lower():
-            return JSONResponse(status_code=403, content={"error": "Forbidden"})
+        if not selected_shop_id and requester_is_architect:
+            cur.execute(
+                """
+                SELECT s.id, s.domain
+                FROM shops s
+                WHERE LOWER(COALESCE(NULLIF(s.name, ''), '')) = LOWER(%s)
+                  AND LOWER(COALESCE(NULLIF(s.address, ''), '')) = LOWER(%s)
+                LIMIT 1
+                """,
+                (shop_name, address),
+            )
+            existing_shop = cur.fetchone() or {}
+            selected_shop_id = _parse_int(existing_shop.get("id"))
+            selected_domain = str(existing_shop.get("domain") or "").strip().lower()
 
-        selected_shop_id = _ensure_shop_scope_id(cur, selected_domain)
+        if not selected_shop_id and requester_is_architect:
+            domain_seed = f"{shop_name}::{address}::{city}::{state}::{zip_code}".lower().encode("utf-8")
+            generated_domain = f"shop-{hashlib.sha1(domain_seed).hexdigest()[:16]}.internal"
+            cur.execute(
+                """
+                INSERT INTO shops (domain, name, address, city, state, zip, updated_at)
+                VALUES (%s, %s, %s, %s, %s, %s, CURRENT_TIMESTAMP)
+                ON CONFLICT (domain)
+                DO UPDATE SET
+                    name = COALESCE(NULLIF(EXCLUDED.name, ''), shops.name),
+                    address = COALESCE(NULLIF(EXCLUDED.address, ''), shops.address),
+                    city = COALESCE(NULLIF(EXCLUDED.city, ''), shops.city),
+                    state = COALESCE(NULLIF(EXCLUDED.state, ''), shops.state),
+                    zip = COALESCE(NULLIF(EXCLUDED.zip, ''), shops.zip),
+                    updated_at = CURRENT_TIMESTAMP
+                RETURNING id, domain
+                """,
+                (generated_domain, shop_name or None, address or None, city or None, state or None, zip_code or None),
+            )
+            new_shop = cur.fetchone() or {}
+            selected_shop_id = _parse_int(new_shop.get("id"))
+            selected_domain = str(new_shop.get("domain") or generated_domain).strip().lower()
 
         if not selected_shop_id:
             return JSONResponse(status_code=400, content={"error": "Unable to resolve shop scope"})
+
+        if not selected_domain:
+            cur.execute("SELECT domain FROM shops WHERE id = %s LIMIT 1", (selected_shop_id,))
+            selected_domain = str((cur.fetchone() or {}).get("domain") or "").strip().lower()
         cur.execute(
             """
             INSERT INTO shop_settings (domain, shop_id, shop_name, address, city, state, zip_code, phone, email, updated_at)
             VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, CURRENT_TIMESTAMP)
-            ON CONFLICT (domain)
+            ON CONFLICT (shop_id)
             DO UPDATE SET
+                domain = EXCLUDED.domain,
                 shop_id = EXCLUDED.shop_id,
                 shop_name = EXCLUDED.shop_name,
                 address = EXCLUDED.address,
@@ -2330,7 +2436,7 @@ async def save_setup_shop(request: Request):
             (shop_name or None, address or None, city or None, state or None, zip_code or None, selected_shop_id),
         )
         conn.commit()
-        return {"status": "ok"}
+        return {"status": "ok", "shop_id": selected_shop_id}
     finally:
         cur.close()
 
@@ -2621,14 +2727,9 @@ async def list_setup_shops(request: Request):
         _ensure_shop_isolation_infrastructure(cur)
         cur.execute(
             """
-            WITH all_domains AS (
-                SELECT DISTINCT domain FROM shop_settings
-                UNION
-                SELECT DISTINCT domain FROM shop_users
-            )
             SELECT
                 sh.id AS shop_id,
-                d.domain,
+                sh.domain,
                 COALESCE(s.shop_name, sh.name) AS shop_name,
                 COALESCE(s.address, sh.address) AS address,
                 COALESCE(s.city, sh.city) AS city,
@@ -2636,10 +2737,9 @@ async def list_setup_shops(request: Request):
                 COALESCE(s.zip_code, sh.zip) AS zip_code,
                 s.phone,
                 s.email
-            FROM all_domains d
-            LEFT JOIN shops sh ON sh.domain = d.domain
-            LEFT JOIN shop_settings s ON s.domain = d.domain
-            ORDER BY LOWER(COALESCE(NULLIF(s.shop_name, ''), NULLIF(sh.name, ''), d.domain)) ASC
+            FROM shops sh
+            LEFT JOIN shop_settings s ON s.shop_id = sh.id
+            ORDER BY LOWER(COALESCE(NULLIF(s.shop_name, ''), NULLIF(sh.name, ''), sh.domain)) ASC
             """
         )
         rows = cur.fetchall() or []
@@ -2670,7 +2770,8 @@ async def update_setup_user(request: Request):
         return JSONResponse(status_code=401, content={"error": "Not authenticated"})
 
     data = await request.json()
-    selected_domain = _resolve_setup_scope_domain(request, domain, data.get("shop_domain"))
+    requested_domain = data.get("shop_domain")
+    requested_shop_id = data.get("shop_id")
     user_id = data.get("id")
     try:
         user_id = int(user_id)
@@ -2698,15 +2799,19 @@ async def update_setup_user(request: Request):
     cur = conn.cursor()
     try:
         _ensure_shop_users_table(cur)
-        _ensure_shop_isolation_infrastructure(cur)
-        requester_row = _resolve_current_user_row(request, cur, domain)
+        selected_shop_id, selected_domain, requester_row, requester_is_architect = _resolve_setup_scope_shop(
+            request,
+            cur,
+            domain,
+            requested_shop_id=requested_shop_id,
+            requested_domain=requested_domain,
+        )
         requester_role = str((requester_row or {}).get("role") or "").strip()
         if not requester_is_architect and not _is_manager_or_hr_role(requester_role):
             return JSONResponse(status_code=403, content={"error": "Forbidden"})
-        if not requester_is_architect and selected_domain != str(domain or "").strip().lower():
+        requester_shop_id = _parse_int((requester_row or {}).get("shop_id"))
+        if not requester_is_architect and selected_shop_id and requester_shop_id != selected_shop_id:
             return JSONResponse(status_code=403, content={"error": "Forbidden"})
-
-        selected_shop_id = _ensure_shop_scope_id(cur, selected_domain)
         if not selected_shop_id:
             return JSONResponse(status_code=400, content={"error": "Unable to resolve shop scope"})
         cur.execute(
@@ -2718,11 +2823,10 @@ async def update_setup_user(request: Request):
                 role = %s
             WHERE id = %s
               AND shop_id = %s
-              AND domain = %s
               AND active = TRUE
             RETURNING id, first_name, last_name, email, role, shop_id, created_at
             """,
-            (first_name, last_name, email, role, user_id, selected_shop_id, selected_domain),
+                        (first_name, last_name, email, role, user_id, selected_shop_id),
         )
         row = cur.fetchone() or {}
         conn.commit()
@@ -2754,7 +2858,8 @@ async def reset_setup_user_password(request: Request):
         return JSONResponse(status_code=401, content={"error": "Not authenticated"})
 
     data = await request.json()
-    selected_domain = _resolve_setup_scope_domain(request, domain, data.get("shop_domain"))
+    requested_domain = data.get("shop_domain")
+    requested_shop_id = data.get("shop_id")
     user_ids_raw = data.get("user_ids") or []
     new_password = str(data.get("new_password") or "")
 
@@ -2781,37 +2886,40 @@ async def reset_setup_user_password(request: Request):
     cur = conn.cursor()
     try:
         _ensure_shop_users_table(cur)
-        _ensure_shop_isolation_infrastructure(cur)
-        requester_is_architect = _request_is_architect(request)
-        requester_row = _resolve_current_user_row(request, cur, domain)
+        selected_shop_id, _, requester_row, requester_is_architect = _resolve_setup_scope_shop(
+            request,
+            cur,
+            domain,
+            requested_shop_id=requested_shop_id,
+            requested_domain=requested_domain,
+        )
         if not requester_row:
             return JSONResponse(status_code=401, content={"error": "Not authenticated"})
         requester_id = int(requester_row.get("id") or 0)
         requester_role = str(requester_row.get("role") or "").strip()
+        requester_shop_id = _parse_int(requester_row.get("shop_id"))
 
         if requester_is_architect:
             pass
         elif _is_manager_or_hr_role(requester_role):
-            if selected_domain != str(domain or "").strip().lower():
+            if requester_shop_id and selected_shop_id and requester_shop_id != selected_shop_id:
                 return JSONResponse(status_code=403, content={"error": "Forbidden"})
         else:
             if len(user_ids) != 1 or int(user_ids[0]) != requester_id:
                 return JSONResponse(status_code=403, content={"error": "You can only reset your own password"})
-            selected_domain = str(domain or "").strip().lower()
+            selected_shop_id = requester_shop_id
 
-        selected_shop_id = _ensure_shop_scope_id(cur, selected_domain)
         if not selected_shop_id:
             return JSONResponse(status_code=400, content={"error": "Unable to resolve shop scope"})
         cur.execute(
             """
             UPDATE shop_users
             SET password_hash = %s
-            WHERE domain = %s
-              AND shop_id = %s
+            WHERE shop_id = %s
               AND active = TRUE
               AND id = ANY(%s)
             """,
-            (password_hash, selected_domain, selected_shop_id, user_ids),
+            (password_hash, selected_shop_id, user_ids),
         )
         updated_count = int(cur.rowcount or 0)
         conn.commit()
@@ -2826,27 +2934,31 @@ async def list_setup_users(request: Request):
     if not domain:
         return JSONResponse(status_code=401, content={"error": "Not authenticated", "users": []})
 
-    selected_domain = _resolve_setup_scope_domain(request, domain, request.query_params.get("shop_domain"))
-    requester_is_architect = _request_is_architect(request)
+    requested_domain = request.query_params.get("shop_domain")
+    requested_shop_id = request.query_params.get("shop_id")
 
     conn = get_conn()
     cur = conn.cursor()
     try:
         _ensure_shop_users_table(cur)
-        _ensure_shop_isolation_infrastructure(cur)
-        selected_shop_id = _ensure_shop_scope_id(cur, selected_domain)
+        selected_shop_id, _, _, requester_is_architect = _resolve_setup_scope_shop(
+            request,
+            cur,
+            domain,
+            requested_shop_id=requested_shop_id,
+            requested_domain=requested_domain,
+        )
         if not selected_shop_id and not requester_is_architect:
             return JSONResponse(status_code=403, content={"error": "Shop scope not resolved", "users": []})
         cur.execute(
             """
             SELECT id, first_name, last_name, email, role, shop_id, created_at
             FROM shop_users
-            WHERE domain = %s
-              AND shop_id = %s
+            WHERE shop_id = %s
               AND active = TRUE
             ORDER BY created_at DESC, id DESC
             """,
-            (selected_domain, selected_shop_id),
+            (selected_shop_id,),
         )
         rows = cur.fetchall() or []
         users = []
@@ -2880,7 +2992,8 @@ async def create_setup_user(request: Request):
         return JSONResponse(status_code=401, content={"error": "Not authenticated"})
 
     data = await request.json()
-    selected_domain = _resolve_setup_scope_domain(request, domain, data.get("shop_domain"))
+    requested_domain = data.get("shop_domain")
+    requested_shop_id = data.get("shop_id")
     first_name = str(data.get("first_name") or "").strip()
     last_name = str(data.get("last_name") or "").strip()
     email = str(data.get("email") or "").strip().lower()
@@ -2905,17 +3018,26 @@ async def create_setup_user(request: Request):
     cur = conn.cursor()
     try:
         _ensure_shop_users_table(cur)
-        _ensure_shop_isolation_infrastructure(cur)
-        requester_row = _resolve_current_user_row(request, cur, domain)
+        selected_shop_id, selected_domain, requester_row, requester_is_architect = _resolve_setup_scope_shop(
+            request,
+            cur,
+            domain,
+            requested_shop_id=requested_shop_id,
+            requested_domain=requested_domain,
+        )
         requester_role = str((requester_row or {}).get("role") or "").strip()
         if not requester_is_architect and not _is_manager_or_hr_role(requester_role):
             return JSONResponse(status_code=403, content={"error": "Forbidden"})
-        if not requester_is_architect and selected_domain != str(domain or "").strip().lower():
+        requester_shop_id = _parse_int((requester_row or {}).get("shop_id"))
+        if not requester_is_architect and selected_shop_id and requester_shop_id != selected_shop_id:
             return JSONResponse(status_code=403, content={"error": "Forbidden"})
-
-        selected_shop_id = _ensure_shop_scope_id(cur, selected_domain)
         if not selected_shop_id:
             return JSONResponse(status_code=400, content={"error": "Unable to resolve shop scope"})
+        if not selected_domain:
+            cur.execute("SELECT domain FROM shops WHERE id = %s LIMIT 1", (selected_shop_id,))
+            selected_domain = str((cur.fetchone() or {}).get("domain") or "").strip().lower()
+            if not selected_domain:
+                return JSONResponse(status_code=400, content={"error": "Unable to resolve shop domain"})
         cur.execute(
             """
             INSERT INTO shop_users (first_name, last_name, email, role, password_hash, domain, shop_id, active)
@@ -2959,7 +3081,8 @@ async def delete_setup_users(request: Request):
         return JSONResponse(status_code=401, content={"error": "Not authenticated"})
 
     data = await request.json()
-    selected_domain = _resolve_setup_scope_domain(request, domain, data.get("shop_domain"))
+    requested_domain = data.get("shop_domain")
+    requested_shop_id = data.get("shop_id")
     user_ids_raw = data.get("user_ids") or []
 
     if not isinstance(user_ids_raw, list) or not user_ids_raw:
@@ -2981,19 +3104,19 @@ async def delete_setup_users(request: Request):
     cur = conn.cursor()
     try:
         _ensure_shop_users_table(cur)
-        _ensure_shop_isolation_infrastructure(cur)
-
-        requester_is_architect = _request_is_architect(request)
-        requester_row = _resolve_current_user_row(request, cur, domain)
+        selected_shop_id, _, requester_row, requester_is_architect = _resolve_setup_scope_shop(
+            request,
+            cur,
+            domain,
+            requested_shop_id=requested_shop_id,
+            requested_domain=requested_domain,
+        )
         requester_role = str((requester_row or {}).get("role") or "").strip()
         if not requester_is_architect and not _is_manager_or_hr_role(requester_role):
             return JSONResponse(status_code=403, content={"error": "Forbidden"})
-        if not requester_is_architect and selected_domain != str(domain or "").strip().lower():
+        requester_shop_id = _parse_int((requester_row or {}).get("shop_id"))
+        if not requester_is_architect and selected_shop_id and requester_shop_id != selected_shop_id:
             return JSONResponse(status_code=403, content={"error": "Forbidden"})
-
-        cur.execute("SELECT id FROM shops WHERE domain = %s LIMIT 1", (selected_domain,))
-        shop_row = cur.fetchone() or {}
-        selected_shop_id = int(shop_row.get("id") or 0)
         if not selected_shop_id:
             return JSONResponse(status_code=400, content={"error": "Unable to resolve shop scope"})
 
@@ -3001,12 +3124,11 @@ async def delete_setup_users(request: Request):
             """
             UPDATE shop_users
             SET active = FALSE
-            WHERE domain = %s
-              AND shop_id = %s
+            WHERE shop_id = %s
               AND id = ANY(%s)
               AND active = TRUE
             """,
-                        (selected_domain, selected_shop_id, user_ids),
+                        (selected_shop_id, user_ids),
         )
         deleted_count = int(cur.rowcount or 0)
         conn.commit()

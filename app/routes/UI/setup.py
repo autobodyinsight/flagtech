@@ -248,8 +248,8 @@ def get_setup_screen_html():
 
                 <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
                     <div style="grid-column:1 / span 2;">
-                        <label for="setupAddShopDomain" style="font-weight:bold; color:#333;">Shop Domain</label>
-                        <input id="setupAddShopDomain" type="text" placeholder="example: newshop.com" style="width:100%; padding:10px; margin-top:6px;" />
+                        <label for="setupAddShopDomain" style="font-weight:bold; color:#333;">Shop Domain (Optional)</label>
+                        <input id="setupAddShopDomain" type="text" placeholder="optional" style="width:100%; padding:10px; margin-top:6px;" />
                     </div>
                     <div style="grid-column:1 / span 2;">
                         <label for="setupAddShopName" style="font-weight:bold; color:#333;">Shop Name</label>
@@ -297,6 +297,7 @@ def get_setup_script():
         let setupUsersData = [];
         let setupShopsData = [];
         let setupIsArchitect = false;
+        let setupSelectedShopId = 0;
         let setupSelectedShopDomain = '';
         let setupDefaultDomain = '';
         let setupEditMode = false;
@@ -318,8 +319,8 @@ def get_setup_script():
                 const data = await resp.json();
                 setupIsArchitect = !!data.is_architect;
                 setupDefaultDomain = String(data.default_domain || '').trim().toLowerCase();
-                if (!setupSelectedShopDomain) {
-                    setupSelectedShopDomain = setupDefaultDomain;
+                if (!setupSelectedShopId) {
+                    setupSelectedShopId = Number(data.default_shop_id || 0) || 0;
                 }
                 if (pane) pane.style.display = setupIsArchitect ? 'block' : 'none';
                 if (addShopBtn) addShopBtn.style.display = setupIsArchitect ? 'inline-block' : 'none';
@@ -332,14 +333,13 @@ def get_setup_script():
         }
 
         function setupBuildScopeQuery() {
-            if (!setupIsArchitect || !setupSelectedShopDomain) return '';
-            const scope = encodeURIComponent(setupSelectedShopDomain);
-            return `?shop_domain=${scope}`;
+            if (!setupIsArchitect || !setupSelectedShopId) return '';
+            return `?shop_id=${encodeURIComponent(String(setupSelectedShopId))}`;
         }
 
         function setupBuildScopePayload() {
-            if (!setupIsArchitect || !setupSelectedShopDomain) return {};
-            return { shop_domain: setupSelectedShopDomain };
+            if (!setupIsArchitect || !setupSelectedShopId) return {};
+            return { shop_id: setupSelectedShopId };
         }
 
         async function setupLoadData() {
@@ -360,8 +360,9 @@ def get_setup_script():
             }
 
             cardsWrap.innerHTML = setupShopsData.map((shop) => {
+                const shopId = Number(shop.id || shop.shop_id || 0);
                 const domain = String(shop.domain || '').trim().toLowerCase();
-                const isActive = domain && domain === setupSelectedShopDomain;
+                const isActive = shopId > 0 && shopId === setupSelectedShopId;
                 const border = isActive ? '2px solid #b22222' : '1px solid #ddd';
                 const bg = isActive ? '#ece9e7' : '#f2f0ef';
                 const shopName = setupEscape(shop.shop_name || domain || 'Shop');
@@ -373,7 +374,7 @@ def get_setup_script():
                 const email = setupEscape(shop.email || '');
                 const cityStateZip = [city, state, zip].filter(Boolean).join(', ').replace(/,\s([^,]+)$/, ' $1');
                 return `
-                    <div onclick="setupSelectShopCard('${setupEscape(domain)}')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();setupSelectShopCard('${setupEscape(domain)}');}" tabindex="0" role="button" style="width:100%; text-align:left; background:${bg}; border:${border}; border-radius:6px; padding:10px; cursor:pointer; color:#000;">
+                    <div onclick="setupSelectShopCard(${shopId})" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();setupSelectShopCard(${shopId});}" tabindex="0" role="button" style="width:100%; text-align:left; background:${bg}; border:${border}; border-radius:6px; padding:10px; cursor:pointer; color:#000;">
                         <div style="font-weight:700; margin-bottom:4px; color:#000;">${shopName}</div>
                         ${address ? `<div style="font-size:12px; color:#000;">${address}</div>` : ''}
                         ${cityStateZip ? `<div style="font-size:12px; color:#000;">${cityStateZip}</div>` : ''}
@@ -393,8 +394,11 @@ def get_setup_script():
                 const data = await resp.json();
                 const shops = Array.isArray(data.shops) ? data.shops : [];
                 setupShopsData = shops;
-                if (!setupSelectedShopDomain || !shops.some((s) => String(s.domain || '').trim().toLowerCase() === setupSelectedShopDomain)) {
-                    setupSelectedShopDomain = String((shops[0] || {}).domain || setupDefaultDomain || '').trim().toLowerCase();
+                if (!setupSelectedShopId || !shops.some((s) => Number(s.id || s.shop_id || 0) === setupSelectedShopId)) {
+                    setupSelectedShopId = Number((shops[0] || {}).id || (shops[0] || {}).shop_id || 0) || 0;
+                    if (!setupSelectedShopDomain) {
+                        setupSelectedShopDomain = String((shops[0] || {}).domain || setupDefaultDomain || '').trim().toLowerCase();
+                    }
                 }
                 setupRenderShops();
             } catch (error) {
@@ -403,10 +407,12 @@ def get_setup_script():
             }
         }
 
-        async function setupSelectShopCard(domain) {
-            const nextDomain = String(domain || '').trim().toLowerCase();
-            if (!nextDomain || nextDomain === setupSelectedShopDomain) return;
-            setupSelectedShopDomain = nextDomain;
+        async function setupSelectShopCard(shopId) {
+            const nextShopId = Number(shopId || 0);
+            if (!nextShopId || nextShopId === setupSelectedShopId) return;
+            setupSelectedShopId = nextShopId;
+            const selected = (setupShopsData || []).find((shop) => Number(shop.id || shop.shop_id || 0) === nextShopId) || {};
+            setupSelectedShopDomain = String(selected.domain || '').trim().toLowerCase();
             setupRenderShops();
             await Promise.all([setupLoadShop(), setupLoadUsers()]);
         }
@@ -442,13 +448,9 @@ def get_setup_script():
             if (saveBtn) saveBtn.disabled = true;
             try {
                 const domain = String(document.getElementById('setupAddShopDomain')?.value || '').trim().toLowerCase();
-                if (!domain) {
-                    alert('Shop domain is required.');
-                    return;
-                }
 
                 const payload = {
-                    shop_domain: domain,
+                    ...(domain ? { shop_domain: domain } : {}),
                     shop_name: (document.getElementById('setupAddShopName')?.value || '').trim(),
                     address: (document.getElementById('setupAddShopAddress')?.value || '').trim(),
                     city: (document.getElementById('setupAddShopCity')?.value || '').trim(),
@@ -467,7 +469,8 @@ def get_setup_script():
                 const data = await resp.json();
                 if (data.error) throw new Error(data.error);
 
-                setupSelectedShopDomain = domain;
+                setupSelectedShopId = Number(data.shop_id || 0) || setupSelectedShopId;
+                if (domain) setupSelectedShopDomain = domain;
                 closeSetupAddShopModal();
                 await setupLoadShops();
                 await Promise.all([setupLoadShop(), setupLoadUsers()]);
@@ -511,6 +514,10 @@ def get_setup_script():
                 const data = await resp.json();
                 const shop = data.shop || {};
                 setupShopData = shop;
+                const loadedShopId = Number(shop.shop_id || 0) || 0;
+                if (loadedShopId) {
+                    setupSelectedShopId = loadedShopId;
+                }
                 const set = (id, value) => {
                     const el = document.getElementById(id);
                     if (el) el.value = String(value || '');
@@ -532,7 +539,7 @@ def get_setup_script():
             const btn = document.getElementById('setupShopSaveBtn');
             if (btn) btn.disabled = true;
             try {
-                if (setupIsArchitect && !setupSelectedShopDomain) {
+                if (setupIsArchitect && !setupSelectedShopId) {
                     alert('Select a shop first or create one with + SHOP.');
                     return;
                 }
@@ -582,7 +589,7 @@ def get_setup_script():
         async function setupLoadUsers() {
             const body = document.getElementById('setupUsersBody');
             if (!body) return;
-            if (setupIsArchitect && !setupSelectedShopDomain) {
+            if (setupIsArchitect && !setupSelectedShopId) {
                 body.innerHTML = '<tr><td colspan="5" style="padding:18px; text-align:center; color:#999;">Select a shop card to load users.</td></tr>';
                 return;
             }
@@ -762,7 +769,7 @@ def get_setup_script():
         }
 
         function openSetupUserModal() {
-            if (setupIsArchitect && !setupSelectedShopDomain) {
+            if (setupIsArchitect && !setupSelectedShopId) {
                 alert('Select a shop card first.');
                 return;
             }
