@@ -133,9 +133,7 @@ def get_setup_screen_html():
                     <button type="button" onclick="openSetupShopModal()" class="setup-action-btn" style="background:#b22222; color:#fff;">SHOP INFO</button>
                     <div style="display:flex; align-items:center; gap:8px;">
                         <button id="setupManageUsersBtn" type="button" onclick="openSetupManageUsersModal()" class="setup-action-btn" style="display:none; background:#555; color:#fff;">Manage</button>
-                        <button type="button" onclick="openSetupUserModal()" class="setup-action-btn" style="background:#b22222; color:#fff;">+ USER</button>
                         <button type="button" onclick="setupResetSelectedUsers()" class="setup-action-btn" style="background:#b22222; color:#fff;">RESET</button>
-                        <button id="setupEditBtn" type="button" onclick="setupToggleEditUsers()" class="setup-action-btn" style="background:#b22222; color:#fff;">EDIT</button>
                     </div>
                 </div>
 
@@ -277,7 +275,10 @@ def get_setup_screen_html():
         <div id="setupManageUsersModal" class="modal" style="display:none;">
             <div class="modal-content" style="max-width:1000px; max-height:88vh; display:flex; flex-direction:column; padding:20px;">
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; flex-shrink:0;">
-                    <h3 style="margin:0; color:#333;">Manage Users</h3>
+                    <div style="display:flex; align-items:center; gap:8px;">
+                        <h3 style="margin:0; color:#333;">Manage Users</h3>
+                        <button type="button" onclick="openSetupUserModal()" class="setup-action-btn" style="background:#b22222; color:#fff; padding:8px 12px;">+</button>
+                    </div>
                     <div style="display:flex; gap:8px; align-items:center;">
                         <button type="button" id="setupManageUsersEditBtn" onclick="setupManageUsersEdit()" class="setup-action-btn" style="background:#555; color:#fff;">Edit</button>
                         <button type="button" onclick="setupManageUsersDelete()" class="setup-action-btn" style="background:#b22222; color:#fff;">Delete</button>
@@ -361,7 +362,6 @@ def get_setup_script():
         let setupSelectedShopId = 0;
         let setupSelectedShopDomain = '';
         let setupDefaultDomain = '';
-        let setupEditMode = false;
 
         // Manage Shops modal state
         let setupManageShopsData = [];
@@ -703,28 +703,17 @@ def get_setup_script():
             }
 
             body.innerHTML = users.map((user, idx) => {
-                    const userId = Number(user.id || 0);
                     const roleLocked = !!user.role_locked;
                     const rowWeight = roleLocked && setupIsArchitect ? '800' : '400';
                     const roleText = setupEscape(user.role || '');
-                    const roleOptions = ['ARCHITECT', 'Manager', 'Estimator', 'Tech', 'Receptionist', 'HR', 'Support']
-                        .map((role) => `<option value="${role}" ${String(user.role || '') === role ? 'selected' : ''}>${role}</option>`)
-                        .join('');
                     const firstText = setupEscape(user.first_name || '');
                     const lastText = setupEscape(user.last_name || '');
                     const emailText = setupEscape(user.email || '');
-                    const firstCell = (setupEditMode && !roleLocked)
-                        ? `<input class="setup-user-first" data-user-id="${userId}" value="${firstText}" style="width:100%; padding:8px; font-size:14px; border:1px solid #ddd; border-radius:4px;" />`
-                        : `<span style="font-size:14px; color:#111; font-weight:${rowWeight};">${firstText}</span>`;
-                    const lastCell = (setupEditMode && !roleLocked)
-                        ? `<input class="setup-user-last" data-user-id="${userId}" value="${lastText}" style="width:100%; padding:8px; font-size:14px; border:1px solid #ddd; border-radius:4px;" />`
-                        : `<span style="font-size:14px; color:#111; font-weight:${rowWeight};">${lastText}</span>`;
-                    const emailCell = (setupEditMode && !roleLocked)
-                        ? `<input class="setup-user-email" data-user-id="${userId}" value="${emailText}" style="width:100%; padding:8px; font-size:14px; border:1px solid #ddd; border-radius:4px;" />`
-                        : `<span style="font-size:14px; color:#111; font-weight:${rowWeight};">${emailText}</span>`;
-                    const roleCell = (setupEditMode && !roleLocked)
-                        ? `<select class="setup-user-role" data-user-id="${userId}" style="width:100%; padding:8px; font-size:14px; border:1px solid #ddd; border-radius:4px;">${roleOptions}</select>`
-                        : `<span style="font-size:14px; color:#111; font-weight:${rowWeight};">${roleText}</span>`;
+                    const firstCell = `<span style="font-size:14px; color:#111; font-weight:${rowWeight};">${firstText}</span>`;
+                    const lastCell = `<span style="font-size:14px; color:#111; font-weight:${rowWeight};">${lastText}</span>`;
+                    const emailCell = `<span style="font-size:14px; color:#111; font-weight:${rowWeight};">${emailText}</span>`;
+                    const roleCell = `<span style="font-size:14px; color:#111; font-weight:${rowWeight};">${roleText}</span>`;
+                    const userId = Number(user.id || 0);
                     return `
                         <tr class="setup-users-main-row">
                             <td style="padding:12px; border-bottom:1px solid rgba(0,0,0,0.06); background:#fff; text-align:center; min-height:48px; height:48px; vertical-align:middle;">
@@ -745,74 +734,6 @@ def get_setup_script():
                         </tr>
                     `;
                 }).join('');
-
-            const editBtn = document.getElementById('setupEditBtn');
-            if (editBtn) {
-                editBtn.textContent = setupEditMode ? 'EDIT (SAVE)' : 'EDIT';
-            }
-        }
-
-        async function setupToggleEditUsers() {
-            if (!setupEditMode) {
-                setupEditMode = true;
-                setupRenderUsers();
-                return;
-            }
-
-            const getValue = (selector, userId) => {
-                const el = document.querySelector(`${selector}[data-user-id="${userId}"]`);
-                return String(el?.value || '').trim();
-            };
-
-            const changes = [];
-            (setupUsersData || []).forEach((user) => {
-                const userId = Number(user.id || 0);
-                if (user.role_locked) {
-                    return;
-                }
-                const next = {
-                    first_name: getValue('.setup-user-first', userId),
-                    last_name: getValue('.setup-user-last', userId),
-                    email: getValue('.setup-user-email', userId),
-                    role: getValue('.setup-user-role', userId),
-                };
-                const changed =
-                    next.first_name !== String(user.first_name || '') ||
-                    next.last_name !== String(user.last_name || '') ||
-                    next.email !== String(user.email || '') ||
-                    next.role !== String(user.role || '');
-                if (changed) {
-                    changes.push({ id: userId, ...next });
-                }
-            });
-
-            if (!changes.length) {
-                setupEditMode = false;
-                setupRenderUsers();
-                return;
-            }
-
-            try {
-                for (const payload of changes) {
-                    const scopedPayload = {
-                        ...payload,
-                        ...setupBuildScopePayload(),
-                    };
-                    const resp = await fetch('/api/setup/users/update', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        credentials: 'include',
-                        body: JSON.stringify(scopedPayload),
-                    });
-                    const data = await resp.json();
-                    if (data.error) throw new Error(data.error);
-                }
-                setupEditMode = false;
-                await setupLoadUsers();
-            } catch (error) {
-                console.error('Error saving user edits:', error);
-                alert('Error saving user edits.');
-            }
         }
 
         async function setupResetSelectedUsers() {
@@ -893,6 +814,10 @@ def get_setup_script():
 
                 closeSetupUserModal();
                 await setupLoadUsers();
+                const manageModal = document.getElementById('setupManageUsersModal');
+                if (manageModal && manageModal.style.display === 'block') {
+                    await openSetupManageUsersModal();
+                }
             } catch (error) {
                 console.error('Error saving setup user:', error);
                 alert('Error saving user.');
