@@ -542,6 +542,15 @@ def get_reports_screen_html():
         reportsExtraSetActiveSidebar('main');
     }
 
+    function reportsBuildDateRangeQuery() {
+        const query = new URLSearchParams();
+        const startDate = String(reportsUiState.startDate || '').trim();
+        const endDate = String(reportsUiState.endDate || '').trim();
+        if (startDate) query.set('start_date', startDate);
+        if (endDate) query.set('end_date', endDate);
+        return query;
+    }
+
     async function reportsOpenTechDetailWindow(techId, techName) {
         const win = window.open('', `Reports_Tech_${techId}`, 'width=1220,height=760,scrollbars=yes,resizable=yes');
         if (!win) {
@@ -592,7 +601,9 @@ def get_reports_screen_html():
         win.document.head.appendChild(style);
 
         try {
-            const resp = await fetch(`/api/records/tech-paid-ros?tech_id=${encodeURIComponent(String(techId))}`, { credentials: 'include' });
+            const query = reportsBuildDateRangeQuery();
+            query.set('tech_id', String(techId));
+            const resp = await fetch(`/api/records/tech-paid-ros?${query.toString()}`, { credentials: 'include' });
             const data = await resp.json();
             const rows = Array.isArray(data.rows) ? data.rows : [];
             const body = win.document.getElementById('reportsTechDetailBody');
@@ -637,7 +648,9 @@ def get_reports_screen_html():
 
         body.innerHTML = `<tr><td colspan='4' style='padding:20px; text-align:center; color:#999;'>Loading...</td></tr>`;
         try {
-            const resp = await fetch('/api/records/tech-payouts', { credentials: 'include' });
+            const query = reportsBuildDateRangeQuery();
+            const url = query.toString() ? `/api/records/tech-payouts?${query.toString()}` : '/api/records/tech-payouts';
+            const resp = await fetch(url, { credentials: 'include' });
             const data = await resp.json();
             const rows = Array.isArray(data.rows) ? data.rows : [];
 
@@ -678,7 +691,9 @@ def get_reports_screen_html():
 
         body.innerHTML = `<tr><td colspan='4' style='padding:20px; text-align:center; color:#999;'>Loading...</td></tr>`;
         try {
-            const resp = await fetch('/api/records/parts/vendors-summary', { credentials: 'include' });
+            const query = reportsBuildDateRangeQuery();
+            const url = query.toString() ? `/api/records/parts/vendors-summary?${query.toString()}` : '/api/records/parts/vendors-summary';
+            const resp = await fetch(url, { credentials: 'include' });
             const data = await resp.json();
             const rows = Array.isArray(data.rows) ? data.rows : [];
 
@@ -1036,6 +1051,15 @@ def get_reports_screen_html():
 
         reportsRenderSummaryCards();
         reportsRenderRoList();
+
+        const techPanel = document.getElementById('reportsPanel-tech');
+        const partsPanel = document.getElementById('reportsPanel-parts');
+        if (techPanel && techPanel.style.display !== 'none') {
+            reportsLoadTechPayouts();
+        }
+        if (partsPanel && partsPanel.style.display !== 'none') {
+            reportsLoadPartsVendors();
+        }
     }
 
     function reportsNormalizeIsoDateForInput(value) {

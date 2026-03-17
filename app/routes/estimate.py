@@ -3702,9 +3702,27 @@ async def list_records_closed_ros(request: Request):
 
 
 @router.get("/records/tech-payouts")
-async def list_records_tech_payouts(request: Request):
+async def list_records_tech_payouts(
+    request: Request,
+    start_date: str | None = None,
+    end_date: str | None = None,
+):
     """Return per-tech payout totals from paid Flagout entries."""
     domain = get_user_domain(request) or "default"
+
+    start_date_value = None
+    if start_date:
+        try:
+            start_date_value = date.fromisoformat(str(start_date).strip()[:10])
+        except ValueError:
+            return JSONResponse(status_code=400, content={"error": "start_date must be YYYY-MM-DD", "rows": []})
+
+    end_date_value = None
+    if end_date:
+        try:
+            end_date_value = date.fromisoformat(str(end_date).strip()[:10])
+        except ValueError:
+            return JSONResponse(status_code=400, content={"error": "end_date must be YYYY-MM-DD", "rows": []})
 
     conn = get_conn()
     cur = conn.cursor()
@@ -3730,6 +3748,8 @@ async def list_records_tech_payouts(request: Request):
                 WHERE f.domain = %s
                   AND f.tech_id IS NOT NULL
                   AND f.paid_at IS NOT NULL
+                                    AND (%s::date IS NULL OR f.paid_at::date >= %s::date)
+                                    AND (%s::date IS NULL OR f.paid_at::date <= %s::date)
             ),
             aggregates AS (
                 SELECT
@@ -3751,7 +3771,7 @@ async def list_records_tech_payouts(request: Request):
              AND p.row_rank = 1
             ORDER BY tech_name ASC
             """,
-            (domain,),
+            (domain, start_date_value, start_date_value, end_date_value, end_date_value),
         )
         rows = cur.fetchall() or []
 
@@ -3773,9 +3793,28 @@ async def list_records_tech_payouts(request: Request):
 
 
 @router.get("/records/tech-paid-ros")
-async def list_records_tech_paid_ros(request: Request, tech_id: int):
+async def list_records_tech_paid_ros(
+    request: Request,
+    tech_id: int,
+    start_date: str | None = None,
+    end_date: str | None = None,
+):
     """Return unique ROs paid to a tech, sourced only from Flagout payout records."""
     domain = get_user_domain(request) or "default"
+
+    start_date_value = None
+    if start_date:
+        try:
+            start_date_value = date.fromisoformat(str(start_date).strip()[:10])
+        except ValueError:
+            return JSONResponse(status_code=400, content={"error": "start_date must be YYYY-MM-DD", "rows": []})
+
+    end_date_value = None
+    if end_date:
+        try:
+            end_date_value = date.fromisoformat(str(end_date).strip()[:10])
+        except ValueError:
+            return JSONResponse(status_code=400, content={"error": "end_date must be YYYY-MM-DD", "rows": []})
 
     conn = get_conn()
     cur = conn.cursor()
@@ -3796,6 +3835,8 @@ async def list_records_tech_paid_ros(request: Request, tech_id: int):
                 WHERE f.domain = %s
                   AND f.paid_at IS NOT NULL
                   AND f.tech_id = %s
+                                    AND (%s::date IS NULL OR f.paid_at::date >= %s::date)
+                                    AND (%s::date IS NULL OR f.paid_at::date <= %s::date)
                   AND f.ro IS NOT NULL
                   AND TRIM(f.ro) <> ''
                 GROUP BY f.tech_id, f.ro
@@ -3835,7 +3876,7 @@ async def list_records_tech_paid_ros(request: Request, tech_id: int):
             LEFT JOIN latest_estimates le ON le.ro = p.ro
             ORDER BY p.ro ASC
             """,
-            (domain, tech_id, domain),
+            (domain, tech_id, start_date_value, start_date_value, end_date_value, end_date_value, domain),
         )
         rows = cur.fetchall() or []
 
@@ -3876,8 +3917,26 @@ async def list_records_tech_paid_ros(request: Request, tech_id: int):
 
 
 @router.get("/records/parts/vendors-summary")
-async def list_records_parts_vendors_summary(request: Request):
+async def list_records_parts_vendors_summary(
+    request: Request,
+    start_date: str | None = None,
+    end_date: str | None = None,
+):
     domain = get_user_domain(request) or "default"
+
+    start_date_value = None
+    if start_date:
+        try:
+            start_date_value = date.fromisoformat(str(start_date).strip()[:10])
+        except ValueError:
+            return JSONResponse(status_code=400, content={"error": "start_date must be YYYY-MM-DD", "rows": []})
+
+    end_date_value = None
+    if end_date:
+        try:
+            end_date_value = date.fromisoformat(str(end_date).strip()[:10])
+        except ValueError:
+            return JSONResponse(status_code=400, content={"error": "end_date must be YYYY-MM-DD", "rows": []})
 
     conn = get_conn()
     cur = conn.cursor()
@@ -3915,12 +3974,14 @@ async def list_records_parts_vendors_summary(request: Request):
             LEFT JOIN parts_received pr
                    ON pr.domain = v.domain
                   AND LOWER(TRIM(pr.vendor)) = LOWER(TRIM(v.name))
+                                    AND (%s::date IS NULL OR COALESCE(pr.received_business_date, pr.received_at::date) >= %s::date)
+                                    AND (%s::date IS NULL OR COALESCE(pr.received_business_date, pr.received_at::date) <= %s::date)
             WHERE v.domain = %s
               AND v.active = TRUE
             GROUP BY v.id, v.name, v.vendor_type
             ORDER BY LOWER(TRIM(v.name)) ASC
             """,
-            (domain,),
+                        (start_date_value, start_date_value, end_date_value, end_date_value, domain),
         )
         rows = cur.fetchall() or []
 
