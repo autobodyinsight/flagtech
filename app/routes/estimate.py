@@ -2149,18 +2149,9 @@ async def get_setup_shop(request: Request):
         _ensure_shop_isolation_infrastructure(cur)
         cur.execute(
             """
-            SELECT
-                COALESCE(ss.shop_id, s.id) AS shop_id,
-                COALESCE(NULLIF(ss.shop_name, ''), NULLIF(s.name, '')) AS shop_name,
-                COALESCE(NULLIF(ss.address, ''), NULLIF(s.address, '')) AS address,
-                COALESCE(NULLIF(ss.city, ''), NULLIF(s.city, '')) AS city,
-                COALESCE(NULLIF(ss.state, ''), NULLIF(s.state, '')) AS state,
-                COALESCE(NULLIF(ss.zip_code, ''), NULLIF(s.zip, '')) AS zip_code,
-                COALESCE(NULLIF(ss.phone, ''), '') AS phone,
-                COALESCE(NULLIF(ss.email, ''), '') AS email
-            FROM shops s
-            LEFT JOIN shop_settings ss ON ss.domain = s.domain
-            WHERE s.domain = %s
+            SELECT shop_id, shop_name, address, city, state, zip_code, phone, email
+            FROM shop_settings
+            WHERE domain = %s
             LIMIT 1
             """,
             (selected_domain,),
