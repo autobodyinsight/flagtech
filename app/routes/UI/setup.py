@@ -132,26 +132,12 @@ def get_setup_screen_html():
                 <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px; gap:10px;">
                     <button type="button" onclick="openSetupShopModal()" class="setup-action-btn" style="background:#b22222; color:#fff;">SHOP INFO</button>
                     <div style="display:flex; align-items:center; gap:8px;">
-                        <button id="setupUsersEditBtn" type="button" onclick="setupToggleEditUsers()" class="setup-action-btn" style="display:none; background:#555; color:#fff;">Edit</button>
-                        <button id="setupUsersDeleteBtn" type="button" onclick="setupDeleteSelectedUsers()" class="setup-action-btn" style="display:none; background:#b22222; color:#fff;">Delete</button>
+                        <button id="setupManageUsersBtn" type="button" onclick="openSetupManageUsersModal()" class="setup-action-btn" style="display:none; background:#555; color:#fff;">Manage</button>
                         <button type="button" onclick="setupResetSelectedUsers()" class="setup-action-btn" style="background:#b22222; color:#fff;">RESET</button>
                     </div>
                 </div>
 
                 <h4 class="setup-users-title-tab" style="margin:0; color:#333;">Users</h4>
-
-                <div id="setupUsersCreatePanel" style="display:none; margin:10px 0 12px 0; background:#f7f4f2; border:1px solid #e2dbd8; border-radius:8px; padding:10px;">
-                    <div style="display:grid; grid-template-columns:1fr 1fr 1.2fr 1fr 1fr auto; gap:8px; align-items:end;">
-                        <input id="setupInlineUserFirst" type="text" placeholder="First Name" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:4px;" />
-                        <input id="setupInlineUserLast" type="text" placeholder="Last Name" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:4px;" />
-                        <input id="setupInlineUserEmail" type="email" placeholder="Email" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:4px;" />
-                        <input id="setupInlineUserPassword" type="password" placeholder="Password" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:4px;" />
-                        <select id="setupInlineUserRole" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:4px;">
-                            <option value="">Select role...</option>
-                        </select>
-                        <button id="setupInlineUserSaveBtn" type="button" onclick="setupSaveInlineUser()" class="setup-action-btn" style="background:#b22222; color:#fff; padding:8px 12px;">Save</button>
-                    </div>
-                </div>
 
                 <div class="setup-users-table-wrap" style="overflow-x:auto;">
                     <table id="setupUsersTable">
@@ -213,6 +199,51 @@ def get_setup_screen_html():
             </div>
         </div>
 
+        <div id="setupUserModal" class="modal" style="display:none;">
+            <div class="modal-content" style="max-width:760px; max-height:88vh; overflow-y:auto;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
+                    <h3 style="margin:0; color:#333;">Add User</h3>
+                    <button id="setupUserSaveBtn" type="button" onclick="setupSaveUser()" style="padding:10px 16px; background:#b22222; color:#fff; border:none; border-radius:4px; cursor:pointer; font-weight:bold;">Save</button>
+                </div>
+
+                <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+                    <div>
+                        <label for="setupUserFirst" style="font-weight:bold; color:#333;">First</label>
+                        <input id="setupUserFirst" type="text" style="width:100%; padding:10px; margin-top:6px;" />
+                    </div>
+                    <div>
+                        <label for="setupUserLast" style="font-weight:bold; color:#333;">Last</label>
+                        <input id="setupUserLast" type="text" style="width:100%; padding:10px; margin-top:6px;" />
+                    </div>
+                    <div style="grid-column:1 / span 2;">
+                        <label for="setupUserEmail" style="font-weight:bold; color:#333;">Email</label>
+                        <input id="setupUserEmail" type="email" style="width:100%; padding:10px; margin-top:6px;" />
+                    </div>
+                    <div>
+                        <label for="setupUserRole" style="font-weight:bold; color:#333;">Role</label>
+                        <select id="setupUserRole" style="width:100%; padding:10px; margin-top:6px;">
+                            <option value="">Select role...</option>
+                            <option value="ARCHITECT">ARCHITECT</option>
+                            <option value="Manager">Manager</option>
+                            <option value="Estimator">Estimator</option>
+                            <option value="Tech">Tech</option>
+                            <option value="Receptionist">Receptionist</option>
+                            <option value="HR">HR</option>
+                            <option value="Support">Support</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label for="setupUserPassword" style="font-weight:bold; color:#333;">Password</label>
+                        <input id="setupUserPassword" type="password" style="width:100%; padding:10px; margin-top:6px;" />
+                    </div>
+                </div>
+
+                <div style="margin-top:14px; text-align:right;">
+                    <button type="button" onclick="closeSetupUserModal()" style="padding:10px 14px; background:#505050; color:#fff; border:none; border-radius:4px; cursor:pointer;">Close</button>
+                </div>
+            </div>
+        </div>
+
         <div id="setupManageShopsModal" class="modal" style="display:none;">
             <div class="modal-content" style="max-width:900px; max-height:88vh; display:flex; flex-direction:column; padding:20px;">
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; flex-shrink:0;">
@@ -235,6 +266,57 @@ def get_setup_screen_html():
                         </thead>
                         <tbody id="setupManageShopsBody">
                             <tr><td colspan="4" style="padding:18px; text-align:center; color:#999;">Loading...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div id="setupManageUsersModal" class="modal" style="display:none;">
+            <div class="modal-content" style="max-width:1000px; max-height:88vh; display:flex; flex-direction:column; padding:20px;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; flex-shrink:0;">
+                    <div style="display:flex; align-items:center; gap:8px;">
+                        <h3 style="margin:0; color:#333;">Manage Users</h3>
+                        <div id="setupManageUsersCreateWrap" style="position:relative;">
+                            <button type="button" onclick="setupToggleManageUsersCreateDropdown()" class="setup-action-btn" style="background:#b22222; color:#fff; padding:8px 12px;">+</button>
+                            <div id="setupManageUsersCreateDropdown" style="display:none; position:absolute; top:calc(100% + 6px); left:0; z-index:20; width:340px; background:#fff; border:1px solid #e0dbd8; border-radius:8px; box-shadow:0 8px 20px rgba(0,0,0,0.12); padding:12px;">
+                                <div style="font-weight:700; color:#333; margin-bottom:10px;">Create User</div>
+                                <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
+                                    <input id="setupManageUserFirst" type="text" placeholder="First" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:4px;" />
+                                    <input id="setupManageUserLast" type="text" placeholder="Last" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:4px;" />
+                                    <input id="setupManageUserEmail" type="email" placeholder="Email" style="grid-column:1 / span 2; width:100%; padding:8px; border:1px solid #ccc; border-radius:4px;" />
+                                    <select id="setupManageUserRole" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:4px;">
+                                        <option value="">Select role...</option>
+                                    </select>
+                                    <input id="setupManageUserPassword" type="password" placeholder="Password" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:4px;" />
+                                </div>
+                                <div style="display:flex; justify-content:flex-end; gap:8px; margin-top:10px;">
+                                    <button type="button" onclick="setupCloseManageUsersCreateDropdown()" style="padding:8px 12px; background:#505050; color:#fff; border:none; border-radius:4px; cursor:pointer;">Close</button>
+                                    <button id="setupManageUsersCreateSaveBtn" type="button" onclick="setupSaveUserFromManageDropdown()" style="padding:8px 12px; background:#b22222; color:#fff; border:none; border-radius:4px; cursor:pointer; font-weight:700;">Save</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div style="display:flex; gap:8px; align-items:center;">
+                        <button type="button" id="setupManageUsersEditBtn" onclick="setupManageUsersEdit()" class="setup-action-btn" style="background:#555; color:#fff;">Edit</button>
+                        <button type="button" id="setupManageUsersDeleteBtn" onclick="setupManageUsersDelete()" class="setup-action-btn" style="background:#b22222; color:#fff;">Delete</button>
+                        <button type="button" onclick="closeSetupManageUsersModal()" style="padding:10px 14px; background:#888; color:#fff; border:none; border-radius:8px; cursor:pointer; font-weight:700;">Close</button>
+                    </div>
+                </div>
+                <div style="overflow-y:auto; flex:1; border:1px solid #e0dbd8; border-radius:8px;">
+                    <table id="setupManageUsersTable" style="width:100%; border-collapse:collapse; font-size:14px; font-family:'Segoe UI',Arial,sans-serif;">
+                        <thead>
+                            <tr style="background:rgba(0,0,0,0.03);">
+                                <th style="padding:12px 10px; text-align:center; width:44px; border-bottom:2px solid #b22222;"><input type="checkbox" id="setupManageUsersSelectAll" onchange="setupManageUsersToggleAll(this)" /></th>
+                                <th style="padding:12px 10px; text-align:left; border-bottom:2px solid #b22222;">First</th>
+                                <th style="padding:12px 10px; text-align:left; border-bottom:2px solid #b22222;">Last</th>
+                                <th style="padding:12px 10px; text-align:left; border-bottom:2px solid #b22222;">Email</th>
+                                <th style="padding:12px 10px; text-align:left; border-bottom:2px solid #b22222;">Shop</th>
+                                <th style="padding:12px 10px; text-align:left; border-bottom:2px solid #b22222;">Role</th>
+                            </tr>
+                        </thead>
+                        <tbody id="setupManageUsersBody">
+                            <tr><td colspan="6" style="padding:18px; text-align:center; color:#999;">Loading...</td></tr>
                         </tbody>
                     </table>
                 </div>
@@ -309,9 +391,11 @@ def get_setup_script():
         let setupManageShopsEditingId = 0;
         let setupManageShopsEditSnapshot = null;
 
-        // Setup users inline edit state
-        let setupUsersEditingId = 0;
-        let setupUsersEditSnapshot = null;
+        // Manage Users modal state
+        let setupManageAllUsersData = [];
+        let setupManageAllShopsData = [];
+        let setupManageUsersEditingId = 0;
+        let setupManageUsersEditSnapshot = null;
 
         function setupEscape(value) {
             return String(value || '')
@@ -358,14 +442,8 @@ def get_setup_script():
                 if (addShopBtn) addShopBtn.style.display = setupIsArchitect ? 'inline-block' : 'none';
                 const manageShopsBtn = document.getElementById('setupManageShopsBtn');
                 if (manageShopsBtn) manageShopsBtn.style.display = setupIsArchitect ? 'inline-block' : 'none';
-                const usersCreatePanel = document.getElementById('setupUsersCreatePanel');
-                if (usersCreatePanel) usersCreatePanel.style.display = setupCanAddUsers ? 'block' : 'none';
-                const usersEditBtn = document.getElementById('setupUsersEditBtn');
-                if (usersEditBtn) usersEditBtn.style.display = setupCanManageUsers ? 'inline-block' : 'none';
-                const usersDeleteBtn = document.getElementById('setupUsersDeleteBtn');
-                if (usersDeleteBtn) usersDeleteBtn.style.display = setupCanManageUsers ? 'inline-block' : 'none';
-                const inlineRoleSelect = document.getElementById('setupInlineUserRole');
-                if (inlineRoleSelect) inlineRoleSelect.innerHTML = setupBuildRoleOptions('');
+                const manageUsersBtn = document.getElementById('setupManageUsersBtn');
+                if (manageUsersBtn) manageUsersBtn.style.display = setupCanManageUsers ? 'inline-block' : 'none';
             } catch (error) {
                 console.error('Error loading setup context:', error);
                 setupIsArchitect = false;
@@ -375,12 +453,6 @@ def get_setup_script():
                 setupRequesterRole = '';
                 if (pane) pane.style.display = 'none';
                 if (addShopBtn) addShopBtn.style.display = 'none';
-                const usersCreatePanel = document.getElementById('setupUsersCreatePanel');
-                if (usersCreatePanel) usersCreatePanel.style.display = 'none';
-                const usersEditBtn = document.getElementById('setupUsersEditBtn');
-                if (usersEditBtn) usersEditBtn.style.display = 'none';
-                const usersDeleteBtn = document.getElementById('setupUsersDeleteBtn');
-                if (usersDeleteBtn) usersDeleteBtn.style.display = 'none';
             }
         }
 
@@ -657,10 +729,6 @@ def get_setup_script():
                 } else {
                     setupUsersData = users;
                 }
-                if (setupUsersEditingId && !setupUsersData.some((u) => Number(u.id || 0) === setupUsersEditingId)) {
-                    setupUsersEditingId = 0;
-                    setupUsersEditSnapshot = null;
-                }
                 if (!users.length) {
                     body.innerHTML = '<tr><td colspan="5" style="padding:18px; text-align:center; color:#999;">No users found.</td></tr>';
                     return;
@@ -682,74 +750,44 @@ def get_setup_script():
                 return;
             }
 
-            body.innerHTML = users.map((user) => {
-                const userId = Number(user.id || 0);
-                const isEditing = setupUsersEditingId > 0 && userId === setupUsersEditingId;
-                const roleLocked = !!user.role_locked;
-                const rowWeight = roleLocked && setupIsArchitect ? '800' : '400';
-                const roleText = setupEscape(user.role || '');
-                const firstText = setupEscape(user.first_name || '');
-                const lastText = setupEscape(user.last_name || '');
-                const emailText = setupEscape(user.email || '');
-
-                if (isEditing) {
-                    const roleOptions = setupGetAssignableRoles()
-                        .map((role) => `<option value="${role}" ${String(user.role || '') === role ? 'selected' : ''}>${role}</option>`)
-                        .join('');
+            body.innerHTML = users.map((user, idx) => {
+                    const roleLocked = !!user.role_locked;
+                    const rowWeight = roleLocked && setupIsArchitect ? '800' : '400';
+                    const roleText = setupEscape(user.role || '');
+                    const firstText = setupEscape(user.first_name || '');
+                    const lastText = setupEscape(user.last_name || '');
+                    const emailText = setupEscape(user.email || '');
+                    const firstCell = `<span style="font-size:14px; color:#111; font-weight:${rowWeight};">${firstText}</span>`;
+                    const lastCell = `<span style="font-size:14px; color:#111; font-weight:${rowWeight};">${lastText}</span>`;
+                    const emailCell = `<span style="font-size:14px; color:#111; font-weight:${rowWeight};">${emailText}</span>`;
+                    const roleCell = `<span style="font-size:14px; color:#111; font-weight:${rowWeight};">${roleText}</span>`;
+                    const userId = Number(user.id || 0);
                     return `
-                        <tr class="setup-users-main-row" style="background:#fff7f0;">
-                            <td style="padding:12px; border-bottom:1px solid rgba(0,0,0,0.06); text-align:center; min-height:48px; height:48px; vertical-align:middle;">
-                                <input type="checkbox" class="setup-user-select" data-user-id="${userId}" checked />
+                        <tr class="setup-users-main-row">
+                            <td style="padding:12px; border-bottom:1px solid rgba(0,0,0,0.06); background:#fff; text-align:center; min-height:48px; height:48px; vertical-align:middle;">
+                                <input type="checkbox" class="setup-user-select" data-user-id="${userId}" />
                             </td>
-                            <td style="padding:8px 10px; border-bottom:1px solid rgba(0,0,0,0.06); vertical-align:middle;">
-                                <input id="setupEditUserFirst_${userId}" value="${firstText}" style="width:100%; padding:6px 8px; border:1px solid #ccc; border-radius:4px;" />
+                            <td style="padding:12px; border-bottom:1px solid rgba(0,0,0,0.06); background:#fff; min-height:48px; height:48px; vertical-align:middle;">
+                                ${firstCell}
                             </td>
-                            <td style="padding:8px 10px; border-bottom:1px solid rgba(0,0,0,0.06); vertical-align:middle;">
-                                <input id="setupEditUserLast_${userId}" value="${lastText}" style="width:100%; padding:6px 8px; border:1px solid #ccc; border-radius:4px;" />
+                            <td style="padding:12px; border-bottom:1px solid rgba(0,0,0,0.06); background:#fff; min-height:48px; height:48px; vertical-align:middle;">
+                                ${lastCell}
                             </td>
-                            <td style="padding:8px 10px; border-bottom:1px solid rgba(0,0,0,0.06); vertical-align:middle;">
-                                <input id="setupEditUserEmail_${userId}" value="${emailText}" style="width:100%; padding:6px 8px; border:1px solid #ccc; border-radius:4px;" />
+                            <td style="padding:12px; border-bottom:1px solid rgba(0,0,0,0.06); background:#fff; min-height:48px; height:48px; vertical-align:middle;">
+                                ${emailCell}
                             </td>
-                            <td style="padding:8px 10px; border-bottom:1px solid rgba(0,0,0,0.06); vertical-align:middle;">
-                                <select id="setupEditUserRole_${userId}" style="width:100%; padding:6px 8px; border:1px solid #ccc; border-radius:4px;">${roleOptions}</select>
+                            <td style="padding:12px; border-bottom:1px solid rgba(0,0,0,0.06); background:#fff; min-height:48px; height:48px; vertical-align:middle;">
+                                ${roleCell}
                             </td>
                         </tr>
                     `;
-                }
-
-                return `
-                    <tr class="setup-users-main-row">
-                        <td style="padding:12px; border-bottom:1px solid rgba(0,0,0,0.06); background:#fff; text-align:center; min-height:48px; height:48px; vertical-align:middle;">
-                            <input type="checkbox" class="setup-user-select" data-user-id="${userId}" />
-                        </td>
-                        <td style="padding:12px; border-bottom:1px solid rgba(0,0,0,0.06); background:#fff; min-height:48px; height:48px; vertical-align:middle;">
-                            <span style="font-size:14px; color:#111; font-weight:${rowWeight};">${firstText}</span>
-                        </td>
-                        <td style="padding:12px; border-bottom:1px solid rgba(0,0,0,0.06); background:#fff; min-height:48px; height:48px; vertical-align:middle;">
-                            <span style="font-size:14px; color:#111; font-weight:${rowWeight};">${lastText}</span>
-                        </td>
-                        <td style="padding:12px; border-bottom:1px solid rgba(0,0,0,0.06); background:#fff; min-height:48px; height:48px; vertical-align:middle;">
-                            <span style="font-size:14px; color:#111; font-weight:${rowWeight};">${emailText}</span>
-                        </td>
-                        <td style="padding:12px; border-bottom:1px solid rgba(0,0,0,0.06); background:#fff; min-height:48px; height:48px; vertical-align:middle;">
-                            <span style="font-size:14px; color:#111; font-weight:${rowWeight};">${roleText}</span>
-                        </td>
-                    </tr>
-                `;
-            }).join('');
-
-            const editBtn = document.getElementById('setupUsersEditBtn');
-            if (editBtn) editBtn.textContent = setupUsersEditingId ? 'Edit (Save)' : 'Edit';
-        }
-
-        function setupGetSelectedUserIds() {
-            return Array.from(document.querySelectorAll('.setup-user-select:checked'))
-                .map((el) => Number(el.getAttribute('data-user-id') || 0))
-                .filter((val) => Number.isFinite(val) && val > 0);
+                }).join('');
         }
 
         async function setupResetSelectedUsers() {
-            const selected = setupGetSelectedUserIds();
+            const selected = Array.from(document.querySelectorAll('.setup-user-select:checked'))
+                .map((el) => Number(el.getAttribute('data-user-id') || 0))
+                .filter((val) => Number.isFinite(val) && val > 0);
 
             if (!selected.length) {
                 alert('Select at least one user to reset password.');
@@ -775,17 +813,30 @@ def get_setup_script():
             }
         }
 
-        async function setupSaveInlineUser() {
-            if (!setupCanAddUsers) return;
-            const saveBtn = document.getElementById('setupInlineUserSaveBtn');
+        function openSetupUserModal() {
+            setupToggleManageUsersCreateDropdown();
+        }
+
+        function closeSetupUserModal() {
+            const modal = document.getElementById('setupUserModal');
+            if (modal) modal.style.display = 'none';
+            const ids = ['setupUserFirst', 'setupUserLast', 'setupUserEmail', 'setupUserRole', 'setupUserPassword'];
+            ids.forEach((id) => {
+                const el = document.getElementById(id);
+                if (el) el.value = '';
+            });
+        }
+
+        async function setupSaveUser() {
+            const saveBtn = document.getElementById('setupUserSaveBtn');
             if (saveBtn) saveBtn.disabled = true;
             try {
                 const payload = {
-                    first_name: (document.getElementById('setupInlineUserFirst')?.value || '').trim(),
-                    last_name: (document.getElementById('setupInlineUserLast')?.value || '').trim(),
-                    email: (document.getElementById('setupInlineUserEmail')?.value || '').trim(),
-                    password: (document.getElementById('setupInlineUserPassword')?.value || '').trim(),
-                    role: (document.getElementById('setupInlineUserRole')?.value || '').trim(),
+                    first_name: (document.getElementById('setupUserFirst')?.value || '').trim(),
+                    last_name: (document.getElementById('setupUserLast')?.value || '').trim(),
+                    email: (document.getElementById('setupUserEmail')?.value || '').trim(),
+                    role: (document.getElementById('setupUserRole')?.value || '').trim(),
+                    password: (document.getElementById('setupUserPassword')?.value || ''),
                     ...setupBuildScopePayload(),
                 };
 
@@ -803,116 +854,18 @@ def get_setup_script():
                 const data = await resp.json();
                 if (data.error) throw new Error(data.error);
 
-                ['setupInlineUserFirst', 'setupInlineUserLast', 'setupInlineUserEmail', 'setupInlineUserPassword', 'setupInlineUserRole']
-                    .forEach((id) => {
-                        const el = document.getElementById(id);
-                        if (el) el.value = '';
-                    });
+                closeSetupUserModal();
                 await setupLoadUsers();
+                const manageModal = document.getElementById('setupManageUsersModal');
+                if (manageModal && manageModal.style.display === 'block') {
+                    await openSetupManageUsersModal();
+                }
             } catch (error) {
                 console.error('Error saving setup user:', error);
-                alert('Error saving user: ' + (error?.message || 'Unknown error'));
+                alert('Error saving user.');
             } finally {
                 if (saveBtn) saveBtn.disabled = false;
             }
-        }
-
-        async function setupDeleteSelectedUsers() {
-            if (!setupCanManageUsers) return;
-            const selected = setupGetSelectedUserIds();
-            if (!selected.length) {
-                alert('Select at least one user to delete.');
-                return;
-            }
-            const names = (setupUsersData || [])
-                .filter((u) => selected.includes(Number(u.id || 0)))
-                .map((u) => `${u.first_name || ''} ${u.last_name || ''}`.trim() || u.email || String(u.id || ''))
-                .join(', ');
-            if (!confirm(`Delete ${selected.length} user(s)?\n\n${names}\n\nThis cannot be undone.`)) return;
-
-            try {
-                const resp = await fetch('/api/setup/users/delete', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    credentials: 'include',
-                    body: JSON.stringify({ user_ids: selected, ...setupBuildScopePayload() }),
-                });
-                const data = await resp.json();
-                if (data.error) throw new Error(data.error);
-                if (selected.includes(setupUsersEditingId)) {
-                    setupUsersEditingId = 0;
-                    setupUsersEditSnapshot = null;
-                }
-                await setupLoadUsers();
-            } catch (error) {
-                console.error('Error deleting users:', error);
-                alert('Error deleting users: ' + (error?.message || 'Unknown error'));
-            }
-        }
-
-        async function setupToggleEditUsers() {
-            if (!setupCanManageUsers) return;
-
-            if (setupUsersEditingId) {
-                const userId = setupUsersEditingId;
-                const snap = setupUsersEditSnapshot || {};
-                const nextFirst = String(document.getElementById(`setupEditUserFirst_${userId}`)?.value || '').trim();
-                const nextLast = String(document.getElementById(`setupEditUserLast_${userId}`)?.value || '').trim();
-                const nextEmail = String(document.getElementById(`setupEditUserEmail_${userId}`)?.value || '').trim();
-                const nextRole = String(document.getElementById(`setupEditUserRole_${userId}`)?.value || '').trim();
-
-                const changed =
-                    nextFirst !== String(snap.first_name || '') ||
-                    nextLast !== String(snap.last_name || '') ||
-                    nextEmail !== String(snap.email || '') ||
-                    nextRole !== String(snap.role || '');
-
-                if (changed) {
-                    try {
-                        const payload = {
-                            id: userId,
-                            first_name: nextFirst,
-                            last_name: nextLast,
-                            email: nextEmail,
-                            role: nextRole,
-                            ...setupBuildScopePayload(),
-                        };
-                        const resp = await fetch('/api/setup/users/admin-update', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            credentials: 'include',
-                            body: JSON.stringify(payload),
-                        });
-                        const data = await resp.json();
-                        if (data.error) throw new Error(data.error);
-                    } catch (error) {
-                        console.error('Error saving user edit:', error);
-                        alert('Error saving user: ' + (error?.message || 'Unknown error'));
-                        return;
-                    }
-                }
-
-                setupUsersEditingId = 0;
-                setupUsersEditSnapshot = null;
-                await setupLoadUsers();
-                return;
-            }
-
-            const selected = setupGetSelectedUserIds();
-            if (!selected.length) {
-                alert('Select one user to edit.');
-                return;
-            }
-            if (selected.length > 1) {
-                alert('Select only one user to edit.');
-                return;
-            }
-            const userId = selected[0];
-            const user = (setupUsersData || []).find((u) => Number(u.id || 0) === userId);
-            if (!user) return;
-            setupUsersEditingId = userId;
-            setupUsersEditSnapshot = { ...user };
-            setupRenderUsers();
         }
 
         // ─── Manage Shops Modal ───────────────────────────────────────────────────
@@ -1126,6 +1079,334 @@ def get_setup_script():
             setupManageShopsRender();
         }
 
+        // ─── Manage Users Modal ───────────────────────────────────────────────────
+
+        async function openSetupManageUsersModal() {
+            if (!setupCanManageUsers) return;
+            setupManageUsersEditingId = 0;
+            setupManageUsersEditSnapshot = null;
+            const modal = document.getElementById('setupManageUsersModal');
+            if (!modal) return;
+            modal.style.display = 'block';
+            const createWrap = document.getElementById('setupManageUsersCreateWrap');
+            if (createWrap) createWrap.style.display = setupCanAddUsers ? 'block' : 'none';
+            const editBtn = document.getElementById('setupManageUsersEditBtn');
+            if (editBtn) editBtn.style.display = setupCanManageUsers ? 'inline-block' : 'none';
+            const deleteBtn = document.getElementById('setupManageUsersDeleteBtn');
+            if (deleteBtn) deleteBtn.style.display = setupCanManageUsers ? 'inline-block' : 'none';
+            const body = document.getElementById('setupManageUsersBody');
+            if (body) body.innerHTML = '<tr><td colspan="6" style="padding:18px; text-align:center; color:#999;">Loading...</td></tr>';
+            try {
+                const usersUrl = `/api/setup/users${setupBuildScopeQuery()}`;
+                const [uData, sData] = await Promise.all([
+                    fetch(usersUrl, { credentials: 'include' })
+                        .then((response) => response.json())
+                        .catch(() => ({ users: [] })),
+                    fetch('/api/setup/shops', { credentials: 'include' })
+                        .then((response) => response.json())
+                        .catch(() => ({ shops: [] })),
+                ]);
+                const fetchedShops = Array.isArray(sData.shops) ? sData.shops : [];
+                if (setupIsArchitect && !Number(setupSelectedShopId || 0) && fetchedShops.length) {
+                    setupSelectedShopId = Number((fetchedShops[0] || {}).id || (fetchedShops[0] || {}).shop_id || 0) || 0;
+                }
+                const selectedShopId = Number(setupSelectedShopId || 0);
+                const fetchedUsers = Array.isArray(uData.users) ? uData.users : [];
+                setupManageAllUsersData = selectedShopId > 0
+                    ? fetchedUsers.filter((user) => Number(user.shop_id || 0) === selectedShopId)
+                    : fetchedUsers;
+                setupManageAllShopsData = fetchedShops;
+                if (!setupManageAllShopsData.length) {
+                    const fallbackShopMap = new Map();
+                    (setupManageAllUsersData || []).forEach((user) => {
+                        const userShopId = Number(user.shop_id || 0);
+                        if (!userShopId || fallbackShopMap.has(userShopId)) return;
+                        fallbackShopMap.set(userShopId, {
+                            id: userShopId,
+                            shop_id: userShopId,
+                            shop_name: String(user.shop_name || '').trim() || `Shop ${userShopId}`,
+                        });
+                    });
+                    setupManageAllShopsData = Array.from(fallbackShopMap.values());
+                }
+            } catch (e) {
+                setupManageAllUsersData = [];
+                setupManageAllShopsData = [];
+            }
+            setupManageUsersRender();
+        }
+
+        function closeSetupManageUsersModal() {
+            setupManageUsersEditingId = 0;
+            setupManageUsersEditSnapshot = null;
+            setupCloseManageUsersCreateDropdown();
+            const modal = document.getElementById('setupManageUsersModal');
+            if (modal) modal.style.display = 'none';
+            const editBtn = document.getElementById('setupManageUsersEditBtn');
+            if (editBtn) editBtn.textContent = 'Edit';
+        }
+
+        function setupToggleManageUsersCreateDropdown() {
+            if (!setupCanAddUsers) return;
+            if (setupIsArchitect && !setupSelectedShopId) {
+                alert('Select a shop card first.');
+                return;
+            }
+            const dropdown = document.getElementById('setupManageUsersCreateDropdown');
+            if (!dropdown) return;
+            const isOpen = dropdown.style.display === 'block';
+            if (isOpen) {
+                setupCloseManageUsersCreateDropdown();
+                return;
+            }
+            const roleSelect = document.getElementById('setupManageUserRole');
+            if (roleSelect) {
+                roleSelect.innerHTML = setupBuildRoleOptions('');
+            }
+            dropdown.style.display = 'block';
+            const first = document.getElementById('setupManageUserFirst');
+            if (first) first.focus();
+        }
+
+        function setupCloseManageUsersCreateDropdown() {
+            const dropdown = document.getElementById('setupManageUsersCreateDropdown');
+            if (dropdown) dropdown.style.display = 'none';
+            const ids = ['setupManageUserFirst', 'setupManageUserLast', 'setupManageUserEmail', 'setupManageUserRole', 'setupManageUserPassword'];
+            ids.forEach((id) => {
+                const el = document.getElementById(id);
+                if (el) el.value = '';
+            });
+            const saveBtn = document.getElementById('setupManageUsersCreateSaveBtn');
+            if (saveBtn) saveBtn.disabled = false;
+        }
+
+        async function setupSaveUserFromManageDropdown() {
+            if (!setupCanAddUsers) return;
+            const saveBtn = document.getElementById('setupManageUsersCreateSaveBtn');
+            if (saveBtn) saveBtn.disabled = true;
+            try {
+                const payload = {
+                    first_name: (document.getElementById('setupManageUserFirst')?.value || '').trim(),
+                    last_name: (document.getElementById('setupManageUserLast')?.value || '').trim(),
+                    email: (document.getElementById('setupManageUserEmail')?.value || '').trim(),
+                    role: (document.getElementById('setupManageUserRole')?.value || '').trim(),
+                    password: (document.getElementById('setupManageUserPassword')?.value || ''),
+                    ...setupBuildScopePayload(),
+                };
+
+                if (!payload.first_name || !payload.last_name || !payload.email || !payload.role || !payload.password) {
+                    alert('Please fill out all user fields.');
+                    return;
+                }
+
+                const resp = await fetch('/api/setup/users', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'include',
+                    body: JSON.stringify(payload),
+                });
+                const data = await resp.json();
+                if (data.error) throw new Error(data.error);
+
+                setupCloseManageUsersCreateDropdown();
+                await setupLoadUsers();
+                await openSetupManageUsersModal();
+            } catch (error) {
+                console.error('Error saving setup user:', error);
+                alert('Error saving user.');
+            } finally {
+                if (saveBtn) saveBtn.disabled = false;
+            }
+        }
+
+        function setupManageUsersRender() {
+            const body = document.getElementById('setupManageUsersBody');
+            if (!body) return;
+            const users = setupManageAllUsersData || [];
+            if (!users.length) {
+                body.innerHTML = '<tr><td colspan="6" style="padding:18px; text-align:center; color:#999;">No users found.</td></tr>';
+                return;
+            }
+            const shopOptions = (setupManageAllShopsData || []).map((s) => {
+                const sid = Number(s.id || s.shop_id || 0);
+                const sname = setupEscape(s.shop_name || s.domain || String(sid));
+                return `<option value="${sid}">${sname}</option>`;
+            }).join('');
+
+            body.innerHTML = users.map((user) => {
+                const userId = Number(user.id || 0);
+                const isEditing = setupManageUsersEditingId > 0 && userId === setupManageUsersEditingId;
+                const first = setupEscape(user.first_name || '');
+                const last = setupEscape(user.last_name || '');
+                const email = setupEscape(user.email || '');
+                const userShopId = Number(user.shop_id || 0);
+                const _shopEntry = (setupManageAllShopsData || []).find((s) => Number(s.id || s.shop_id || 0) === userShopId) || {};
+                const shopName = setupEscape(user.shop_name || _shopEntry.shop_name || _shopEntry.domain || '');
+                const roleLocked = !!user.role_locked;
+                const rowBg = roleLocked ? 'rgba(178,34,34,0.04)' : '#fff';
+                const fontWeight = roleLocked ? '700' : '400';
+
+                if (isEditing && !roleLocked) {
+                    const roleOpts = setupGetAssignableRoles()
+                        .map((r) => `<option value="${r}" ${user.role === r ? 'selected' : ''}>${r}</option>`)
+                        .join('');
+                    const shopSelectOpts = (setupManageAllShopsData || []).map((s) => {
+                        const sid = Number(s.id || s.shop_id || 0);
+                        const sname = setupEscape(s.shop_name || s.domain || String(sid));
+                        return `<option value="${sid}" ${sid === userShopId ? 'selected' : ''}>${sname}</option>`;
+                    }).join('');
+                    return `
+                        <tr style="background:#fff7f0;">
+                            <td style="padding:10px; border-bottom:1px solid rgba(0,0,0,0.06); text-align:center;">
+                                <input type="checkbox" class="setup-manage-user-cb" data-user-id="${userId}" checked />
+                            </td>
+                            <td style="padding:8px 10px; border-bottom:1px solid rgba(0,0,0,0.06);">
+                                <input id="mufirst_${userId}" value="${first}" style="width:100%; padding:6px 8px; border:1px solid #ccc; border-radius:4px; font-size:13px;" />
+                            </td>
+                            <td style="padding:8px 10px; border-bottom:1px solid rgba(0,0,0,0.06);">
+                                <input id="mulast_${userId}" value="${last}" style="width:100%; padding:6px 8px; border:1px solid #ccc; border-radius:4px; font-size:13px;" />
+                            </td>
+                            <td style="padding:8px 10px; border-bottom:1px solid rgba(0,0,0,0.06);">
+                                <input id="muemail_${userId}" value="${email}" style="width:100%; padding:6px 8px; border:1px solid #ccc; border-radius:4px; font-size:13px;" />
+                            </td>
+                            <td style="padding:8px 10px; border-bottom:1px solid rgba(0,0,0,0.06);">
+                                <select id="mushop_${userId}" style="width:100%; padding:6px 8px; border:1px solid #ccc; border-radius:4px; font-size:13px;">${shopSelectOpts}</select>
+                            </td>
+                            <td style="padding:8px 10px; border-bottom:1px solid rgba(0,0,0,0.06);">
+                                <select id="murole_${userId}" style="width:100%; padding:6px 8px; border:1px solid #ccc; border-radius:4px; font-size:13px;">${roleOpts}</select>
+                            </td>
+                        </tr>
+                    `;
+                }
+                const roleText = setupEscape(user.role || '');
+                return `
+                    <tr style="background:${rowBg};">
+                        <td style="padding:10px; border-bottom:1px solid rgba(0,0,0,0.06); text-align:center;">
+                            <input type="checkbox" class="setup-manage-user-cb" data-user-id="${userId}" />
+                        </td>
+                        <td style="padding:10px; border-bottom:1px solid rgba(0,0,0,0.06); font-weight:${fontWeight}; color:#222;">${first || '<span style="color:#aaa;">—</span>'}</td>
+                        <td style="padding:10px; border-bottom:1px solid rgba(0,0,0,0.06); font-weight:${fontWeight}; color:#222;">${last || '<span style="color:#aaa;">—</span>'}</td>
+                        <td style="padding:10px; border-bottom:1px solid rgba(0,0,0,0.06); color:#444;">${email || '<span style="color:#aaa;">—</span>'}</td>
+                        <td style="padding:10px; border-bottom:1px solid rgba(0,0,0,0.06); color:#444;">${shopName || '<span style="color:#aaa;">—</span>'}</td>
+                        <td style="padding:10px; border-bottom:1px solid rgba(0,0,0,0.06); color:#444;">${roleText || '<span style="color:#aaa;">—</span>'}</td>
+                    </tr>
+                `;
+            }).join('');
+
+            const editBtn = document.getElementById('setupManageUsersEditBtn');
+            if (editBtn) editBtn.textContent = setupManageUsersEditingId ? 'Edit (Save)' : 'Edit';
+        }
+
+        function setupManageUsersToggleAll(cb) {
+            document.querySelectorAll('.setup-manage-user-cb').forEach((el) => { el.checked = cb.checked; });
+        }
+
+        function setupManageUsersGetSelected() {
+            return Array.from(document.querySelectorAll('.setup-manage-user-cb:checked'))
+                .map((el) => Number(el.getAttribute('data-user-id') || 0))
+                .filter((v) => v > 0);
+        }
+
+        async function setupManageUsersDelete() {
+            if (!setupCanManageUsers) return;
+            const selected = setupManageUsersGetSelected();
+            if (!selected.length) { alert('Select at least one user to delete.'); return; }
+            const count = selected.length;
+            const names = setupManageAllUsersData
+                .filter((u) => selected.includes(Number(u.id || 0)))
+                .map((u) => `${u.first_name || ''} ${u.last_name || ''}`.trim() || u.email || String(u.id))
+                .join(', ');
+            if (!confirm(`Delete ${count} user(s)?\\n\\n${names}\\n\\nThis cannot be undone.`)) return;
+            try {
+                const resp = await fetch('/api/setup/users/delete', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'include',
+                    body: JSON.stringify({ user_ids: selected, shop_id: setupSelectedShopId || 0 }),
+                });
+                const data = await resp.json();
+                if (data.error) throw new Error(data.error);
+                setupManageAllUsersData = setupManageAllUsersData.filter((u) => !selected.includes(Number(u.id || 0)));
+                setupManageUsersRender();
+                await setupLoadUsers();
+            } catch (e) {
+                console.error('Error deleting users:', e);
+                alert('Error deleting users: ' + e.message);
+            }
+        }
+
+        async function setupManageUsersEdit() {
+            if (!setupCanManageUsers) return;
+            // If currently in edit mode → save or exit
+            if (setupManageUsersEditingId) {
+                const userId = setupManageUsersEditingId;
+                const snap = setupManageUsersEditSnapshot || {};
+                const g = (id) => String(document.getElementById(id)?.value || '').trim();
+                const newFirst = g(`mufirst_${userId}`);
+                const newLast = g(`mulast_${userId}`);
+                const newEmail = g(`muemail_${userId}`);
+                const newShopId = Number(document.getElementById(`mushop_${userId}`)?.value || 0);
+                const newRole = g(`murole_${userId}`);
+                const changed =
+                    newFirst !== (snap.first_name || '') ||
+                    newLast !== (snap.last_name || '') ||
+                    newEmail !== (snap.email || '') ||
+                    newShopId !== Number(snap.shop_id || 0) ||
+                    newRole !== (snap.role || '');
+                if (changed) {
+                    try {
+                        const payload = {
+                            id: userId,
+                            first_name: newFirst,
+                            last_name: newLast,
+                            email: newEmail,
+                            shop_id: newShopId || undefined,
+                            role: newRole,
+                        };
+                        const resp = await fetch('/api/setup/users/admin-update', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            credentials: 'include',
+                            body: JSON.stringify(payload),
+                        });
+                        const data = await resp.json();
+                        if (data.error) throw new Error(data.error);
+                        // Update local list
+                        const idx = setupManageAllUsersData.findIndex((u) => Number(u.id || 0) === userId);
+                        if (idx >= 0) {
+                            const newShopName = (setupManageAllShopsData.find((s) => Number(s.id || s.shop_id || 0) === newShopId) || {}).shop_name || snap.shop_name || '';
+                            setupManageAllUsersData[idx] = {
+                                ...setupManageAllUsersData[idx],
+                                first_name: newFirst, last_name: newLast, email: newEmail,
+                                shop_id: newShopId, shop_name: newShopName, role: newRole,
+                            };
+                        }
+                        await setupLoadUsers();
+                    } catch (e) {
+                        console.error('Error saving user edit:', e);
+                        alert('Error saving user: ' + e.message);
+                        return;
+                    }
+                }
+                setupManageUsersEditingId = 0;
+                setupManageUsersEditSnapshot = null;
+                setupManageUsersRender();
+                return;
+            }
+
+            // Enter edit mode for single selected user
+            const selected = setupManageUsersGetSelected();
+            if (!selected.length) { alert('Select one user to edit.'); return; }
+            if (selected.length > 1) { alert('Select only one user to edit.'); return; }
+            const userId = selected[0];
+            const user = setupManageAllUsersData.find((u) => Number(u.id || 0) === userId);
+            if (!user) return;
+            if (user.role_locked) { alert('Architect accounts cannot be edited here.'); return; }
+            setupManageUsersEditingId = userId;
+            setupManageUsersEditSnapshot = { ...user };
+            setupManageUsersRender();
+        }
+
         window.addEventListener('click', (event) => {
             const shopModal = document.getElementById('setupShopModal');
             if (shopModal && shopModal.style.display === 'block' && event.target === shopModal) {
@@ -1145,5 +1426,16 @@ def get_setup_script():
                 return;
             }
 
+            const manageUsersModal = document.getElementById('setupManageUsersModal');
+            if (manageUsersModal && manageUsersModal.style.display === 'block' && event.target === manageUsersModal) {
+                closeSetupManageUsersModal();
+                return;
+            }
+
+            const modal = document.getElementById('setupUserModal');
+            if (!modal || modal.style.display !== 'block') return;
+            if (event.target === modal) {
+                closeSetupUserModal();
+            }
         });
     """
