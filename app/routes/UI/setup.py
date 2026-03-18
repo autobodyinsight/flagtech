@@ -246,7 +246,7 @@ def get_setup_screen_html():
 
         <div id="setupManageShopsModal" class="modal" style="display:none;">
             <div class="modal-content" style="max-width:900px; max-height:88vh; display:flex; flex-direction:column; padding:20px;">
-                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; flex-shrink:0; position:relative; z-index:40;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; flex-shrink:0;">
                     <h3 style="margin:0; color:#333;">Manage Shops</h3>
                     <div style="display:flex; gap:8px; align-items:center;">
                         <button type="button" id="setupManageShopsEditBtn" onclick="setupManageShopsEdit()" class="setup-action-btn" style="background:#555; color:#fff;">Edit</button>
@@ -279,7 +279,7 @@ def get_setup_screen_html():
                         <h3 style="margin:0; color:#333;">Manage Users</h3>
                         <div id="setupManageUsersCreateWrap" style="position:relative;">
                             <button type="button" onclick="setupToggleManageUsersCreateDropdown()" class="setup-action-btn" style="background:#b22222; color:#fff; padding:8px 12px;">+</button>
-                            <div id="setupManageUsersCreateDropdown" style="display:none; position:absolute; top:calc(100% + 6px); left:0; z-index:2000; width:340px; background:#fff; border:1px solid #e0dbd8; border-radius:8px; box-shadow:0 8px 20px rgba(0,0,0,0.12); padding:12px; pointer-events:auto;">
+                            <div id="setupManageUsersCreateDropdown" style="display:none; position:absolute; top:calc(100% + 6px); left:0; z-index:20; width:340px; background:#fff; border:1px solid #e0dbd8; border-radius:8px; box-shadow:0 8px 20px rgba(0,0,0,0.12); padding:12px;">
                                 <div style="font-weight:700; color:#333; margin-bottom:10px;">Create User</div>
                                 <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
                                     <input id="setupManageUserFirst" type="text" placeholder="First" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:4px;" />
@@ -1162,27 +1162,6 @@ def get_setup_script():
             const roleSelect = document.getElementById('setupManageUserRole');
             if (roleSelect) {
                 roleSelect.innerHTML = setupBuildRoleOptions('');
-                roleSelect.disabled = false;
-            }
-            const firstInput = document.getElementById('setupManageUserFirst');
-            if (firstInput) {
-                firstInput.disabled = false;
-                firstInput.readOnly = false;
-            }
-            const lastInput = document.getElementById('setupManageUserLast');
-            if (lastInput) {
-                lastInput.disabled = false;
-                lastInput.readOnly = false;
-            }
-            const emailInput = document.getElementById('setupManageUserEmail');
-            if (emailInput) {
-                emailInput.disabled = false;
-                emailInput.readOnly = false;
-            }
-            const passwordInput = document.getElementById('setupManageUserPassword');
-            if (passwordInput) {
-                passwordInput.disabled = false;
-                passwordInput.readOnly = false;
             }
             dropdown.style.display = 'block';
             const first = document.getElementById('setupManageUserFirst');
