@@ -1797,28 +1797,11 @@ def get_parts_script():
             if (!estimatorName) {
                 estimatorName = partsGetRoEstimatorFromTable(ro);
             }
-            const userEmail = String(appUiState?.currentUser?.email || appUiState?.sessionUser?.email || '').trim();
-
-            let shopInfo = (typeof setupShopData !== 'undefined' && setupShopData) ? setupShopData : null;
-            if (!shopInfo || !Object.keys(shopInfo).length) {
-                try {
-                    const shopScopeQuery = appUiState?.shopId
-                        ? `?shop_id=${encodeURIComponent(String(appUiState.shopId))}`
-                        : '';
-                    const shopResp = await fetch('/api/setup/shop' + shopScopeQuery, { credentials: 'include' });
-                    const shopData = await shopResp.json();
-                    shopInfo = shopData?.shop || null;
-                } catch (error) {
-                    shopInfo = null;
-                }
-            }
-            const shopName = String(shopInfo?.shop_name || appUiState?.shopName || '').trim();
-            const shopAddress = String(shopInfo?.address || '').trim();
-            const shopCity = String(shopInfo?.city || '').trim();
-            const shopState = String(shopInfo?.state || '').trim();
-            const shopZip = String(shopInfo?.zip_code || '').trim();
-            const shopPhone = String(shopInfo?.phone || '').trim();
-            const shopCityStateZip = [shopCity, shopState].filter(Boolean).join(', ') + ([shopZip].filter(Boolean).length ? ((shopCity || shopState) ? ` ${shopZip}` : shopZip) : '');
+            const operatorLabel = 'System';
+            const headerName = String(options?.headerName || 'AutobodyOS').trim();
+            const headerLine1 = String(options?.headerLine1 || '').trim();
+            const headerLine2 = String(options?.headerLine2 || '').trim();
+            const headerLine3 = String(options?.headerLine3 || '').trim();
 
             let totalAmount = 0;
             const rowsHtml = orderedLines.map((line, index) => {
@@ -1894,13 +1877,13 @@ def get_parts_script():
                                 ${vendorAddress ? `<div class="line">Address: ${safe(vendorAddress)}</div>` : ''}
                             </div>
                             <div class="card">
-                                <h4>SHOP INFO</h4>
-                                <div class="line">${safe(shopName || '—')}</div>
-                                <div class="line">${safe(shopAddress || '—')}</div>
-                                <div class="line">${safe(shopCityStateZip || '—')}</div>
-                                <div class="line">${safe(shopPhone || '—')}</div>
+                                <h4>HEADER</h4>
+                                <div class="line">${safe(headerName || '—')}</div>
+                                <div class="line">${safe(headerLine1 || '—')}</div>
+                                <div class="line">${safe(headerLine2 || '—')}</div>
+                                <div class="line">${safe(headerLine3 || '—')}</div>
                                 <div class="line">Estimator: <strong>${safe(estimatorName || '—')}</strong></div>
-                                <div class="line">User Email: ${safe(userEmail || '—')}</div>
+                                <div class="line">Operator: ${safe(operatorLabel)}</div>
                             </div>
                         </div>
 

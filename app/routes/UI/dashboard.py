@@ -626,9 +626,7 @@ def get_dashboard_screen_html():
                 techAssignLines: [],
                 techAssignManualLines: [],
                 techAssignNextManualId: 1,
-                roPrintTechOptions: [],
-                roPrintShopInfo: null,
-                roPrintShopInfoLoaded: false
+                roPrintTechOptions: []
             };
 
             function escapePopupHtml(value) {
@@ -661,43 +659,8 @@ def get_dashboard_screen_html():
                 return popupFormatDateTime(value);
             }
 
-            async function getRoPrintShopInfo() {
-                if (popupState.roPrintShopInfoLoaded) {
-                    return popupState.roPrintShopInfo || {};
-                }
-                popupState.roPrintShopInfoLoaded = true;
-                try {
-                    const data = await popupFetchJson('/api/setup/shop');
-                    popupState.roPrintShopInfo = (data && typeof data.shop === 'object' && data.shop) ? data.shop : {};
-                } catch (error) {
-                    console.warn('Unable to load shop info for print header:', error);
-                    popupState.roPrintShopInfo = {};
-                }
-                return popupState.roPrintShopInfo || {};
-            }
-
-            function buildRoPrintShopHeaderHtml(shopData) {
-                const shop = shopData && typeof shopData === 'object' ? shopData : {};
-                const name = escapePopupHtml(String(shop.shop_name || '').trim());
-                const address = escapePopupHtml(String(shop.address || '').trim());
-                const city = escapePopupHtml(String(shop.city || '').trim());
-                const state = escapePopupHtml(String(shop.state || '').trim());
-                const zip = escapePopupHtml(String(shop.zip_code || '').trim());
-                const phone = escapePopupHtml(String(shop.phone || '').trim());
-                const cityStateZip = [city, state, zip].filter(Boolean).join(', ').replace(/,\s([^,]+)$/, ' $1');
-
-                if (!name && !address && !cityStateZip && !phone) {
-                    return '';
-                }
-
-                return `
-                    <div style="position:absolute; left:50%; transform:translateX(-50%); top:26px; width:70%; text-align:center; z-index:2;">
-                        ${name ? `<div style="font-size:36px; font-weight:800; line-height:1.12;">${name}</div>` : ''}
-                        ${address ? `<div style="font-size:24px; color:#444; margin-top:4px; line-height:1.15;">${address}</div>` : ''}
-                        ${cityStateZip ? `<div style="font-size:24px; color:#444; margin-top:4px; line-height:1.15;">${cityStateZip}</div>` : ''}
-                        ${phone ? `<div style="font-size:24px; color:#444; margin-top:4px; line-height:1.15;">${phone}</div>` : ''}
-                    </div>
-                `;
+            function buildPrintHeaderHtml() {
+                return '';
             }
 
             function extractPartNumberAndDescription(rawDescription, explicitPartNumber) {
@@ -916,7 +879,7 @@ def get_dashboard_screen_html():
             async function roPrintBill() {
                 roClosePrintOptionsModal();
                 try {
-                    const shopHeaderHtml = buildRoPrintShopHeaderHtml(await getRoPrintShopInfo());
+                    const printHeaderHtml = buildPrintHeaderHtml();
                     const res = await popupFetchJson(`/api/ro-estimate?ro=${encodeURIComponent(ro.ro)}`);
                     const estimate = res.estimate || {};
                     const lines = popupGetUnifiedEstimateLines(estimate);
@@ -955,7 +918,7 @@ def get_dashboard_screen_html():
                         `RO ${ro.ro} Bill`,
                         `
                             <div class="header" style="text-align:left; position:relative; min-height:170px;">
-                                ${shopHeaderHtml}
+                                ${printHeaderHtml}
                                 <div style="font-size:72px; font-weight:800; line-height:1; margin-bottom:8px;">RO #${escapePopupHtml(ro.ro || '-')}</div>
                                 <div style="display:flex; justify-content:space-between; align-items:flex-end; gap:18px; margin-bottom:6px;">
                                     <div style="font-size:24px; font-weight:600;">Vehicle: ${escapePopupHtml(ro.vehicle || '-')}</div>
@@ -1035,7 +998,7 @@ def get_dashboard_screen_html():
                 roClosePrintOptionsModal();
 
                 try {
-                    const shopHeaderHtml = buildRoPrintShopHeaderHtml(await getRoPrintShopInfo());
+                    const printHeaderHtml = buildPrintHeaderHtml();
                     let targets = popupState.roPrintTechOptions || [];
                     if (selectedValue !== 'all') {
                         targets = targets.filter((item) => String(item.tech_id) === selectedValue);
@@ -1126,7 +1089,7 @@ def get_dashboard_screen_html():
                         `RO ${ro.ro} Service Order`,
                         `
                             <div class="header" style="text-align:left; position:relative; min-height:170px;">
-                                ${shopHeaderHtml}
+                                ${printHeaderHtml}
                                 <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:18px; margin-bottom:6px;">
                                     <div style="font-size:72px; font-weight:800; line-height:1; margin-bottom:8px;">RO #${escapePopupHtml(ro.ro || '-')}</div>
                                     <div style="text-align:right;">
@@ -1151,7 +1114,7 @@ def get_dashboard_screen_html():
             async function roPrintParts() {
                 roClosePrintOptionsModal();
                 try {
-                    const shopHeaderHtml = buildRoPrintShopHeaderHtml(await getRoPrintShopInfo());
+                    const printHeaderHtml = buildPrintHeaderHtml();
                     const [linesRes, onOrderRes, arrivedRes, returnedRes, receivedRes] = await Promise.all([
                         popupFetchJson(`/api/parts/ro-lines?ro=${encodeURIComponent(ro.ro)}`),
                         popupFetchJson(`/api/parts/on-order-lines?ro=${encodeURIComponent(ro.ro)}`),
@@ -1236,7 +1199,7 @@ def get_dashboard_screen_html():
                         `RO ${ro.ro} Parts`,
                         `
                             <div class="header" style="text-align:left; position:relative; min-height:170px;">
-                                ${shopHeaderHtml}
+                                ${printHeaderHtml}
                                 <div style="font-size:72px; font-weight:800; line-height:1; margin-bottom:8px;">RO #${escapePopupHtml(ro.ro || '-')}</div>
                                 <div style="display:flex; justify-content:space-between; align-items:flex-end; gap:18px; margin-bottom:6px;">
                                     <div style="font-size:24px; font-weight:600;">Vehicle: ${vehicleText}</div>

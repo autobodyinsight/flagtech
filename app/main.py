@@ -5,12 +5,9 @@ from fastapi.staticfiles import StaticFiles
 from pathlib import Path
 
 # Routers
-from app.routes.estimate import router as estimate_router
 from app.routes.UI.ui import router as ui_router
 from app.routes.UI.ui_with_processing import router as processing_router
 from app.routes.UI.upload_ui.routes import router as ui_routes_router
-from app.routes.UI.reports import router as reports_router
-from app.routes.payments import router as payments_router
 
 
 app = FastAPI(title="FlagTech Estimate Parser")
@@ -54,9 +51,7 @@ app.add_middleware(
 # ---------------------------------------------------------
 
 # API endpoints
-app.include_router(estimate_router, prefix="/api")
-app.include_router(payments_router, prefix="/api")
-app.include_router(reports_router)
+app.include_router(processing_router, prefix="/api")
 
 # Main UI display
 app.include_router(ui_router, prefix="/ui")
@@ -73,4 +68,4 @@ app.include_router(ui_routes_router, prefix="/ui")
 
 @app.get("/", include_in_schema=False)
 def root():
-    return RedirectResponse(url="/ui/login")
+    return RedirectResponse(url="/ui/")
