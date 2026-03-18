@@ -1076,7 +1076,6 @@ async def home_screen(request: Request):
         const appUiState = {{
             activeScreen: 'dashboard',
             sessionUser: null,
-            shopId: 0,
             shopDomain: '',
             shopName: '',
             users: [],
@@ -1527,7 +1526,7 @@ async def home_screen(request: Request):
             if (!newPassword) return;
             try {{
                 const payload = {{ user_ids: [appUiState.currentUser.id], new_password: newPassword }};
-                if (appUiState.shopId) payload.shop_id = appUiState.shopId;
+                if (appUiState.shopDomain) payload.shop_domain = appUiState.shopDomain;
                 const resp = await fetch('/api/setup/users/reset-password', {{
                     method: 'POST',
                     credentials: 'include',
@@ -1552,17 +1551,16 @@ async def home_screen(request: Request):
                 const contextData = await contextResp.json();
                 if (!sessionResp.ok || !sessionData.authenticated) return;
                 appUiState.sessionUser = sessionData.user || null;
-                appUiState.shopId = Number(contextData.default_shop_id || sessionData.user?.shop_id || 0) || 0;
                 appUiState.shopDomain = String(contextData.default_domain || sessionData.user?.domain || '').trim();
 
-                const shopScopeQuery = appUiState.shopId
-                    ? `?shop_id=${{encodeURIComponent(String(appUiState.shopId))}}`
+                const shopScopeQuery = appUiState.shopDomain
+                    ? `?shop_domain=${{encodeURIComponent(appUiState.shopDomain)}}`
                     : '';
                 const shopResp = await fetch('/api/setup/shop' + shopScopeQuery, {{ credentials: 'include' }});
                 const shopData = await shopResp.json();
                 appUiState.shopName = String(shopData?.shop?.shop_name || '').trim();
 
-                const userResp = await fetch(`/api/setup/users${{appUiState.shopId ? `?shop_id=${{encodeURIComponent(String(appUiState.shopId))}}` : ''}}`, {{ credentials: 'include' }});
+                const userResp = await fetch(`/api/setup/users${{appUiState.shopDomain ? `?shop_domain=${{encodeURIComponent(appUiState.shopDomain)}}` : ''}}`, {{ credentials: 'include' }});
                 const userData = await userResp.json();
                 appUiState.users = Array.isArray(userData.users) ? userData.users : [];
 

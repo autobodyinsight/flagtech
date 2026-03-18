@@ -1802,8 +1802,8 @@ def get_parts_script():
             let shopInfo = (typeof setupShopData !== 'undefined' && setupShopData) ? setupShopData : null;
             if (!shopInfo || !Object.keys(shopInfo).length) {
                 try {
-                    const shopScopeQuery = appUiState?.shopId
-                        ? `?shop_id=${encodeURIComponent(String(appUiState.shopId))}`
+                    const shopScopeQuery = appUiState?.shopDomain
+                        ? `?shop_domain=${encodeURIComponent(String(appUiState.shopDomain))}`
                         : '';
                     const shopResp = await fetch('/api/setup/shop' + shopScopeQuery, { credentials: 'include' });
                     const shopData = await shopResp.json();
