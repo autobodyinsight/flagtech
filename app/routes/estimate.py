@@ -783,75 +783,6 @@ def _ensure_shop_users_table(cur) -> None:
     cur.execute("CREATE INDEX IF NOT EXISTS idx_shop_users_shop_id_active ON shop_users(shop_id, active)")
 
 
-def _ensure_shop_scope_id(cur, domain: str | None) -> int | None:
-    normalized_domain = str(domain or "").strip().lower()
-    if not normalized_domain:
-        return None
-
-    _ensure_shops_table(cur)
-    _ensure_shop_settings_table(cur)
-    _ensure_shop_users_table(cur)
-
-    cur.execute("SELECT id FROM shops WHERE domain = %s LIMIT 1", (normalized_domain,))
-    shop_row = cur.fetchone() or {}
-    shop_id = int(shop_row.get("id") or 0)
-
-    if not shop_id:
-        cur.execute(
-            """
-            SELECT shop_name, address, city, state, zip_code
-            FROM shop_settings
-            WHERE domain = %s
-            LIMIT 1
-            """,
-            (normalized_domain,),
-        )
-        settings_row = cur.fetchone() or {}
-        cur.execute(
-            """
-            INSERT INTO shops (domain, name, address, city, state, zip, updated_at)
-            VALUES (%s, %s, %s, %s, %s, %s, CURRENT_TIMESTAMP)
-            ON CONFLICT (domain)
-            DO UPDATE SET updated_at = CURRENT_TIMESTAMP
-            RETURNING id
-            """,
-            (
-                normalized_domain,
-                str(settings_row.get("shop_name") or "").strip() or None,
-                str(settings_row.get("address") or "").strip() or None,
-                str(settings_row.get("city") or "").strip() or None,
-                str(settings_row.get("state") or "").strip() or None,
-                str(settings_row.get("zip_code") or "").strip() or None,
-            ),
-        )
-        inserted_row = cur.fetchone() or {}
-        shop_id = int(inserted_row.get("id") or 0)
-
-    if not shop_id:
-        return None
-
-    cur.execute(
-        """
-        UPDATE shop_settings
-        SET shop_id = %s
-        WHERE domain = %s
-          AND shop_id IS DISTINCT FROM %s
-        """,
-        (shop_id, normalized_domain, shop_id),
-    )
-    cur.execute(
-        """
-        UPDATE shop_users
-        SET shop_id = %s
-        WHERE domain = %s
-          AND shop_id IS DISTINCT FROM %s
-        """,
-        (shop_id, normalized_domain, shop_id),
-    )
-
-    return shop_id
-
-
 def _ensure_chat_messages_table(cur) -> None:
     cur.execute(
         """
@@ -2216,7 +2147,6 @@ async def get_setup_shop(request: Request):
     try:
         _ensure_shop_settings_table(cur)
         _ensure_shop_isolation_infrastructure(cur)
-        _ensure_shop_scope_id(cur, selected_domain)
         cur.execute(
             """
             SELECT
@@ -2284,7 +2214,29 @@ async def save_setup_shop(request: Request):
         if not requester_is_architect and selected_domain != str(domain or "").strip().lower():
             return JSONResponse(status_code=403, content={"error": "Forbidden"})
 
-        selected_shop_id = _ensure_shop_scope_id(cur, selected_domain)
+        cur.execute("SELECT id FROM shops WHERE domain = %s LIMIT 1", (selected_domain,))
+        shop_row = cur.fetchone() or {}
+        selected_shop_id = int(shop_row.get("id") or 0)
+
+        if not selected_shop_id and requester_is_architect:
+            cur.execute(
+                """
+                INSERT INTO shops (domain, name, address, city, state, zip, updated_at)
+                VALUES (%s, %s, %s, %s, %s, %s, CURRENT_TIMESTAMP)
+                ON CONFLICT (domain)
+                DO UPDATE SET
+                    name = COALESCE(EXCLUDED.name, shops.name),
+                    address = COALESCE(EXCLUDED.address, shops.address),
+                    city = COALESCE(EXCLUDED.city, shops.city),
+                    state = COALESCE(EXCLUDED.state, shops.state),
+                    zip = COALESCE(EXCLUDED.zip, shops.zip),
+                    updated_at = CURRENT_TIMESTAMP
+                RETURNING id
+                """,
+                (selected_domain, shop_name or None, address or None, city or None, state or None, zip_code or None),
+            )
+            inserted_shop_row = cur.fetchone() or {}
+            selected_shop_id = int(inserted_shop_row.get("id") or 0)
 
         if not selected_shop_id:
             return JSONResponse(status_code=400, content={"error": "Unable to resolve shop scope"})
@@ -2706,7 +2658,9 @@ async def update_setup_user(request: Request):
         if not requester_is_architect and selected_domain != str(domain or "").strip().lower():
             return JSONResponse(status_code=403, content={"error": "Forbidden"})
 
-        selected_shop_id = _ensure_shop_scope_id(cur, selected_domain)
+        cur.execute("SELECT id FROM shops WHERE domain = %s LIMIT 1", (selected_domain,))
+        shop_row = cur.fetchone() or {}
+        selected_shop_id = int(shop_row.get("id") or 0)
         if not selected_shop_id:
             return JSONResponse(status_code=400, content={"error": "Unable to resolve shop scope"})
         cur.execute(
@@ -2799,7 +2753,9 @@ async def reset_setup_user_password(request: Request):
                 return JSONResponse(status_code=403, content={"error": "You can only reset your own password"})
             selected_domain = str(domain or "").strip().lower()
 
-        selected_shop_id = _ensure_shop_scope_id(cur, selected_domain)
+        cur.execute("SELECT id FROM shops WHERE domain = %s LIMIT 1", (selected_domain,))
+        shop_row = cur.fetchone() or {}
+        selected_shop_id = int(shop_row.get("id") or 0)
         if not selected_shop_id:
             return JSONResponse(status_code=400, content={"error": "Unable to resolve shop scope"})
         cur.execute(
@@ -2834,7 +2790,9 @@ async def list_setup_users(request: Request):
     try:
         _ensure_shop_users_table(cur)
         _ensure_shop_isolation_infrastructure(cur)
-        selected_shop_id = _ensure_shop_scope_id(cur, selected_domain)
+        cur.execute("SELECT id FROM shops WHERE domain = %s LIMIT 1", (selected_domain,))
+        shop_row = cur.fetchone() or {}
+        selected_shop_id = int(shop_row.get("id") or 0)
         if not selected_shop_id and not requester_is_architect:
             return JSONResponse(status_code=403, content={"error": "Shop scope not resolved", "users": []})
         cur.execute(
@@ -2913,7 +2871,9 @@ async def create_setup_user(request: Request):
         if not requester_is_architect and selected_domain != str(domain or "").strip().lower():
             return JSONResponse(status_code=403, content={"error": "Forbidden"})
 
-        selected_shop_id = _ensure_shop_scope_id(cur, selected_domain)
+        cur.execute("SELECT id FROM shops WHERE domain = %s LIMIT 1", (selected_domain,))
+        shop_row = cur.fetchone() or {}
+        selected_shop_id = int(shop_row.get("id") or 0)
         if not selected_shop_id:
             return JSONResponse(status_code=400, content={"error": "Unable to resolve shop scope"})
         cur.execute(
