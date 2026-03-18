@@ -2770,7 +2770,8 @@ async def list_setup_users(request: Request):
     if not domain:
         return JSONResponse(status_code=401, content={"error": "Not authenticated", "users": []})
 
-    selected_domain = _resolve_setup_scope_domain(request, domain, request.query_params.get("shop_domain"))
+    requested_domain = str(request.query_params.get("shop_domain") or "").strip().lower()
+    selected_domain = _resolve_setup_scope_domain(request, domain, requested_domain)
     requester_is_architect = _request_is_architect(request)
 
     conn = get_conn()
@@ -2778,22 +2779,38 @@ async def list_setup_users(request: Request):
     try:
         _ensure_shop_users_table(cur)
         _ensure_shop_isolation_infrastructure(cur)
-        cur.execute("SELECT id FROM shops WHERE domain = %s LIMIT 1", (selected_domain,))
-        shop_row = cur.fetchone() or {}
-        selected_shop_id = int(shop_row.get("id") or 0)
-        if not selected_shop_id and not requester_is_architect:
-            return JSONResponse(status_code=403, content={"error": "Shop scope not resolved", "users": []})
-        cur.execute(
-            """
-            SELECT id, first_name, last_name, email, role, shop_id, created_at
-            FROM shop_users
-            WHERE domain = %s
-              AND shop_id = %s
-              AND active = TRUE
-            ORDER BY created_at DESC, id DESC
-            """,
-            (selected_domain, selected_shop_id),
-        )
+        if requester_is_architect:
+            if requested_domain:
+                cur.execute(
+                    """
+                    SELECT id, first_name, last_name, email, role, shop_id, created_at
+                    FROM shop_users
+                    WHERE domain = %s
+                      AND active = TRUE
+                    ORDER BY created_at DESC, id DESC
+                    """,
+                    (selected_domain,),
+                )
+            else:
+                cur.execute(
+                    """
+                    SELECT id, first_name, last_name, email, role, shop_id, created_at
+                    FROM shop_users
+                    WHERE active = TRUE
+                    ORDER BY created_at DESC, id DESC
+                    """
+                )
+        else:
+            cur.execute(
+                """
+                SELECT id, first_name, last_name, email, role, shop_id, created_at
+                FROM shop_users
+                WHERE domain = %s
+                  AND active = TRUE
+                ORDER BY created_at DESC, id DESC
+                """,
+                (selected_domain,),
+            )
         rows = cur.fetchall() or []
         users = []
         for row in rows:

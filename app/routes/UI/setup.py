@@ -299,6 +299,7 @@ def get_setup_script():
         let setupSelectedShopDomain = '';
         let setupDefaultDomain = '';
         let setupEditMode = false;
+        let setupUsersRequestSeq = 0;
 
         function setupEscape(value) {
             return String(value || '')
@@ -581,6 +582,8 @@ def get_setup_script():
         async function setupLoadUsers() {
             const body = document.getElementById('setupUsersBody');
             if (!body) return;
+            const requestSeq = ++setupUsersRequestSeq;
+            const requestedShopDomain = String(setupSelectedShopDomain || '').trim().toLowerCase();
             if (setupIsArchitect && !setupSelectedShopDomain) {
                 body.innerHTML = '<tr><td colspan="5" style="padding:18px; text-align:center; color:#999;">Select a shop card to load users.</td></tr>';
                 return;
@@ -589,6 +592,11 @@ def get_setup_script():
             try {
                 const resp = await fetch(`/api/setup/users${setupBuildScopeQuery()}`, { credentials: 'include' });
                 const data = await resp.json();
+                if (requestSeq !== setupUsersRequestSeq) return;
+                if (setupIsArchitect && requestedShopDomain !== String(setupSelectedShopDomain || '').trim().toLowerCase()) return;
+                if (!resp.ok || data.error) {
+                    throw new Error(data.error || `Failed to load users (${resp.status})`);
+                }
                 const users = Array.isArray(data.users) ? data.users : [];
                 if (setupIsArchitect) {
                     const architectRows = users.filter((user) => !!user.role_locked);
@@ -604,6 +612,8 @@ def get_setup_script():
 
                 setupRenderUsers();
             } catch (error) {
+                if (requestSeq !== setupUsersRequestSeq) return;
+                if (setupIsArchitect && requestedShopDomain !== String(setupSelectedShopDomain || '').trim().toLowerCase()) return;
                 console.error('Error loading setup users:', error);
                 body.innerHTML = '<tr><td colspan="5" style="padding:18px; text-align:center; color:#c00;">Error loading users.</td></tr>';
             }
