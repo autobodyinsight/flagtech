@@ -2736,16 +2736,9 @@ async def list_setup_shops(request: Request):
                 COALESCE(s.state, sh.state) AS state,
                 COALESCE(s.zip_code, sh.zip) AS zip_code,
                 s.phone,
-                s.email,
-                COALESCE(uc.user_count, 0) AS user_count
+                s.email
             FROM shops sh
             LEFT JOIN shop_settings s ON s.shop_id = sh.id
-            LEFT JOIN (
-                SELECT shop_id, COUNT(*) AS user_count
-                FROM shop_users
-                WHERE active = TRUE
-                GROUP BY shop_id
-            ) uc ON uc.shop_id = sh.id
             ORDER BY LOWER(COALESCE(NULLIF(s.shop_name, ''), NULLIF(sh.name, ''), sh.domain)) ASC
             """
         )
@@ -2763,7 +2756,6 @@ async def list_setup_shops(request: Request):
                     "zip_code": str(row.get("zip_code") or "").strip(),
                     "phone": str(row.get("phone") or "").strip(),
                     "email": str(row.get("email") or "").strip(),
-                    "user_count": int(row.get("user_count") or 0),
                 }
             )
         return {"shops": shops}
@@ -3154,21 +3146,9 @@ async def delete_setup_shop(request: Request):
         return JSONResponse(status_code=403, content={"error": "Forbidden"})
 
     data = await request.json()
-    shop_ids_raw = data.get("shop_ids") or []
-    if not isinstance(shop_ids_raw, list) or not shop_ids_raw:
-        return JSONResponse(status_code=400, content={"error": "shop_ids is required"})
-
-    shop_ids = []
-    for value in shop_ids_raw:
-        try:
-            parsed = int(value)
-        except (TypeError, ValueError):
-            continue
-        if parsed > 0 and parsed not in shop_ids:
-            shop_ids.append(parsed)
-
-    if not shop_ids:
-        return JSONResponse(status_code=400, content={"error": "No valid shop ids provided"})
+    selected_domain = str(data.get("shop_domain") or "").strip().lower()
+    if not selected_domain:
+        return JSONResponse(status_code=400, content={"error": "shop_domain is required"})
 
     conn = get_conn()
     cur = conn.cursor()
@@ -3177,161 +3157,24 @@ async def delete_setup_shop(request: Request):
         _ensure_shop_users_table(cur)
         _ensure_shop_isolation_infrastructure(cur)
 
-        cur.execute("SELECT domain FROM shops WHERE id = ANY(%s)", (shop_ids,))
-        domain_rows = cur.fetchall() or []
-        domains = [str(r.get("domain") or "").strip().lower() for r in domain_rows if r.get("domain")]
-
-        if domains:
-            for tbl in [
-                "saved_estimates", "techs", "archived_techs", "ro_line_assignments",
-                "ro_assignments", "ro_phases", "ro_flagout_lines", "ro_payment_totals",
-                "ro_payment_entries", "parts_vendors", "parts_received",
-            ]:
-                try:
-                    cur.execute(
-                        sql.SQL("DELETE FROM {} WHERE domain = ANY(%s)").format(sql.Identifier(tbl)),
-                        (domains,),
-                    )
-                except Exception:
-                    pass
-
-        cur.execute("DELETE FROM shop_settings WHERE shop_id = ANY(%s)", (shop_ids,))
+        cur.execute("DELETE FROM shop_settings WHERE domain = %s", (selected_domain,))
         settings_deleted = int(cur.rowcount or 0)
 
-        cur.execute("DELETE FROM shop_users WHERE shop_id = ANY(%s)", (shop_ids,))
+        cur.execute("DELETE FROM shop_users WHERE domain = %s", (selected_domain,))
         users_deleted = int(cur.rowcount or 0)
 
-        cur.execute("DELETE FROM shops WHERE id = ANY(%s)", (shop_ids,))
+        cur.execute("DELETE FROM shops WHERE domain = %s", (selected_domain,))
         shops_deleted = int(cur.rowcount or 0)
 
         conn.commit()
         return {
             "status": "ok",
             "deleted": {
-                "shops": shops_deleted,
-                "shop_users": users_deleted,
                 "shop_settings": settings_deleted,
+                "shop_users": users_deleted,
+                "shops": shops_deleted,
             },
         }
-    except Exception as exc:
-        conn.rollback()
-        return JSONResponse(status_code=500, content={"error": str(exc)})
-    finally:
-        cur.close()
-
-
-@router.get("/setup/users/all")
-async def get_all_setup_users(request: Request):
-    domain = get_user_domain(request)
-    if not domain:
-        return JSONResponse(status_code=401, content={"error": "Not authenticated", "users": []})
-    if not _request_is_architect(request):
-        return JSONResponse(status_code=403, content={"error": "Forbidden", "users": []})
-
-    conn = get_conn()
-    cur = conn.cursor()
-    try:
-        _ensure_shop_users_table(cur)
-        _ensure_shop_isolation_infrastructure(cur)
-        cur.execute(
-            """
-            SELECT
-                su.id,
-                su.email,
-                su.first_name,
-                su.last_name,
-                su.role,
-                su.shop_id,
-                su.role_locked,
-                COALESCE(NULLIF(ss.shop_name, ''), NULLIF(sh.name, ''), sh.domain, '') AS shop_name
-            FROM shop_users su
-            LEFT JOIN shops sh ON sh.id = su.shop_id
-            LEFT JOIN shop_settings ss ON ss.shop_id = su.shop_id
-            WHERE su.active = TRUE
-            ORDER BY
-                LOWER(COALESCE(NULLIF(ss.shop_name, ''), NULLIF(sh.name, ''), sh.domain)) ASC,
-                LOWER(su.last_name) ASC,
-                LOWER(su.first_name) ASC
-            """
-        )
-        rows = cur.fetchall() or []
-        users = []
-        for row in rows:
-            users.append({
-                "id": int(row.get("id") or 0),
-                "email": str(row.get("email") or "").strip(),
-                "first_name": str(row.get("first_name") or "").strip(),
-                "last_name": str(row.get("last_name") or "").strip(),
-                "role": str(row.get("role") or "").strip(),
-                "shop_id": int(row.get("shop_id") or 0),
-                "shop_name": str(row.get("shop_name") or "").strip(),
-                "role_locked": bool(row.get("role_locked")),
-            })
-        return {"users": users}
-    finally:
-        cur.close()
-
-
-@router.post("/setup/users/admin-update")
-async def admin_update_setup_user(request: Request):
-    domain = get_user_domain(request)
-    if not domain:
-        return JSONResponse(status_code=401, content={"error": "Not authenticated"})
-    if not _request_is_architect(request):
-        return JSONResponse(status_code=403, content={"error": "Forbidden"})
-
-    data = await request.json()
-    user_id = data.get("id")
-    try:
-        user_id = int(user_id)
-    except (TypeError, ValueError):
-        return JSONResponse(status_code=400, content={"error": "id is required"})
-
-    first_name = str(data.get("first_name") or "").strip()
-    last_name = str(data.get("last_name") or "").strip()
-    email = str(data.get("email") or "").strip().lower()
-    role = str(data.get("role") or "").strip()
-    new_shop_id = _parse_int(data.get("shop_id"))
-
-    if not first_name or not last_name or not email or not role:
-        return JSONResponse(status_code=400, content={"error": "first_name, last_name, email, and role are required"})
-
-    allowed_roles = {"ARCHITECT", "Manager", "Estimator", "Tech", "Receptionist", "HR", "Support"}
-    if role not in allowed_roles:
-        return JSONResponse(status_code=400, content={"error": "Invalid role"})
-
-    conn = get_conn()
-    cur = conn.cursor()
-    try:
-        _ensure_shop_users_table(cur)
-        if new_shop_id:
-            cur.execute(
-                """
-                UPDATE shop_users
-                SET first_name = %s, last_name = %s, email = %s, role = %s, shop_id = %s
-                WHERE id = %s AND active = TRUE
-                RETURNING id, first_name, last_name, email, role, shop_id
-                """,
-                (first_name, last_name, email, role, new_shop_id, user_id),
-            )
-        else:
-            cur.execute(
-                """
-                UPDATE shop_users
-                SET first_name = %s, last_name = %s, email = %s, role = %s
-                WHERE id = %s AND active = TRUE
-                RETURNING id, first_name, last_name, email, role, shop_id
-                """,
-                (first_name, last_name, email, role, user_id),
-            )
-        row = cur.fetchone() or {}
-        if not row:
-            return JSONResponse(status_code=404, content={"error": "User not found"})
-        conn.commit()
-        return {"status": "ok", "user": dict(row)}
-    except Exception as exc:
-        conn.rollback()
-        return JSONResponse(status_code=500, content={"error": str(exc)})
     finally:
         cur.close()
 
