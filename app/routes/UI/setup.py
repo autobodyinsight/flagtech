@@ -1106,12 +1106,16 @@ def get_setup_script():
                         .then((response) => response.json())
                         .catch(() => ({ shops: [] })),
                 ]);
+                const fetchedShops = Array.isArray(sData.shops) ? sData.shops : [];
+                if (setupIsArchitect && !Number(setupSelectedShopId || 0) && fetchedShops.length) {
+                    setupSelectedShopId = Number((fetchedShops[0] || {}).id || (fetchedShops[0] || {}).shop_id || 0) || 0;
+                }
                 const selectedShopId = Number(setupSelectedShopId || 0);
                 const fetchedUsers = Array.isArray(uData.users) ? uData.users : [];
                 setupManageAllUsersData = selectedShopId > 0
                     ? fetchedUsers.filter((user) => Number(user.shop_id || 0) === selectedShopId)
                     : fetchedUsers;
-                setupManageAllShopsData = Array.isArray(sData.shops) ? sData.shops : [];
+                setupManageAllShopsData = fetchedShops;
                 if (!setupManageAllShopsData.length) {
                     const fallbackShopMap = new Map();
                     (setupManageAllUsersData || []).forEach((user) => {

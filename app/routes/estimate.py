@@ -859,6 +859,14 @@ def _ensure_shop_scope_id(cur, domain: str | None) -> int | None:
     return shop_id
 
 
+def _resolve_first_active_shop_id(cur) -> int | None:
+    _ensure_shops_table(cur)
+    cur.execute("SELECT id FROM shops WHERE active = TRUE ORDER BY id ASC LIMIT 1")
+    row = cur.fetchone() or {}
+    shop_id = int(row.get("id") or 0)
+    return shop_id or None
+
+
 def _ensure_chat_messages_table(cur) -> None:
     cur.execute(
         """
@@ -3016,8 +3024,12 @@ async def list_setup_users(request: Request):
             requested_shop_id=requested_shop_id,
             requested_domain=requested_domain,
         )
+        if not selected_shop_id and requester_is_architect:
+            selected_shop_id = _resolve_first_active_shop_id(cur)
         if not selected_shop_id and not requester_is_architect:
             return JSONResponse(status_code=403, content={"error": "Shop scope not resolved", "users": []})
+        if not selected_shop_id:
+            return {"users": []}
         cur.execute(
             """
             SELECT id, first_name, last_name, email, role, shop_id, created_at
