@@ -277,32 +277,7 @@ def get_setup_screen_html():
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; flex-shrink:0;">
                     <div style="display:flex; align-items:center; gap:8px;">
                         <h3 style="margin:0; color:#333;">Manage Users</h3>
-                        <div id="setupManageUsersCreateWrap" style="position:relative;">
-                            <button type="button" onclick="setupToggleManageUsersCreateDropdown()" class="setup-action-btn" style="background:#b22222; color:#fff; padding:8px 12px;">+</button>
-                            <div id="setupManageUsersCreateDropdown" style="display:none; position:absolute; top:calc(100% + 6px); left:0; z-index:20; width:340px; background:#fff; border:1px solid #e0dbd8; border-radius:8px; box-shadow:0 8px 20px rgba(0,0,0,0.12); padding:12px;">
-                                <div style="font-weight:700; color:#333; margin-bottom:10px;">Create User</div>
-                                <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
-                                    <input id="setupManageUserFirst" type="text" placeholder="First" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:4px;" />
-                                    <input id="setupManageUserLast" type="text" placeholder="Last" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:4px;" />
-                                    <input id="setupManageUserEmail" type="email" placeholder="Email" style="grid-column:1 / span 2; width:100%; padding:8px; border:1px solid #ccc; border-radius:4px;" />
-                                    <select id="setupManageUserRole" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:4px;">
-                                        <option value="">Select role...</option>
-                                        <option value="ARCHITECT">ARCHITECT</option>
-                                        <option value="Manager">Manager</option>
-                                        <option value="Estimator">Estimator</option>
-                                        <option value="Tech">Tech</option>
-                                        <option value="Receptionist">Receptionist</option>
-                                        <option value="HR">HR</option>
-                                        <option value="Support">Support</option>
-                                    </select>
-                                    <input id="setupManageUserPassword" type="password" placeholder="Password" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:4px;" />
-                                </div>
-                                <div style="display:flex; justify-content:flex-end; gap:8px; margin-top:10px;">
-                                    <button type="button" onclick="setupCloseManageUsersCreateDropdown()" style="padding:8px 12px; background:#505050; color:#fff; border:none; border-radius:4px; cursor:pointer;">Close</button>
-                                    <button id="setupManageUsersCreateSaveBtn" type="button" onclick="setupSaveUserFromManageDropdown()" style="padding:8px 12px; background:#b22222; color:#fff; border:none; border-radius:4px; cursor:pointer; font-weight:700;">Save</button>
-                                </div>
-                            </div>
-                        </div>
+                        <button type="button" onclick="openSetupUserModal()" class="setup-action-btn" style="background:#b22222; color:#fff; padding:8px 12px;">+</button>
                     </div>
                     <div style="display:flex; gap:8px; align-items:center;">
                         <button type="button" id="setupManageUsersEditBtn" onclick="setupManageUsersEdit()" class="setup-action-btn" style="background:#555; color:#fff;">Edit</button>
@@ -791,7 +766,13 @@ def get_setup_script():
         }
 
         function openSetupUserModal() {
-            setupToggleManageUsersCreateDropdown();
+            if (setupIsArchitect && !setupSelectedShopId) {
+                alert('Select a shop card first.');
+                return;
+            }
+            const modal = document.getElementById('setupUserModal');
+            if (!modal) return;
+            modal.style.display = 'block';
         }
 
         function closeSetupUserModal() {
@@ -1091,78 +1072,10 @@ def get_setup_script():
         function closeSetupManageUsersModal() {
             setupManageUsersEditingId = 0;
             setupManageUsersEditSnapshot = null;
-            setupCloseManageUsersCreateDropdown();
             const modal = document.getElementById('setupManageUsersModal');
             if (modal) modal.style.display = 'none';
             const editBtn = document.getElementById('setupManageUsersEditBtn');
             if (editBtn) editBtn.textContent = 'Edit';
-        }
-
-        function setupToggleManageUsersCreateDropdown() {
-            if (setupIsArchitect && !setupSelectedShopId) {
-                alert('Select a shop card first.');
-                return;
-            }
-            const dropdown = document.getElementById('setupManageUsersCreateDropdown');
-            if (!dropdown) return;
-            const isOpen = dropdown.style.display === 'block';
-            if (isOpen) {
-                setupCloseManageUsersCreateDropdown();
-                return;
-            }
-            dropdown.style.display = 'block';
-            const first = document.getElementById('setupManageUserFirst');
-            if (first) first.focus();
-        }
-
-        function setupCloseManageUsersCreateDropdown() {
-            const dropdown = document.getElementById('setupManageUsersCreateDropdown');
-            if (dropdown) dropdown.style.display = 'none';
-            const ids = ['setupManageUserFirst', 'setupManageUserLast', 'setupManageUserEmail', 'setupManageUserRole', 'setupManageUserPassword'];
-            ids.forEach((id) => {
-                const el = document.getElementById(id);
-                if (el) el.value = '';
-            });
-            const saveBtn = document.getElementById('setupManageUsersCreateSaveBtn');
-            if (saveBtn) saveBtn.disabled = false;
-        }
-
-        async function setupSaveUserFromManageDropdown() {
-            const saveBtn = document.getElementById('setupManageUsersCreateSaveBtn');
-            if (saveBtn) saveBtn.disabled = true;
-            try {
-                const payload = {
-                    first_name: (document.getElementById('setupManageUserFirst')?.value || '').trim(),
-                    last_name: (document.getElementById('setupManageUserLast')?.value || '').trim(),
-                    email: (document.getElementById('setupManageUserEmail')?.value || '').trim(),
-                    role: (document.getElementById('setupManageUserRole')?.value || '').trim(),
-                    password: (document.getElementById('setupManageUserPassword')?.value || ''),
-                    ...setupBuildScopePayload(),
-                };
-
-                if (!payload.first_name || !payload.last_name || !payload.email || !payload.role || !payload.password) {
-                    alert('Please fill out all user fields.');
-                    return;
-                }
-
-                const resp = await fetch('/api/setup/users', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    credentials: 'include',
-                    body: JSON.stringify(payload),
-                });
-                const data = await resp.json();
-                if (data.error) throw new Error(data.error);
-
-                setupCloseManageUsersCreateDropdown();
-                await setupLoadUsers();
-                await openSetupManageUsersModal();
-            } catch (error) {
-                console.error('Error saving setup user:', error);
-                alert('Error saving user.');
-            } finally {
-                if (saveBtn) saveBtn.disabled = false;
-            }
         }
 
         function setupManageUsersRender() {
