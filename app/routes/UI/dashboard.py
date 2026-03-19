@@ -1680,7 +1680,7 @@ def get_dashboard_screen_html():
                         <div style="font-weight:700; font-size:18px; margin-bottom:10px; color:#333;">Notes Log</div>
                         <div style="display:flex; gap:10px; margin-bottom:12px; align-items:flex-start;">
                             <textarea id="roPopupNoteInput" rows="3" style="flex:1; padding:10px; border:1px solid #ccc; border-radius:6px; resize:vertical;" placeholder="Add note..."></textarea>
-                            <span id="roPopupNoteSave" role="button" aria-label="Save" title="Save" style="display:inline-flex; align-items:center; justify-content:center; width:68px; height:68px; color:#b22222; cursor:pointer;"><svg width="44" height="44" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M5 3h11l3 3v15H5V3z" fill="currentColor"/><rect x="8" y="4" width="8" height="5" fill="#ffffff"/><rect x="8" y="14" width="8" height="6" fill="#ffffff"/></svg></span>
+                            <span id="roPopupNoteSave" role="button" aria-label="Save" title="Save" style="display:inline-flex; align-items:center; justify-content:center; width:68px; height:68px; color:#b22222; cursor:pointer;"><svg width="44" height="44" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M5 4h11l3 3v13H5V4z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><rect x="8" y="4" width="7" height="5" rx="0.8" stroke="currentColor" stroke-width="1.8"/><rect x="8" y="13" width="8" height="6" rx="1" stroke="currentColor" stroke-width="1.8"/></svg></span>
                         </div>
                         <div id="roPopupNotesList" style="max-height:420px; overflow-y:auto;"></div>
                     </div>
@@ -1926,11 +1926,13 @@ def get_dashboard_screen_html():
                     }
 
                     contentEl.innerHTML = `
-                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
-                            <div style="font-weight:700; color:#333;">Repair Lines</div>
-                            <div style="font-weight:700; color:#333;">Estimate Total: ${escapePopupHtml(estimateTotalDisplay)}</div>
+                        <div class="dashboard-ro-table-wrap" style="overflow:hidden;">
+                            <div style="display:flex; justify-content:space-between; align-items:center; padding:0 12px 8px 12px;">
+                                <div style="font-weight:700; color:#333;">Repair Lines</div>
+                                <div style="font-weight:700; color:#333;">Grand Total: ${escapePopupHtml(estimateTotalDisplay)}</div>
+                            </div>
+                            ${unifiedHtml}
                         </div>
-                        ${unifiedHtml}
                     `;
                 } catch (error) {
                     console.error('Error loading estimate snapshot:', error);
@@ -2606,7 +2608,7 @@ def get_dashboard_screen_html():
                     <div class="ro-window-card">
                         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
                             <div id="roPopupPaymentsTitle" style="font-weight:700; font-size:18px; color:#333;">Payments - GRAND TOTAL: -</div>
-                            <span id="roPopupPaymentsSave" role="button" aria-label="Save" title="Save" style="display:inline-flex; align-items:center; justify-content:center; width:68px; height:68px; color:#d32f2f; cursor:pointer;"><svg width="44" height="44" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M5 3h11l3 3v15H5V3z" fill="currentColor"/><rect x="8" y="4" width="8" height="5" fill="#ffffff"/><rect x="8" y="14" width="8" height="6" fill="#ffffff"/></svg></span>
+                            <span id="roPopupPaymentsSave" role="button" aria-label="Save" title="Save" style="display:inline-flex; align-items:center; justify-content:center; width:68px; height:68px; color:#d32f2f; cursor:pointer;"><svg width="44" height="44" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M5 4h11l3 3v13H5V4z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><rect x="8" y="4" width="7" height="5" rx="0.8" stroke="currentColor" stroke-width="1.8"/><rect x="8" y="13" width="8" height="6" rx="1" stroke="currentColor" stroke-width="1.8"/></svg></span>
                         </div>
                         <div id="roPopupPaymentsLog"><div style="color:#777;">Loading...</div></div>
                     </div>
