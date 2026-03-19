@@ -194,6 +194,7 @@ def get_techs_screen_html():
         let openTechPanel = { techId: null };
         let openNestedRoByTech = {};
         let selectedRosByTech = {};
+        let techAssignmentsByTech = {};
         let manageQueuedAdds = [];
 
         function escapeHtml(value) {
@@ -208,6 +209,16 @@ def get_techs_screen_html():
         function formatCurrency(value) {
             const numeric = Number(value || 0);
             return `$${numeric.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+        }
+
+        function formatEstimatorWrittenBy(estimatorRaw, writtenByRaw) {
+            const estimator = String(estimatorRaw || '').trim();
+            const writtenBy = String(writtenByRaw || '').trim();
+            if (estimator && writtenBy) {
+                if (estimator.toLowerCase() === writtenBy.toLowerCase()) return estimator;
+                return `${estimator} / ${writtenBy}`;
+            }
+            return estimator || writtenBy || '—';
         }
 
         function splitNameParts(fullNameRaw) {
@@ -393,6 +404,7 @@ def get_techs_screen_html():
                 .then(r => r.json())
                 .then(techsRes => {
                     cachedTechRows = Array.isArray(techsRes.techs) ? techsRes.techs : [];
+                    techAssignmentsByTech = {};
                     tableContainer.innerHTML = '';
 
                     if (!cachedTechRows.length) {
@@ -567,6 +579,12 @@ def get_techs_screen_html():
                     if (res.error) throw new Error(res.error);
                     const assignments = Array.isArray(res.assignments) ? res.assignments : [];
                     const selectedRos = selectedRosByTech[String(techId)] || [];
+                    const assignmentMap = {};
+                    assignments.forEach((item) => {
+                        const key = String(item?.ro || '').trim();
+                        if (key) assignmentMap[key] = item;
+                    });
+                    techAssignmentsByTech[String(techId)] = assignmentMap;
 
                     if (!assignments.length) {
                         listContainer.innerHTML = '<div style="color:#999; padding:8px 0;">No assignments yet.</div>';
@@ -713,6 +731,7 @@ def get_techs_screen_html():
                 alert('Select at least one RO to print.');
                 return;
             }
+            const assignmentMap = techAssignmentsByTech[String(techId)] || {};
 
             const tech = cachedTechRows.find(item => Number(item.id) === Number(techId));
             const techName = tech
@@ -730,6 +749,7 @@ def get_techs_screen_html():
                         return {
                             ro,
                             lines: Array.isArray(payload.lines) ? payload.lines : [],
+                            meta: assignmentMap[String(ro)] || {},
                         };
                     })
                 );
@@ -738,6 +758,15 @@ def get_techs_screen_html():
                 const printedAt = `${now.getMonth() + 1}/${now.getDate()}/${String(now.getFullYear()).slice(-2)} ${now.toLocaleTimeString()}`;
 
                 const sectionsHtml = responses.map((entry) => {
+                    const vehicleText = escapeHtml(entry?.meta?.vehicle || '—');
+                    const vinValue = String(entry?.meta?.vin || '').trim();
+                    const vinText = escapeHtml(vinValue || '—');
+                    const insuranceText = escapeHtml(entry?.meta?.insurance || '—');
+                    const estimatorWrittenText = escapeHtml(formatEstimatorWrittenBy(entry?.meta?.estimator, entry?.meta?.written_by));
+                    const totalHoursFromMeta = Number(entry?.meta?.total_hours);
+                    const totalHoursFromLines = (entry.lines || []).reduce((sum, line) => sum + Number(line?.value || 0), 0);
+                    const totalAssignedHours = (Number.isFinite(totalHoursFromMeta) ? totalHoursFromMeta : totalHoursFromLines).toFixed(1);
+
                     const lineItemsHtml = entry.lines.length
                         ? entry.lines.map((line) => {
                             const lineNum = escapeHtml(line.line || '—');
@@ -758,6 +787,17 @@ def get_techs_screen_html():
                     return `
                         <section style="margin-bottom:22px; page-break-inside:avoid;">
                             <h3 style="margin:0 0 8px 0; font-size:16px; color:#222;">RO ${escapeHtml(entry.ro)}</h3>
+                            <div style="display:grid; grid-template-columns:1fr auto 1fr; align-items:start; margin-bottom:10px; gap:10px;">
+                                <div></div>
+                                <div style="text-align:center; line-height:1.25;">
+                                    <div style="font-size:14px; font-weight:700;">${vehicleText}</div>
+                                    <div style="font-size:12px; color:#444;">VIN: ${vinText}</div>
+                                </div>
+                                <div style="text-align:right; line-height:1.25;">
+                                    <div style="font-size:12px;"><strong>Insurance:</strong> ${insuranceText}</div>
+                                    <div style="font-size:12px; margin-top:2px;"><strong>Estimator / Written by:</strong> ${estimatorWrittenText}</div>
+                                </div>
+                            </div>
                             <table style="width:100%; border-collapse:collapse; font-size:12px;">
                                 <thead>
                                     <tr style="background:#f4f4f4;">
@@ -771,6 +811,7 @@ def get_techs_screen_html():
                                     ${lineItemsHtml}
                                 </tbody>
                             </table>
+                            <div style="display:flex; justify-content:flex-end; margin-top:8px; font-size:13px; font-weight:700;">Total Assigned Hours: ${totalAssignedHours}</div>
                         </section>
                     `;
                 }).join('');

@@ -5708,7 +5708,11 @@ async def get_tech_assignments(request: Request, tech_id: int):
                     year,
                     make,
                     model,
-                    vehicle
+                                        vehicle,
+                                        vin,
+                                        insurance_company,
+                                        estimator,
+                                        written_by
                 FROM saved_estimates
                 WHERE domain = %s
                   AND ro IS NOT NULL
@@ -5721,14 +5725,18 @@ async def get_tech_assignments(request: Request, tech_id: int):
                 le.year,
                 le.make,
                 le.model,
-                le.vehicle
+                                le.vehicle,
+                                le.vin,
+                                le.insurance_company,
+                                le.estimator,
+                                le.written_by
             FROM ro_line_assignments a
             LEFT JOIN latest_estimates le ON le.ro = a.ro
             WHERE a.domain = %s
               AND a.tech_id = %s
               AND a.tech_name IS NOT NULL
               AND COALESCE(a.ready_to_flag, FALSE) = FALSE
-            GROUP BY a.ro, le.year, le.make, le.model, le.vehicle
+                        GROUP BY a.ro, le.year, le.make, le.model, le.vehicle, le.vin, le.insurance_company, le.estimator, le.written_by
             ORDER BY ro
             """,
             (domain, domain, tech_id),
@@ -5748,6 +5756,10 @@ async def get_tech_assignments(request: Request, tech_id: int):
                     "ro": row.get("ro"),
                     "total_hours": _parse_float_value(row.get("total_hours")),
                     "vehicle": vehicle_text,
+                    "vin": (row.get("vin") or "").strip(),
+                    "insurance": (row.get("insurance_company") or "").strip(),
+                    "estimator": (row.get("estimator") or "").strip(),
+                    "written_by": (row.get("written_by") or "").strip(),
                     "status": "Assigned",
                 }
             )
