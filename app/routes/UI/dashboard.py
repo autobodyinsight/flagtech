@@ -1288,6 +1288,7 @@ def get_dashboard_screen_html():
                 const insuranceText = escapePopupHtml(ro.insurance || '-');
                 const vehicleText = escapePopupHtml(ro.vehicle || '-');
                 const vinText = escapePopupHtml(ro.vin || '-');
+                const estimatorText = escapePopupHtml(getRoEstimatorDisplay(ro) || '-');
 
                 roOpenPrintWindow(
                     `RO ${ro.ro} Service Tag`,
@@ -1305,7 +1306,14 @@ def get_dashboard_screen_html():
                                 <div>${vehicleText}</div>
                                 <div>${insuranceText}</div>
                             </div>
+                            <div style="display:flex; justify-content:flex-end; font-size:26px; font-weight:600; line-height:1.1;">
+                                <div>WRITTEN BY: ${estimatorText}</div>
+                            </div>
                             <div style="font-size:32px; font-weight:600; line-height:1.1;">${vinText}</div>
+                            <div style="display:flex; align-items:flex-end; font-size:28px; font-weight:700; padding-top:2px;">
+                                <span style="white-space:nowrap; padding-right:10px;">TECH:</span>
+                                <div style="flex:1; border-bottom:2px solid #333; min-height:28px;"></div>
+                            </div>
                         </div>
                         <div class="line-break"></div>
                         <div style="height:45vh; display:flex; flex-direction:column; justify-content:center; margin-top:12px;">${checksHtml}</div>
@@ -1323,6 +1331,7 @@ def get_dashboard_screen_html():
                     const insuranceText = escapePopupHtml(printData?.insurance || ro.insurance || '-');
                     const vehicleText = escapePopupHtml(printData?.vehicle || ro.vehicle || '-');
                     const vinText = escapePopupHtml(printData?.vin || ro.vin || '-');
+                    const estimatorText = escapePopupHtml(getRoEstimatorDisplay(ro) || '-');
                     const insuranceTotal = popupToNumber(printData?.totals?.insurance_total, popupToNumber(ro.insurance_pay || 0));
                     const customerTotal = popupToNumber(printData?.totals?.customer_total, popupToNumber(ro.customer_pay || 0));
 
@@ -1348,7 +1357,14 @@ def get_dashboard_screen_html():
                                     <div>${vehicleText}</div>
                                     <div>${insuranceText}</div>
                                 </div>
+                                <div style="display:flex; justify-content:flex-end; font-size:26px; font-weight:600; line-height:1.1;">
+                                    <div>WRITTEN BY: ${estimatorText}</div>
+                                </div>
                                 <div style="font-size:32px; font-weight:600; line-height:1.1;">${vinText}</div>
+                                <div style="display:flex; align-items:flex-end; font-size:28px; font-weight:700; padding-top:2px;">
+                                    <span style="white-space:nowrap; padding-right:10px;">TECH:</span>
+                                    <div style="flex:1; border-bottom:2px solid #333; min-height:28px;"></div>
+                                </div>
                             </div>
                             <div class="line-break"></div>
                             <div style="height:45vh; display:flex; flex-direction:column; justify-content:flex-start; margin-top:8px;">
