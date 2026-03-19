@@ -3,12 +3,73 @@ import os
 import re
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
-import psycopg2
-import psycopg2.extras
+from sqlalchemy import create_engine
 
 DATABASE_URL = os.getenv("DATABASE_URL")
 
-conn = None
+engine = None
+
+
+class CursorAdapter:
+    def __init__(self, connection):
+        self._connection = connection
+        self._result = None
+        self.rowcount = -1
+
+    def execute(self, statement, params=None):
+        if params is None:
+            self._result = self._connection.exec_driver_sql(statement)
+        else:
+            self._result = self._connection.exec_driver_sql(statement, params)
+        try:
+            self.rowcount = int(self._result.rowcount or 0)
+        except Exception:
+            self.rowcount = -1
+        return self
+
+    def fetchone(self):
+        if self._result is None:
+            return None
+        row = self._result.mappings().first()
+        return dict(row) if row is not None else None
+
+    def fetchall(self):
+        if self._result is None:
+            return []
+        return [dict(row) for row in self._result.mappings().all()]
+
+    def close(self):
+        self._result = None
+
+
+class ConnectionAdapter:
+    def __init__(self, connection):
+        self._connection = connection
+        self._autocommit = True
+
+    def cursor(self):
+        return CursorAdapter(self._connection)
+
+    def commit(self):
+        self._connection.commit()
+
+    def rollback(self):
+        self._connection.rollback()
+
+    def close(self):
+        self._connection.close()
+
+    @property
+    def closed(self):
+        return self._connection.closed
+
+    @property
+    def autocommit(self):
+        return self._autocommit
+
+    @autocommit.setter
+    def autocommit(self, value):
+        self._autocommit = bool(value)
 
 
 def _ensure_sslmode(dsn: str) -> str:
@@ -24,11 +85,17 @@ def get_conn():
         raise RuntimeError("DATABASE_URL environment variable is required")
 
     dsn_with_ssl = _ensure_sslmode(DATABASE_URL)
-    global conn
-    if conn is None or conn.closed:
-        conn = psycopg2.connect(dsn_with_ssl, cursor_factory=psycopg2.extras.RealDictCursor)
-        conn.autocommit = True
-    return conn
+    global engine
+    if engine is None:
+        engine = create_engine(
+            dsn_with_ssl,
+            pool_size=10,
+            max_overflow=5,
+            pool_timeout=30,
+            pool_recycle=1800,
+            isolation_level="AUTOCOMMIT",
+        )
+    return ConnectionAdapter(engine.connect())
 
 
 def _parse_float(value) -> float:

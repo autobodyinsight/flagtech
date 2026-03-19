@@ -12,11 +12,17 @@ from app.models.estimate import EstimateResponse
 from app.services.db import get_conn
 from app.services.middleware import get_user_domain
 from fastapi.responses import JSONResponse
-from psycopg2 import sql
 
 router = APIRouter()
 
 _ARCHITECT_EMAIL = "jorge@autobodyinsight.com"
+
+
+def _quote_ident(value: str) -> str:
+    identifier = str(value or "").strip()
+    if not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", identifier):
+        raise ValueError(f"Invalid SQL identifier: {identifier}")
+    return f'"{identifier}"'
 
 
 def _resolve_request_user_email(request: Request) -> str:
@@ -170,24 +176,21 @@ def _ensure_shop_id_columns_for_domain_tables(cur) -> None:
             continue
         if table_name == "shops":
             continue
-        cur.execute(sql.SQL("ALTER TABLE {} ADD COLUMN IF NOT EXISTS shop_id INTEGER").format(sql.Identifier(table_name)))
+        quoted_table = _quote_ident(table_name)
+        cur.execute(f"ALTER TABLE {quoted_table} ADD COLUMN IF NOT EXISTS shop_id INTEGER")
         cur.execute(
-            sql.SQL(
-                """
-                UPDATE {table_name} t
-                SET shop_id = s.id
-                FROM shops s
-                WHERE t.shop_id IS NULL
-                  AND COALESCE(t.domain, '') <> ''
-                  AND s.domain = t.domain
-                """
-            ).format(table_name=sql.Identifier(table_name))
+            f"""
+            UPDATE {quoted_table} t
+            SET shop_id = s.id
+            FROM shops s
+            WHERE t.shop_id IS NULL
+              AND COALESCE(t.domain, '') <> ''
+              AND s.domain = t.domain
+            """
         )
+        quoted_index = _quote_ident(f"idx_{table_name}_shop_id")
         cur.execute(
-            sql.SQL("CREATE INDEX IF NOT EXISTS {} ON {}(shop_id)").format(
-                sql.Identifier(f"idx_{table_name}_shop_id"),
-                sql.Identifier(table_name),
-            )
+            f"CREATE INDEX IF NOT EXISTS {quoted_index} ON {quoted_table}(shop_id)"
         )
 
 
@@ -228,19 +231,16 @@ def _ensure_shop_id_sync_triggers(cur) -> None:
         if not table_name or table_name == "shops":
             continue
         trigger_name = f"trg_{table_name}_shop_scope"
-        cur.execute(sql.SQL("DROP TRIGGER IF EXISTS {} ON {}").format(sql.Identifier(trigger_name), sql.Identifier(table_name)))
+        quoted_table = _quote_ident(table_name)
+        quoted_trigger = _quote_ident(trigger_name)
+        cur.execute(f"DROP TRIGGER IF EXISTS {quoted_trigger} ON {quoted_table}")
         cur.execute(
-            sql.SQL(
-                """
-                CREATE TRIGGER {trigger_name}
-                BEFORE INSERT OR UPDATE ON {table_name}
-                FOR EACH ROW
-                EXECUTE FUNCTION set_shop_scope_fields()
-                """
-            ).format(
-                trigger_name=sql.Identifier(trigger_name),
-                table_name=sql.Identifier(table_name),
-            )
+            f"""
+            CREATE TRIGGER {quoted_trigger}
+            BEFORE INSERT OR UPDATE ON {quoted_table}
+            FOR EACH ROW
+            EXECUTE FUNCTION set_shop_scope_fields()
+            """
         )
 
 
@@ -3044,10 +3044,7 @@ async def flash_data():
             table_name = table_row.get("table_name")
             if not table_schema or not table_name:
                 continue
-            delete_stmt = sql.SQL("DELETE FROM {}.{}").format(
-                sql.Identifier(table_schema),
-                sql.Identifier(table_name),
-            )
+            delete_stmt = f"DELETE FROM {_quote_ident(table_schema)}.{_quote_ident(table_name)}"
             cur.execute(delete_stmt)
             deleted_counts[f"{table_schema}.{table_name}"] = cur.rowcount
 

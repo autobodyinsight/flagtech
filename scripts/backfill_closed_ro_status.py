@@ -1,18 +1,10 @@
 # Backfill script to set status='closed' for eligible repair orders
 # Adjust the WHERE clause as needed for your business logic
 
-import psycopg2
-import os
-
-DATABASE_URL = os.getenv(
-    "DATABASE_URL",
-)
+from app.services.db import get_conn
 
 def main():
-    if not DATABASE_URL:
-        raise RuntimeError("DATABASE_URL environment variable is required")
-
-    conn = psycopg2.connect(DATABASE_URL)
+    conn = get_conn()
     cur = conn.cursor()
     # Example: close all ROs that have a picked_up date and are not already closed
     cur.execute("""

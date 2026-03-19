@@ -4,6 +4,7 @@ gunicorn
 PyMuPDF 
 pillow
 psycopg2
+SQLAlchemy
 pytesseract
 
 python-multipart
