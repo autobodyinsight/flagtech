@@ -2553,7 +2553,7 @@ async def list_setup_shops(request: Request):
     try:
         _ensure_shop_settings_table(cur)
         _ensure_shop_users_table(cur)
-        _ensure_shop_isolation_infrastructure(cur)
+        _sync_shop_id_bindings(cur)
         cur.execute(
             """
             WITH all_domains AS (
