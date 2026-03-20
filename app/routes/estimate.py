@@ -253,7 +253,6 @@ def _resolve_request_shop_id(request: Request, cur, domain: str | None = None) -
     if not domain_value:
         return None
 
-    _sync_shop_id_bindings(cur)
     cur.execute("SELECT id FROM shops WHERE domain = %s LIMIT 1", (domain_value,))
     row = cur.fetchone() or {}
     try:
@@ -2137,8 +2136,6 @@ async def get_setup_shop(request: Request):
     conn = get_conn()
     cur = conn.cursor()
     try:
-        _ensure_shop_settings_table(cur)
-        _ensure_shop_isolation_infrastructure(cur)
         cur.execute(
             """
             SELECT shop_id, shop_name, address, city, state, zip_code, phone, email
@@ -2187,8 +2184,6 @@ async def save_setup_shop(request: Request):
     conn = get_conn()
     cur = conn.cursor()
     try:
-        _ensure_shop_settings_table(cur)
-        _ensure_shop_isolation_infrastructure(cur)
         requester_is_architect = _request_is_architect(request)
         requester_row = _resolve_current_user_row(request, cur, domain)
         requester_role = str((requester_row or {}).get("role") or "").strip()
@@ -2275,13 +2270,8 @@ async def get_setup_context(request: Request):
     domain = get_user_domain(request)
     if not domain:
         return JSONResponse(status_code=401, content={"error": "Not authenticated"})
-
-    conn = get_conn()
-    cur = conn.cursor()
-    try:
-        shop_id = _resolve_request_shop_id(request, cur, domain)
-    finally:
-        cur.close()
+    authenticated_user = get_authenticated_user(request) or {}
+    shop_id = int(authenticated_user.get("shop_id") or 0) or None
 
     return {
         "is_architect": _request_is_architect(request),
@@ -2551,9 +2541,6 @@ async def list_setup_shops(request: Request):
     conn = get_conn()
     cur = conn.cursor()
     try:
-        _ensure_shop_settings_table(cur)
-        _ensure_shop_users_table(cur)
-        _sync_shop_id_bindings(cur)
         cur.execute(
             """
             WITH all_domains AS (
@@ -2628,8 +2615,6 @@ async def update_setup_user(request: Request):
     conn = get_conn()
     cur = conn.cursor()
     try:
-        _ensure_shop_users_table(cur)
-        _ensure_shop_isolation_infrastructure(cur)
         requester_is_architect = _request_is_architect(request)
         requester_row = _resolve_current_user_row(request, cur, domain)
         requester_role = str((requester_row or {}).get("role") or "").strip()
@@ -2714,8 +2699,6 @@ async def reset_setup_user_password(request: Request):
     conn = get_conn()
     cur = conn.cursor()
     try:
-        _ensure_shop_users_table(cur)
-        _ensure_shop_isolation_infrastructure(cur)
         requester_is_architect = _request_is_architect(request)
         requester_row = _resolve_current_user_row(request, cur, domain)
         if not requester_row:
@@ -2769,8 +2752,6 @@ async def list_setup_users(request: Request):
     conn = get_conn()
     cur = conn.cursor()
     try:
-        _ensure_shop_users_table(cur)
-        _ensure_shop_isolation_infrastructure(cur)
         if requester_is_architect:
             if requested_domain:
                 cur.execute(
@@ -2855,8 +2836,6 @@ async def create_setup_user(request: Request):
     conn = get_conn()
     cur = conn.cursor()
     try:
-        _ensure_shop_users_table(cur)
-        _ensure_shop_isolation_infrastructure(cur)
         requester_is_architect = _request_is_architect(request)
         requester_row = _resolve_current_user_row(request, cur, domain)
         requester_role = str((requester_row or {}).get("role") or "").strip()
@@ -2934,9 +2913,6 @@ async def delete_setup_users(request: Request):
     conn = get_conn()
     cur = conn.cursor()
     try:
-        _ensure_shop_users_table(cur)
-        _ensure_shop_isolation_infrastructure(cur)
-
         requester_is_architect = _request_is_architect(request)
         requester_row = _resolve_current_user_row(request, cur, domain)
         requester_role = str((requester_row or {}).get("role") or "").strip()
@@ -2986,10 +2962,6 @@ async def delete_setup_shop(request: Request):
     conn = get_conn()
     cur = conn.cursor()
     try:
-        _ensure_shop_settings_table(cur)
-        _ensure_shop_users_table(cur)
-        _ensure_shop_isolation_infrastructure(cur)
-
         cur.execute("DELETE FROM shop_settings WHERE domain = %s", (selected_domain,))
         settings_deleted = int(cur.rowcount or 0)
 
