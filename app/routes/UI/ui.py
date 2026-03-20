@@ -1602,7 +1602,7 @@ async def home_screen(request: Request):
                 const sideManageBtn = document.getElementById('sideManageBtn');
                 if (sideManageBtn) sideManageBtn.style.display = isArchitect ? 'flex' : 'none';
                 const sideSetupBtn = document.getElementById('sideSetupBtn');
-                if (sideSetupBtn) sideSetupBtn.style.display = isManagerHr ? 'flex' : 'none';
+                if (sideSetupBtn) sideSetupBtn.style.display = (isManagerHr || isArchitect) ? 'flex' : 'none';
 
                 const shopText = document.getElementById('profileShopText');
                 const roleText = document.getElementById('profileRoleText');

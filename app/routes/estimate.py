@@ -2991,7 +2991,7 @@ async def update_setup_user(request: Request):
         if not requester_row:
             return JSONResponse(status_code=401, content={"error": "Not authenticated"})
         requester_role = str((requester_row or {}).get("role") or "").strip()
-        if not _is_manager_or_hr_role(requester_role):
+        if not (_request_is_architect(request) or _is_manager_or_hr_role(requester_role)):
             return JSONResponse(status_code=403, content={"error": "Forbidden"})
 
         cur.execute("SELECT id FROM shops WHERE domain = %s LIMIT 1", (selected_domain,))
@@ -3074,7 +3074,7 @@ async def reset_setup_user_password(request: Request):
         if not requester_row:
             return JSONResponse(status_code=401, content={"error": "Not authenticated"})
         requester_role = str(requester_row.get("role") or "").strip()
-        if not _is_manager_or_hr_role(requester_role):
+        if not (_request_is_architect(request) or _is_manager_or_hr_role(requester_role)):
             return JSONResponse(status_code=403, content={"error": "Forbidden"})
 
         cur.execute("SELECT id FROM shops WHERE domain = %s LIMIT 1", (selected_domain,))
@@ -3115,7 +3115,7 @@ async def list_setup_users(request: Request):
         if not requester_row:
             return JSONResponse(status_code=401, content={"error": "Not authenticated", "users": []})
         requester_role = str((requester_row or {}).get("role") or "").strip()
-        if not _is_manager_or_hr_role(requester_role):
+        if not (_request_is_architect(request) or _is_manager_or_hr_role(requester_role)):
             return JSONResponse(status_code=403, content={"error": "Forbidden", "users": []})
 
         cur.execute(
@@ -3184,7 +3184,7 @@ async def create_setup_user(request: Request):
         if not requester_row:
             return JSONResponse(status_code=401, content={"error": "Not authenticated"})
         requester_role = str((requester_row or {}).get("role") or "").strip()
-        if not _is_manager_or_hr_role(requester_role):
+        if not (_request_is_architect(request) or _is_manager_or_hr_role(requester_role)):
             return JSONResponse(status_code=403, content={"error": "Forbidden"})
 
         cur.execute("SELECT id FROM shops WHERE domain = %s LIMIT 1", (selected_domain,))
@@ -3260,7 +3260,7 @@ async def delete_setup_users(request: Request):
         if not requester_row:
             return JSONResponse(status_code=401, content={"error": "Not authenticated"})
         requester_role = str((requester_row or {}).get("role") or "").strip()
-        if not _is_manager_or_hr_role(requester_role):
+        if not (_request_is_architect(request) or _is_manager_or_hr_role(requester_role)):
             return JSONResponse(status_code=403, content={"error": "Forbidden"})
 
         cur.execute("SELECT id FROM shops WHERE domain = %s LIMIT 1", (selected_domain,))
