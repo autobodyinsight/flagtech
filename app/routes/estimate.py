@@ -75,6 +75,7 @@ def _ensure_shops_table(cur) -> None:
             city VARCHAR(120),
             state VARCHAR(120),
             zip VARCHAR(20),
+            active BOOLEAN DEFAULT TRUE,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
@@ -86,9 +87,12 @@ def _ensure_shops_table(cur) -> None:
     cur.execute("ALTER TABLE shops ADD COLUMN IF NOT EXISTS city VARCHAR(120)")
     cur.execute("ALTER TABLE shops ADD COLUMN IF NOT EXISTS state VARCHAR(120)")
     cur.execute("ALTER TABLE shops ADD COLUMN IF NOT EXISTS zip VARCHAR(20)")
+    cur.execute("ALTER TABLE shops ADD COLUMN IF NOT EXISTS active BOOLEAN DEFAULT TRUE")
+    cur.execute("UPDATE shops SET active = TRUE WHERE active IS NULL")
     cur.execute("ALTER TABLE shops ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP")
     cur.execute("ALTER TABLE shops ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP")
     cur.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_shops_domain_unique ON shops(domain)")
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_shops_active ON shops(active)")
 
 
 def _sync_shop_id_bindings(cur) -> None:
@@ -285,12 +289,23 @@ async def auth_login(request: Request):
         _ensure_shop_isolation_infrastructure(cur)
         cur.execute(
             """
-            SELECT id, first_name, last_name, email, role, domain, shop_id
-            FROM shop_users
-            WHERE LOWER(email) = %s
-              AND password_hash = %s
-              AND active = TRUE
-            ORDER BY created_at DESC, id DESC
+                        SELECT
+                                su.id,
+                                su.first_name,
+                                su.last_name,
+                                su.email,
+                                su.role,
+                                su.domain,
+                                su.shop_id,
+                                COALESCE(sh.active, TRUE) AS shop_active
+                        FROM shop_users su
+                        LEFT JOIN shops sh
+                            ON sh.id = su.shop_id
+                         AND sh.domain = su.domain
+                        WHERE LOWER(su.email) = %s
+                            AND su.password_hash = %s
+                            AND su.active = TRUE
+                        ORDER BY su.created_at DESC, su.id DESC
             LIMIT 1
             """,
             (email, password_hash),
@@ -298,6 +313,9 @@ async def auth_login(request: Request):
         row = cur.fetchone() or {}
         if not row:
             return JSONResponse(status_code=401, content={"error": "Invalid credentials"})
+
+        if not bool(row.get("shop_active", True)):
+            return JSONResponse(status_code=403, content={"error": "LOG IN NOT AUTHORIZED, CONTACT SUPPORT"})
 
         user_email = str(row.get("email") or "").strip().lower()
         user_domain = str(row.get("domain") or "").strip().lower()
@@ -2552,6 +2570,7 @@ async def list_setup_shops(request: Request):
             SELECT
                 sh.id AS shop_id,
                 d.domain,
+                COALESCE(sh.active, TRUE) AS active,
                 COALESCE(s.shop_name, sh.name) AS shop_name,
                 COALESCE(s.address, sh.address) AS address,
                 COALESCE(s.city, sh.city) AS city,
@@ -2572,6 +2591,7 @@ async def list_setup_shops(request: Request):
                 {
                     "id": int(row.get("shop_id") or 0) or None,
                     "domain": str(row.get("domain") or "").strip().lower(),
+                    "active": bool(row.get("active", True)),
                     "shop_name": str(row.get("shop_name") or "").strip(),
                     "address": str(row.get("address") or "").strip(),
                     "city": str(row.get("city") or "").strip(),
@@ -2582,6 +2602,357 @@ async def list_setup_shops(request: Request):
                 }
             )
         return {"shops": shops}
+    finally:
+        cur.close()
+
+
+@router.get("/manage/shops")
+async def list_manage_shops(request: Request):
+    domain = get_user_domain(request)
+    if not domain:
+        return JSONResponse(status_code=401, content={"error": "Not authenticated", "shops": []})
+    if not _request_is_architect(request):
+        return JSONResponse(status_code=403, content={"error": "Forbidden", "shops": []})
+
+    conn = get_conn()
+    cur = conn.cursor()
+    try:
+        _ensure_shop_isolation_infrastructure(cur)
+        cur.execute(
+            """
+            WITH all_domains AS (
+                SELECT DISTINCT domain FROM shops
+                UNION
+                SELECT DISTINCT domain FROM shop_settings
+                UNION
+                SELECT DISTINCT domain FROM shop_users
+            )
+            SELECT
+                sh.id AS shop_id,
+                d.domain,
+                COALESCE(sh.active, TRUE) AS active,
+                COALESCE(ss.shop_name, sh.name, d.domain) AS shop_name,
+                COUNT(DISTINCT su.id) FILTER (WHERE su.active = TRUE) AS user_count
+            FROM all_domains d
+            LEFT JOIN shops sh ON sh.domain = d.domain
+            LEFT JOIN shop_settings ss ON ss.domain = d.domain
+            LEFT JOIN shop_users su ON su.domain = d.domain
+            GROUP BY sh.id, d.domain, sh.active, ss.shop_name, sh.name
+            ORDER BY LOWER(COALESCE(NULLIF(ss.shop_name, ''), NULLIF(sh.name, ''), d.domain)) ASC
+            """
+        )
+        rows = cur.fetchall() or []
+        shops = []
+        for row in rows:
+            shops.append(
+                {
+                    "id": int(row.get("shop_id") or 0) or None,
+                    "domain": str(row.get("domain") or "").strip().lower(),
+                    "shop_name": str(row.get("shop_name") or "").strip(),
+                    "active": bool(row.get("active", True)),
+                    "user_count": int(row.get("user_count") or 0),
+                }
+            )
+        return {"shops": shops}
+    finally:
+        cur.close()
+
+
+@router.get("/manage/users")
+async def list_manage_users(request: Request, shop_domain: str | None = None):
+    domain = get_user_domain(request)
+    if not domain:
+        return JSONResponse(status_code=401, content={"error": "Not authenticated", "users": []})
+    if not _request_is_architect(request):
+        return JSONResponse(status_code=403, content={"error": "Forbidden", "users": []})
+
+    selected_domain = str(shop_domain or "").strip().lower()
+    if not selected_domain:
+        return JSONResponse(status_code=400, content={"error": "shop_domain is required", "users": []})
+
+    conn = get_conn()
+    cur = conn.cursor()
+    try:
+        _ensure_shop_users_table(cur)
+        cur.execute(
+            """
+            SELECT
+                su.id,
+                su.first_name,
+                su.last_name,
+                su.email,
+                su.role,
+                su.shop_id,
+                COALESCE(ss.shop_name, sh.name, su.domain) AS shop_name
+            FROM shop_users su
+            LEFT JOIN shops sh ON sh.id = su.shop_id
+            LEFT JOIN shop_settings ss ON ss.shop_id = su.shop_id AND ss.domain = su.domain
+            WHERE su.domain = %s
+              AND su.active = TRUE
+            ORDER BY su.created_at DESC, su.id DESC
+            """,
+            (selected_domain,),
+        )
+        rows = cur.fetchall() or []
+        users = []
+        for row in rows:
+            row_email = str(row.get("email") or "").strip().lower()
+            users.append(
+                {
+                    "id": int(row.get("id") or 0),
+                    "first_name": str(row.get("first_name") or "").strip(),
+                    "last_name": str(row.get("last_name") or "").strip(),
+                    "email": str(row.get("email") or "").strip(),
+                    "role": "ARCHITECT" if _is_architect_email(row_email) else str(row.get("role") or "").strip(),
+                    "shop_name": str(row.get("shop_name") or "").strip(),
+                    "shop_id": int(row.get("shop_id") or 0) or None,
+                }
+            )
+        return {"users": users}
+    finally:
+        cur.close()
+
+
+@router.post("/manage/shops/active")
+async def update_manage_shop_active(request: Request):
+    domain = get_user_domain(request)
+    if not domain:
+        return JSONResponse(status_code=401, content={"error": "Not authenticated"})
+    if not _request_is_architect(request):
+        return JSONResponse(status_code=403, content={"error": "Forbidden"})
+
+    data = await request.json()
+    selected_domain = str(data.get("shop_domain") or "").strip().lower()
+    active = bool(data.get("active", True))
+    if not selected_domain:
+        return JSONResponse(status_code=400, content={"error": "shop_domain is required"})
+
+    conn = get_conn()
+    cur = conn.cursor()
+    try:
+        _ensure_shops_table(cur)
+        cur.execute(
+            """
+            INSERT INTO shops (domain, active, updated_at)
+            VALUES (%s, %s, CURRENT_TIMESTAMP)
+            ON CONFLICT (domain)
+            DO UPDATE SET
+                active = EXCLUDED.active,
+                updated_at = CURRENT_TIMESTAMP
+            RETURNING id, domain, active
+            """,
+            (selected_domain, active),
+        )
+        row = cur.fetchone() or {}
+        conn.commit()
+        return {
+            "status": "ok",
+            "shop": {
+                "id": int(row.get("id") or 0) or None,
+                "domain": str(row.get("domain") or "").strip().lower(),
+                "active": bool(row.get("active", True)),
+            },
+        }
+    finally:
+        cur.close()
+
+
+@router.post("/manage/users/update")
+async def update_manage_user(request: Request):
+    domain = get_user_domain(request)
+    if not domain:
+        return JSONResponse(status_code=401, content={"error": "Not authenticated"})
+    if not _request_is_architect(request):
+        return JSONResponse(status_code=403, content={"error": "Forbidden"})
+
+    data = await request.json()
+    try:
+        user_id = int(data.get("id"))
+    except (TypeError, ValueError):
+        return JSONResponse(status_code=400, content={"error": "id is required"})
+
+    selected_domain = str(data.get("shop_domain") or "").strip().lower()
+    first_name = str(data.get("first_name") or "").strip()
+    last_name = str(data.get("last_name") or "").strip()
+    email = str(data.get("email") or "").strip().lower()
+    role = str(data.get("role") or "").strip()
+
+    allowed_roles = {"Manager", "Estimator", "Tech", "Receptionist", "HR", "Support"}
+    if not selected_domain or not first_name or not last_name or not email or role not in allowed_roles:
+        return JSONResponse(status_code=400, content={"error": "shop_domain, first_name, last_name, email, and valid role are required"})
+    if _is_architect_email(email):
+        return JSONResponse(status_code=400, content={"error": "This email cannot be assigned from Manage"})
+
+    conn = get_conn()
+    cur = conn.cursor()
+    try:
+        _ensure_shop_users_table(cur)
+        cur.execute("SELECT id FROM shops WHERE domain = %s LIMIT 1", (selected_domain,))
+        shop_row = cur.fetchone() or {}
+        selected_shop_id = int(shop_row.get("id") or 0)
+        if not selected_shop_id:
+            return JSONResponse(status_code=400, content={"error": "Unable to resolve shop scope"})
+
+        cur.execute(
+            """
+            UPDATE shop_users
+            SET first_name = %s,
+                last_name = %s,
+                email = %s,
+                role = %s,
+                domain = %s,
+                shop_id = %s
+            WHERE id = %s
+              AND active = TRUE
+            RETURNING id, first_name, last_name, email, role, domain, shop_id
+            """,
+            (first_name, last_name, email, role, selected_domain, selected_shop_id, user_id),
+        )
+        row = cur.fetchone() or {}
+        conn.commit()
+
+        if not row:
+            return JSONResponse(status_code=404, content={"error": "User not found"})
+
+        return {
+            "status": "ok",
+            "user": {
+                "id": int(row.get("id") or 0),
+                "first_name": str(row.get("first_name") or "").strip(),
+                "last_name": str(row.get("last_name") or "").strip(),
+                "email": str(row.get("email") or "").strip(),
+                "role": str(row.get("role") or "").strip(),
+                "shop_id": int(row.get("shop_id") or 0) or None,
+                "shop_domain": str(row.get("domain") or "").strip().lower(),
+            },
+        }
+    finally:
+        cur.close()
+
+
+@router.post("/manage/users")
+async def create_manage_user(request: Request):
+    domain = get_user_domain(request)
+    if not domain:
+        return JSONResponse(status_code=401, content={"error": "Not authenticated"})
+    if not _request_is_architect(request):
+        return JSONResponse(status_code=403, content={"error": "Forbidden"})
+
+    data = await request.json()
+    selected_domain = str(data.get("shop_domain") or "").strip().lower()
+    first_name = str(data.get("first_name") or "").strip()
+    last_name = str(data.get("last_name") or "").strip()
+    email = str(data.get("email") or "").strip().lower()
+    role = str(data.get("role") or "").strip()
+    password = str(data.get("password") or "").strip()
+    allowed_roles = {"Manager", "Estimator", "Tech", "Receptionist", "HR", "Support"}
+
+    if not selected_domain or not first_name or not last_name or not email or not role or not password:
+        return JSONResponse(status_code=400, content={"error": "shop_domain, first_name, last_name, email, role, and password are required"})
+    if role not in allowed_roles:
+        return JSONResponse(status_code=400, content={"error": "Invalid role"})
+    if _is_architect_email(email):
+        return JSONResponse(status_code=400, content={"error": "This email cannot be assigned from Manage"})
+
+    password_hash = hashlib.sha256(password.encode("utf-8")).hexdigest()
+
+    conn = get_conn()
+    cur = conn.cursor()
+    try:
+        _ensure_shop_users_table(cur)
+        cur.execute("SELECT id FROM shops WHERE domain = %s LIMIT 1", (selected_domain,))
+        shop_row = cur.fetchone() or {}
+        selected_shop_id = int(shop_row.get("id") or 0)
+        if not selected_shop_id:
+            return JSONResponse(status_code=400, content={"error": "Unable to resolve shop scope"})
+
+        cur.execute(
+            """
+            INSERT INTO shop_users (first_name, last_name, email, role, password_hash, domain, shop_id, active)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, TRUE)
+            RETURNING id, first_name, last_name, email, role, shop_id
+            """,
+            (first_name, last_name, email, role, password_hash, selected_domain, selected_shop_id),
+        )
+        row = cur.fetchone() or {}
+        conn.commit()
+        return {
+            "status": "ok",
+            "user": {
+                "id": int(row.get("id") or 0),
+                "first_name": str(row.get("first_name") or "").strip(),
+                "last_name": str(row.get("last_name") or "").strip(),
+                "email": str(row.get("email") or "").strip(),
+                "role": str(row.get("role") or "").strip(),
+                "shop_id": int(row.get("shop_id") or 0) or None,
+            },
+        }
+    except Exception as exc:
+        conn.rollback()
+        message = str(exc)
+        if "idx_shop_users_shop_id_email_unique" in message or "idx_shop_users_domain_email_unique" in message:
+            return JSONResponse(status_code=400, content={"error": "User with that email already exists for this shop"})
+        return JSONResponse(status_code=500, content={"error": "Unable to create user"})
+    finally:
+        cur.close()
+
+
+@router.post("/manage/delete")
+async def delete_manage_entities(request: Request):
+    domain = get_user_domain(request)
+    if not domain:
+        return JSONResponse(status_code=401, content={"error": "Not authenticated"})
+    if not _request_is_architect(request):
+        return JSONResponse(status_code=403, content={"error": "Forbidden"})
+
+    data = await request.json()
+    user_ids = []
+    for value in data.get("user_ids") or []:
+        try:
+            user_ids.append(int(value))
+        except (TypeError, ValueError):
+            continue
+    shop_domains = [str(value or "").strip().lower() for value in (data.get("shop_domains") or []) if str(value or "").strip()]
+
+    if not user_ids and not shop_domains:
+        return JSONResponse(status_code=400, content={"error": "No users or shops selected"})
+
+    conn = get_conn()
+    cur = conn.cursor()
+    try:
+        deleted_users = 0
+        deleted_shops = 0
+
+        if user_ids:
+            cur.execute(
+                """
+                UPDATE shop_users
+                SET active = FALSE
+                WHERE id = ANY(%s)
+                  AND active = TRUE
+                """,
+                (user_ids,),
+            )
+            deleted_users += int(cur.rowcount or 0)
+
+        if shop_domains:
+            cur.execute(
+                """
+                UPDATE shop_users
+                SET active = FALSE
+                WHERE domain = ANY(%s)
+                  AND active = TRUE
+                """,
+                (shop_domains,),
+            )
+            deleted_users += int(cur.rowcount or 0)
+
+            cur.execute("DELETE FROM shop_settings WHERE domain = ANY(%s)", (shop_domains,))
+            cur.execute("DELETE FROM shops WHERE domain = ANY(%s)", (shop_domains,))
+            deleted_shops = int(cur.rowcount or 0)
+
+        conn.commit()
+        return {"status": "ok", "deleted_users": deleted_users, "deleted_shops": deleted_shops}
     finally:
         cur.close()
 

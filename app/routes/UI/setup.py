@@ -110,7 +110,6 @@ def get_setup_screen_html():
             <div id="setupShopsPane">
                 <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; margin:0 0 10px 0;">
                     <h4 style="margin:0; color:#333;">Shops</h4>
-                    <button id="setupAddShopBtn" type="button" onclick="openSetupAddShopModal()" class="setup-action-btn" style="display:none; background:#b22222; color:#fff; padding:8px 12px;">+ SHOP</button>
                 </div>
                 <div id="setupShopsCards">
                     <div style="color:#999; padding:8px;">Loading shops...</div>
@@ -127,7 +126,7 @@ def get_setup_screen_html():
                 <hr style="margin:24px 0; border:none; border-top:2px solid #d2d2d2;" />
 
                 <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px; gap:10px;">
-                    <button type="button" onclick="openSetupShopModal()" class="setup-action-btn" style="background:#b22222; color:#fff;">SHOP INFO</button>
+                    <button id="setupManageBtn" type="button" onclick="openSetupManageWindow()" class="setup-action-btn" style="display:none; background:#b22222; color:#fff;">Manage</button>
                     <div style="display:flex; align-items:center; gap:8px;">
                         <button type="button" onclick="openSetupUserModal()" class="setup-action-btn" style="background:#b22222; color:#fff;">+ USER</button>
                         <button type="button" onclick="setupResetSelectedUsers()" class="setup-action-btn" style="background:#b22222; color:#fff;">RESET</button>
@@ -152,47 +151,6 @@ def get_setup_screen_html():
                             <tr><td colspan="5" style="padding:18px; text-align:center; color:#999;">Loading...</td></tr>
                         </tbody>
                     </table>
-                </div>
-            </div>
-        </div>
-
-        <div id="setupShopModal" class="modal" style="display:none;">
-            <div class="modal-content" style="max-width:760px; max-height:88vh; overflow-y:auto;">
-                <h3 style="margin:0 0 14px 0; color:#333;">Shop Information</h3>
-
-                <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
-                    <div style="grid-column:1 / span 2;">
-                        <label for="setupShopName" style="font-weight:bold; color:#333;">Shop Name</label>
-                        <input id="setupShopName" type="text" style="width:100%; padding:10px; margin-top:6px;" />
-                    </div>
-                    <div style="grid-column:1 / span 2;">
-                        <label for="setupShopAddress" style="font-weight:bold; color:#333;">Address</label>
-                        <input id="setupShopAddress" type="text" style="width:100%; padding:10px; margin-top:6px;" />
-                    </div>
-                    <div>
-                        <label for="setupShopCity" style="font-weight:bold; color:#333;">City</label>
-                        <input id="setupShopCity" type="text" style="width:100%; padding:10px; margin-top:6px;" />
-                    </div>
-                    <div>
-                        <label for="setupShopState" style="font-weight:bold; color:#333;">State</label>
-                        <input id="setupShopState" type="text" style="width:100%; padding:10px; margin-top:6px;" />
-                    </div>
-                    <div>
-                        <label for="setupShopZip" style="font-weight:bold; color:#333;">Zip Code</label>
-                        <input id="setupShopZip" type="text" style="width:100%; padding:10px; margin-top:6px;" />
-                    </div>
-                    <div>
-                        <label for="setupShopPhone" style="font-weight:bold; color:#333;">Phone</label>
-                        <input id="setupShopPhone" type="text" style="width:100%; padding:10px; margin-top:6px;" />
-                    </div>
-                    <div style="grid-column:1 / span 2;">
-                        <label for="setupShopEmail" style="font-weight:bold; color:#333;">Email</label>
-                        <input id="setupShopEmail" type="email" style="width:100%; padding:10px; margin-top:6px;" />
-                    </div>
-                </div>
-
-                <div style="margin-top:14px; text-align:right;">
-                    <button id="setupShopSaveBtn" type="button" onclick="setupSaveShop()" style="padding:10px 16px; background:#b22222; color:#fff; border:none; border-radius:4px; cursor:pointer; font-weight:bold;">Save</button>
                 </div>
             </div>
         </div>
@@ -241,51 +199,6 @@ def get_setup_screen_html():
             </div>
         </div>
 
-        <div id="setupAddShopModal" class="modal" style="display:none;">
-            <div class="modal-content" style="max-width:760px; max-height:88vh; overflow-y:auto;">
-                <h3 style="margin:0 0 14px 0; color:#333;">Add Shop</h3>
-
-                <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
-                    <div style="grid-column:1 / span 2;">
-                        <label for="setupAddShopDomain" style="font-weight:bold; color:#333;">Shop Domain</label>
-                        <input id="setupAddShopDomain" type="text" placeholder="example: newshop.com" style="width:100%; padding:10px; margin-top:6px;" />
-                    </div>
-                    <div style="grid-column:1 / span 2;">
-                        <label for="setupAddShopName" style="font-weight:bold; color:#333;">Shop Name</label>
-                        <input id="setupAddShopName" type="text" style="width:100%; padding:10px; margin-top:6px;" />
-                    </div>
-                    <div style="grid-column:1 / span 2;">
-                        <label for="setupAddShopAddress" style="font-weight:bold; color:#333;">Address</label>
-                        <input id="setupAddShopAddress" type="text" style="width:100%; padding:10px; margin-top:6px;" />
-                    </div>
-                    <div>
-                        <label for="setupAddShopCity" style="font-weight:bold; color:#333;">City</label>
-                        <input id="setupAddShopCity" type="text" style="width:100%; padding:10px; margin-top:6px;" />
-                    </div>
-                    <div>
-                        <label for="setupAddShopState" style="font-weight:bold; color:#333;">State</label>
-                        <input id="setupAddShopState" type="text" style="width:100%; padding:10px; margin-top:6px;" />
-                    </div>
-                    <div>
-                        <label for="setupAddShopZip" style="font-weight:bold; color:#333;">Zip Code</label>
-                        <input id="setupAddShopZip" type="text" style="width:100%; padding:10px; margin-top:6px;" />
-                    </div>
-                    <div>
-                        <label for="setupAddShopPhone" style="font-weight:bold; color:#333;">Phone</label>
-                        <input id="setupAddShopPhone" type="text" style="width:100%; padding:10px; margin-top:6px;" />
-                    </div>
-                    <div style="grid-column:1 / span 2;">
-                        <label for="setupAddShopEmail" style="font-weight:bold; color:#333;">Email</label>
-                        <input id="setupAddShopEmail" type="email" style="width:100%; padding:10px; margin-top:6px;" />
-                    </div>
-                </div>
-
-                <div style="margin-top:14px; text-align:right; display:flex; justify-content:flex-end; gap:8px;">
-                    <button type="button" onclick="closeSetupAddShopModal()" style="padding:10px 14px; background:#505050; color:#fff; border:none; border-radius:4px; cursor:pointer;">Close</button>
-                    <button id="setupAddShopSaveBtn" type="button" onclick="setupSaveNewShop()" style="padding:10px 16px; background:#b22222; color:#fff; border:none; border-radius:4px; cursor:pointer; font-weight:bold;">Save</button>
-                </div>
-            </div>
-        </div>
     </div>
     """
 
@@ -312,7 +225,7 @@ def get_setup_script():
 
         async function setupLoadContext() {
             const pane = document.getElementById('setupShopsPane');
-            const addShopBtn = document.getElementById('setupAddShopBtn');
+            const manageBtn = document.getElementById('setupManageBtn');
             try {
                 const resp = await fetch('/api/setup/context', { credentials: 'include' });
                 const data = await resp.json();
@@ -322,13 +235,18 @@ def get_setup_script():
                     setupSelectedShopDomain = setupDefaultDomain;
                 }
                 if (pane) pane.style.display = setupIsArchitect ? 'block' : 'none';
-                if (addShopBtn) addShopBtn.style.display = setupIsArchitect ? 'inline-block' : 'none';
+                if (manageBtn) manageBtn.style.display = setupIsArchitect ? 'inline-block' : 'none';
             } catch (error) {
                 console.error('Error loading setup context:', error);
                 setupIsArchitect = false;
                 if (pane) pane.style.display = 'none';
-                if (addShopBtn) addShopBtn.style.display = 'none';
+                if (manageBtn) manageBtn.style.display = 'none';
             }
+        }
+
+        function openSetupManageWindow() {
+            if (!setupIsArchitect) return;
+            window.open('/ui/manage', '_blank', 'noopener,noreferrer,width=1320,height=880');
         }
 
         function setupBuildScopeQuery() {
@@ -411,74 +329,6 @@ def get_setup_script():
             await Promise.all([setupLoadShop(), setupLoadUsers()]);
         }
 
-        function openSetupAddShopModal() {
-            if (!setupIsArchitect) return;
-            const modal = document.getElementById('setupAddShopModal');
-            if (!modal) return;
-            const ids = [
-                'setupAddShopDomain',
-                'setupAddShopName',
-                'setupAddShopAddress',
-                'setupAddShopCity',
-                'setupAddShopState',
-                'setupAddShopZip',
-                'setupAddShopPhone',
-                'setupAddShopEmail',
-            ];
-            ids.forEach((id) => {
-                const el = document.getElementById(id);
-                if (el) el.value = '';
-            });
-            modal.style.display = 'block';
-        }
-
-        function closeSetupAddShopModal() {
-            const modal = document.getElementById('setupAddShopModal');
-            if (modal) modal.style.display = 'none';
-        }
-
-        async function setupSaveNewShop() {
-            const saveBtn = document.getElementById('setupAddShopSaveBtn');
-            if (saveBtn) saveBtn.disabled = true;
-            try {
-                const domain = String(document.getElementById('setupAddShopDomain')?.value || '').trim().toLowerCase();
-                if (!domain) {
-                    alert('Shop domain is required.');
-                    return;
-                }
-
-                const payload = {
-                    shop_domain: domain,
-                    shop_name: (document.getElementById('setupAddShopName')?.value || '').trim(),
-                    address: (document.getElementById('setupAddShopAddress')?.value || '').trim(),
-                    city: (document.getElementById('setupAddShopCity')?.value || '').trim(),
-                    state: (document.getElementById('setupAddShopState')?.value || '').trim(),
-                    zip_code: (document.getElementById('setupAddShopZip')?.value || '').trim(),
-                    phone: (document.getElementById('setupAddShopPhone')?.value || '').trim(),
-                    email: (document.getElementById('setupAddShopEmail')?.value || '').trim(),
-                };
-
-                const resp = await fetch('/api/setup/shop', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    credentials: 'include',
-                    body: JSON.stringify(payload),
-                });
-                const data = await resp.json();
-                if (data.error) throw new Error(data.error);
-
-                setupSelectedShopDomain = domain;
-                closeSetupAddShopModal();
-                await setupLoadShops();
-                await Promise.all([setupLoadShop(), setupLoadUsers()]);
-            } catch (error) {
-                console.error('Error saving new shop:', error);
-                alert('Error saving new shop.');
-            } finally {
-                if (saveBtn) saveBtn.disabled = false;
-            }
-        }
-
         function setupRenderShopDisplay() {
             const wrap = document.getElementById('setupShopDisplay');
             if (!wrap) return;
@@ -511,72 +361,10 @@ def get_setup_script():
                 const data = await resp.json();
                 const shop = data.shop || {};
                 setupShopData = shop;
-                const set = (id, value) => {
-                    const el = document.getElementById(id);
-                    if (el) el.value = String(value || '');
-                };
-                set('setupShopName', shop.shop_name);
-                set('setupShopAddress', shop.address);
-                set('setupShopCity', shop.city);
-                set('setupShopState', shop.state);
-                set('setupShopZip', shop.zip_code);
-                set('setupShopPhone', shop.phone);
-                set('setupShopEmail', shop.email);
                 setupRenderShopDisplay();
             } catch (error) {
                 console.error('Error loading shop setup:', error);
             }
-        }
-
-        async function setupSaveShop() {
-            const btn = document.getElementById('setupShopSaveBtn');
-            if (btn) btn.disabled = true;
-            try {
-                if (setupIsArchitect && !setupSelectedShopDomain) {
-                    alert('Select a shop first or create one with + SHOP.');
-                    return;
-                }
-                const payload = {
-                    shop_name: (document.getElementById('setupShopName')?.value || '').trim(),
-                    address: (document.getElementById('setupShopAddress')?.value || '').trim(),
-                    city: (document.getElementById('setupShopCity')?.value || '').trim(),
-                    state: (document.getElementById('setupShopState')?.value || '').trim(),
-                    zip_code: (document.getElementById('setupShopZip')?.value || '').trim(),
-                    phone: (document.getElementById('setupShopPhone')?.value || '').trim(),
-                    email: (document.getElementById('setupShopEmail')?.value || '').trim(),
-                    ...setupBuildScopePayload(),
-                };
-
-                const resp = await fetch('/api/setup/shop', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    credentials: 'include',
-                    body: JSON.stringify(payload),
-                });
-                const data = await resp.json();
-                if (data.error) throw new Error(data.error);
-                closeSetupShopModal();
-                await setupLoadShop();
-                if (setupIsArchitect) {
-                    await setupLoadShops();
-                }
-            } catch (error) {
-                console.error('Error saving shop setup:', error);
-                alert('Error saving shop information.');
-            } finally {
-                if (btn) btn.disabled = false;
-            }
-        }
-
-        function openSetupShopModal() {
-            const modal = document.getElementById('setupShopModal');
-            if (!modal) return;
-            modal.style.display = 'block';
-        }
-
-        function closeSetupShopModal() {
-            const modal = document.getElementById('setupShopModal');
-            if (modal) modal.style.display = 'none';
         }
 
         async function setupLoadUsers() {
@@ -828,18 +616,6 @@ def get_setup_script():
         }
 
         window.addEventListener('click', (event) => {
-            const shopModal = document.getElementById('setupShopModal');
-            if (shopModal && shopModal.style.display === 'block' && event.target === shopModal) {
-                closeSetupShopModal();
-                return;
-            }
-
-            const addShopModal = document.getElementById('setupAddShopModal');
-            if (addShopModal && addShopModal.style.display === 'block' && event.target === addShopModal) {
-                closeSetupAddShopModal();
-                return;
-            }
-
             const modal = document.getElementById('setupUserModal');
             if (!modal || modal.style.display !== 'block') return;
             if (event.target === modal) {

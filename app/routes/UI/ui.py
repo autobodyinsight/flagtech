@@ -2,6 +2,7 @@
 
 from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
+from app.services.middleware import get_authenticated_user
 
 from .flagout import get_flagtech_screen_html
 from .parts import get_parts_screen_html, get_parts_script
@@ -29,6 +30,11 @@ def _is_authenticated(request: Request) -> bool:
     email = str(request.cookies.get("user_email") or "").strip()
     domain = str(request.cookies.get("user_domain") or "").strip()
     return bool(email and domain)
+
+
+def _is_architect(request: Request) -> bool:
+    user = get_authenticated_user(request) or {}
+    return bool(user.get("is_architect"))
 
 
 @router.get("/login", response_class=HTMLResponse)
@@ -213,7 +219,12 @@ async def login_screen(request: Request):
 
                 window.location.href = '/ui/';
             } catch (error) {
-                errorWrap.textContent = String(error.message || 'Login failed');
+                const message = String(error.message || 'Login failed');
+                if (message === 'LOG IN NOT AUTHORIZED, CONTACT SUPPORT') {
+                    errorWrap.innerHTML = '<strong>LOG IN NOT AUTHORIZED, CONTACT SUPPORT</strong>';
+                } else {
+                    errorWrap.textContent = message;
+                }
             } finally {
                 loginBtn.disabled = false;
             }
@@ -1734,3 +1745,325 @@ async def home_screen(request: Request):
 # ---------------------------------------------------------
 # Individual Screen Endpoints
 # ---------------------------------------------------------
+
+
+@router.get("/manage", response_class=HTMLResponse)
+async def manage_screen(request: Request):
+    if not _is_authenticated(request):
+        return RedirectResponse(url="/ui/login")
+    if not _is_architect(request):
+        return HTMLResponse("<h2 style='font-family:Segoe UI,Arial,sans-serif; padding:24px;'>Forbidden</h2>", status_code=403)
+
+    return """
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Manage</title>
+    <style>
+        * { box-sizing: border-box; }
+        body { margin: 0; font-family: "Segoe UI", Arial, sans-serif; background: #f2f2f2; color: #222; }
+        .wrap { max-width: 1280px; margin: 0 auto; padding: 20px; }
+        .topbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }
+        .actions { display: flex; gap: 8px; }
+        .btn { background: #b22222; color: #fff; border: none; border-radius: 6px; padding: 9px 14px; font-weight: 700; cursor: pointer; }
+        .list { background: #fff; border: 1px solid #ddd; border-radius: 8px; overflow: hidden; }
+        .shop-row { display: grid; grid-template-columns: 42px 140px 1fr 120px; align-items: center; gap: 10px; padding: 10px 12px; border-bottom: 1px solid #eee; }
+        .shop-name { color: #0055aa; cursor: pointer; font-weight: 700; text-decoration: none; background: none; border: none; text-align: left; }
+        .toggle { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 700; }
+        .slide { display: none; padding: 10px 12px 14px 12px; background: #fafafa; border-bottom: 1px solid #eee; }
+        .slide.open { display: block; }
+        table { width: 100%; border-collapse: collapse; background: #fff; }
+        th, td { border-bottom: 1px solid #ececec; padding: 8px; text-align: left; }
+        th { background: #f7f7f7; font-size: 13px; }
+        input[type='text'], input[type='email'], select { width: 100%; padding: 6px 8px; border: 1px solid #ccc; border-radius: 4px; }
+        .muted { color: #777; font-size: 12px; }
+    </style>
+</head>
+<body>
+    <div class="wrap">
+        <div class="topbar">
+            <h2 style="margin:0;">Manage</h2>
+            <div class="actions">
+                <button class="btn" onclick="onEdit()">Edit</button>
+                <button class="btn" onclick="onDelete()">Delete</button>
+                <button class="btn" onclick="onAdd()">Add</button>
+            </div>
+        </div>
+        <div id="shopsList" class="list"></div>
+    </div>
+
+    <script>
+        const state = {
+            shops: [],
+            usersByDomain: {},
+            expandedDomain: '',
+            selectedShopDomains: new Set(),
+            selectedUserIds: new Set(),
+            editMode: false,
+            addingRowByDomain: {},
+        };
+
+        function esc(value) {
+            return String(value || '')
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/\"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
+
+        async function api(url, options = {}) {
+            const resp = await fetch(url, { credentials: 'include', ...options });
+            const data = await resp.json();
+            if (!resp.ok || data.error) throw new Error(data.error || 'Request failed');
+            return data;
+        }
+
+        async function loadShops() {
+            const data = await api('/api/manage/shops');
+            state.shops = Array.isArray(data.shops) ? data.shops : [];
+            if (!state.expandedDomain && state.shops.length) {
+                state.expandedDomain = String(state.shops[0].domain || '').trim().toLowerCase();
+            }
+            render();
+            if (state.expandedDomain) await ensureUsersLoaded(state.expandedDomain);
+        }
+
+        async function ensureUsersLoaded(domain) {
+            const normalized = String(domain || '').trim().toLowerCase();
+            if (!normalized) return;
+            const data = await api(`/api/manage/users?shop_domain=${encodeURIComponent(normalized)}`);
+            state.usersByDomain[normalized] = Array.isArray(data.users) ? data.users : [];
+            render();
+        }
+
+        function render() {
+            const wrap = document.getElementById('shopsList');
+            if (!wrap) return;
+            if (!state.shops.length) {
+                wrap.innerHTML = '<div style="padding:12px; color:#777;">No shops found.</div>';
+                return;
+            }
+
+            wrap.innerHTML = state.shops.map((shop) => {
+                const domain = String(shop.domain || '').trim().toLowerCase();
+                const open = state.expandedDomain === domain;
+                const users = state.usersByDomain[domain] || [];
+                const addRow = state.addingRowByDomain[domain] || null;
+                const tableRows = users.map((u) => renderUserRow(u, domain)).join('') + (addRow ? renderUserRow(addRow, domain, true) : '');
+
+                return `
+                    <div class="shop-row">
+                        <div><input type="checkbox" data-shop-domain="${esc(domain)}" ${state.selectedShopDomains.has(domain) ? 'checked' : ''} onchange="toggleShopSelection('${esc(domain)}', this.checked)" /></div>
+                        <label class="toggle"><input type="checkbox" ${shop.active ? 'checked' : ''} onchange="toggleShopActive('${esc(domain)}', this.checked)" /> ${shop.active ? 'ACTIVE' : 'INACTIVE'}</label>
+                        <button type="button" class="shop-name" onclick="toggleExpand('${esc(domain)}')">${esc(shop.shop_name || domain)}</button>
+                        <div class="muted">Users: ${Number(shop.user_count || 0)}</div>
+                    </div>
+                    <div class="slide ${open ? 'open' : ''}">
+                        ${open ? `
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th style="width:40px;">Sel</th>
+                                        <th>First name</th>
+                                        <th>Last name</th>
+                                        <th>Email</th>
+                                        <th>Role</th>
+                                        <th>Shop name</th>
+                                        <th style="width:90px;">Save</th>
+                                    </tr>
+                                </thead>
+                                <tbody>${tableRows || '<tr><td colspan="7" class="muted">No users.</td></tr>'}</tbody>
+                            </table>
+                        ` : ''}
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function roleOptions(selected) {
+            return ['Manager','Estimator','Tech','Receptionist','HR','Support'].map((r) => `<option value="${r}" ${selected === r ? 'selected' : ''}>${r}</option>`).join('');
+        }
+
+        function shopOptions(selectedDomain) {
+            return state.shops.map((s) => {
+                const domain = String(s.domain || '').trim().toLowerCase();
+                const label = String(s.shop_name || domain);
+                return `<option value="${esc(domain)}" ${domain === selectedDomain ? 'selected' : ''}>${esc(label)}</option>`;
+            }).join('');
+        }
+
+        function renderUserRow(user, domain, isNew = false) {
+            const userId = Number(user.id || 0);
+            const selected = userId > 0 && state.selectedUserIds.has(userId);
+            const editable = isNew || (state.editMode && selected);
+            const role = String(user.role || 'Estimator');
+            const shopDomain = String(user.shop_domain || domain || '').trim().toLowerCase();
+
+            const firstCell = editable
+                ? `<input data-field="first_name" data-domain="${esc(domain)}" data-user-id="${userId}" value="${esc(user.first_name || '')}" />`
+                : esc(user.first_name || '');
+            const lastCell = editable
+                ? `<input data-field="last_name" data-domain="${esc(domain)}" data-user-id="${userId}" value="${esc(user.last_name || '')}" />`
+                : esc(user.last_name || '');
+            const emailCell = editable
+                ? `<input type="email" data-field="email" data-domain="${esc(domain)}" data-user-id="${userId}" value="${esc(user.email || '')}" />`
+                : esc(user.email || '');
+            const roleCell = editable
+                ? `<select data-field="role" data-domain="${esc(domain)}" data-user-id="${userId}">${roleOptions(role)}</select>`
+                : esc(role);
+            const shopCell = editable
+                ? `<select data-field="shop_domain" data-domain="${esc(domain)}" data-user-id="${userId}">${shopOptions(shopDomain)}</select>`
+                : esc(user.shop_name || domain);
+
+            return `
+                <tr>
+                    <td><input type="checkbox" ${selected ? 'checked' : ''} ${isNew ? 'disabled' : ''} onchange="toggleUserSelection(${userId}, this.checked)" /></td>
+                    <td>${firstCell}</td>
+                    <td>${lastCell}</td>
+                    <td>${emailCell}</td>
+                    <td>${roleCell}</td>
+                    <td>${shopCell}</td>
+                    <td>${editable ? `<button class="btn" style="padding:6px 10px;" onclick="saveUserRow('${esc(domain)}', ${userId}, ${isNew ? 'true' : 'false'})">Save</button>` : ''}</td>
+                </tr>
+            `;
+        }
+
+        function toggleShopSelection(domain, checked) {
+            const key = String(domain || '').trim().toLowerCase();
+            if (!key) return;
+            if (checked) state.selectedShopDomains.add(key);
+            else state.selectedShopDomains.delete(key);
+        }
+
+        function toggleUserSelection(userId, checked) {
+            const id = Number(userId || 0);
+            if (!id) return;
+            if (checked) state.selectedUserIds.add(id);
+            else state.selectedUserIds.delete(id);
+        }
+
+        async function toggleShopActive(domain, active) {
+            try {
+                await api('/api/manage/shops/active', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ shop_domain: domain, active })
+                });
+                await loadShops();
+            } catch (error) {
+                alert(String(error.message || 'Unable to update shop state'));
+            }
+        }
+
+        async function toggleExpand(domain) {
+            const normalized = String(domain || '').trim().toLowerCase();
+            state.expandedDomain = state.expandedDomain === normalized ? '' : normalized;
+            render();
+            if (state.expandedDomain) await ensureUsersLoaded(state.expandedDomain);
+        }
+
+        function readEditableRow(domain, userId) {
+            const read = (field) => {
+                const selector = `[data-field="${field}"][data-domain="${domain}"][data-user-id="${String(userId)}"]`;
+                const el = document.querySelector(selector);
+                return String(el?.value || '').trim();
+            };
+            return {
+                first_name: read('first_name'),
+                last_name: read('last_name'),
+                email: read('email').toLowerCase(),
+                role: read('role'),
+                shop_domain: read('shop_domain').toLowerCase(),
+            };
+        }
+
+        async function saveUserRow(domain, userId, isNew) {
+            try {
+                const payload = readEditableRow(domain, userId);
+                if (!payload.first_name || !payload.last_name || !payload.email || !payload.role || !payload.shop_domain) {
+                    alert('All fields are required.');
+                    return;
+                }
+                if (isNew) {
+                    const password = window.prompt('Enter temporary password for new user:');
+                    if (!password) return;
+                    await api('/api/manage/users', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ ...payload, password })
+                    });
+                    delete state.addingRowByDomain[domain];
+                } else {
+                    await api('/api/manage/users/update', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ id: Number(userId), ...payload })
+                    });
+                }
+                state.editMode = false;
+                await loadShops();
+                if (state.expandedDomain) await ensureUsersLoaded(state.expandedDomain);
+            } catch (error) {
+                alert(String(error.message || 'Unable to save user'));
+            }
+        }
+
+        function onEdit() {
+            if (!state.selectedUserIds.size) {
+                alert('Select user rows first.');
+                return;
+            }
+            state.editMode = true;
+            render();
+        }
+
+        async function onDelete() {
+            if (!state.selectedUserIds.size && !state.selectedShopDomains.size) {
+                alert('Select user(s) or shop(s) first.');
+                return;
+            }
+            try {
+                await api('/api/manage/delete', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        user_ids: Array.from(state.selectedUserIds),
+                        shop_domains: Array.from(state.selectedShopDomains),
+                    })
+                });
+                state.selectedUserIds.clear();
+                state.selectedShopDomains.clear();
+                state.editMode = false;
+                await loadShops();
+                if (state.expandedDomain) await ensureUsersLoaded(state.expandedDomain);
+            } catch (error) {
+                alert(String(error.message || 'Unable to delete selection'));
+            }
+        }
+
+        function onAdd() {
+            if (!state.expandedDomain) {
+                alert('Select a shop first.');
+                return;
+            }
+            state.addingRowByDomain[state.expandedDomain] = {
+                id: -1,
+                first_name: '',
+                last_name: '',
+                email: '',
+                role: 'Estimator',
+                shop_name: state.expandedDomain,
+                shop_domain: state.expandedDomain,
+            };
+            render();
+        }
+
+        loadShops().catch((error) => {
+            const wrap = document.getElementById('shopsList');
+            if (wrap) wrap.innerHTML = `<div style="padding:12px; color:#b22222;">${esc(error.message || 'Unable to load data')}</div>`;
+        });
+    </script>
+</body>
+</html>
+"""
