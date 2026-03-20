@@ -1601,7 +1601,7 @@ async def list_techs(request: Request):
                                 GROUP BY tech_id
                         ) rc ON rc.tech_id = t.id
                         WHERE t.active = true
-                            AND (t.domain = %s OR t.domain IS NULL)
+                            AND t.domain = %s
             ORDER BY first_name, last_name
                 """, (domain, domain))
         
@@ -1648,7 +1648,7 @@ async def update_tech_status(request: Request):
             SET status = %s
             WHERE id = %s
               AND active = TRUE
-              AND (domain = %s OR domain IS NULL)
+                            AND domain = %s
             RETURNING id, status
             """,
             (status_value, tech_id, domain),
@@ -1720,7 +1720,7 @@ async def update_tech_line(request: Request):
             SET {', '.join(update_fields)}
             WHERE id = %s
               AND active = TRUE
-              AND (domain = %s OR domain IS NULL)
+                            AND domain = %s
             RETURNING id, first_name, last_name, role, pay_rate
             """,
             params + [tech_id, domain],
@@ -1768,7 +1768,8 @@ async def delete_tech(request: Request):
             UPDATE techs
             SET active = false
                         WHERE id = %s
-                            AND (domain = %s OR domain IS NULL)
+                            AND domain = %s
+                            AND active = TRUE
             RETURNING id
             """,
                         (tech_id, domain),
@@ -1816,7 +1817,7 @@ async def archive_techs(request: Request):
             FROM techs
             WHERE id = ANY(%s)
               AND active = TRUE
-              AND (domain = %s OR domain IS NULL)
+                            AND domain = %s
             ORDER BY first_name, last_name
             """,
             (normalized_ids, domain),
