@@ -81,6 +81,7 @@ def get_setup_screen_html():
             <div style="display:flex; align-items:center; justify-content:flex-end; margin-bottom:8px; gap:8px;">
                 <button type="button" onclick="openSetupUserModal()" class="setup-action-btn" style="background:#b22222; color:#fff;">+ USER</button>
                 <button type="button" onclick="setupResetSelectedUsers()" class="setup-action-btn" style="background:#b22222; color:#fff;">RESET</button>
+                <button type="button" onclick="setupPromptDeleteSelectedUsers()" class="setup-action-btn" style="background:#111; color:#fff;">DELETE</button>
                 <button id="setupEditBtn" type="button" onclick="setupToggleEditUsers()" class="setup-action-btn" style="background:#b22222; color:#fff;">EDIT</button>
             </div>
 
@@ -148,6 +149,19 @@ def get_setup_screen_html():
             </div>
         </div>
 
+        <div id="setupDeleteConfirmModal" class="modal" style="display:none;">
+            <div class="modal-content" style="max-width:520px; padding:24px;">
+                <div id="setupDeleteConfirmTitle" style="font-size:20px; font-weight:800; color:#111; margin-bottom:12px;">YOU'RE ABOUT TO DELETE SELECTED USER</div>
+                <div style="font-size:14px; line-height:1.5; color:#333; margin-bottom:18px;">
+                    This action permanently deletes the selected user record and cannot be undone.
+                </div>
+                <div style="display:flex; justify-content:flex-end; gap:10px;">
+                    <button type="button" onclick="closeSetupDeleteConfirmModal()" style="padding:10px 14px; background:#505050; color:#fff; border:none; border-radius:4px; cursor:pointer;">Cancel</button>
+                    <button id="setupDeleteConfirmBtn" type="button" onclick="setupDeleteSelectedUsers()" style="padding:10px 16px; background:#b22222; color:#fff; border:none; border-radius:4px; cursor:pointer; font-weight:bold;">Confirm</button>
+                </div>
+            </div>
+        </div>
+
     </div>
     """
 
@@ -156,6 +170,7 @@ def get_setup_script():
     return """
         let setupUsersData = [];
         let setupEditMode = false;
+        let setupPendingDeleteUserIds = [];
 
         function setupEscape(value) {
             return String(value || '')
@@ -340,6 +355,64 @@ def get_setup_script():
             }
         }
 
+        function openSetupDeleteConfirmModal() {
+            const modal = document.getElementById('setupDeleteConfirmModal');
+            if (modal) modal.style.display = 'block';
+        }
+
+        function closeSetupDeleteConfirmModal() {
+            const modal = document.getElementById('setupDeleteConfirmModal');
+            if (modal) modal.style.display = 'none';
+            setupPendingDeleteUserIds = [];
+        }
+
+        function setupPromptDeleteSelectedUsers() {
+            const selected = Array.from(document.querySelectorAll('.setup-user-select:checked'))
+                .map((el) => Number(el.getAttribute('data-user-id') || 0))
+                .filter((val) => Number.isFinite(val) && val > 0);
+
+            if (!selected.length) {
+                alert('Select at least one user to delete.');
+                return;
+            }
+
+            setupPendingDeleteUserIds = selected;
+            const titleEl = document.getElementById('setupDeleteConfirmTitle');
+            if (titleEl) {
+                titleEl.textContent = selected.length > 1
+                    ? "YOU'RE ABOUT TO DELETE SELECTED USERS"
+                    : "YOU'RE ABOUT TO DELETE SELECTED USER";
+            }
+            openSetupDeleteConfirmModal();
+        }
+
+        async function setupDeleteSelectedUsers() {
+            if (!setupPendingDeleteUserIds.length) {
+                closeSetupDeleteConfirmModal();
+                return;
+            }
+
+            const confirmBtn = document.getElementById('setupDeleteConfirmBtn');
+            if (confirmBtn) confirmBtn.disabled = true;
+            try {
+                const resp = await fetch('/api/setup/users/delete', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'include',
+                    body: JSON.stringify({ user_ids: setupPendingDeleteUserIds }),
+                });
+                const data = await resp.json();
+                if (!resp.ok || data.error) throw new Error(data.error || 'Unable to delete user');
+                closeSetupDeleteConfirmModal();
+                await setupLoadUsers();
+            } catch (error) {
+                console.error('Error deleting selected users:', error);
+                alert(String(error.message || 'Error deleting selected user.'));
+            } finally {
+                if (confirmBtn) confirmBtn.disabled = false;
+            }
+        }
+
         function openSetupUserModal() {
             const modal = document.getElementById('setupUserModal');
             if (!modal) return;
@@ -394,9 +467,13 @@ def get_setup_script():
 
         window.addEventListener('click', (event) => {
             const modal = document.getElementById('setupUserModal');
-            if (!modal || modal.style.display !== 'block') return;
-            if (event.target === modal) {
+            if (modal && modal.style.display === 'block' && event.target === modal) {
                 closeSetupUserModal();
+            }
+
+            const deleteModal = document.getElementById('setupDeleteConfirmModal');
+            if (deleteModal && deleteModal.style.display === 'block' && event.target === deleteModal) {
+                closeSetupDeleteConfirmModal();
             }
         });
     """

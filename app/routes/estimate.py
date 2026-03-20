@@ -3340,8 +3340,8 @@ async def delete_setup_users(request: Request):
 
         cur.execute(
             """
-            UPDATE shop_users
-            SET active = FALSE
+            SELECT id
+            FROM shop_users
             WHERE domain = %s
               AND shop_id = %s
               AND id = ANY(%s)
@@ -3349,6 +3349,25 @@ async def delete_setup_users(request: Request):
               AND LOWER(email) <> %s
             """,
             (selected_domain, selected_shop_id, user_ids, _ARCHITECT_EMAIL),
+        )
+        deletable_ids = [int((row or {}).get("id") or 0) for row in (cur.fetchall() or [])]
+        deletable_ids = [value for value in deletable_ids if value > 0]
+        if not deletable_ids:
+            return JSONResponse(status_code=404, content={"error": "No deletable users found"})
+
+        cur.execute(
+            "DELETE FROM auth_sessions WHERE user_id = ANY(%s)",
+            (deletable_ids,),
+        )
+
+        cur.execute(
+            """
+            DELETE FROM shop_users
+            WHERE domain = %s
+              AND shop_id = %s
+              AND id = ANY(%s)
+            """,
+            (selected_domain, selected_shop_id, deletable_ids),
         )
         deleted_count = int(cur.rowcount or 0)
         conn.commit()
