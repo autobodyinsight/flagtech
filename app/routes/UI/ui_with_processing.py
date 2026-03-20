@@ -1,5 +1,5 @@
 from fastapi import APIRouter, UploadFile, File, Request
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, JSONResponse
 from app.services.extractor import extract_text_from_pdf, extract_words_from_pdf
 from app.services.parser import parse_estimate_text
 from app.services.grid_processor import process_pdf_grid, generate_pages_html
@@ -1181,6 +1181,8 @@ async def save_estimate(request: Request):
     paint_repairs = data.get("paint_repairs") or []
     parts_repairs = data.get("parts_repairs") or []
     domain = get_user_domain(request)
+    if not domain:
+        return JSONResponse(status_code=401, content={"error": "Not authenticated"})
     local_upload_date = (data.get("local_upload_date") or "").strip()
     in_date_value = date.today()
     if local_upload_date:
@@ -1314,6 +1316,8 @@ async def auto_generate_ro(request: Request):
     conn = get_conn()
     cur = conn.cursor()
     domain = get_user_domain(request)
+    if not domain:
+        return JSONResponse(status_code=401, content={"error": "Not authenticated"})
 
     try:
         _ensure_ro_auto_sequence(cur)

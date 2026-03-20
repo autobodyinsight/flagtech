@@ -10,7 +10,14 @@ from app.services.extractor import load_pdf
 from app.services.parser import parse_estimate_pdf
 from app.models.estimate import EstimateResponse
 from app.services.db import get_conn
-from app.services.middleware import get_user_domain
+from app.services.middleware import (
+    SESSION_COOKIE_NAME,
+    create_auth_session,
+    get_authenticated_user,
+    get_authenticated_user_email,
+    get_user_domain,
+    revoke_auth_session,
+)
 from fastapi.responses import JSONResponse
 
 router = APIRouter()
@@ -26,19 +33,7 @@ def _quote_ident(value: str) -> str:
 
 
 def _resolve_request_user_email(request: Request) -> str:
-    candidates = (
-        request.headers.get("x-user-email"),
-        request.headers.get("x-auth-request-email"),
-        request.headers.get("x-ms-client-principal-name"),
-        request.headers.get("remote-user"),
-        request.query_params.get("user_email"),
-        request.cookies.get("user_email"),
-    )
-    for value in candidates:
-        email = str(value or "").strip().lower()
-        if email:
-            return email
-    return ""
+    return get_authenticated_user_email(request)
 
 
 def _is_architect_email(email: str) -> bool:
@@ -63,9 +58,6 @@ def _request_is_architect(request: Request) -> bool:
 
 
 def _resolve_setup_scope_domain(request: Request, fallback_domain: str, requested_domain: str | None) -> str:
-    requested = str(requested_domain or "").strip().lower()
-    if requested and _request_is_architect(request):
-        return requested
     return str(fallback_domain or "").strip().lower()
 
 
@@ -245,10 +237,14 @@ def _ensure_shop_id_sync_triggers(cur) -> None:
 
 
 def _resolve_request_shop_id(request: Request, cur, domain: str | None = None) -> int | None:
-    if _request_is_architect(request):
-        requested = str(request.query_params.get("shop_id") or request.headers.get("x-shop-id") or request.cookies.get("user_shop_id") or "").strip()
-        if requested.isdigit():
-            return int(requested)
+    auth_user = get_authenticated_user(request)
+    if auth_user:
+        try:
+            resolved_shop_id = int(auth_user.get("shop_id") or 0)
+            if resolved_shop_id:
+                return resolved_shop_id
+        except Exception:
+            pass
 
     domain_value = str(domain or get_user_domain(request) or "").strip().lower()
     if not domain_value:
@@ -311,6 +307,7 @@ async def auth_login(request: Request):
             return JSONResponse(status_code=401, content={"error": "Invalid user record"})
 
         secure = _build_cookie_secure_flag(request)
+        session_id = create_auth_session(int(row.get("id") or 0))
         response = JSONResponse(
             content={
                 "status": "ok",
@@ -323,6 +320,15 @@ async def auth_login(request: Request):
                     "shop_id": user_shop_id,
                 },
             }
+        )
+        response.set_cookie(
+            key=SESSION_COOKIE_NAME,
+            value=session_id,
+            httponly=True,
+            secure=secure,
+            samesite="lax",
+            max_age=60 * 60 * 12,
+            path="/",
         )
         response.set_cookie(
             key="user_email",
@@ -359,7 +365,9 @@ async def auth_login(request: Request):
 @router.post("/auth/logout")
 async def auth_logout(request: Request):
     secure = _build_cookie_secure_flag(request)
+    revoke_auth_session(request.cookies.get(SESSION_COOKIE_NAME))
     response = JSONResponse(content={"status": "ok"})
+    response.delete_cookie(SESSION_COOKIE_NAME, path="/", secure=secure, samesite="lax")
     response.delete_cookie("user_email", path="/", secure=secure, samesite="lax")
     response.delete_cookie("user_domain", path="/", secure=secure, samesite="lax")
     response.delete_cookie("user_shop_id", path="/", secure=secure, samesite="lax")
@@ -368,35 +376,12 @@ async def auth_logout(request: Request):
 
 @router.get("/auth/session")
 async def auth_session(request: Request):
-    email = _resolve_request_user_email(request)
-    domain = get_user_domain(request)
-    if not email or not domain:
+    authenticated_user = get_authenticated_user(request)
+    if not authenticated_user:
         return JSONResponse(status_code=401, content={"authenticated": False})
-
-    shop_id_cookie = str(request.cookies.get("user_shop_id") or "").strip()
-    shop_id = int(shop_id_cookie) if shop_id_cookie.isdigit() else None
-    if not shop_id:
-        conn = get_conn()
-        cur = conn.cursor()
-        try:
-            _ensure_shop_users_table(cur)
-            _ensure_shop_isolation_infrastructure(cur)
-            cur.execute(
-                """
-                SELECT shop_id
-                FROM shop_users
-                WHERE domain = %s
-                  AND LOWER(email) = %s
-                  AND active = TRUE
-                ORDER BY created_at DESC, id DESC
-                LIMIT 1
-                """,
-                (str(domain).strip().lower(), str(email).strip().lower()),
-            )
-            row = cur.fetchone() or {}
-            shop_id = int(row.get("shop_id") or 0) or None
-        finally:
-            cur.close()
+    email = str(authenticated_user.get("email") or "").strip().lower()
+    domain = str(authenticated_user.get("domain") or "").strip().lower()
+    shop_id = int(authenticated_user.get("shop_id") or 0) or None
 
     return {
         "authenticated": True,
@@ -1512,14 +1497,18 @@ def _sum_assigned_hours(items, excluded_lines) -> float:
 
 
 @router.post("/parse-labor", response_model=EstimateResponse)
-async def parse_labor(file: UploadFile = File(...)):
+async def parse_labor(request: Request, file: UploadFile = File(...)):
+    if not get_user_domain(request):
+        return JSONResponse(status_code=401, content={"error": "Not authenticated"})
     doc = load_pdf(file)
     parsed = parse_estimate_pdf(doc)
     return {"line_items": parsed["labor"]}
 
 
 @router.post("/parse-paint", response_model=EstimateResponse)
-async def parse_paint(file: UploadFile = File(...)):
+async def parse_paint(request: Request, file: UploadFile = File(...)):
+    if not get_user_domain(request):
+        return JSONResponse(status_code=401, content={"error": "Not authenticated"})
     doc = load_pdf(file)
     parsed = parse_estimate_pdf(doc)
     return {"line_items": parsed["paint"]}
@@ -3021,46 +3010,17 @@ async def delete_setup_shop(request: Request):
 
 
 @router.post("/flash")
-async def flash_data():
-    """Delete all row data from public tables while preserving table structure."""
-    conn = get_conn()
-    cur = conn.cursor()
-
-    deleted_counts = {}
-    try:
-        cur.execute(
-            """
-            SELECT table_schema, table_name
-            FROM information_schema.tables
-            WHERE table_schema = 'public'
-              AND table_type = 'BASE TABLE'
-            ORDER BY table_name
-            """
-        )
-        table_rows = cur.fetchall() or []
-
-        for table_row in table_rows:
-            table_schema = table_row.get("table_schema")
-            table_name = table_row.get("table_name")
-            if not table_schema or not table_name:
-                continue
-            delete_stmt = f"DELETE FROM {_quote_ident(table_schema)}.{_quote_ident(table_name)}"
-            cur.execute(delete_stmt)
-            deleted_counts[f"{table_schema}.{table_name}"] = cur.rowcount
-
-        conn.commit()
-    except Exception as exc:
-        conn.rollback()
-        return JSONResponse(status_code=500, content={"status": "error", "message": str(exc)})
-    finally:
-        cur.close()
-
-    return {"status": "success", "deleted": deleted_counts}
+async def flash_data(request: Request):
+    if not get_user_domain(request):
+        return JSONResponse(status_code=401, content={"error": "Not authenticated"})
+    return JSONResponse(status_code=403, content={"error": "Endpoint disabled for tenant safety"})
 
 
 @router.get("/dashboard-data")
 async def get_dashboard_data(request: Request):
-    domain = get_user_domain(request) or "default"
+    domain = get_user_domain(request)
+    if not domain:
+        return JSONResponse(status_code=401, content={"error": "Not authenticated"})
 
     conn = get_conn()
     cur = conn.cursor()
@@ -3645,7 +3605,9 @@ async def get_ro_payments(request: Request):
 
 @router.get("/records/closed-ros")
 async def list_records_closed_ros(request: Request):
-    domain = get_user_domain(request) or "default"
+    domain = get_user_domain(request)
+    if not domain:
+        return JSONResponse(status_code=401, content={"error": "Not authenticated", "rows": []})
 
     conn = get_conn()
     cur = conn.cursor()
@@ -3722,7 +3684,9 @@ async def list_records_tech_payouts(
     end_date: str | None = None,
 ):
     """Return per-tech payout totals from paid Flagout entries."""
-    domain = get_user_domain(request) or "default"
+    domain = get_user_domain(request)
+    if not domain:
+        return JSONResponse(status_code=401, content={"error": "Not authenticated", "rows": []})
 
     start_date_value = None
     if start_date:
@@ -3814,7 +3778,9 @@ async def list_records_tech_paid_ros(
     end_date: str | None = None,
 ):
     """Return unique ROs paid to a tech, sourced only from Flagout payout records."""
-    domain = get_user_domain(request) or "default"
+    domain = get_user_domain(request)
+    if not domain:
+        return JSONResponse(status_code=401, content={"error": "Not authenticated", "rows": []})
 
     start_date_value = None
     if start_date:
@@ -3936,7 +3902,9 @@ async def list_records_parts_vendors_summary(
     start_date: str | None = None,
     end_date: str | None = None,
 ):
-    domain = get_user_domain(request) or "default"
+    domain = get_user_domain(request)
+    if not domain:
+        return JSONResponse(status_code=401, content={"error": "Not authenticated", "rows": []})
 
     start_date_value = None
     if start_date:
@@ -4023,7 +3991,9 @@ async def list_records_parts_vendor_invoices(
     start_date: str | None = None,
     end_date: str | None = None,
 ):
-    domain = get_user_domain(request) or "default"
+    domain = get_user_domain(request)
+    if not domain:
+        return JSONResponse(status_code=401, content={"error": "Not authenticated", "rows": []})
 
     start_date_value = None
     if start_date:
@@ -4104,7 +4074,9 @@ async def list_records_parts_vendor_invoices(
 
 @router.get("/records/parts/vendor-invoice-parts")
 async def list_records_parts_vendor_invoice_parts(request: Request, vendor_id: int, ro: str, invoice: str):
-    domain = get_user_domain(request) or "default"
+    domain = get_user_domain(request)
+    if not domain:
+        return JSONResponse(status_code=401, content={"error": "Not authenticated", "parts": []})
     ro_value = str(ro or "").strip()
     invoice_value = str(invoice or "").strip()
 
@@ -4408,7 +4380,9 @@ async def save_ro_payments(request: Request):
 
 @router.post("/payments/close-ro")
 async def close_ro_from_payments(request: Request):
-    domain = get_user_domain(request) or "default"
+    domain = get_user_domain(request)
+    if not domain:
+        return JSONResponse(status_code=401, content={"error": "Not authenticated"})
 
     try:
         data = await request.json()
@@ -4426,23 +4400,21 @@ async def close_ro_from_payments(request: Request):
         _ensure_saved_estimates_table(cur)
         _ensure_ro_phases_table(cur)
 
-        resolved_domain = domain
         if ro_value:
             cur.execute(
                 """
-                SELECT domain
+                SELECT 1
                 FROM saved_estimates
                 WHERE ro = %s
-                ORDER BY saved_at DESC NULLS LAST, id DESC
+                  AND domain = %s
                 LIMIT 1
                 """,
-                (ro_value,),
+                (ro_value, domain),
             )
-            latest_saved_row = cur.fetchone()
-            if latest_saved_row:
-                resolved_domain = str(latest_saved_row.get("domain") or domain).strip() or domain
+            if not cur.fetchone():
+                conn.rollback()
+                return JSONResponse(status_code=404, content={"error": "RO not found for current tenant"})
 
-        if ro_value:
             cur.execute(
                 """
                 INSERT INTO ro_phases (ro, phase, domain)
@@ -4451,7 +4423,7 @@ async def close_ro_from_payments(request: Request):
                 DO UPDATE SET phase = EXCLUDED.phase,
                               updated_at = CURRENT_TIMESTAMP
                 """,
-                (ro_value, "complete/finish", resolved_domain),
+                (ro_value, "complete/finish", domain),
             )
 
         conn.commit()
@@ -6531,7 +6503,9 @@ async def phase_board(request: Request):
 
 @router.get("/ro-notes")
 async def list_ro_notes(request: Request, ro: str):
-    domain = get_user_domain(request) or "default"
+    domain = get_user_domain(request)
+    if not domain:
+        return JSONResponse(status_code=401, content={"error": "Not authenticated", "notes": []})
     conn = get_conn()
     cur = conn.cursor()
     try:
@@ -6691,7 +6665,9 @@ async def list_ro_activity(request: Request, ro: str):
 
 @router.post("/ro-notes")
 async def add_ro_note(request: Request):
-    domain = get_user_domain(request) or "default"
+    domain = get_user_domain(request)
+    if not domain:
+        return JSONResponse(status_code=401, content={"error": "Not authenticated"})
     data = await request.json()
     ro = (data.get("ro") or "").strip()
     note = (data.get("note") or "").strip()

@@ -1,12 +1,17 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
 from app.services.db import get_closed_ros_and_summary
+from app.services.middleware import get_user_domain
 
 router = APIRouter()
 
 @router.get("/api/reports_data", response_class=JSONResponse)
-async def reports_data():
-    closed_ros, summary = get_closed_ros_and_summary()
+async def reports_data(request: Request):
+    domain = get_user_domain(request)
+    if not domain:
+        return JSONResponse(status_code=401, content={"error": "Not authenticated"})
+
+    closed_ros, summary = get_closed_ros_and_summary(domain)
     summary_data = [
         {"category": k, "sales": v["sales"], "gp_percent": v["gp_percent"], "gp_dollar": v["gp_dollar"]}
         for k, v in summary.items()

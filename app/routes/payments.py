@@ -1,16 +1,11 @@
 from fastapi import APIRouter, Request, HTTPException
 from app.services.db import close_repair_order
+from app.services.middleware import get_user_domain
 
 router = APIRouter()
 
 @router.post("/api/payments/close-ro")
 async def close_ro(request: Request):
-    data = await request.json()
-    ro_number = data.get("ro")
-    if not ro_number:
-        raise HTTPException(status_code=400, detail="Missing RO number")
-    try:
-        close_repair_order(ro_number)
-        return {"success": True}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    if not get_user_domain(request):
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    raise HTTPException(status_code=410, detail="Deprecated endpoint. Use /api/payments/close-ro from main estimate routes.")

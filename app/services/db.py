@@ -159,7 +159,15 @@ def _percent(numerator: float, denominator: float) -> float:
     return (numerator / denominator) * 100.0
 
 
-def get_closed_ros_and_summary():
+def get_closed_ros_and_summary(domain: str):
+    scoped_domain = str(domain or "").strip().lower()
+    if not scoped_domain:
+        return [], {
+            "RO'S": {"sales": 0.0, "gp_percent": 0.0, "gp_dollar": 0.0},
+            "PARTS": {"sales": 0.0, "gp_percent": 0.0, "gp_dollar": 0.0},
+            "LABOR": {"sales": 0.0, "gp_percent": 0.0, "gp_dollar": 0.0},
+        }
+
     conn = get_conn()
     cur = conn.cursor()
     try:
@@ -273,12 +281,15 @@ def get_closed_ros_and_summary():
                 SELECT *
                 FROM saved_estimates se
                 WHERE se.ro = rp.ro
+                  AND se.domain = rp.domain
                 ORDER BY se.saved_at DESC, se.id DESC
                 LIMIT 1
             ) se ON TRUE
             WHERE COALESCE(LOWER(TRIM(rp.phase)), '') IN ('complete', 'complete/finish')
+              AND rp.domain = %s
             ORDER BY rp.updated_at DESC NULLS LAST, rp.ro ASC
-            """
+            """,
+            (scoped_domain,),
         )
         rows = cur.fetchall() or []
 
@@ -295,6 +306,7 @@ def get_closed_ros_and_summary():
                 FROM parts_received
                 WHERE ro IS NOT NULL
                   AND ro <> ''
+                                    AND domain = %s
                   AND invoice_number IS NOT NULL
                   AND TRIM(invoice_number) <> ''
                 GROUP BY ro, invoice_number
@@ -308,11 +320,13 @@ def get_closed_ros_and_summary():
                 FROM parts_received
                 WHERE ro IS NOT NULL
                   AND ro <> ''
+                                    AND domain = %s
                   AND (invoice_number IS NULL OR TRIM(invoice_number) = '')
                 GROUP BY ro
             ) invoices
             GROUP BY invoices.ro
-            """
+                        """,
+                        (scoped_domain, scoped_domain),
         )
         parts_cost_rows = cur.fetchall() or []
         parts_cost_by_ro = {str(row.get("ro") or "").strip(): _parse_float(row.get("parts_cost")) for row in parts_cost_rows}
@@ -323,8 +337,10 @@ def get_closed_ros_and_summary():
             FROM ro_flagout_lines
             WHERE ro IS NOT NULL
               AND ro <> ''
+                            AND domain = %s
             GROUP BY ro
-            """
+                        """,
+                        (scoped_domain,),
         )
         labor_cost_rows = cur.fetchall() or []
         labor_cost_by_ro = {str(row.get("ro") or "").strip(): _parse_float(row.get("labor_cost")) for row in labor_cost_rows}
@@ -335,10 +351,12 @@ def get_closed_ros_and_summary():
             FROM ro_line_assignments
             WHERE ro IS NOT NULL
               AND ro <> ''
+                            AND domain = %s
               AND tech_name IS NOT NULL
               AND TRIM(tech_name) <> ''
             GROUP BY ro
-            """
+                        """,
+                        (scoped_domain,),
         )
         tech_rows = cur.fetchall() or []
         tech_by_ro = {
