@@ -11,11 +11,14 @@ from app.services.parser import parse_estimate_pdf
 from app.models.estimate import EstimateResponse
 from app.services.db import get_conn
 from app.services.middleware import (
+    ARCHITECT_VIEW_DOMAIN_COOKIE,
     SESSION_COOKIE_NAME,
     create_auth_session,
+    get_architect_view_domain,
     get_authenticated_user,
     get_authenticated_user_email,
     get_user_domain,
+    is_architect_view_mode,
     revoke_auth_session,
 )
 from fastapi.responses import JSONResponse
@@ -314,10 +317,11 @@ async def auth_login(request: Request):
         if not row:
             return JSONResponse(status_code=401, content={"error": "Invalid credentials"})
 
-        if not bool(row.get("shop_active", True)):
+        user_email = str(row.get("email") or "").strip().lower()
+
+        if not bool(row.get("shop_active", True)) and not _is_architect_email(user_email):
             return JSONResponse(status_code=403, content={"error": "LOG IN NOT AUTHORIZED, CONTACT SUPPORT"})
 
-        user_email = str(row.get("email") or "").strip().lower()
         user_domain = str(row.get("domain") or "").strip().lower()
         first_name = str(row.get("first_name") or "").strip()
         last_name = str(row.get("last_name") or "").strip()
@@ -391,6 +395,7 @@ async def auth_logout(request: Request):
     response.delete_cookie("user_email", path="/", secure=secure, samesite="lax")
     response.delete_cookie("user_domain", path="/", secure=secure, samesite="lax")
     response.delete_cookie("user_shop_id", path="/", secure=secure, samesite="lax")
+    response.delete_cookie(ARCHITECT_VIEW_DOMAIN_COOKIE, path="/", secure=secure, samesite="lax")
     return response
 
 
@@ -402,6 +407,7 @@ async def auth_session(request: Request):
     email = str(authenticated_user.get("email") or "").strip().lower()
     domain = str(authenticated_user.get("domain") or "").strip().lower()
     shop_id = int(authenticated_user.get("shop_id") or 0) or None
+    scoped_domain = str(get_architect_view_domain(request) or "").strip().lower()
 
     return {
         "authenticated": True,
@@ -410,8 +416,65 @@ async def auth_session(request: Request):
             "domain": domain,
             "shop_id": shop_id,
             "access_level": _resolve_internal_access_level(request),
+            "view_mode": bool(is_architect_view_mode(request)),
+            "view_domain": scoped_domain,
         },
     }
+
+
+@router.get("/architect/view-mode")
+async def architect_view_mode_status(request: Request):
+    domain = get_user_domain(request)
+    if not domain:
+        return JSONResponse(status_code=401, content={"error": "Not authenticated"})
+    if not _request_is_architect(request):
+        return JSONResponse(status_code=403, content={"error": "Forbidden"})
+    scoped_domain = str(get_architect_view_domain(request) or "").strip().lower()
+    return {
+        "enabled": bool(scoped_domain),
+        "shop_domain": scoped_domain or None,
+    }
+
+
+@router.post("/architect/view-mode")
+async def architect_set_view_mode(request: Request):
+    domain = get_user_domain(request)
+    if not domain:
+        return JSONResponse(status_code=401, content={"error": "Not authenticated"})
+    if not _request_is_architect(request):
+        return JSONResponse(status_code=403, content={"error": "Forbidden"})
+
+    data = await request.json()
+    requested_domain = str(data.get("shop_domain") or "").strip().lower()
+
+    secure = _build_cookie_secure_flag(request)
+    response = JSONResponse(content={"status": "ok", "enabled": False, "shop_domain": None})
+    if not requested_domain:
+        response.delete_cookie(ARCHITECT_VIEW_DOMAIN_COOKIE, path="/", secure=secure, samesite="lax")
+        return response
+
+    conn = get_conn()
+    cur = conn.cursor()
+    try:
+        _ensure_shops_table(cur)
+        cur.execute("SELECT domain FROM shops WHERE domain = %s LIMIT 1", (requested_domain,))
+        row = cur.fetchone() or {}
+        if not row:
+            return JSONResponse(status_code=404, content={"error": "Shop not found"})
+    finally:
+        cur.close()
+
+    response = JSONResponse(content={"status": "ok", "enabled": True, "shop_domain": requested_domain})
+    response.set_cookie(
+        key=ARCHITECT_VIEW_DOMAIN_COOKIE,
+        value=requested_domain,
+        httponly=True,
+        secure=secure,
+        samesite="lax",
+        max_age=60 * 60 * 12,
+        path="/",
+    )
+    return response
 
 
 def _to_local_business_date(value) -> date | None:
@@ -2991,7 +3054,7 @@ async def update_setup_user(request: Request):
         if not requester_row:
             return JSONResponse(status_code=401, content={"error": "Not authenticated"})
         requester_role = str((requester_row or {}).get("role") or "").strip()
-        if not _is_manager_or_hr_role(requester_role):
+        if not (_request_is_architect(request) or _is_manager_or_hr_role(requester_role)):
             return JSONResponse(status_code=403, content={"error": "Forbidden"})
 
         cur.execute("SELECT id FROM shops WHERE domain = %s LIMIT 1", (selected_domain,))
@@ -3074,7 +3137,7 @@ async def reset_setup_user_password(request: Request):
         if not requester_row:
             return JSONResponse(status_code=401, content={"error": "Not authenticated"})
         requester_role = str(requester_row.get("role") or "").strip()
-        if not _is_manager_or_hr_role(requester_role):
+        if not (_request_is_architect(request) or _is_manager_or_hr_role(requester_role)):
             return JSONResponse(status_code=403, content={"error": "Forbidden"})
 
         cur.execute("SELECT id FROM shops WHERE domain = %s LIMIT 1", (selected_domain,))
@@ -3115,7 +3178,7 @@ async def list_setup_users(request: Request):
         if not requester_row:
             return JSONResponse(status_code=401, content={"error": "Not authenticated", "users": []})
         requester_role = str((requester_row or {}).get("role") or "").strip()
-        if not _is_manager_or_hr_role(requester_role):
+        if not (_request_is_architect(request) or _is_manager_or_hr_role(requester_role)):
             return JSONResponse(status_code=403, content={"error": "Forbidden", "users": []})
 
         cur.execute(
@@ -3184,7 +3247,7 @@ async def create_setup_user(request: Request):
         if not requester_row:
             return JSONResponse(status_code=401, content={"error": "Not authenticated"})
         requester_role = str((requester_row or {}).get("role") or "").strip()
-        if not _is_manager_or_hr_role(requester_role):
+        if not (_request_is_architect(request) or _is_manager_or_hr_role(requester_role)):
             return JSONResponse(status_code=403, content={"error": "Forbidden"})
 
         cur.execute("SELECT id FROM shops WHERE domain = %s LIMIT 1", (selected_domain,))
@@ -3260,7 +3323,7 @@ async def delete_setup_users(request: Request):
         if not requester_row:
             return JSONResponse(status_code=401, content={"error": "Not authenticated"})
         requester_role = str((requester_row or {}).get("role") or "").strip()
-        if not _is_manager_or_hr_role(requester_role):
+        if not (_request_is_architect(request) or _is_manager_or_hr_role(requester_role)):
             return JSONResponse(status_code=403, content={"error": "Forbidden"})
 
         cur.execute("SELECT id FROM shops WHERE domain = %s LIMIT 1", (selected_domain,))

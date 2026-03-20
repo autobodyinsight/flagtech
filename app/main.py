@@ -1,5 +1,5 @@
-from fastapi import FastAPI
-from fastapi.responses import RedirectResponse
+from fastapi import FastAPI, Request
+from fastapi.responses import RedirectResponse, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from pathlib import Path
@@ -11,6 +11,12 @@ from app.routes.UI.ui_with_processing import router as processing_router
 from app.routes.UI.upload_ui.routes import router as ui_routes_router
 from app.routes.UI.reports import router as reports_router
 from app.routes.payments import router as payments_router
+from app.services.middleware import (
+    DEFAULT_SCOPE_DOMAIN,
+    get_architect_view_domain,
+    get_authenticated_user,
+    is_architect_view_mode,
+)
 
 
 app = FastAPI(title="FlagTech Estimate Parser")
@@ -48,6 +54,25 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.middleware("http")
+async def architect_view_mode_read_only_guard(request: Request, call_next):
+    method = str(request.method or "").upper()
+    if method not in {"GET", "HEAD", "OPTIONS"}:
+        user = get_authenticated_user(request)
+        if user and bool(user.get("is_architect")) and is_architect_view_mode(request):
+            scoped_domain = str(get_architect_view_domain(request) or "").strip().lower()
+            if scoped_domain == str(DEFAULT_SCOPE_DOMAIN or "").strip().lower():
+                return await call_next(request)
+            path = str(request.url.path or "")
+            allowed_write_paths = {
+                "/api/architect/view-mode",
+                "/api/auth/logout",
+            }
+            if path not in allowed_write_paths:
+                return JSONResponse(status_code=403, content={"error": "VIEW MODE ONLY"})
+    return await call_next(request)
 
 # ---------------------------------------------------------
 # ROUTERS

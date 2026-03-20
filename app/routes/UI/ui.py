@@ -943,6 +943,10 @@ async def home_screen(request: Request):
                 <span class="nav-label" id="sideUserLabel">Account</span>
             </button>
             <div id="headerUserDropdown">
+                <div id="architectShopScopeWrap" style="display:none; padding:10px 12px; border-bottom:1px solid rgba(255,255,255,0.15);">
+                    <div style="font-size:11px; color:rgba(255,255,255,0.78); margin-bottom:6px; font-weight:700; letter-spacing:0.3px;">VIEW MODE (ARCHITECT)</div>
+                    <select id="architectShopScopeSelect" style="width:100%; padding:8px; border:1px solid rgba(255,255,255,0.25); border-radius:6px; background:rgba(0,0,0,0.22); color:#fff;"></select>
+                </div>
                 <button type="button" class="header-menu-action" onclick="openProfileModal()">Profile</button>
                 <button type="button" class="header-menu-action" onclick="logoutApp()">Log Out</button>
             </div>
@@ -1557,6 +1561,60 @@ async def home_screen(request: Request):
             }}
         }}
 
+        async function loadArchitectShopScopePicker() {{
+            const wrap = document.getElementById('architectShopScopeWrap');
+            const select = document.getElementById('architectShopScopeSelect');
+            if (!wrap || !select) return;
+
+            const isArchitect = String(appUiState.sessionUser?.access_level || '').toUpperCase() === 'ARCHITECT';
+            if (!isArchitect) {{
+                wrap.style.display = 'none';
+                return;
+            }}
+
+            wrap.style.display = 'block';
+            select.innerHTML = '<option value="">Creator mode (full access)</option>';
+            try {{
+                const [shopsResp, modeResp] = await Promise.all([
+                    fetch('/api/manage/shops', {{ credentials: 'include' }}),
+                    fetch('/api/architect/view-mode', {{ credentials: 'include' }}),
+                ]);
+                const shopsData = await shopsResp.json();
+                const modeData = await modeResp.json();
+
+                const shops = Array.isArray(shopsData.shops) ? shopsData.shops : [];
+                const current = String(modeData.shop_domain || '').trim().toLowerCase();
+
+                select.innerHTML = [
+                    '<option value="">Creator mode (full access)</option>',
+                    ...shops.map((shop) => {{
+                        const domain = String(shop?.domain || '').trim().toLowerCase();
+                        const label = String(shop?.shop_name || domain || 'Shop');
+                        return `<option value="${{headerEscapeHtml(domain)}}" ${{domain === current ? 'selected' : ''}}>${{headerEscapeHtml(label)}}</option>`;
+                    }}),
+                ].join('');
+            }} catch (error) {{
+                console.error('Unable to load architect shop scope:', error);
+            }}
+
+            select.onchange = async () => {{
+                const domain = String(select.value || '').trim().toLowerCase();
+                try {{
+                    const resp = await fetch('/api/architect/view-mode', {{
+                        method: 'POST',
+                        headers: {{ 'Content-Type': 'application/json' }},
+                        credentials: 'include',
+                        body: JSON.stringify({{ shop_domain: domain || null }}),
+                    }});
+                    const data = await resp.json();
+                    if (!resp.ok || data.error) throw new Error(data.error || 'Unable to switch shop view mode');
+                    window.location.reload();
+                }} catch (error) {{
+                    alert(String(error.message || 'Unable to switch shop view mode'));
+                }}
+            }};
+        }}
+
         async function initHeaderData() {{
             try {{
                 const [sessionResp, contextResp] = await Promise.all([
@@ -1602,7 +1660,9 @@ async def home_screen(request: Request):
                 const sideManageBtn = document.getElementById('sideManageBtn');
                 if (sideManageBtn) sideManageBtn.style.display = isArchitect ? 'flex' : 'none';
                 const sideSetupBtn = document.getElementById('sideSetupBtn');
-                if (sideSetupBtn) sideSetupBtn.style.display = isManagerHr ? 'flex' : 'none';
+                if (sideSetupBtn) sideSetupBtn.style.display = (isManagerHr || isArchitect) ? 'flex' : 'none';
+
+                await loadArchitectShopScopePicker();
 
                 const shopText = document.getElementById('profileShopText');
                 const roleText = document.getElementById('profileRoleText');
