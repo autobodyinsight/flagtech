@@ -58,6 +58,9 @@ def _request_is_architect(request: Request) -> bool:
 
 
 def _resolve_setup_scope_domain(request: Request, fallback_domain: str, requested_domain: str | None) -> str:
+    requested = str(requested_domain or "").strip().lower()
+    if requested and _request_is_architect(request):
+        return requested
     return str(fallback_domain or "").strip().lower()
 
 
