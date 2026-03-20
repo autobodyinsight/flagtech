@@ -27,9 +27,7 @@ router = APIRouter()
 
 
 def _is_authenticated(request: Request) -> bool:
-    email = str(request.cookies.get("user_email") or "").strip()
-    domain = str(request.cookies.get("user_domain") or "").strip()
-    return bool(email and domain)
+    return bool(get_authenticated_user(request))
 
 
 def _is_architect(request: Request) -> bool:
@@ -1104,6 +1102,34 @@ async def home_screen(request: Request):
             chatAudienceMode: 'users',
         }};
 
+        const appScreenFeatureMap = {{
+            dashboard: 'dashboard',
+            upload: 'upload',
+            phase: 'phase',
+            parts: 'parts',
+            tech: 'tech',
+            flagtech: 'flagout',
+            reports: 'reports',
+            setup: 'setup',
+        }};
+
+        function getPermissionSnapshot() {{
+            return appUiState.sessionUser?.permissions || null;
+        }}
+
+        function canAccessFeature(feature) {{
+            return !!getPermissionSnapshot()?.features?.[feature];
+        }}
+
+        function canPerformAction(action) {{
+            return !!getPermissionSnapshot()?.actions?.[action];
+        }}
+
+        function canAccessScreen(screenName) {{
+            const feature = appScreenFeatureMap[String(screenName || '')] || 'main_ui';
+            return canAccessFeature(feature);
+        }}
+
         function getChatAudienceUsers() {{
             const currentUserId = String(appUiState.currentUser?.id || '');
             const users = Array.isArray(appUiState.users)
@@ -1477,6 +1503,7 @@ async def home_screen(request: Request):
         }}
 
         function openSidebarManageWindow() {{
+            if (!canAccessFeature('manage')) return;
             window.open('/ui/manage', '_blank', 'noopener,noreferrer,width=1320,height=880');
         }}
 
@@ -1559,29 +1586,25 @@ async def home_screen(request: Request):
 
         async function initHeaderData() {{
             try {{
-                const [sessionResp, contextResp] = await Promise.all([
+                const [sessionResp, userResp] = await Promise.all([
                     fetch('/api/auth/session', {{ credentials: 'include' }}),
-                    fetch('/api/setup/context', {{ credentials: 'include' }}),
+                    fetch('/api/chat/users', {{ credentials: 'include' }}),
                 ]);
                 const sessionData = await sessionResp.json();
-                const contextData = await contextResp.json();
+                const userData = await userResp.json();
                 if (!sessionResp.ok || !sessionData.authenticated) return;
                 appUiState.sessionUser = sessionData.user || null;
-                appUiState.shopDomain = String(contextData.default_domain || sessionData.user?.domain || '').trim();
+                appUiState.currentUser = appUiState.sessionUser || null;
+                appUiState.shopDomain = String(sessionData.user?.permissions?.shop_domain || sessionData.user?.domain || '').trim();
+                appUiState.shopName = String(sessionData.user?.shop_name || '').trim();
+                appUiState.users = Array.isArray(userData.users) ? userData.users : [];
 
                 const shopScopeQuery = appUiState.shopDomain
                     ? `?shop_domain=${{encodeURIComponent(appUiState.shopDomain)}}`
                     : '';
                 const shopResp = await fetch('/api/setup/shop' + shopScopeQuery, {{ credentials: 'include' }});
                 const shopData = await shopResp.json();
-                appUiState.shopName = String(shopData?.shop?.shop_name || '').trim();
-
-                const userResp = await fetch(`/api/setup/users${{appUiState.shopDomain ? `?shop_domain=${{encodeURIComponent(appUiState.shopDomain)}}` : ''}}`, {{ credentials: 'include' }});
-                const userData = await userResp.json();
-                appUiState.users = Array.isArray(userData.users) ? userData.users : [];
-
-                const sessionEmail = String(appUiState.sessionUser?.email || '').toLowerCase();
-                appUiState.currentUser = appUiState.users.find((u) => String(u.email || '').toLowerCase() === sessionEmail) || null;
+                appUiState.shopName = String(shopData?.shop?.shop_name || appUiState.shopName || '').trim();
 
                 await fetchChatMessages();
                 deriveChatStateFromMessages();
@@ -1589,20 +1612,21 @@ async def home_screen(request: Request):
                 const firstName = String(appUiState.currentUser?.first_name || '').trim();
                 const lastName = String(appUiState.currentUser?.last_name || '').trim();
                 const initials = `${{(firstName[0] || '').toUpperCase()}}${{(lastName[0] || '').toUpperCase()}}` || 'U';
-                const role = String(appUiState.currentUser?.role || appUiState.sessionUser?.access_level || '-');
+                const role = String(appUiState.sessionUser?.access_level || '').toUpperCase() === 'ARCHITECT'
+                    ? 'ARCHITECT'
+                    : String(appUiState.currentUser?.role || appUiState.sessionUser?.access_level || '-');
                 const email = String(appUiState.currentUser?.email || appUiState.sessionUser?.email || '-');
-                const isArchitect = String(appUiState.sessionUser?.access_level || '').toUpperCase() === 'ARCHITECT';
-                const normalizedRole = String(appUiState.currentUser?.role || '').trim().toLowerCase();
-                const isManagerHr = normalizedRole === 'manager' || normalizedRole === 'hr';
 
                 const initialsEl = document.getElementById('sideUserInitials');
                 if (initialsEl) initialsEl.textContent = initials;
                 const userLabelEl = document.getElementById('sideUserLabel');
                 if (userLabelEl && (firstName || lastName)) userLabelEl.textContent = (firstName + ' ' + lastName).trim();
                 const sideManageBtn = document.getElementById('sideManageBtn');
-                if (sideManageBtn) sideManageBtn.style.display = isArchitect ? 'flex' : 'none';
+                if (sideManageBtn) sideManageBtn.style.display = canAccessFeature('manage') ? 'flex' : 'none';
                 const sideSetupBtn = document.getElementById('sideSetupBtn');
-                if (sideSetupBtn) sideSetupBtn.style.display = (isManagerHr || isArchitect) ? 'flex' : 'none';
+                if (sideSetupBtn) sideSetupBtn.style.display = canAccessFeature('setup') ? 'flex' : 'none';
+                const resetPasswordBtn = document.getElementById('profileResetPasswordBtn');
+                if (resetPasswordBtn) resetPasswordBtn.style.display = canPerformAction('reset_profile_password') ? 'inline-flex' : 'none';
 
                 const shopText = document.getElementById('profileShopText');
                 const roleText = document.getElementById('profileRoleText');
@@ -1692,6 +1716,7 @@ async def home_screen(request: Request):
         }}
 
         function switchScreen(screenName, sourceEl = null) {{
+            if (!canAccessScreen(screenName)) return;
             const screens = document.querySelectorAll('.screen');
             screens.forEach(screen => screen.classList.remove('active'));
 

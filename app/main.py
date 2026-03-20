@@ -1,8 +1,10 @@
 from fastapi import FastAPI
-from fastapi.responses import RedirectResponse
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from pathlib import Path
+from app.services.middleware import get_authenticated_user
+from app.services.permissions import has_feature_access, resolve_feature_for_path
 
 # Routers
 from app.routes.estimate import router as estimate_router
@@ -66,6 +68,35 @@ app.include_router(processing_router, prefix="/ui")
 
 # Save routes (labor + refinish)
 app.include_router(ui_routes_router, prefix="/ui")
+
+
+@app.middleware("http")
+async def permission_guard_middleware(request, call_next):
+    path = str(request.url.path or "").strip()
+
+    if not path or path == "/" or path.startswith("/static/"):
+        return await call_next(request)
+
+    if path in {"/ui/login", "/api/auth/login", "/api/auth/logout", "/api/auth/session"}:
+        return await call_next(request)
+
+    if not (path.startswith("/ui") or path.startswith("/api")):
+        return await call_next(request)
+
+    authenticated_user = get_authenticated_user(request)
+    if not authenticated_user:
+        if path.startswith("/ui") and request.method.upper() == "GET":
+            return RedirectResponse(url="/ui/login")
+        return JSONResponse(status_code=401, content={"error": "Not authenticated"})
+
+    feature = resolve_feature_for_path(path, request.method)
+    permissions = authenticated_user.get("permissions") or {}
+    if feature and not has_feature_access(permissions, feature):
+        if path.startswith("/ui") and request.method.upper() == "GET":
+            return HTMLResponse("<h2 style='font-family:Segoe UI,Arial,sans-serif; padding:24px;'>Forbidden</h2>", status_code=403)
+        return JSONResponse(status_code=403, content={"error": "Forbidden"})
+
+    return await call_next(request)
 
 # ---------------------------------------------------------
 # ROOT REDIRECT

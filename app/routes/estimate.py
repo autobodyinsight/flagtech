@@ -18,6 +18,7 @@ from app.services.middleware import (
     get_user_domain,
     revoke_auth_session,
 )
+from app.services.permissions import build_permission_snapshot
 from fastapi.responses import JSONResponse
 
 router = APIRouter()
@@ -48,9 +49,11 @@ def _build_cookie_secure_flag(request: Request) -> bool:
 
 def _resolve_internal_access_level(request: Request) -> str:
     # Internal-only access level mapping. ARCHITECT is never user-selectable.
-    if _is_architect_email(_resolve_request_user_email(request)):
-        return "ARCHITECT"
-    return "STANDARD"
+    authenticated_user = get_authenticated_user(request) or {}
+    access_level = str(authenticated_user.get("access_level") or "").strip().upper()
+    if access_level:
+        return access_level
+    return "ARCHITECT" if _is_architect_email(_resolve_request_user_email(request)) else "USER"
 
 
 def _request_is_architect(request: Request) -> bool:
@@ -321,13 +324,20 @@ async def auth_login(request: Request):
         user_domain = str(row.get("domain") or "").strip().lower()
         first_name = str(row.get("first_name") or "").strip()
         last_name = str(row.get("last_name") or "").strip()
+        user_role = str(row.get("role") or "").strip()
         user_shop_id = int(row.get("shop_id") or 0)
+        permission_snapshot = build_permission_snapshot(
+            role=user_role,
+            domain=user_domain,
+            shop_id=user_shop_id,
+            is_architect=_is_architect_email(user_email),
+        )
 
         if not user_email or not user_domain or not user_shop_id:
             return JSONResponse(status_code=401, content={"error": "Invalid user record"})
 
         secure = _build_cookie_secure_flag(request)
-        session_id = create_auth_session(int(row.get("id") or 0))
+        session_id = create_auth_session(int(row.get("id") or 0), permission_snapshot=permission_snapshot)
         response = JSONResponse(
             content={
                 "status": "ok",
@@ -336,8 +346,11 @@ async def auth_login(request: Request):
                     "email": user_email,
                     "first_name": first_name,
                     "last_name": last_name,
+                    "role": user_role,
                     "domain": user_domain,
                     "shop_id": user_shop_id,
+                    "access_level": permission_snapshot.get("access_level"),
+                    "permissions": permission_snapshot,
                 },
             }
         )
@@ -399,17 +412,22 @@ async def auth_session(request: Request):
     authenticated_user = get_authenticated_user(request)
     if not authenticated_user:
         return JSONResponse(status_code=401, content={"authenticated": False})
-    email = str(authenticated_user.get("email") or "").strip().lower()
-    domain = str(authenticated_user.get("domain") or "").strip().lower()
-    shop_id = int(authenticated_user.get("shop_id") or 0) or None
+    permissions = authenticated_user.get("permissions") or {}
 
     return {
         "authenticated": True,
         "user": {
-            "email": email,
-            "domain": domain,
-            "shop_id": shop_id,
-            "access_level": _resolve_internal_access_level(request),
+            "id": int(authenticated_user.get("id") or 0),
+            "email": str(authenticated_user.get("email") or "").strip().lower(),
+            "first_name": str(authenticated_user.get("first_name") or "").strip(),
+            "last_name": str(authenticated_user.get("last_name") or "").strip(),
+            "role": str(authenticated_user.get("role") or "").strip(),
+            "domain": str(authenticated_user.get("domain") or "").strip().lower(),
+            "shop_id": int(authenticated_user.get("shop_id") or 0) or None,
+            "shop_name": str(authenticated_user.get("shop_name") or "").strip(),
+            "address": str(authenticated_user.get("address") or "").strip(),
+            "access_level": str(authenticated_user.get("access_level") or "").strip(),
+            "permissions": permissions,
         },
     }
 
@@ -2452,6 +2470,57 @@ async def chat_messages(request: Request):
             )
 
         return {"messages": messages}
+    finally:
+        cur.close()
+
+
+@router.get("/chat/users")
+async def chat_users(request: Request):
+    domain = str(get_user_domain(request) or "").strip().lower()
+    if not domain:
+        return JSONResponse(status_code=401, content={"error": "Not authenticated", "users": []})
+
+    conn = get_conn()
+    cur = conn.cursor()
+    try:
+        _ensure_shop_users_table(cur)
+        _ensure_shop_isolation_infrastructure(cur)
+
+        current_user = _resolve_current_user_row(request, cur, domain)
+        if not current_user:
+            return JSONResponse(status_code=401, content={"error": "Not authenticated", "users": []})
+
+        current_shop_id = int(current_user.get("shop_id") or 0)
+        if not current_shop_id:
+            return JSONResponse(status_code=403, content={"error": "Shop scope not resolved", "users": []})
+
+        cur.execute(
+            """
+            SELECT id, first_name, last_name, email, role, shop_id
+            FROM shop_users
+            WHERE domain = %s
+              AND shop_id = %s
+              AND active = TRUE
+            ORDER BY first_name ASC, last_name ASC, id ASC
+            """,
+            (domain, current_shop_id),
+        )
+        rows = cur.fetchall() or []
+        users = []
+        for row in rows:
+            row_email = str(row.get("email") or "").strip().lower()
+            users.append(
+                {
+                    "id": int(row.get("id") or 0),
+                    "first_name": str(row.get("first_name") or "").strip(),
+                    "last_name": str(row.get("last_name") or "").strip(),
+                    "email": str(row.get("email") or "").strip(),
+                    "role": "ARCHITECT" if _is_architect_email(row_email) else str(row.get("role") or "").strip(),
+                    "shop_id": int(row.get("shop_id") or 0) or None,
+                }
+            )
+
+        return {"users": users}
     finally:
         cur.close()
 
