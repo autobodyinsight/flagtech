@@ -14,7 +14,6 @@ from app.services.db import get_conn
 DEFAULT_SCOPE_DOMAIN = "autobodyinsight.com"
 ARCHITECT_EMAIL = "jorge@autobodyinsight.com"
 SESSION_COOKIE_NAME = "session_id"
-ARCHITECT_VIEW_DOMAIN_COOKIE = "architect_view_domain"
 SESSION_DURATION_HOURS = 12
 
 
@@ -147,31 +146,11 @@ def get_authenticated_user_email(request: Request) -> str:
     return str(user.get("email") or "").strip().lower()
 
 
-def get_architect_view_domain(request: Request) -> Optional[str]:
-    user = get_authenticated_user(request)
-    if not user or not bool(user.get("is_architect")):
-        return None
-    selected = _clean(request.cookies.get(ARCHITECT_VIEW_DOMAIN_COOKIE))
-    if not selected:
-        return None
-    return _build_scope_key(selected)
-
-
-def is_architect_view_mode(request: Request) -> bool:
-    return bool(get_architect_view_domain(request))
-
-
 def get_user_domain(request: Request) -> Optional[str]:
     """Resolve the active tenant domain scope for authenticated requests."""
     user = get_authenticated_user(request)
     if not user:
         return None
-
-    if bool(user.get("is_architect")):
-        scoped = get_architect_view_domain(request)
-        if scoped:
-            return scoped
-
     candidate_domain = _clean(str(user.get("domain") or "").lower())
     if not candidate_domain:
         return None
