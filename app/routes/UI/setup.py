@@ -1,41 +1,18 @@
-"""Setup screen for shop profile and user management."""
+"""Setup screen for user management."""
 
 
 def get_setup_screen_html():
     return """
     <div id="setup" class="screen" style="padding:20px;">
         <style>
-            #setup #setupLayout {
-                width: min(96vw, 1520px);
-                margin: 0 auto;
-                display: flex;
-                align-items: flex-start;
-                gap: 20px;
-            }
-            #setup #setupShopsPane,
             #setup #setupMainPane {
+                width: min(96vw, 1200px);
+                margin: 0 auto;
                 background: #fbfaf9;
                 border: 1px solid #ddd6d2;
                 border-radius: 14px;
                 box-shadow: 0 10px 26px rgba(20, 20, 20, 0.08);
-            }
-            #setup #setupShopsPane {
-                display: none;
-                width: 330px;
-                padding: 16px;
-            }
-            #setup #setupMainPane {
-                flex: 1;
-                min-width: 0;
                 padding: 26px;
-            }
-            #setup #setupShopsCards {
-                display: flex;
-                flex-direction: column;
-                gap: 10px;
-                max-height: 74vh;
-                overflow-y: auto;
-                padding-right: 4px;
             }
             #setup .setup-users-title-tab {
                 display: inline-flex;
@@ -96,62 +73,34 @@ def get_setup_screen_html():
                 font-weight: 600;
                 box-shadow: 0 2px 8px rgba(0,0,0,0.08);
             }
-            @media (max-width: 980px) {
-                #setup #setupLayout {
-                    flex-direction: column;
-                }
-                #setup #setupShopsPane {
-                    width: 100%;
-                }
-            }
         </style>
 
-        <div id="setupLayout">
-            <div id="setupShopsPane">
-                <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; margin:0 0 10px 0;">
-                    <h4 style="margin:0; color:#333;">Shops</h4>
-                </div>
-                <div id="setupShopsCards">
-                    <div style="color:#999; padding:8px;">Loading shops...</div>
-                </div>
+        <div id="setupMainPane">
+            <h3 style="margin:0 0 18px 0; color:#333;">Setup</h3>
+
+            <div style="display:flex; align-items:center; justify-content:flex-end; margin-bottom:8px; gap:8px;">
+                <button type="button" onclick="openSetupUserModal()" class="setup-action-btn" style="background:#b22222; color:#fff;">+ USER</button>
+                <button type="button" onclick="setupResetSelectedUsers()" class="setup-action-btn" style="background:#b22222; color:#fff;">RESET</button>
+                <button id="setupEditBtn" type="button" onclick="setupToggleEditUsers()" class="setup-action-btn" style="background:#b22222; color:#fff;">EDIT</button>
             </div>
 
-            <div id="setupMainPane">
-                <h3 style="margin:0 0 18px 0; color:#333;">Setup</h3>
+            <h4 class="setup-users-title-tab" style="margin:0; color:#333;">Users</h4>
 
-                <div id="setupShopDisplay" style="text-align:center; margin-bottom:18px; color:#333;">
-                    <div style="color:#999;">Loading shop information...</div>
-                </div>
-
-                <hr style="margin:24px 0; border:none; border-top:2px solid #d2d2d2;" />
-
-                <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px; gap:10px;">
-                    <button id="setupManageBtn" type="button" onclick="openSetupManageWindow()" class="setup-action-btn" style="display:none; background:#b22222; color:#fff;">Manage</button>
-                    <div style="display:flex; align-items:center; gap:8px;">
-                        <button type="button" onclick="openSetupUserModal()" class="setup-action-btn" style="background:#b22222; color:#fff;">+ USER</button>
-                        <button type="button" onclick="setupResetSelectedUsers()" class="setup-action-btn" style="background:#b22222; color:#fff;">RESET</button>
-                        <button id="setupEditBtn" type="button" onclick="setupToggleEditUsers()" class="setup-action-btn" style="background:#b22222; color:#fff;">EDIT</button>
-                    </div>
-                </div>
-
-                <h4 class="setup-users-title-tab" style="margin:0; color:#333;">Users</h4>
-
-                <div class="setup-users-table-wrap" style="overflow-x:auto;">
-                    <table id="setupUsersTable">
-                        <thead>
-                            <tr>
-                                <th style="width:50px; text-align:center;">SEL</th>
-                                <th>FIRST</th>
-                                <th>LAST</th>
-                                <th>EMAIL</th>
-                                <th>ROLE</th>
-                            </tr>
-                        </thead>
-                        <tbody id="setupUsersBody">
-                            <tr><td colspan="5" style="padding:18px; text-align:center; color:#999;">Loading...</td></tr>
-                        </tbody>
-                    </table>
-                </div>
+            <div class="setup-users-table-wrap" style="overflow-x:auto;">
+                <table id="setupUsersTable">
+                    <thead>
+                        <tr>
+                            <th style="width:50px; text-align:center;">SEL</th>
+                            <th>FIRST</th>
+                            <th>LAST</th>
+                            <th>EMAIL</th>
+                            <th>ROLE</th>
+                        </tr>
+                    </thead>
+                    <tbody id="setupUsersBody">
+                        <tr><td colspan="5" style="padding:18px; text-align:center; color:#999;">Loading...</td></tr>
+                    </tbody>
+                </table>
             </div>
         </div>
 
@@ -205,14 +154,8 @@ def get_setup_screen_html():
 
 def get_setup_script():
     return """
-        let setupShopData = null;
         let setupUsersData = [];
-        let setupShopsData = [];
-        let setupIsArchitect = false;
-        let setupSelectedShopDomain = '';
-        let setupDefaultDomain = '';
         let setupEditMode = false;
-        let setupUsersRequestSeq = 0;
 
         function setupEscape(value) {
             return String(value || '')
@@ -223,185 +166,28 @@ def get_setup_script():
                 .replace(/'/g, '&#39;');
         }
 
-        async function setupLoadContext() {
-            const pane = document.getElementById('setupShopsPane');
-            const manageBtn = document.getElementById('setupManageBtn');
-            try {
-                const resp = await fetch('/api/setup/context', { credentials: 'include' });
-                const data = await resp.json();
-                setupIsArchitect = !!data.is_architect;
-                setupDefaultDomain = String(data.default_domain || '').trim().toLowerCase();
-                if (!setupSelectedShopDomain) {
-                    setupSelectedShopDomain = setupDefaultDomain;
-                }
-                if (pane) pane.style.display = setupIsArchitect ? 'block' : 'none';
-                if (manageBtn) manageBtn.style.display = setupIsArchitect ? 'inline-block' : 'none';
-            } catch (error) {
-                console.error('Error loading setup context:', error);
-                setupIsArchitect = false;
-                if (pane) pane.style.display = 'none';
-                if (manageBtn) manageBtn.style.display = 'none';
-            }
-        }
-
-        function openSetupManageWindow() {
-            if (!setupIsArchitect) return;
-            window.open('/ui/manage', '_blank', 'noopener,noreferrer,width=1320,height=880');
-        }
-
-        function setupBuildScopeQuery() {
-            if (!setupIsArchitect || !setupSelectedShopDomain) return '';
-            const scope = encodeURIComponent(setupSelectedShopDomain);
-            return `?shop_domain=${scope}`;
-        }
-
-        function setupBuildScopePayload() {
-            if (!setupIsArchitect || !setupSelectedShopDomain) return {};
-            return { shop_domain: setupSelectedShopDomain };
-        }
-
         async function setupLoadData() {
-            await setupLoadContext();
-            if (setupIsArchitect) {
-                await setupLoadShops();
-            }
-            await Promise.all([setupLoadShop(), setupLoadUsers()]);
-        }
-
-        function setupRenderShops() {
-            const cardsWrap = document.getElementById('setupShopsCards');
-            if (!cardsWrap || !setupIsArchitect) return;
-
-            if (!setupShopsData.length) {
-                cardsWrap.innerHTML = '<div style="color:#999; padding:8px;">No shops found.</div>';
-                return;
-            }
-
-            cardsWrap.innerHTML = setupShopsData.map((shop) => {
-                const domain = String(shop.domain || '').trim().toLowerCase();
-                const isActive = domain && domain === setupSelectedShopDomain;
-                const border = isActive ? '2px solid #b22222' : '1px solid #ddd';
-                const bg = isActive ? '#ece9e7' : '#f2f0ef';
-                const shopName = setupEscape(shop.shop_name || domain || 'Shop');
-                const address = setupEscape(shop.address || '');
-                const city = setupEscape(shop.city || '');
-                const state = setupEscape(shop.state || '');
-                const zip = setupEscape(shop.zip_code || '');
-                const phone = setupEscape(shop.phone || '');
-                const email = setupEscape(shop.email || '');
-                const cityStateZip = [city, state, zip].filter(Boolean).join(', ').replace(/,\s([^,]+)$/, ' $1');
-                return `
-                    <div onclick="setupSelectShopCard('${setupEscape(domain)}')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();setupSelectShopCard('${setupEscape(domain)}');}" tabindex="0" role="button" style="width:100%; text-align:left; background:${bg}; border:${border}; border-radius:6px; padding:10px; cursor:pointer; color:#000;">
-                        <div style="font-weight:700; margin-bottom:4px; color:#000;">${shopName}</div>
-                        ${address ? `<div style="font-size:12px; color:#000;">${address}</div>` : ''}
-                        ${cityStateZip ? `<div style="font-size:12px; color:#000;">${cityStateZip}</div>` : ''}
-                        ${phone ? `<div style="font-size:12px; color:#000;">${phone}</div>` : ''}
-                        ${email ? `<div style="font-size:12px; color:#000;">${email}</div>` : ''}
-                    </div>
-                `;
-            }).join('');
-        }
-
-        async function setupLoadShops() {
-            const cardsWrap = document.getElementById('setupShopsCards');
-            if (!setupIsArchitect) return;
-            if (cardsWrap) cardsWrap.innerHTML = '<div style="color:#999; padding:8px;">Loading shops...</div>';
-            try {
-                const resp = await fetch('/api/setup/shops', { credentials: 'include' });
-                const data = await resp.json();
-                const shops = Array.isArray(data.shops) ? data.shops : [];
-                setupShopsData = shops;
-                if (!setupSelectedShopDomain || !shops.some((s) => String(s.domain || '').trim().toLowerCase() === setupSelectedShopDomain)) {
-                    setupSelectedShopDomain = String((shops[0] || {}).domain || setupDefaultDomain || '').trim().toLowerCase();
-                }
-                setupRenderShops();
-            } catch (error) {
-                console.error('Error loading shops:', error);
-                if (cardsWrap) cardsWrap.innerHTML = '<div style="color:#c00; padding:8px;">Error loading shops.</div>';
-            }
-        }
-
-        async function setupSelectShopCard(domain) {
-            const nextDomain = String(domain || '').trim().toLowerCase();
-            if (!nextDomain || nextDomain === setupSelectedShopDomain) return;
-            setupSelectedShopDomain = nextDomain;
-            setupRenderShops();
-            await Promise.all([setupLoadShop(), setupLoadUsers()]);
-        }
-
-        function setupRenderShopDisplay() {
-            const wrap = document.getElementById('setupShopDisplay');
-            if (!wrap) return;
-            const shop = setupShopData || {};
-            const name = setupEscape(shop.shop_name || '');
-            const address = setupEscape(shop.address || '');
-            const city = setupEscape(shop.city || '');
-            const state = setupEscape(shop.state || '');
-            const zipCode = setupEscape(shop.zip_code || '');
-            const phone = setupEscape(shop.phone || '');
-            const email = setupEscape(shop.email || '');
-
-            if (!name && !address && !city && !state && !zipCode && !phone && !email) {
-                wrap.innerHTML = '<div style="color:#999;">No shop information saved yet.</div>';
-                return;
-            }
-
-            const cityStateZip = [city, state, zipCode].filter(Boolean).join(', ').replace(/,\s([^,]+)$/, ' $1');
-            wrap.innerHTML = `
-                <div style="font-weight:700; font-size:20px; color:#222; margin-bottom:4px;">${name || 'Shop'}</div>
-                ${address ? `<div style="color:#444; margin-bottom:2px;">${address}</div>` : ''}
-                ${cityStateZip ? `<div style="color:#444; margin-bottom:2px;">${cityStateZip}</div>` : ''}
-                <div style="color:#444;">${phone ? `<span>${phone}</span>` : ''}${phone && email ? ' | ' : ''}${email ? `<span>${email}</span>` : ''}</div>
-            `;
-        }
-
-        async function setupLoadShop() {
-            try {
-                const resp = await fetch(`/api/setup/shop${setupBuildScopeQuery()}`, { credentials: 'include' });
-                const data = await resp.json();
-                const shop = data.shop || {};
-                setupShopData = shop;
-                setupRenderShopDisplay();
-            } catch (error) {
-                console.error('Error loading shop setup:', error);
-            }
+            await setupLoadUsers();
         }
 
         async function setupLoadUsers() {
             const body = document.getElementById('setupUsersBody');
             if (!body) return;
-            const requestSeq = ++setupUsersRequestSeq;
-            const requestedShopDomain = String(setupSelectedShopDomain || '').trim().toLowerCase();
-            if (setupIsArchitect && !setupSelectedShopDomain) {
-                body.innerHTML = '<tr><td colspan="5" style="padding:18px; text-align:center; color:#999;">Select a shop card to load users.</td></tr>';
-                return;
-            }
             body.innerHTML = '<tr><td colspan="5" style="padding:18px; text-align:center; color:#999;">Loading...</td></tr>';
             try {
-                const resp = await fetch(`/api/setup/users${setupBuildScopeQuery()}`, { credentials: 'include' });
+                const resp = await fetch('/api/setup/users', { credentials: 'include' });
                 const data = await resp.json();
-                if (requestSeq !== setupUsersRequestSeq) return;
-                if (setupIsArchitect && requestedShopDomain !== String(setupSelectedShopDomain || '').trim().toLowerCase()) return;
                 if (!resp.ok || data.error) {
                     throw new Error(data.error || `Failed to load users (${resp.status})`);
                 }
-                const users = Array.isArray(data.users) ? data.users : [];
-                if (setupIsArchitect) {
-                    const architectRows = users.filter((user) => !!user.role_locked);
-                    const normalRows = users.filter((user) => !user.role_locked);
-                    setupUsersData = [...architectRows, ...normalRows];
-                } else {
-                    setupUsersData = users;
-                }
-                if (!users.length) {
+                setupUsersData = Array.isArray(data.users) ? data.users : [];
+                if (!setupUsersData.length) {
                     body.innerHTML = '<tr><td colspan="5" style="padding:18px; text-align:center; color:#999;">No users found.</td></tr>';
                     return;
                 }
 
                 setupRenderUsers();
             } catch (error) {
-                if (requestSeq !== setupUsersRequestSeq) return;
-                if (setupIsArchitect && requestedShopDomain !== String(setupSelectedShopDomain || '').trim().toLowerCase()) return;
                 console.error('Error loading setup users:', error);
                 body.innerHTML = '<tr><td colspan="5" style="padding:18px; text-align:center; color:#c00;">Error loading users.</td></tr>';
             }
@@ -416,49 +202,49 @@ def get_setup_script():
                 return;
             }
 
-            body.innerHTML = users.map((user, idx) => {
-                    const userId = Number(user.id || 0);
-                    const roleLocked = !!user.role_locked;
-                    const rowWeight = roleLocked && setupIsArchitect ? '800' : '400';
-                    const roleText = setupEscape(user.role || '');
-                    const roleOptions = ['Manager', 'Estimator', 'Tech', 'Receptionist', 'HR', 'Support']
-                        .map((role) => `<option value="${role}" ${String(user.role || '') === role ? 'selected' : ''}>${role}</option>`)
-                        .join('');
-                    const firstText = setupEscape(user.first_name || '');
-                    const lastText = setupEscape(user.last_name || '');
-                    const emailText = setupEscape(user.email || '');
-                    const firstCell = (setupEditMode && !roleLocked)
-                        ? `<input class="setup-user-first" data-user-id="${userId}" value="${firstText}" style="width:100%; padding:8px; font-size:14px; border:1px solid #ddd; border-radius:4px;" />`
-                        : `<span style="font-size:14px; color:#111; font-weight:${rowWeight};">${firstText}</span>`;
-                    const lastCell = (setupEditMode && !roleLocked)
-                        ? `<input class="setup-user-last" data-user-id="${userId}" value="${lastText}" style="width:100%; padding:8px; font-size:14px; border:1px solid #ddd; border-radius:4px;" />`
-                        : `<span style="font-size:14px; color:#111; font-weight:${rowWeight};">${lastText}</span>`;
-                    const emailCell = (setupEditMode && !roleLocked)
-                        ? `<input class="setup-user-email" data-user-id="${userId}" value="${emailText}" style="width:100%; padding:8px; font-size:14px; border:1px solid #ddd; border-radius:4px;" />`
-                        : `<span style="font-size:14px; color:#111; font-weight:${rowWeight};">${emailText}</span>`;
-                    const roleCell = (setupEditMode && !roleLocked)
-                        ? `<select class="setup-user-role" data-user-id="${userId}" style="width:100%; padding:8px; font-size:14px; border:1px solid #ddd; border-radius:4px;">${roleOptions}</select>`
-                        : `<span style="font-size:14px; color:#111; font-weight:${rowWeight};">${roleText}</span>`;
-                    return `
-                        <tr class="setup-users-main-row">
-                            <td style="padding:12px; border-bottom:1px solid rgba(0,0,0,0.06); background:#fff; text-align:center; min-height:48px; height:48px; vertical-align:middle;">
-                                <input type="checkbox" class="setup-user-select" data-user-id="${userId}" />
-                            </td>
-                            <td style="padding:12px; border-bottom:1px solid rgba(0,0,0,0.06); background:#fff; min-height:48px; height:48px; vertical-align:middle;">
-                                ${firstCell}
-                            </td>
-                            <td style="padding:12px; border-bottom:1px solid rgba(0,0,0,0.06); background:#fff; min-height:48px; height:48px; vertical-align:middle;">
-                                ${lastCell}
-                            </td>
-                            <td style="padding:12px; border-bottom:1px solid rgba(0,0,0,0.06); background:#fff; min-height:48px; height:48px; vertical-align:middle;">
-                                ${emailCell}
-                            </td>
-                            <td style="padding:12px; border-bottom:1px solid rgba(0,0,0,0.06); background:#fff; min-height:48px; height:48px; vertical-align:middle;">
-                                ${roleCell}
-                            </td>
-                        </tr>
-                    `;
-                }).join('');
+            body.innerHTML = users.map((user) => {
+                const userId = Number(user.id || 0);
+                const roleLocked = !!user.role_locked;
+                const rowWeight = roleLocked ? '800' : '400';
+                const roleText = setupEscape(user.role || '');
+                const roleOptions = ['Manager', 'Estimator', 'Tech', 'Receptionist', 'HR', 'Support']
+                    .map((role) => `<option value="${role}" ${String(user.role || '') === role ? 'selected' : ''}>${role}</option>`)
+                    .join('');
+                const firstText = setupEscape(user.first_name || '');
+                const lastText = setupEscape(user.last_name || '');
+                const emailText = setupEscape(user.email || '');
+                const firstCell = (setupEditMode && !roleLocked)
+                    ? `<input class="setup-user-first" data-user-id="${userId}" value="${firstText}" style="width:100%; padding:8px; font-size:14px; border:1px solid #ddd; border-radius:4px;" />`
+                    : `<span style="font-size:14px; color:#111; font-weight:${rowWeight};">${firstText}</span>`;
+                const lastCell = (setupEditMode && !roleLocked)
+                    ? `<input class="setup-user-last" data-user-id="${userId}" value="${lastText}" style="width:100%; padding:8px; font-size:14px; border:1px solid #ddd; border-radius:4px;" />`
+                    : `<span style="font-size:14px; color:#111; font-weight:${rowWeight};">${lastText}</span>`;
+                const emailCell = (setupEditMode && !roleLocked)
+                    ? `<input class="setup-user-email" data-user-id="${userId}" value="${emailText}" style="width:100%; padding:8px; font-size:14px; border:1px solid #ddd; border-radius:4px;" />`
+                    : `<span style="font-size:14px; color:#111; font-weight:${rowWeight};">${emailText}</span>`;
+                const roleCell = (setupEditMode && !roleLocked)
+                    ? `<select class="setup-user-role" data-user-id="${userId}" style="width:100%; padding:8px; font-size:14px; border:1px solid #ddd; border-radius:4px;">${roleOptions}</select>`
+                    : `<span style="font-size:14px; color:#111; font-weight:${rowWeight};">${roleText}</span>`;
+                return `
+                    <tr class="setup-users-main-row">
+                        <td style="padding:12px; border-bottom:1px solid rgba(0,0,0,0.06); background:#fff; text-align:center; min-height:48px; height:48px; vertical-align:middle;">
+                            <input type="checkbox" class="setup-user-select" data-user-id="${userId}" />
+                        </td>
+                        <td style="padding:12px; border-bottom:1px solid rgba(0,0,0,0.06); background:#fff; min-height:48px; height:48px; vertical-align:middle;">
+                            ${firstCell}
+                        </td>
+                        <td style="padding:12px; border-bottom:1px solid rgba(0,0,0,0.06); background:#fff; min-height:48px; height:48px; vertical-align:middle;">
+                            ${lastCell}
+                        </td>
+                        <td style="padding:12px; border-bottom:1px solid rgba(0,0,0,0.06); background:#fff; min-height:48px; height:48px; vertical-align:middle;">
+                            ${emailCell}
+                        </td>
+                        <td style="padding:12px; border-bottom:1px solid rgba(0,0,0,0.06); background:#fff; min-height:48px; height:48px; vertical-align:middle;">
+                            ${roleCell}
+                        </td>
+                    </tr>
+                `;
+            }).join('');
 
             const editBtn = document.getElementById('setupEditBtn');
             if (editBtn) {
@@ -508,15 +294,11 @@ def get_setup_script():
 
             try {
                 for (const payload of changes) {
-                    const scopedPayload = {
-                        ...payload,
-                        ...setupBuildScopePayload(),
-                    };
                     const resp = await fetch('/api/setup/users/update', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         credentials: 'include',
-                        body: JSON.stringify(scopedPayload),
+                        body: JSON.stringify(payload),
                     });
                     const data = await resp.json();
                     if (data.error) throw new Error(data.error);
@@ -547,7 +329,7 @@ def get_setup_script():
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     credentials: 'include',
-                    body: JSON.stringify({ user_ids: selected, new_password: newPassword, ...setupBuildScopePayload() }),
+                    body: JSON.stringify({ user_ids: selected, new_password: newPassword }),
                 });
                 const data = await resp.json();
                 if (data.error) throw new Error(data.error);
@@ -559,10 +341,6 @@ def get_setup_script():
         }
 
         function openSetupUserModal() {
-            if (setupIsArchitect && !setupSelectedShopDomain) {
-                alert('Select a shop card first.');
-                return;
-            }
             const modal = document.getElementById('setupUserModal');
             if (!modal) return;
             modal.style.display = 'block';
@@ -588,7 +366,6 @@ def get_setup_script():
                     email: (document.getElementById('setupUserEmail')?.value || '').trim(),
                     role: (document.getElementById('setupUserRole')?.value || '').trim(),
                     password: (document.getElementById('setupUserPassword')?.value || ''),
-                    ...setupBuildScopePayload(),
                 };
 
                 if (!payload.first_name || !payload.last_name || !payload.email || !payload.role || !payload.password) {

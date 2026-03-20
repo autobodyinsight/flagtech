@@ -933,7 +933,8 @@ async def home_screen(request: Request):
             <button type="button" class="side-menu-item" data-screen="tech" aria-label="Techs"><span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="8" r="3" stroke="currentColor" stroke-width="1.8"/><path d="M5 20c0-3.3 3.1-6 7-6s7 2.7 7 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></span><span class="nav-label">Techs</span></button>
             <button type="button" class="side-menu-item" data-screen="flagtech" aria-label="Flagout"><span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M6 3v18" stroke="currentColor" stroke-width="1.8"/><path d="M6 4h11l-2.2 3L17 10H6" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg></span><span class="nav-label">Flagout</span></button>
             <button type="button" class="side-menu-item" data-screen="reports" aria-label="Reports"><span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M5 5h14v14H5z" stroke="currentColor" stroke-width="1.8"/><path d="M8 9h8M8 13h8M8 17h5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></span><span class="nav-label">Reports</span></button>
-            <button type="button" class="side-menu-item" data-screen="setup" aria-label="Setup"><span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M5 19l6-6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M10.2 7.8a2.8 2.8 0 0 1-3.9 3.9L3.8 14.2a1.4 1.4 0 0 0 2 2l2.5-2.5a2.8 2.8 0 0 1 3.9-3.9" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M19 5l-6 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M13.8 16.2a2.8 2.8 0 0 1 3.9-3.9l2.5-2.5a1.4 1.4 0 1 0-2-2l-2.5 2.5a2.8 2.8 0 0 1-3.9 3.9" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span class="nav-label">Setup</span></button>
+            <button id="sideSetupBtn" type="button" class="side-menu-item" data-screen="setup" aria-label="Setup" style="display:none;"><span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M5 19l6-6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M10.2 7.8a2.8 2.8 0 0 1-3.9 3.9L3.8 14.2a1.4 1.4 0 0 0 2 2l2.5-2.5a2.8 2.8 0 0 1 3.9-3.9" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M19 5l-6 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M13.8 16.2a2.8 2.8 0 0 1 3.9-3.9l2.5-2.5a1.4 1.4 0 1 0-2-2l-2.5 2.5a2.8 2.8 0 0 1-3.9 3.9" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span class="nav-label">Setup</span></button>
+            <button id="sideManageBtn" type="button" class="side-menu-item" data-action="manage" aria-label="Manage" style="display:none;"><span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M4 6h16" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M4 12h16" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M4 18h16" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></span><span class="nav-label">Manage</span></button>
             <button type="button" class="side-menu-item" data-action="chat" aria-label="Chat"><span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M4 5h16v10H8l-4 4V5z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg></span><span class="nav-label">Chat</span></button>
         </div>
         <div class="side-user-wrap">
@@ -1475,6 +1476,10 @@ async def home_screen(request: Request):
             if (modal) modal.style.display = 'none';
         }}
 
+        function openSidebarManageWindow() {{
+            window.open('/ui/manage', '_blank', 'noopener,noreferrer,width=1320,height=880');
+        }}
+
         async function sendHeaderMessage(kind) {{
             const select = document.getElementById('chatUserSelect');
             const textArea = document.getElementById('chatMessageText');
@@ -1586,11 +1591,18 @@ async def home_screen(request: Request):
                 const initials = `${{(firstName[0] || '').toUpperCase()}}${{(lastName[0] || '').toUpperCase()}}` || 'U';
                 const role = String(appUiState.currentUser?.role || appUiState.sessionUser?.access_level || '-');
                 const email = String(appUiState.currentUser?.email || appUiState.sessionUser?.email || '-');
+                const isArchitect = String(appUiState.sessionUser?.access_level || '').toUpperCase() === 'ARCHITECT';
+                const normalizedRole = String(appUiState.currentUser?.role || '').trim().toLowerCase();
+                const isManagerHr = normalizedRole === 'manager' || normalizedRole === 'hr';
 
                 const initialsEl = document.getElementById('sideUserInitials');
                 if (initialsEl) initialsEl.textContent = initials;
                 const userLabelEl = document.getElementById('sideUserLabel');
                 if (userLabelEl && (firstName || lastName)) userLabelEl.textContent = (firstName + ' ' + lastName).trim();
+                const sideManageBtn = document.getElementById('sideManageBtn');
+                if (sideManageBtn) sideManageBtn.style.display = isArchitect ? 'flex' : 'none';
+                const sideSetupBtn = document.getElementById('sideSetupBtn');
+                if (sideSetupBtn) sideSetupBtn.style.display = isManagerHr ? 'flex' : 'none';
 
                 const shopText = document.getElementById('profileShopText');
                 const roleText = document.getElementById('profileRoleText');
@@ -1653,6 +1665,14 @@ async def home_screen(request: Request):
                     if (sidebar) sidebar.classList.remove('expanded');
                     sidebarSuppressed = true;
                     await openChatModal();
+                }});
+            }});
+
+            document.querySelectorAll('.side-menu-item[data-action="manage"]').forEach((item) => {{
+                item.addEventListener('click', () => {{
+                    if (sidebar) sidebar.classList.remove('expanded');
+                    sidebarSuppressed = true;
+                    openSidebarManageWindow();
                 }});
             }});
 
