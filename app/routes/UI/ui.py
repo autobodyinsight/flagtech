@@ -1876,7 +1876,8 @@ async def manage_screen(request: Request):
             <div class="actions">
                 <button class="btn" onclick="onEdit()">Edit</button>
                 <button class="btn" onclick="onDelete()">Delete</button>
-                <button class="btn" onclick="onAdd()">Add</button>
+                <button id="manageAddBtn" class="btn" onclick="onAdd()">Add</button>
+                <button id="manageAddShopBtn" class="btn" onclick="onAddShopToggle()">+ Shop</button>
             </div>
         </div>
         <div id="manageLoading" class="manage-loading-wrap visible" aria-live="polite" aria-busy="true">
@@ -1910,6 +1911,7 @@ async def manage_screen(request: Request):
             selectedUserIds: new Set(),
             editMode: false,
             addingRowByDomain: {},
+            addingShop: false,
         };
         const manageShopsTtlMs = 15000;
         const manageUsersTtlMs = 15000;
@@ -2040,12 +2042,13 @@ async def manage_screen(request: Request):
         function render() {
             const wrap = document.getElementById('shopsList');
             if (!wrap) return;
+            updateActionButtons();
             if (!state.shops.length) {
-                wrap.innerHTML = '<div style="padding:12px; color:#777;">No shops found.</div>';
+                wrap.innerHTML = `${renderAddShopPanel()}<div style="padding:12px; color:#777;">No shops found.</div>`;
                 return;
             }
 
-            wrap.innerHTML = state.shops.map((shop) => {
+            wrap.innerHTML = `${renderAddShopPanel()}${state.shops.map((shop) => {
                 const domain = String(shop.domain || '').trim().toLowerCase();
                 const open = state.expandedDomain === domain;
                 const users = state.usersByDomain[domain] || [];
@@ -2078,7 +2081,36 @@ async def manage_screen(request: Request):
                         ` : ''}
                     </div>
                 `;
-            }).join('');
+            }).join('')}`;
+        }
+
+        function updateActionButtons() {
+            const addBtn = document.getElementById('manageAddBtn');
+            if (addBtn) {
+                const active = !!(state.expandedDomain && state.addingRowByDomain[state.expandedDomain]);
+                addBtn.textContent = active ? 'Add (On)' : 'Add';
+            }
+            const addShopBtn = document.getElementById('manageAddShopBtn');
+            if (addShopBtn) {
+                addShopBtn.textContent = state.addingShop ? '+ Shop (On)' : '+ Shop';
+            }
+        }
+
+        function renderAddShopPanel() {
+            if (!state.addingShop) return '';
+            return `
+                <div style="margin-bottom:12px; background:#f8f8f8; border:1px solid #ddd; border-radius:8px; padding:10px;">
+                    <div style="display:grid; grid-template-columns:2fr 2fr 1fr 1fr 1fr 1.5fr 2fr; gap:8px;">
+                        <input data-shop-field="shop_name" placeholder="Shop name" style="padding:8px;" />
+                        <input data-shop-field="address" placeholder="Address" style="padding:8px;" />
+                        <input data-shop-field="city" placeholder="City" style="padding:8px;" />
+                        <input data-shop-field="state" placeholder="State" style="padding:8px;" />
+                        <input data-shop-field="zip_code" placeholder="Zip" style="padding:8px;" />
+                        <input data-shop-field="phone" placeholder="Phone" style="padding:8px;" />
+                        <input data-shop-field="email" placeholder="Email" style="padding:8px;" />
+                    </div>
+                </div>
+            `;
         }
 
         function roleOptions(selected) {
@@ -2124,7 +2156,7 @@ async def manage_screen(request: Request):
                     <td>${emailCell}</td>
                     <td>${roleCell}</td>
                     <td>${shopCell}</td>
-                    <td>${editable ? `<button class="btn" style="padding:6px 10px;" onclick="saveUserRow('${esc(domain)}', ${userId}, ${isNew ? 'true' : 'false'})">Save</button>` : ''}</td>
+                    <td>${editable && !isNew ? `<button class="btn" style="padding:6px 10px;" onclick="saveUserRow('${esc(domain)}', ${userId}, false)">Save</button>` : ''}</td>
                 </tr>
             `;
         }
@@ -2253,16 +2285,129 @@ async def manage_screen(request: Request):
                 alert('Select a shop first.');
                 return;
             }
-            state.addingRowByDomain[state.expandedDomain] = {
-                id: -1,
-                first_name: '',
-                last_name: '',
-                email: '',
-                role: 'Estimator',
-                shop_name: state.expandedDomain,
-                shop_domain: state.expandedDomain,
+            const domain = state.expandedDomain;
+            const hasDraft = !!state.addingRowByDomain[domain];
+            if (!hasDraft) {
+                state.addingRowByDomain[domain] = {
+                    id: -1,
+                    first_name: '',
+                    last_name: '',
+                    email: '',
+                    role: 'Estimator',
+                    shop_name: domain,
+                    shop_domain: domain,
+                };
+                render();
+                return;
+            }
+            void commitDraftUser(domain);
+        }
+
+        function readShopDraft() {
+            const read = (field) => String(document.querySelector(`[data-shop-field="${field}"]`)?.value || '').trim();
+            return {
+                shop_name: read('shop_name'),
+                address: read('address'),
+                city: read('city'),
+                state: read('state'),
+                zip_code: read('zip_code'),
+                phone: read('phone'),
+                email: read('email'),
             };
-            render();
+        }
+
+        function deriveShopDomain(shopName) {
+            const base = String(shopName || '').trim().toLowerCase().replace(/[^a-z0-9]+/g, '');
+            if (!base) return '';
+            const existing = new Set((state.shops || []).map((s) => String(s.domain || '').trim().toLowerCase()));
+            let candidate = `${base}.com`;
+            let counter = 2;
+            while (existing.has(candidate)) {
+                candidate = `${base}${counter}.com`;
+                counter += 1;
+            }
+            return candidate;
+        }
+
+        async function onAddShopToggle() {
+            if (!state.addingShop) {
+                state.addingShop = true;
+                render();
+                return;
+            }
+
+            const draft = readShopDraft();
+            const hasChanges = Object.values(draft).some((value) => String(value || '').trim().length > 0);
+            if (!hasChanges) {
+                state.addingShop = false;
+                render();
+                return;
+            }
+
+            if (!draft.shop_name || !draft.address || !draft.city || !draft.state || !draft.zip_code) {
+                alert('Shop name, address, city, state, and zip are required.');
+                return;
+            }
+
+            const shopDomain = deriveShopDomain(draft.shop_name);
+            if (!shopDomain) {
+                alert('Unable to generate shop domain from shop name.');
+                return;
+            }
+
+            try {
+                await api('/api/setup/shop', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        shop_domain: shopDomain,
+                        shop_name: draft.shop_name,
+                        address: draft.address,
+                        city: draft.city,
+                        state: draft.state,
+                        zip_code: draft.zip_code,
+                        phone: draft.phone,
+                        email: draft.email,
+                    }),
+                });
+                state.addingShop = false;
+                await loadShops({ force: true });
+                state.expandedDomain = shopDomain;
+                await ensureUsersLoaded(shopDomain, { force: true });
+                render();
+            } catch (error) {
+                alert(String(error.message || 'Unable to save shop'));
+            }
+        }
+
+        async function commitDraftUser(domain) {
+            const payload = readEditableRow(domain, -1);
+            const hasChanges = Object.values(payload).some((value) => String(value || '').trim().length > 0);
+            if (!hasChanges) {
+                delete state.addingRowByDomain[domain];
+                render();
+                return;
+            }
+            if (!payload.first_name || !payload.last_name || !payload.email || !payload.role || !payload.shop_domain) {
+                alert('All user fields are required before saving.');
+                return;
+            }
+            const password = window.prompt('Enter temporary password for new user:');
+            if (!password) return;
+            try {
+                await api('/api/manage/users', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ ...payload, password }),
+                });
+                delete state.addingRowByDomain[domain];
+                state.editMode = false;
+                await loadShops({ force: true });
+                await ensureUsersLoaded(domain, { force: true });
+                render();
+            } catch (error) {
+                alert(String(error.message || 'Unable to save user'));
+            }
         }
 
         async function bootstrapManageWindow(retryCount = 2) {
