@@ -43,14 +43,20 @@ def _ensure_auth_sessions_table(cur) -> None:
         CREATE TABLE IF NOT EXISTS auth_sessions (
             session_id VARCHAR(128) PRIMARY KEY,
             user_id INTEGER NOT NULL,
+            user_uuid UUID,
+            shop_uuid UUID,
             permission_snapshot JSONB,
             expires_at TIMESTAMP NOT NULL,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
         """
     )
+    cur.execute("ALTER TABLE auth_sessions ADD COLUMN IF NOT EXISTS user_uuid UUID")
+    cur.execute("ALTER TABLE auth_sessions ADD COLUMN IF NOT EXISTS shop_uuid UUID")
     cur.execute("ALTER TABLE auth_sessions ADD COLUMN IF NOT EXISTS permission_snapshot JSONB")
     cur.execute("CREATE INDEX IF NOT EXISTS idx_auth_sessions_user_id ON auth_sessions(user_id)")
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_auth_sessions_user_uuid ON auth_sessions(user_uuid)")
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_auth_sessions_shop_uuid ON auth_sessions(shop_uuid)")
     cur.execute("CREATE INDEX IF NOT EXISTS idx_auth_sessions_expires_at ON auth_sessions(expires_at)")
 
 
@@ -66,20 +72,26 @@ def _normalize_permission_snapshot(raw_snapshot) -> dict | None:
     return None
 
 
-def create_auth_session(user_id: int, permission_snapshot: dict | None = None, duration_hours: int = SESSION_DURATION_HOURS) -> str:
+def create_auth_session(
+    user_id: int,
+    permission_snapshot: dict | None = None,
+    duration_hours: int = SESSION_DURATION_HOURS,
+) -> str:
     token = secrets.token_urlsafe(48)
     expires_at = datetime.now(timezone.utc) + timedelta(hours=max(1, int(duration_hours or 1)))
     snapshot_payload = json.dumps(permission_snapshot or {})
+    user_uuid = str((permission_snapshot or {}).get("user_uuid") or "").strip() or None
+    shop_uuid = str((permission_snapshot or {}).get("shop_uuid") or "").strip() or None
     conn = get_conn()
     cur = conn.cursor()
     try:
         _ensure_auth_sessions_table(cur)
         cur.execute(
             """
-            INSERT INTO auth_sessions (session_id, user_id, permission_snapshot, expires_at)
-            VALUES (%s, %s, %s::jsonb, %s)
+            INSERT INTO auth_sessions (session_id, user_id, user_uuid, shop_uuid, permission_snapshot, expires_at)
+            VALUES (%s, %s, %s::uuid, %s::uuid, %s::jsonb, %s)
             """,
-            (token, int(user_id), snapshot_payload, expires_at),
+            (token, int(user_id), user_uuid, shop_uuid, snapshot_payload, expires_at),
         )
         conn.commit()
     finally:
@@ -115,12 +127,14 @@ def get_authenticated_user(request: Request) -> dict | None:
             """
             SELECT
                 su.id,
+                su.user_id,
                 su.first_name,
                 su.last_name,
                 su.email,
                 su.role,
                 su.domain,
                 su.shop_id,
+                su.shop_uuid,
                 COALESCE(ss.shop_name, sh.name, '') AS shop_name,
                 COALESCE(ss.address, sh.address, '') AS address,
                 s.permission_snapshot,
@@ -148,12 +162,16 @@ def get_authenticated_user(request: Request) -> dict | None:
         is_architect = str(row.get("email") or "").strip().lower() == ARCHITECT_EMAIL
         normalized_domain = _build_scope_key(str(row.get("domain") or "").strip().lower())
         normalized_shop_id = int(row.get("shop_id") or 0) or None
+        normalized_shop_uuid = str(row.get("shop_uuid") or "").strip() or None
+        normalized_user_uuid = str(row.get("user_id") or "").strip() or None
         permission_snapshot = _normalize_permission_snapshot(row.get("permission_snapshot"))
         if not permission_snapshot:
             permission_snapshot = build_permission_snapshot(
                 role=str(row.get("role") or "").strip(),
                 domain=normalized_domain,
                 shop_id=normalized_shop_id,
+                shop_uuid=normalized_shop_uuid,
+                user_uuid=normalized_user_uuid,
                 is_architect=is_architect,
             )
 
@@ -166,6 +184,8 @@ def get_authenticated_user(request: Request) -> dict | None:
             "access_level": str(permission_snapshot.get("access_level") or "").strip(),
             "domain": normalized_domain,
             "shop_id": normalized_shop_id,
+            "shop_uuid": normalized_shop_uuid,
+            "user_uuid": normalized_user_uuid,
             "shop_name": str(row.get("shop_name") or "").strip(),
             "address": str(row.get("address") or "").strip(),
             "is_architect": is_architect,
@@ -191,3 +211,11 @@ def get_user_domain(request: Request) -> Optional[str]:
     if not candidate_domain:
         return None
     return _build_scope_key(candidate_domain)
+
+
+def get_user_shop_uuid(request: Request) -> Optional[str]:
+    user = get_authenticated_user(request)
+    if not user:
+        return None
+    value = _clean(str(user.get("shop_uuid") or ""))
+    return value or None

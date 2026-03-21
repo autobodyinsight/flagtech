@@ -5,6 +5,7 @@ import json
 import math
 import re
 import hashlib
+import uuid
 from decimal import Decimal
 from datetime import date, datetime, timedelta, timezone
 from app.services.extractor import load_pdf
@@ -17,6 +18,7 @@ from app.services.middleware import (
     get_authenticated_user,
     get_authenticated_user_email,
     get_user_domain,
+    get_user_shop_uuid,
     revoke_auth_session,
 )
 from app.services.permissions import build_permission_snapshot
@@ -73,6 +75,7 @@ def _ensure_shops_table(cur) -> None:
         """
         CREATE TABLE IF NOT EXISTS shops (
             id SERIAL PRIMARY KEY,
+            shop_id UUID,
             domain VARCHAR(255) NOT NULL UNIQUE,
             name VARCHAR(255),
             address TEXT,
@@ -85,6 +88,7 @@ def _ensure_shops_table(cur) -> None:
         )
         """
     )
+    cur.execute("ALTER TABLE shops ADD COLUMN IF NOT EXISTS shop_id UUID")
     cur.execute("ALTER TABLE shops ADD COLUMN IF NOT EXISTS domain VARCHAR(255)")
     cur.execute("ALTER TABLE shops ADD COLUMN IF NOT EXISTS name VARCHAR(255)")
     cur.execute("ALTER TABLE shops ADD COLUMN IF NOT EXISTS address TEXT")
@@ -96,7 +100,14 @@ def _ensure_shops_table(cur) -> None:
     cur.execute("ALTER TABLE shops ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP")
     cur.execute("ALTER TABLE shops ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP")
     cur.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_shops_domain_unique ON shops(domain)")
+    cur.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_shops_shop_id_unique ON shops(shop_id)")
     cur.execute("CREATE INDEX IF NOT EXISTS idx_shops_active ON shops(active)")
+    cur.execute("SELECT id FROM shops WHERE shop_id IS NULL")
+    for row in (cur.fetchall() or []):
+        legacy_id = int((row or {}).get("id") or 0)
+        if legacy_id <= 0:
+            continue
+        cur.execute("UPDATE shops SET shop_id = %s::uuid WHERE id = %s", (str(uuid.uuid4()), legacy_id))
 
 
 def _sync_shop_id_bindings(cur) -> None:
@@ -156,6 +167,30 @@ def _sync_shop_id_bindings(cur) -> None:
           AND s.domain = su.domain
         """
     )
+        cur.execute(
+                """
+                UPDATE shop_settings ss
+                SET shop_uuid = s.shop_id
+                FROM shops s
+                WHERE (ss.shop_uuid IS NULL OR ss.shop_uuid IS DISTINCT FROM s.shop_id)
+                    AND (
+                                (ss.shop_id IS NOT NULL AND s.id = ss.shop_id)
+                         OR (COALESCE(ss.domain, '') <> '' AND s.domain = ss.domain)
+                    )
+                """
+        )
+        cur.execute(
+                """
+                UPDATE shop_users su
+                SET shop_uuid = s.shop_id
+                FROM shops s
+                WHERE (su.shop_uuid IS NULL OR su.shop_uuid IS DISTINCT FROM s.shop_id)
+                    AND (
+                                (su.shop_id IS NOT NULL AND s.id = su.shop_id)
+                         OR (COALESCE(su.domain, '') <> '' AND s.domain = su.domain)
+                    )
+                """
+        )
 
 
 def _ensure_shop_id_columns_for_domain_tables(cur) -> None:
@@ -181,6 +216,7 @@ def _ensure_shop_id_columns_for_domain_tables(cur) -> None:
             continue
         quoted_table = _quote_ident(table_name)
         cur.execute(f"ALTER TABLE {quoted_table} ADD COLUMN IF NOT EXISTS shop_id INTEGER")
+        cur.execute(f"ALTER TABLE {quoted_table} ADD COLUMN IF NOT EXISTS shop_uuid UUID")
         cur.execute(
             f"""
             UPDATE {quoted_table} t
@@ -191,9 +227,25 @@ def _ensure_shop_id_columns_for_domain_tables(cur) -> None:
               AND s.domain = t.domain
             """
         )
+        cur.execute(
+            f"""
+            UPDATE {quoted_table} t
+            SET shop_uuid = s.shop_id
+            FROM shops s
+            WHERE t.shop_uuid IS NULL
+              AND (
+                    (t.shop_id IS NOT NULL AND s.id = t.shop_id)
+                 OR (COALESCE(t.domain, '') <> '' AND s.domain = t.domain)
+              )
+            """
+        )
         quoted_index = _quote_ident(f"idx_{table_name}_shop_id")
         cur.execute(
             f"CREATE INDEX IF NOT EXISTS {quoted_index} ON {quoted_table}(shop_id)"
+        )
+        quoted_uuid_index = _quote_ident(f"idx_{table_name}_shop_uuid")
+        cur.execute(
+            f"CREATE INDEX IF NOT EXISTS {quoted_uuid_index} ON {quoted_table}(shop_uuid)"
         )
 
 
@@ -207,8 +259,17 @@ def _ensure_shop_id_sync_triggers(cur) -> None:
             IF NEW.shop_id IS NULL AND NEW.domain IS NOT NULL THEN
                 SELECT id INTO NEW.shop_id FROM shops WHERE domain = NEW.domain LIMIT 1;
             END IF;
+            IF NEW.shop_uuid IS NULL AND NEW.shop_id IS NOT NULL THEN
+                SELECT shop_id INTO NEW.shop_uuid FROM shops WHERE id = NEW.shop_id LIMIT 1;
+            END IF;
+            IF NEW.shop_id IS NULL AND NEW.shop_uuid IS NOT NULL THEN
+                SELECT id INTO NEW.shop_id FROM shops WHERE shop_id = NEW.shop_uuid LIMIT 1;
+            END IF;
             IF (NEW.domain IS NULL OR NEW.domain = '') AND NEW.shop_id IS NOT NULL THEN
                 SELECT domain INTO NEW.domain FROM shops WHERE id = NEW.shop_id LIMIT 1;
+            END IF;
+            IF (NEW.domain IS NULL OR NEW.domain = '') AND NEW.shop_uuid IS NOT NULL THEN
+                SELECT domain INTO NEW.domain FROM shops WHERE shop_id = NEW.shop_uuid LIMIT 1;
             END IF;
             RETURN NEW;
         END;
@@ -269,6 +330,29 @@ def _resolve_request_shop_id(request: Request, cur, domain: str | None = None) -
         return None
 
 
+def _resolve_request_shop_uuid(request: Request, cur, domain: str | None = None) -> str | None:
+    auth_shop_uuid = str(get_user_shop_uuid(request) or "").strip()
+    if auth_shop_uuid:
+        return auth_shop_uuid
+
+    auth_user = get_authenticated_user(request) or {}
+    fallback_shop_id = int(auth_user.get("shop_id") or 0) or None
+    if fallback_shop_id:
+        cur.execute("SELECT shop_id FROM shops WHERE id = %s LIMIT 1", (fallback_shop_id,))
+        row = cur.fetchone() or {}
+        value = str(row.get("shop_id") or "").strip()
+        if value:
+            return value
+
+    domain_value = str(domain or get_user_domain(request) or "").strip().lower()
+    if not domain_value:
+        return None
+    cur.execute("SELECT shop_id FROM shops WHERE domain = %s LIMIT 1", (domain_value,))
+    row = cur.fetchone() or {}
+    value = str(row.get("shop_id") or "").strip()
+    return value or None
+
+
 def _ensure_shop_isolation_infrastructure(cur) -> None:
     _sync_shop_id_bindings(cur)
     _ensure_shop_id_columns_for_domain_tables(cur)
@@ -295,17 +379,18 @@ async def auth_login(request: Request):
             """
                         SELECT
                                 su.id,
+                                su.user_id,
                                 su.first_name,
                                 su.last_name,
                                 su.email,
                                 su.role,
                                 su.domain,
                                 su.shop_id,
+                                su.shop_uuid,
                                 COALESCE(sh.active, TRUE) AS shop_active
                         FROM shop_users su
                         LEFT JOIN shops sh
                             ON sh.id = su.shop_id
-                         AND sh.domain = su.domain
                         WHERE LOWER(su.email) = %s
                             AND su.password_hash = %s
                             AND su.active = TRUE
@@ -327,10 +412,14 @@ async def auth_login(request: Request):
         last_name = str(row.get("last_name") or "").strip()
         user_role = str(row.get("role") or "").strip()
         user_shop_id = int(row.get("shop_id") or 0)
+        user_shop_uuid = str(row.get("shop_uuid") or "").strip() or None
+        user_uuid = str(row.get("user_id") or "").strip() or None
         permission_snapshot = build_permission_snapshot(
             role=user_role,
             domain=user_domain,
             shop_id=user_shop_id,
+            shop_uuid=user_shop_uuid,
+            user_uuid=user_uuid,
             is_architect=_is_architect_email(user_email),
         )
 
@@ -350,6 +439,8 @@ async def auth_login(request: Request):
                     "role": user_role,
                     "domain": user_domain,
                     "shop_id": user_shop_id,
+                    "shop_uuid": user_shop_uuid,
+                    "user_uuid": user_uuid,
                     "access_level": permission_snapshot.get("access_level"),
                     "permissions": permission_snapshot,
                 },
@@ -425,6 +516,8 @@ async def auth_session(request: Request):
             "role": str(authenticated_user.get("role") or "").strip(),
             "domain": str(authenticated_user.get("domain") or "").strip().lower(),
             "shop_id": int(authenticated_user.get("shop_id") or 0) or None,
+            "shop_uuid": str(authenticated_user.get("shop_uuid") or "").strip() or None,
+            "user_uuid": str(authenticated_user.get("user_uuid") or "").strip() or None,
             "shop_name": str(authenticated_user.get("shop_name") or "").strip(),
             "address": str(authenticated_user.get("address") or "").strip(),
             "access_level": str(authenticated_user.get("access_level") or "").strip(),
@@ -750,6 +843,7 @@ def _ensure_shop_settings_table(cur) -> None:
             id SERIAL PRIMARY KEY,
             domain VARCHAR(255) NOT NULL,
             shop_id INTEGER,
+            shop_uuid UUID,
             shop_name VARCHAR(255),
             address TEXT,
             city VARCHAR(120),
@@ -762,6 +856,7 @@ def _ensure_shop_settings_table(cur) -> None:
         """
     )
     cur.execute("ALTER TABLE shop_settings ADD COLUMN IF NOT EXISTS shop_id INTEGER")
+    cur.execute("ALTER TABLE shop_settings ADD COLUMN IF NOT EXISTS shop_uuid UUID")
     cur.execute("ALTER TABLE shop_settings ADD COLUMN IF NOT EXISTS shop_name VARCHAR(255)")
     cur.execute("ALTER TABLE shop_settings ADD COLUMN IF NOT EXISTS address TEXT")
     cur.execute("ALTER TABLE shop_settings ADD COLUMN IF NOT EXISTS city VARCHAR(120)")
@@ -772,6 +867,7 @@ def _ensure_shop_settings_table(cur) -> None:
     cur.execute("ALTER TABLE shop_settings ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP")
     cur.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_shop_settings_domain_unique ON shop_settings(domain)")
     cur.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_shop_settings_shop_id_unique ON shop_settings(shop_id)")
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_shop_settings_shop_uuid ON shop_settings(shop_uuid)")
 
 
 def _ensure_shop_users_table(cur) -> None:
@@ -780,6 +876,7 @@ def _ensure_shop_users_table(cur) -> None:
         """
         CREATE TABLE IF NOT EXISTS shop_users (
             id SERIAL PRIMARY KEY,
+            user_id UUID,
             first_name VARCHAR(100) NOT NULL,
             last_name VARCHAR(100) NOT NULL,
             email VARCHAR(255) NOT NULL,
@@ -787,11 +884,13 @@ def _ensure_shop_users_table(cur) -> None:
             password_hash VARCHAR(255) NOT NULL,
             domain VARCHAR(255) NOT NULL,
             shop_id INTEGER,
+            shop_uuid UUID,
             active BOOLEAN DEFAULT TRUE,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
         """
     )
+    cur.execute("ALTER TABLE shop_users ADD COLUMN IF NOT EXISTS user_id UUID")
     cur.execute("ALTER TABLE shop_users ADD COLUMN IF NOT EXISTS first_name VARCHAR(100)")
     cur.execute("ALTER TABLE shop_users ADD COLUMN IF NOT EXISTS last_name VARCHAR(100)")
     cur.execute("ALTER TABLE shop_users ADD COLUMN IF NOT EXISTS email VARCHAR(255)")
@@ -799,12 +898,21 @@ def _ensure_shop_users_table(cur) -> None:
     cur.execute("ALTER TABLE shop_users ADD COLUMN IF NOT EXISTS password_hash VARCHAR(255)")
     cur.execute("ALTER TABLE shop_users ADD COLUMN IF NOT EXISTS domain VARCHAR(255)")
     cur.execute("ALTER TABLE shop_users ADD COLUMN IF NOT EXISTS shop_id INTEGER")
+    cur.execute("ALTER TABLE shop_users ADD COLUMN IF NOT EXISTS shop_uuid UUID")
     cur.execute("ALTER TABLE shop_users ADD COLUMN IF NOT EXISTS active BOOLEAN DEFAULT TRUE")
     cur.execute("ALTER TABLE shop_users ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP")
     cur.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_shop_users_domain_email_unique ON shop_users(domain, email)")
     cur.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_shop_users_shop_id_email_unique ON shop_users(shop_id, email)")
+    cur.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_shop_users_user_id_unique ON shop_users(user_id)")
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_shop_users_shop_uuid_active ON shop_users(shop_uuid, active)")
     cur.execute("CREATE INDEX IF NOT EXISTS idx_shop_users_domain_active ON shop_users(domain, active)")
     cur.execute("CREATE INDEX IF NOT EXISTS idx_shop_users_shop_id_active ON shop_users(shop_id, active)")
+    cur.execute("SELECT id FROM shop_users WHERE user_id IS NULL")
+    for row in (cur.fetchall() or []):
+        legacy_id = int((row or {}).get("id") or 0)
+        if legacy_id <= 0:
+            continue
+        cur.execute("UPDATE shop_users SET user_id = %s::uuid WHERE id = %s", (str(uuid.uuid4()), legacy_id))
 
 
 def _ensure_chat_messages_table(cur) -> None:
@@ -813,6 +921,8 @@ def _ensure_chat_messages_table(cur) -> None:
         CREATE TABLE IF NOT EXISTS chat_messages (
             id SERIAL PRIMARY KEY,
             domain VARCHAR(255) NOT NULL,
+            shop_id INTEGER,
+            shop_uuid UUID,
             sender_user_id INTEGER NOT NULL,
             recipient_user_id INTEGER NOT NULL,
             kind VARCHAR(24) NOT NULL DEFAULT 'message',
@@ -824,6 +934,8 @@ def _ensure_chat_messages_table(cur) -> None:
         """
     )
     cur.execute("ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS domain VARCHAR(255)")
+    cur.execute("ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS shop_id INTEGER")
+    cur.execute("ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS shop_uuid UUID")
     cur.execute("ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS sender_user_id INTEGER")
     cur.execute("ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS recipient_user_id INTEGER")
     cur.execute("ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS kind VARCHAR(24) NOT NULL DEFAULT 'message'")
@@ -831,30 +943,61 @@ def _ensure_chat_messages_table(cur) -> None:
     cur.execute("ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS read_at TIMESTAMP NULL")
     cur.execute("ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS completed_at TIMESTAMP NULL")
     cur.execute("ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP")
+        cur.execute(
+                """
+                UPDATE chat_messages m
+                SET shop_uuid = s.shop_id
+                FROM shops s
+                WHERE m.shop_uuid IS NULL
+                    AND (
+                                (m.shop_id IS NOT NULL AND s.id = m.shop_id)
+                         OR (COALESCE(m.domain, '') <> '' AND s.domain = m.domain)
+                    )
+                """
+        )
     cur.execute("CREATE INDEX IF NOT EXISTS idx_chat_messages_domain_pair_created ON chat_messages(domain, sender_user_id, recipient_user_id, created_at)")
     cur.execute("CREATE INDEX IF NOT EXISTS idx_chat_messages_domain_recipient_unread ON chat_messages(domain, recipient_user_id, read_at)")
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_chat_messages_shop_uuid_created ON chat_messages(shop_uuid, sender_user_id, recipient_user_id, created_at)")
 
 
 def _resolve_current_user_row(request: Request, cur, domain: str) -> dict | None:
     email = _resolve_request_user_email(request)
     normalized_email = str(email or "").strip().lower()
+    if not normalized_email:
+        return None
+
+    current_shop_uuid = _resolve_request_shop_uuid(request, cur, domain)
     normalized_domain = str(domain or "").strip().lower()
-    if not normalized_email or not normalized_domain:
+    if not current_shop_uuid and not normalized_domain:
         return None
 
     _ensure_shop_users_table(cur)
-    cur.execute(
-        """
-            SELECT id, first_name, last_name, email, role, shop_id
-        FROM shop_users
-        WHERE domain = %s
-          AND LOWER(email) = %s
-          AND active = TRUE
-        ORDER BY created_at DESC, id DESC
-        LIMIT 1
-        """,
-        (normalized_domain, normalized_email),
-    )
+    if current_shop_uuid:
+        cur.execute(
+            """
+                SELECT id, user_id, first_name, last_name, email, role, shop_id, shop_uuid
+            FROM shop_users
+            WHERE shop_uuid = %s::uuid
+              AND LOWER(email) = %s
+              AND active = TRUE
+            ORDER BY created_at DESC, id DESC
+            LIMIT 1
+            """,
+            (current_shop_uuid, normalized_email),
+        )
+    else:
+        cur.execute(
+            """
+                SELECT id, user_id, first_name, last_name, email, role, shop_id, shop_uuid
+            FROM shop_users
+            WHERE domain = %s
+              AND LOWER(email) = %s
+              AND active = TRUE
+            ORDER BY created_at DESC, id DESC
+            LIMIT 1
+            """,
+            (normalized_domain, normalized_email),
+        )
     return cur.fetchone() or None
 
 
@@ -1574,15 +1717,22 @@ async def add_tech(request: Request):
 
     try:
         _ensure_techs_table(cur)
+        _ensure_shop_isolation_infrastructure(cur)
+        current_shop_id = _resolve_request_shop_id(request, cur, domain)
+        current_shop_uuid = _resolve_request_shop_uuid(request, cur, domain)
+        if not current_shop_id or not current_shop_uuid:
+            return JSONResponse(status_code=403, content={"error": "Shop scope not resolved"})
         cur.execute("""
-            INSERT INTO techs (first_name, last_name, pay_rate, domain, status, role, total_ros)
-            VALUES (%s, %s, %s, %s, 'Active', %s, 0)
+            INSERT INTO techs (first_name, last_name, pay_rate, domain, shop_id, shop_uuid, status, role, total_ros)
+            VALUES (%s, %s, %s, %s, %s, %s::uuid, 'Active', %s, 0)
             RETURNING id, first_name, last_name, pay_rate, active, status, role, total_ros
         """, (
             data["first_name"],
             data["last_name"],
             data["pay_rate"],
             domain,
+            current_shop_id,
+            current_shop_uuid,
             role_value or "",
         ))
         row = cur.fetchone()
@@ -1617,6 +1767,11 @@ async def list_techs(request: Request):
     try:
         _ensure_techs_table(cur)
         _ensure_ro_line_assignments_table(cur)
+        _ensure_shop_isolation_infrastructure(cur)
+        current_shop_id = _resolve_request_shop_id(request, cur, domain)
+        current_shop_uuid = _resolve_request_shop_uuid(request, cur, domain)
+        if not current_shop_id or not current_shop_uuid:
+            return JSONResponse(status_code=403, content={"error": "Shop scope not resolved", "techs": []})
 
         cur.execute("""
                         SELECT
@@ -1632,15 +1787,21 @@ async def list_techs(request: Request):
                         LEFT JOIN (
                                 SELECT tech_id, COUNT(DISTINCT ro) AS total_ros
                                 FROM ro_line_assignments
-                                WHERE domain = %s
+                                WHERE (
+                                        shop_uuid = %s::uuid
+                                     OR (shop_uuid IS NULL AND shop_id = %s AND domain = %s)
+                                      )
                                     AND COALESCE(ready_to_flag, FALSE) = FALSE
                                     AND tech_id IS NOT NULL
                                 GROUP BY tech_id
                         ) rc ON rc.tech_id = t.id
                         WHERE t.active = true
-                            AND t.domain = %s
+                          AND (
+                                t.shop_uuid = %s::uuid
+                             OR (t.shop_uuid IS NULL AND t.shop_id = %s AND t.domain = %s)
+                              )
             ORDER BY first_name, last_name
-                """, (domain, domain))
+                """, (current_shop_uuid, current_shop_id, domain, current_shop_uuid, current_shop_id, domain))
         
         rows = cur.fetchall()
         
@@ -1679,16 +1840,24 @@ async def update_tech_status(request: Request):
     cur = conn.cursor()
     try:
         _ensure_techs_table(cur)
+                _ensure_shop_isolation_infrastructure(cur)
+                current_shop_id = _resolve_request_shop_id(request, cur, domain)
+                current_shop_uuid = _resolve_request_shop_uuid(request, cur, domain)
+                if not current_shop_id or not current_shop_uuid:
+                        return JSONResponse(status_code=403, content={"error": "Shop scope not resolved"})
         cur.execute(
             """
             UPDATE techs
             SET status = %s
             WHERE id = %s
               AND active = TRUE
-                            AND domain = %s
+                            AND (
+                                        shop_uuid = %s::uuid
+                                 OR (shop_uuid IS NULL AND shop_id = %s AND domain = %s)
+                            )
             RETURNING id, status
             """,
-            (status_value, tech_id, domain),
+                        (status_value, tech_id, current_shop_uuid, current_shop_id, domain),
         )
         row = cur.fetchone()
         conn.commit()
@@ -1751,16 +1920,24 @@ async def update_tech_line(request: Request):
     cur = conn.cursor()
     try:
         _ensure_techs_table(cur)
+                _ensure_shop_isolation_infrastructure(cur)
+                current_shop_id = _resolve_request_shop_id(request, cur, domain)
+                current_shop_uuid = _resolve_request_shop_uuid(request, cur, domain)
+                if not current_shop_id or not current_shop_uuid:
+                        return JSONResponse(status_code=403, content={"error": "Shop scope not resolved"})
         cur.execute(
             f"""
             UPDATE techs
             SET {', '.join(update_fields)}
             WHERE id = %s
               AND active = TRUE
-                            AND domain = %s
+                            AND (
+                                        shop_uuid = %s::uuid
+                                 OR (shop_uuid IS NULL AND shop_id = %s AND domain = %s)
+                            )
             RETURNING id, first_name, last_name, role, pay_rate
             """,
-            params + [tech_id, domain],
+                        params + [tech_id, current_shop_uuid, current_shop_id, domain],
         )
         row = cur.fetchone()
         conn.commit()
@@ -1800,16 +1977,24 @@ async def delete_tech(request: Request):
 
     try:
         _ensure_techs_table(cur)
+                _ensure_shop_isolation_infrastructure(cur)
+                current_shop_id = _resolve_request_shop_id(request, cur, domain)
+                current_shop_uuid = _resolve_request_shop_uuid(request, cur, domain)
+                if not current_shop_id or not current_shop_uuid:
+                        return JSONResponse(status_code=403, content={"error": "Shop scope not resolved"})
         cur.execute(
             """
             UPDATE techs
             SET active = false
                         WHERE id = %s
-                            AND domain = %s
                             AND active = TRUE
+                            AND (
+                                        shop_uuid = %s::uuid
+                                 OR (shop_uuid IS NULL AND shop_id = %s AND domain = %s)
+                            )
             RETURNING id
             """,
-                        (tech_id, domain),
+                        (tech_id, current_shop_uuid, current_shop_id, domain),
         )
         row = cur.fetchone()
         conn.commit()
@@ -1847,6 +2032,11 @@ async def archive_techs(request: Request):
         _ensure_techs_table(cur)
         _ensure_ro_line_assignments_table(cur)
         _ensure_archived_techs_table(cur)
+                _ensure_shop_isolation_infrastructure(cur)
+                current_shop_id = _resolve_request_shop_id(request, cur, domain)
+                current_shop_uuid = _resolve_request_shop_uuid(request, cur, domain)
+                if not current_shop_id or not current_shop_uuid:
+                        return JSONResponse(status_code=403, content={"error": "Shop scope not resolved"})
 
         cur.execute(
             """
@@ -1854,10 +2044,13 @@ async def archive_techs(request: Request):
             FROM techs
             WHERE id = ANY(%s)
               AND active = TRUE
-                            AND domain = %s
+                            AND (
+                                        shop_uuid = %s::uuid
+                                 OR (shop_uuid IS NULL AND shop_id = %s AND domain = %s)
+                            )
             ORDER BY first_name, last_name
             """,
-            (normalized_ids, domain),
+                        (normalized_ids, current_shop_uuid, current_shop_id, domain),
         )
         tech_rows = cur.fetchall() or []
 
@@ -1872,14 +2065,17 @@ async def archive_techs(request: Request):
                 """
                 SELECT ro, COALESCE(SUM(hours), 0) AS hours
                 FROM ro_line_assignments
-                WHERE domain = %s
+                                WHERE (
+                                                shop_uuid = %s::uuid
+                                         OR (shop_uuid IS NULL AND shop_id = %s AND domain = %s)
+                                            )
                   AND tech_id = %s
                   AND tech_name IS NOT NULL
                   AND COALESCE(ready_to_flag, FALSE) = FALSE
                 GROUP BY ro
                 ORDER BY ro
                 """,
-                (domain, tech_id),
+                                (current_shop_uuid, current_shop_id, domain, tech_id),
             )
             ro_rows = cur.fetchall() or []
 
@@ -1895,8 +2091,8 @@ async def archive_techs(request: Request):
 
             cur.execute(
                 """
-                INSERT INTO archived_techs (tech_id, tech_name, pay_rate, assigned_ros, total_hours, domain)
-                VALUES (%s, %s, %s, %s, %s, %s)
+                INSERT INTO archived_techs (tech_id, tech_name, pay_rate, assigned_ros, total_hours, domain, shop_id, shop_uuid)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s::uuid)
                 """,
                 (
                     tech_id,
@@ -1905,6 +2101,8 @@ async def archive_techs(request: Request):
                     json.dumps(assigned_ros),
                     total_hours,
                     domain,
+                    current_shop_id,
+                    current_shop_uuid,
                 ),
             )
 
@@ -1913,8 +2111,12 @@ async def archive_techs(request: Request):
                 UPDATE techs
                 SET active = FALSE
                 WHERE id = %s
+                  AND (
+                        shop_uuid = %s::uuid
+                     OR (shop_uuid IS NULL AND shop_id = %s AND domain = %s)
+                  )
                 """,
-                (tech_id,),
+                (tech_id, current_shop_uuid, current_shop_id, domain),
             )
 
             archived.append({
@@ -1941,14 +2143,22 @@ async def list_archived_techs(request: Request):
     cur = conn.cursor()
     try:
         _ensure_archived_techs_table(cur)
+        _ensure_shop_isolation_infrastructure(cur)
+        current_shop_id = _resolve_request_shop_id(request, cur, domain)
+        current_shop_uuid = _resolve_request_shop_uuid(request, cur, domain)
+        if not current_shop_id or not current_shop_uuid:
+            return JSONResponse(status_code=403, content={"error": "Shop scope not resolved", "archived": []})
         cur.execute(
             """
             SELECT id, tech_id, tech_name, pay_rate, assigned_ros, total_hours, archived_at
             FROM archived_techs
-            WHERE domain = %s
+            WHERE (
+                    shop_uuid = %s::uuid
+                 OR (shop_uuid IS NULL AND shop_id = %s AND domain = %s)
+                  )
             ORDER BY archived_at DESC, id DESC
             """,
-            (domain,),
+            (current_shop_uuid, current_shop_id, domain),
         )
         rows = cur.fetchall() or []
         archived = []
@@ -1999,10 +2209,15 @@ async def add_vendor(request: Request):
     cur = conn.cursor()
     try:
         _ensure_parts_vendors_table(cur)
+        _ensure_shop_isolation_infrastructure(cur)
+        current_shop_id = _resolve_request_shop_id(request, cur, domain)
+        current_shop_uuid = _resolve_request_shop_uuid(request, cur, domain)
+        if not current_shop_id or not current_shop_uuid:
+            return JSONResponse(status_code=403, content={"error": "Shop scope not resolved"})
         cur.execute(
             """
-            INSERT INTO parts_vendors (name, vendor_type, contact_person, phone, street, city, state, zip, domain)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+            INSERT INTO parts_vendors (name, vendor_type, contact_person, phone, street, city, state, zip, domain, shop_id, shop_uuid)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s::uuid)
             RETURNING id, name, vendor_type, contact_person, phone, street, city, state, zip, active
             """,
             (
@@ -2015,6 +2230,8 @@ async def add_vendor(request: Request):
                 state or None,
                 zip_code or None,
                 domain,
+                current_shop_id,
+                current_shop_uuid,
             ),
         )
 
@@ -2050,14 +2267,23 @@ async def list_vendors(request: Request):
     cur = conn.cursor()
     try:
         _ensure_parts_vendors_table(cur)
+                _ensure_shop_isolation_infrastructure(cur)
+                current_shop_id = _resolve_request_shop_id(request, cur, domain)
+                current_shop_uuid = _resolve_request_shop_uuid(request, cur, domain)
+                if not current_shop_id or not current_shop_uuid:
+                        return JSONResponse(status_code=403, content={"error": "Shop scope not resolved", "vendors": []})
         cur.execute(
             """
             SELECT id, name, vendor_type, contact_person, phone, street, city, state, zip, active
             FROM parts_vendors
-            WHERE active = TRUE AND domain = %s
+                        WHERE active = TRUE
+                            AND (
+                                        shop_uuid = %s::uuid
+                                 OR (shop_uuid IS NULL AND shop_id = %s AND domain = %s)
+                            )
             ORDER BY name
             """,
-            (domain,),
+                        (current_shop_uuid, current_shop_id, domain),
         )
 
         rows = cur.fetchall()
@@ -2111,6 +2337,11 @@ async def update_vendor(request: Request):
     cur = conn.cursor()
     try:
         _ensure_parts_vendors_table(cur)
+        _ensure_shop_isolation_infrastructure(cur)
+        current_shop_id = _resolve_request_shop_id(request, cur, domain)
+        current_shop_uuid = _resolve_request_shop_uuid(request, cur, domain)
+        if not current_shop_id or not current_shop_uuid:
+            return JSONResponse(status_code=403, content={"error": "Shop scope not resolved"})
         cur.execute(
             """
             UPDATE parts_vendors
@@ -2123,7 +2354,12 @@ async def update_vendor(request: Request):
                 city = %s,
                 state = %s,
                 zip = %s
-            WHERE id = %s AND domain = %s AND active = TRUE
+                        WHERE id = %s
+                            AND active = TRUE
+                            AND (
+                                        shop_uuid = %s::uuid
+                                 OR (shop_uuid IS NULL AND shop_id = %s AND domain = %s)
+                            )
             RETURNING id, name, vendor_type, contact_person, phone, street, city, state, zip, active
             """,
             (
@@ -2136,6 +2372,8 @@ async def update_vendor(request: Request):
                 state or None,
                 zip_code or None,
                 vendor_id,
+                current_shop_uuid,
+                current_shop_id,
                 domain,
             ),
         )
@@ -2174,19 +2412,35 @@ async def get_setup_shop(request: Request):
     conn = get_conn()
     cur = conn.cursor()
     try:
-        cur.execute(
-            """
-            SELECT shop_id, shop_name, address, city, state, zip_code, phone, email
-            FROM shop_settings
-            WHERE domain = %s
-            LIMIT 1
-            """,
-            (selected_domain,),
-        )
+        selected_shop_uuid = _resolve_request_shop_uuid(request, cur, selected_domain)
+        if selected_shop_uuid:
+            cur.execute(
+                """
+                SELECT shop_id, shop_uuid, shop_name, address, city, state, zip_code, phone, email
+                FROM shop_settings
+                WHERE (
+                        shop_uuid = %s::uuid
+                     OR (shop_uuid IS NULL AND domain = %s)
+                      )
+                LIMIT 1
+                """,
+                (selected_shop_uuid, selected_domain),
+            )
+        else:
+            cur.execute(
+                """
+                SELECT shop_id, shop_uuid, shop_name, address, city, state, zip_code, phone, email
+                FROM shop_settings
+                WHERE domain = %s
+                LIMIT 1
+                """,
+                (selected_domain,),
+            )
         row = cur.fetchone() or {}
         return {
             "shop": {
                 "shop_id": int(row.get("shop_id") or 0) or None,
+                "shop_uuid": str(row.get("shop_uuid") or "").strip() or selected_shop_uuid,
                 "shop_name": str(row.get("shop_name") or "").strip(),
                 "address": str(row.get("address") or "").strip(),
                 "city": str(row.get("city") or "").strip(),
@@ -2230,9 +2484,10 @@ async def save_setup_shop(request: Request):
         if not requester_is_architect and selected_domain != str(domain or "").strip().lower():
             return JSONResponse(status_code=403, content={"error": "Forbidden"})
 
-        cur.execute("SELECT id FROM shops WHERE domain = %s LIMIT 1", (selected_domain,))
+        cur.execute("SELECT id, shop_id FROM shops WHERE domain = %s LIMIT 1", (selected_domain,))
         shop_row = cur.fetchone() or {}
         selected_shop_id = int(shop_row.get("id") or 0)
+        selected_shop_uuid = str(shop_row.get("shop_id") or "").strip() or None
 
         if not selected_shop_id and requester_is_architect:
             cur.execute(
@@ -2247,22 +2502,24 @@ async def save_setup_shop(request: Request):
                     state = COALESCE(EXCLUDED.state, shops.state),
                     zip = COALESCE(EXCLUDED.zip, shops.zip),
                     updated_at = CURRENT_TIMESTAMP
-                RETURNING id
+                RETURNING id, shop_id
                 """,
                 (selected_domain, shop_name or None, address or None, city or None, state or None, zip_code or None),
             )
             inserted_shop_row = cur.fetchone() or {}
             selected_shop_id = int(inserted_shop_row.get("id") or 0)
+            selected_shop_uuid = str(inserted_shop_row.get("shop_id") or "").strip() or None
 
-        if not selected_shop_id:
+        if not selected_shop_id or not selected_shop_uuid:
             return JSONResponse(status_code=400, content={"error": "Unable to resolve shop scope"})
         cur.execute(
             """
-            INSERT INTO shop_settings (domain, shop_id, shop_name, address, city, state, zip_code, phone, email, updated_at)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, CURRENT_TIMESTAMP)
+            INSERT INTO shop_settings (domain, shop_id, shop_uuid, shop_name, address, city, state, zip_code, phone, email, updated_at)
+            VALUES (%s, %s, %s::uuid, %s, %s, %s, %s, %s, %s, %s, CURRENT_TIMESTAMP)
             ON CONFLICT (domain)
             DO UPDATE SET
                 shop_id = EXCLUDED.shop_id,
+                shop_uuid = EXCLUDED.shop_uuid,
                 shop_name = EXCLUDED.shop_name,
                 address = EXCLUDED.address,
                 city = EXCLUDED.city,
@@ -2275,6 +2532,7 @@ async def save_setup_shop(request: Request):
             (
                 selected_domain,
                 selected_shop_id,
+                selected_shop_uuid,
                 shop_name or None,
                 address or None,
                 city or None,
@@ -2310,11 +2568,13 @@ async def get_setup_context(request: Request):
         return JSONResponse(status_code=401, content={"error": "Not authenticated"})
     authenticated_user = get_authenticated_user(request) or {}
     shop_id = int(authenticated_user.get("shop_id") or 0) or None
+    shop_uuid = str(authenticated_user.get("shop_uuid") or "").strip() or None
 
     return {
         "is_architect": _request_is_architect(request),
         "default_domain": str(domain or "").strip().lower(),
         "default_shop_id": shop_id,
+        "default_shop_uuid": shop_uuid,
     }
 
 
@@ -2349,7 +2609,8 @@ async def chat_send(request: Request):
         if not sender:
             return JSONResponse(status_code=401, content={"error": "Not authenticated"})
         sender_shop_id = int(sender.get("shop_id") or 0)
-        if not sender_shop_id:
+        sender_shop_uuid = str(sender.get("shop_uuid") or "").strip() or _resolve_request_shop_uuid(request, cur, domain)
+        if not sender_shop_id or not sender_shop_uuid:
             return JSONResponse(status_code=403, content={"error": "Shop scope not resolved"})
 
         cur.execute(
@@ -2357,12 +2618,14 @@ async def chat_send(request: Request):
             SELECT id
             FROM shop_users
             WHERE id = %s
-              AND shop_id = %s
-              AND domain = %s
               AND active = TRUE
+              AND (
+                    shop_uuid = %s::uuid
+                 OR (shop_uuid IS NULL AND shop_id = %s AND domain = %s)
+              )
             LIMIT 1
             """,
-            (recipient_user_id, sender_shop_id, domain),
+            (recipient_user_id, sender_shop_uuid, sender_shop_id, domain),
         )
         recipient = cur.fetchone() or {}
         if not recipient:
@@ -2370,11 +2633,11 @@ async def chat_send(request: Request):
 
         cur.execute(
             """
-            INSERT INTO chat_messages (domain, shop_id, sender_user_id, recipient_user_id, kind, body)
-            VALUES (%s, %s, %s, %s, %s, %s)
+            INSERT INTO chat_messages (domain, shop_id, shop_uuid, sender_user_id, recipient_user_id, kind, body)
+            VALUES (%s, %s, %s::uuid, %s, %s, %s, %s)
             RETURNING id, created_at
             """,
-            (domain, sender_shop_id, int(sender.get("id") or 0), recipient_user_id, kind, body),
+            (domain, sender_shop_id, sender_shop_uuid, int(sender.get("id") or 0), recipient_user_id, kind, body),
         )
         row = cur.fetchone() or {}
         conn.commit()
@@ -2414,7 +2677,8 @@ async def chat_messages(request: Request):
             return JSONResponse(status_code=401, content={"error": "Not authenticated"})
         current_user_id = int(current_user.get("id") or 0)
         current_shop_id = int(current_user.get("shop_id") or 0)
-        if not current_shop_id:
+        current_shop_uuid = str(current_user.get("shop_uuid") or "").strip() or _resolve_request_shop_uuid(request, cur, domain)
+        if not current_shop_id or not current_shop_uuid:
             return JSONResponse(status_code=403, content={"error": "Shop scope not resolved"})
 
         cur.execute(
@@ -2435,17 +2699,17 @@ async def chat_messages(request: Request):
             FROM chat_messages m
             LEFT JOIN shop_users su
                 ON su.id = m.sender_user_id
-               AND su.domain = m.domain
             LEFT JOIN shop_users ru
                 ON ru.id = m.recipient_user_id
-               AND ru.domain = m.domain
-            WHERE m.domain = %s
-                            AND m.shop_id = %s
+                WHERE (
+                          m.shop_uuid = %s::uuid
+                      OR (m.shop_uuid IS NULL AND m.shop_id = %s AND m.domain = %s)
+                        )
               AND (m.sender_user_id = %s OR m.recipient_user_id = %s)
             ORDER BY m.created_at ASC, m.id ASC
             LIMIT 3000
             """,
-                        (domain, current_shop_id, current_user_id, current_user_id),
+                (current_shop_uuid, current_shop_id, domain, current_user_id, current_user_id),
         )
         rows = cur.fetchall() or []
 
@@ -2492,19 +2756,22 @@ async def chat_users(request: Request):
             return JSONResponse(status_code=401, content={"error": "Not authenticated", "users": []})
 
         current_shop_id = int(current_user.get("shop_id") or 0)
-        if not current_shop_id:
+        current_shop_uuid = str(current_user.get("shop_uuid") or "").strip() or _resolve_request_shop_uuid(request, cur, domain)
+        if not current_shop_id or not current_shop_uuid:
             return JSONResponse(status_code=403, content={"error": "Shop scope not resolved", "users": []})
 
         cur.execute(
             """
-            SELECT id, first_name, last_name, email, role, shop_id
+                        SELECT id, user_id, first_name, last_name, email, role, shop_id, shop_uuid
             FROM shop_users
-            WHERE domain = %s
-              AND shop_id = %s
+                        WHERE (
+                                        shop_uuid = %s::uuid
+                                 OR (shop_uuid IS NULL AND domain = %s AND shop_id = %s)
+                                    )
               AND active = TRUE
             ORDER BY first_name ASC, last_name ASC, id ASC
             """,
-            (domain, current_shop_id),
+                        (current_shop_uuid, domain, current_shop_id),
         )
         rows = cur.fetchall() or []
         users = []
@@ -2518,6 +2785,8 @@ async def chat_users(request: Request):
                     "email": str(row.get("email") or "").strip(),
                     "role": "ARCHITECT" if _is_architect_email(row_email) else str(row.get("role") or "").strip(),
                     "shop_id": int(row.get("shop_id") or 0) or None,
+                    "shop_uuid": str(row.get("shop_uuid") or "").strip() or None,
+                    "user_uuid": str(row.get("user_id") or "").strip() or None,
                 }
             )
 
@@ -2549,20 +2818,23 @@ async def chat_mark_read(request: Request):
             return JSONResponse(status_code=401, content={"error": "Not authenticated"})
         current_user_id = int(current_user.get("id") or 0)
         current_shop_id = int(current_user.get("shop_id") or 0)
-        if not current_shop_id:
+        current_shop_uuid = str(current_user.get("shop_uuid") or "").strip() or _resolve_request_shop_uuid(request, cur, domain)
+        if not current_shop_id or not current_shop_uuid:
             return JSONResponse(status_code=403, content={"error": "Shop scope not resolved"})
 
         cur.execute(
             """
             UPDATE chat_messages
             SET read_at = CURRENT_TIMESTAMP
-            WHERE domain = %s
-                            AND shop_id = %s
+                        WHERE (
+                                        shop_uuid = %s::uuid
+                                 OR (shop_uuid IS NULL AND shop_id = %s AND domain = %s)
+                                    )
               AND recipient_user_id = %s
               AND sender_user_id = %s
               AND read_at IS NULL
             """,
-                        (domain, current_shop_id, current_user_id, with_user_id),
+                        (current_shop_uuid, current_shop_id, domain, current_user_id, with_user_id),
         )
         updated = int(cur.rowcount or 0)
         conn.commit()
@@ -2594,7 +2866,8 @@ async def chat_complete_task(request: Request):
             return JSONResponse(status_code=401, content={"error": "Not authenticated"})
         current_user_id = int(current_user.get("id") or 0)
         current_shop_id = int(current_user.get("shop_id") or 0)
-        if not current_shop_id:
+        current_shop_uuid = str(current_user.get("shop_uuid") or "").strip() or _resolve_request_shop_uuid(request, cur, domain)
+        if not current_shop_id or not current_shop_uuid:
             return JSONResponse(status_code=403, content={"error": "Shop scope not resolved"})
 
         cur.execute(
@@ -2603,12 +2876,14 @@ async def chat_complete_task(request: Request):
             SET completed_at = CURRENT_TIMESTAMP,
                 read_at = COALESCE(read_at, CURRENT_TIMESTAMP)
             WHERE id = %s
-              AND domain = %s
-                            AND shop_id = %s
+                            AND (
+                                        shop_uuid = %s::uuid
+                                 OR (shop_uuid IS NULL AND shop_id = %s AND domain = %s)
+                                    )
               AND recipient_user_id = %s
               AND kind = 'task'
             """,
-                        (task_id, domain, current_shop_id, current_user_id),
+                        (task_id, current_shop_uuid, current_shop_id, domain, current_user_id),
         )
         updated = int(cur.rowcount or 0)
         conn.commit()
@@ -2869,10 +3144,11 @@ async def update_manage_user(request: Request):
     cur = conn.cursor()
     try:
         _ensure_shop_users_table(cur)
-        cur.execute("SELECT id FROM shops WHERE domain = %s LIMIT 1", (selected_domain,))
+        cur.execute("SELECT id, shop_id FROM shops WHERE domain = %s LIMIT 1", (selected_domain,))
         shop_row = cur.fetchone() or {}
         selected_shop_id = int(shop_row.get("id") or 0)
-        if not selected_shop_id:
+        selected_shop_uuid = str(shop_row.get("shop_id") or "").strip() or None
+        if not selected_shop_id or not selected_shop_uuid:
             return JSONResponse(status_code=400, content={"error": "Unable to resolve shop scope"})
 
         cur.execute(
@@ -2883,12 +3159,13 @@ async def update_manage_user(request: Request):
                 email = %s,
                 role = %s,
                 domain = %s,
-                shop_id = %s
+                                shop_id = %s,
+                                shop_uuid = %s::uuid
             WHERE id = %s
               AND active = TRUE
-            RETURNING id, first_name, last_name, email, role, domain, shop_id
+                        RETURNING id, user_id, first_name, last_name, email, role, domain, shop_id, shop_uuid
             """,
-            (first_name, last_name, email, role, selected_domain, selected_shop_id, user_id),
+                        (first_name, last_name, email, role, selected_domain, selected_shop_id, selected_shop_uuid, user_id),
         )
         row = cur.fetchone() or {}
         conn.commit()
@@ -2905,6 +3182,8 @@ async def update_manage_user(request: Request):
                 "email": str(row.get("email") or "").strip(),
                 "role": str(row.get("role") or "").strip(),
                 "shop_id": int(row.get("shop_id") or 0) or None,
+                "shop_uuid": str(row.get("shop_uuid") or "").strip() or None,
+                "user_uuid": str(row.get("user_id") or "").strip() or None,
                 "shop_domain": str(row.get("domain") or "").strip().lower(),
             },
         }
@@ -2942,19 +3221,20 @@ async def create_manage_user(request: Request):
     cur = conn.cursor()
     try:
         _ensure_shop_users_table(cur)
-        cur.execute("SELECT id FROM shops WHERE domain = %s LIMIT 1", (selected_domain,))
+        cur.execute("SELECT id, shop_id FROM shops WHERE domain = %s LIMIT 1", (selected_domain,))
         shop_row = cur.fetchone() or {}
         selected_shop_id = int(shop_row.get("id") or 0)
-        if not selected_shop_id:
+        selected_shop_uuid = str(shop_row.get("shop_id") or "").strip() or None
+        if not selected_shop_id or not selected_shop_uuid:
             return JSONResponse(status_code=400, content={"error": "Unable to resolve shop scope"})
 
         cur.execute(
             """
-            INSERT INTO shop_users (first_name, last_name, email, role, password_hash, domain, shop_id, active)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, TRUE)
-            RETURNING id, first_name, last_name, email, role, shop_id
+            INSERT INTO shop_users (user_id, first_name, last_name, email, role, password_hash, domain, shop_id, shop_uuid, active)
+            VALUES (%s::uuid, %s, %s, %s, %s, %s, %s, %s, %s::uuid, TRUE)
+            RETURNING id, user_id, first_name, last_name, email, role, shop_id, shop_uuid
             """,
-            (first_name, last_name, email, role, password_hash, selected_domain, selected_shop_id),
+            (str(uuid.uuid4()), first_name, last_name, email, role, password_hash, selected_domain, selected_shop_id, selected_shop_uuid),
         )
         row = cur.fetchone() or {}
         conn.commit()
@@ -2967,6 +3247,8 @@ async def create_manage_user(request: Request):
                 "email": str(row.get("email") or "").strip(),
                 "role": str(row.get("role") or "").strip(),
                 "shop_id": int(row.get("shop_id") or 0) or None,
+                "shop_uuid": str(row.get("shop_uuid") or "").strip() or None,
+                "user_uuid": str(row.get("user_id") or "").strip() or None,
             },
         }
     except Exception as exc:
@@ -3076,10 +3358,11 @@ async def update_setup_user(request: Request):
         if not (_request_is_architect(request) or _is_manager_or_hr_role(requester_role)):
             return JSONResponse(status_code=403, content={"error": "Forbidden"})
 
-        cur.execute("SELECT id FROM shops WHERE domain = %s LIMIT 1", (selected_domain,))
+                cur.execute("SELECT id, shop_id FROM shops WHERE domain = %s LIMIT 1", (selected_domain,))
         shop_row = cur.fetchone() or {}
         selected_shop_id = int(shop_row.get("id") or 0)
-        if not selected_shop_id:
+                selected_shop_uuid = str(shop_row.get("shop_id") or "").strip() or None
+                if not selected_shop_id or not selected_shop_uuid:
             return JSONResponse(status_code=400, content={"error": "Unable to resolve shop scope"})
         cur.execute(
             """
@@ -3087,14 +3370,16 @@ async def update_setup_user(request: Request):
             SET first_name = %s,
                 last_name = %s,
                 email = %s,
-                role = %s
+                                role = %s,
+                                shop_uuid = %s::uuid
             WHERE id = %s
               AND shop_id = %s
+                            AND shop_uuid = %s::uuid
               AND domain = %s
               AND active = TRUE
-            RETURNING id, first_name, last_name, email, role, shop_id, created_at
+                        RETURNING id, user_id, first_name, last_name, email, role, shop_id, shop_uuid, created_at
             """,
-            (first_name, last_name, email, role, user_id, selected_shop_id, selected_domain),
+                        (first_name, last_name, email, role, selected_shop_uuid, user_id, selected_shop_id, selected_shop_uuid, selected_domain),
         )
         row = cur.fetchone() or {}
         conn.commit()
@@ -3112,6 +3397,8 @@ async def update_setup_user(request: Request):
                 "email": str(row.get("email") or "").strip(),
                 "role": str(row.get("role") or "").strip(),
                 "shop_id": int(row.get("shop_id") or 0) or None,
+                "shop_uuid": str(row.get("shop_uuid") or "").strip() or None,
+                "user_uuid": str(row.get("user_id") or "").strip() or None,
                 "created_at": created_at.isoformat() if isinstance(created_at, datetime) else None,
             },
         }
@@ -3159,10 +3446,11 @@ async def reset_setup_user_password(request: Request):
         if not (_request_is_architect(request) or _is_manager_or_hr_role(requester_role)):
             return JSONResponse(status_code=403, content={"error": "Forbidden"})
 
-        cur.execute("SELECT id FROM shops WHERE domain = %s LIMIT 1", (selected_domain,))
+                cur.execute("SELECT id, shop_id FROM shops WHERE domain = %s LIMIT 1", (selected_domain,))
         shop_row = cur.fetchone() or {}
         selected_shop_id = int(shop_row.get("id") or 0)
-        if not selected_shop_id:
+                selected_shop_uuid = str(shop_row.get("shop_id") or "").strip() or None
+                if not selected_shop_id or not selected_shop_uuid:
             return JSONResponse(status_code=400, content={"error": "Unable to resolve shop scope"})
         cur.execute(
             """
@@ -3170,10 +3458,11 @@ async def reset_setup_user_password(request: Request):
             SET password_hash = %s
             WHERE domain = %s
               AND shop_id = %s
+                            AND shop_uuid = %s::uuid
               AND active = TRUE
               AND id = ANY(%s)
             """,
-            (password_hash, selected_domain, selected_shop_id, user_ids),
+                        (password_hash, selected_domain, selected_shop_id, selected_shop_uuid, user_ids),
         )
         updated_count = int(cur.rowcount or 0)
         conn.commit()
@@ -3200,15 +3489,18 @@ async def list_setup_users(request: Request):
         if not (_request_is_architect(request) or _is_manager_or_hr_role(requester_role)):
             return JSONResponse(status_code=403, content={"error": "Forbidden", "users": []})
 
+                current_shop_uuid = _resolve_request_shop_uuid(request, cur, selected_domain)
+                if not current_shop_uuid:
+                        return JSONResponse(status_code=400, content={"error": "Unable to resolve shop scope", "users": []})
         cur.execute(
             """
-            SELECT id, first_name, last_name, email, role, shop_id, created_at
+                        SELECT id, user_id, first_name, last_name, email, role, shop_id, shop_uuid, created_at
             FROM shop_users
-            WHERE domain = %s
+                        WHERE shop_uuid = %s::uuid
               AND active = TRUE
             ORDER BY created_at DESC, id DESC
             """,
-            (selected_domain,),
+                        (current_shop_uuid,),
         )
         rows = cur.fetchall() or []
         users = []
@@ -3226,6 +3518,8 @@ async def list_setup_users(request: Request):
                     "email": str(row.get("email") or "").strip(),
                     "role": display_role,
                     "shop_id": int(row.get("shop_id") or 0) or None,
+                    "shop_uuid": str(row.get("shop_uuid") or "").strip() or None,
+                    "user_uuid": str(row.get("user_id") or "").strip() or None,
                     "role_locked": role_locked,
                     "created_at": created_at.isoformat() if isinstance(created_at, datetime) else None,
                 }
@@ -3269,26 +3563,28 @@ async def create_setup_user(request: Request):
         if not (_request_is_architect(request) or _is_manager_or_hr_role(requester_role)):
             return JSONResponse(status_code=403, content={"error": "Forbidden"})
 
-        cur.execute("SELECT id FROM shops WHERE domain = %s LIMIT 1", (selected_domain,))
+        cur.execute("SELECT id, shop_id FROM shops WHERE domain = %s LIMIT 1", (selected_domain,))
         shop_row = cur.fetchone() or {}
         selected_shop_id = int(shop_row.get("id") or 0)
-        if not selected_shop_id:
+        selected_shop_uuid = str(shop_row.get("shop_id") or "").strip() or None
+        if not selected_shop_id or not selected_shop_uuid:
             return JSONResponse(status_code=400, content={"error": "Unable to resolve shop scope"})
         cur.execute(
             """
-            INSERT INTO shop_users (first_name, last_name, email, role, password_hash, domain, shop_id, active)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, TRUE)
+            INSERT INTO shop_users (user_id, first_name, last_name, email, role, password_hash, domain, shop_id, shop_uuid, active)
+            VALUES (%s::uuid, %s, %s, %s, %s, %s, %s, %s, %s::uuid, TRUE)
             ON CONFLICT (domain, email)
             DO UPDATE SET
                 first_name = EXCLUDED.first_name,
                 last_name = EXCLUDED.last_name,
                 role = EXCLUDED.role,
                 shop_id = EXCLUDED.shop_id,
+                shop_uuid = EXCLUDED.shop_uuid,
                 password_hash = EXCLUDED.password_hash,
                 active = TRUE
-            RETURNING id, first_name, last_name, email, role, shop_id, created_at
+            RETURNING id, user_id, first_name, last_name, email, role, shop_id, shop_uuid, created_at
             """,
-            (first_name, last_name, email, role, password_hash, selected_domain, selected_shop_id),
+            (str(uuid.uuid4()), first_name, last_name, email, role, password_hash, selected_domain, selected_shop_id, selected_shop_uuid),
         )
         row = cur.fetchone() or {}
         conn.commit()
@@ -3303,6 +3599,8 @@ async def create_setup_user(request: Request):
                 "email": str(row.get("email") or "").strip(),
                 "role": str(row.get("role") or "").strip(),
                 "shop_id": int(row.get("shop_id") or 0) or None,
+                "shop_uuid": str(row.get("shop_uuid") or "").strip() or None,
+                "user_uuid": str(row.get("user_id") or "").strip() or None,
                 "created_at": created_at.isoformat() if isinstance(created_at, datetime) else None,
             },
         }
@@ -3345,10 +3643,11 @@ async def delete_setup_users(request: Request):
         if not (_request_is_architect(request) or _is_manager_or_hr_role(requester_role)):
             return JSONResponse(status_code=403, content={"error": "Forbidden"})
 
-        cur.execute("SELECT id FROM shops WHERE domain = %s LIMIT 1", (selected_domain,))
+                cur.execute("SELECT id, shop_id FROM shops WHERE domain = %s LIMIT 1", (selected_domain,))
         shop_row = cur.fetchone() or {}
         selected_shop_id = int(shop_row.get("id") or 0)
-        if not selected_shop_id:
+                selected_shop_uuid = str(shop_row.get("shop_id") or "").strip() or None
+                if not selected_shop_id or not selected_shop_uuid:
             return JSONResponse(status_code=400, content={"error": "Unable to resolve shop scope"})
 
         cur.execute(
@@ -3357,11 +3656,12 @@ async def delete_setup_users(request: Request):
             FROM shop_users
             WHERE domain = %s
               AND shop_id = %s
+                            AND shop_uuid = %s::uuid
               AND id = ANY(%s)
               AND active = TRUE
               AND LOWER(email) <> %s
             """,
-            (selected_domain, selected_shop_id, user_ids, _ARCHITECT_EMAIL),
+                        (selected_domain, selected_shop_id, selected_shop_uuid, user_ids, _ARCHITECT_EMAIL),
         )
         deletable_ids = [int((row or {}).get("id") or 0) for row in (cur.fetchall() or [])]
         deletable_ids = [value for value in deletable_ids if value > 0]
@@ -3378,9 +3678,10 @@ async def delete_setup_users(request: Request):
             DELETE FROM shop_users
             WHERE domain = %s
               AND shop_id = %s
+                            AND shop_uuid = %s::uuid
               AND id = ANY(%s)
             """,
-            (selected_domain, selected_shop_id, deletable_ids),
+                        (selected_domain, selected_shop_id, selected_shop_uuid, deletable_ids),
         )
         deleted_count = int(cur.rowcount or 0)
         conn.commit()
@@ -3707,6 +4008,12 @@ async def list_open_ros_for_payments(request: Request):
         _ensure_ro_payment_totals_table(cur)
         _ensure_ro_payment_entries_table(cur)
         _ensure_parts_received_table(cur)
+        _ensure_shop_isolation_infrastructure(cur)
+
+        current_shop_id = _resolve_request_shop_id(request, cur, domain)
+        current_shop_uuid = _resolve_request_shop_uuid(request, cur, domain)
+        if not current_shop_id or not current_shop_uuid:
+            return JSONResponse(status_code=403, content={"error": "Shop scope not resolved", "rows": []})
 
         cur.execute(
             """
@@ -3724,12 +4031,15 @@ async def list_open_ros_for_payments(request: Request):
                    deductible,
                    saved_at
             FROM saved_estimates
-            WHERE domain = %s
+                        WHERE (
+                                        shop_uuid = %s::uuid
+                                 OR (shop_uuid IS NULL AND shop_id = %s AND domain = %s)
+                                    )
               AND ro IS NOT NULL
               AND ro <> ''
             ORDER BY ro, saved_at DESC, id DESC
             """,
-            (domain,),
+                        (current_shop_uuid, current_shop_id, domain),
         )
         rows = cur.fetchall() or []
 
@@ -3737,9 +4047,12 @@ async def list_open_ros_for_payments(request: Request):
             """
             SELECT ro, phase
             FROM ro_phases
-            WHERE domain = %s
+            WHERE (
+                    shop_uuid = %s::uuid
+                 OR (shop_uuid IS NULL AND shop_id = %s AND domain = %s)
+                  )
             """,
-            (domain,),
+            (current_shop_uuid, current_shop_id, domain),
         )
         phase_rows = cur.fetchall() or []
         phase_map = {str(row.get("ro") or ""): str(row.get("phase") or "").strip().lower() for row in phase_rows}
@@ -3748,9 +4061,12 @@ async def list_open_ros_for_payments(request: Request):
             """
             SELECT ro, insurance_paid, customer_paid
             FROM ro_payment_totals
-            WHERE domain = %s
+            WHERE (
+                    shop_uuid = %s::uuid
+                 OR (shop_uuid IS NULL AND shop_id = %s AND domain = %s)
+                  )
             """,
-            (domain,),
+            (current_shop_uuid, current_shop_id, domain),
         )
         payment_rows = cur.fetchall() or []
         payment_map = {
@@ -3766,10 +4082,13 @@ async def list_open_ros_for_payments(request: Request):
             """
             SELECT ro, payer_type, payment_method, check_number, created_by, amount, business_date
             FROM ro_payment_entries
-            WHERE domain = %s
+            WHERE (
+                    shop_uuid = %s::uuid
+                 OR (shop_uuid IS NULL AND shop_id = %s AND domain = %s)
+                  )
             ORDER BY business_date DESC NULLS LAST, id DESC
             """,
-            (domain,),
+            (current_shop_uuid, current_shop_id, domain),
         )
         payment_entry_rows = cur.fetchall() or []
         payment_entries_by_ro = {}
@@ -3806,7 +4125,10 @@ async def list_open_ros_for_payments(request: Request):
                 COALESCE(NULLIF(SUM(DISTINCT invoice_total), 0), SUM(cost), 0) AS invoice_paid_total,
                 MAX(COALESCE(received_business_date, received_at::date)) AS latest_received_date
             FROM parts_received
-            WHERE domain = %s
+                        WHERE (
+                                        shop_uuid = %s::uuid
+                                 OR (shop_uuid IS NULL AND shop_id = %s AND domain = %s)
+                                    )
               AND ro IS NOT NULL
               AND ro <> ''
               AND invoice_number IS NOT NULL
@@ -3814,7 +4136,7 @@ async def list_open_ros_for_payments(request: Request):
             GROUP BY ro, invoice_number
             ORDER BY ro, latest_received_date DESC, invoice_number
             """,
-            (domain,),
+            (current_shop_uuid, current_shop_id, domain),
         )
         invoice_rows = cur.fetchall() or []
 
@@ -3905,6 +4227,12 @@ async def get_ro_payments(request: Request):
         _ensure_saved_estimates_table(cur)
         _ensure_ro_payment_totals_table(cur)
         _ensure_ro_payment_entries_table(cur)
+        _ensure_shop_isolation_infrastructure(cur)
+
+        current_shop_id = _resolve_request_shop_id(request, cur, domain)
+        current_shop_uuid = _resolve_request_shop_uuid(request, cur, domain)
+        if not current_shop_id or not current_shop_uuid:
+            return JSONResponse(status_code=403, content={"error": "Shop scope not resolved"})
 
         cur.execute(
             """
@@ -3922,11 +4250,14 @@ async def get_ro_payments(request: Request):
                    deductible,
                    saved_at
             FROM saved_estimates
-            WHERE domain = %s
+                        WHERE (
+                                        shop_uuid = %s::uuid
+                                 OR (shop_uuid IS NULL AND shop_id = %s AND domain = %s)
+                                    )
               AND ro = %s
             ORDER BY ro, saved_at DESC, id DESC
             """,
-            (domain, ro_value),
+                        (current_shop_uuid, current_shop_id, domain, ro_value),
         )
         row = cur.fetchone()
         if not row:
@@ -3936,11 +4267,14 @@ async def get_ro_payments(request: Request):
             """
             SELECT insurance_paid, customer_paid
             FROM ro_payment_totals
-            WHERE domain = %s
+                        WHERE (
+                                        shop_uuid = %s::uuid
+                                 OR (shop_uuid IS NULL AND shop_id = %s AND domain = %s)
+                                    )
               AND ro = %s
             LIMIT 1
             """,
-            (domain, ro_value),
+                        (current_shop_uuid, current_shop_id, domain, ro_value),
         )
         totals_row = cur.fetchone() or {}
 
@@ -3948,11 +4282,14 @@ async def get_ro_payments(request: Request):
             """
             SELECT ro, payer_type, payment_method, check_number, created_by, amount, business_date
             FROM ro_payment_entries
-            WHERE domain = %s
+                        WHERE (
+                                        shop_uuid = %s::uuid
+                                 OR (shop_uuid IS NULL AND shop_id = %s AND domain = %s)
+                                    )
               AND ro = %s
             ORDER BY business_date DESC NULLS LAST, id DESC
             """,
-            (domain, ro_value),
+                        (current_shop_uuid, current_shop_id, domain, ro_value),
         )
         payment_entry_rows = cur.fetchall() or []
 
@@ -4032,6 +4369,11 @@ async def list_records_closed_ros(request: Request):
     try:
         _ensure_saved_estimates_table(cur)
         _ensure_ro_phases_table(cur)
+        _ensure_shop_isolation_infrastructure(cur)
+        current_shop_id = _resolve_request_shop_id(request, cur, domain)
+        current_shop_uuid = _resolve_request_shop_uuid(request, cur, domain)
+        if not current_shop_id or not current_shop_uuid:
+            return JSONResponse(status_code=403, content={"error": "Shop scope not resolved", "rows": []})
 
         cur.execute(
             """
@@ -4052,15 +4394,21 @@ async def list_records_closed_ros(request: Request):
                 SELECT *
                 FROM saved_estimates se
                 WHERE se.ro = rp.ro
-                  AND (se.domain = rp.domain OR se.domain = %s OR se.domain IS NULL)
+                                    AND (
+                                                se.shop_uuid = %s::uuid
+                                         OR (se.shop_uuid IS NULL AND se.shop_id = %s AND se.domain = %s)
+                                    )
                 ORDER BY se.saved_at DESC, se.id DESC
                 LIMIT 1
             ) se ON TRUE
-            WHERE rp.domain = %s
+                        WHERE (
+                                        rp.shop_uuid = %s::uuid
+                                 OR (rp.shop_uuid IS NULL AND rp.shop_id = %s AND rp.domain = %s)
+                                    )
               AND COALESCE(LOWER(TRIM(rp.phase)), '') IN ('complete', 'complete/finish')
             ORDER BY rp.updated_at DESC NULLS LAST, rp.ro ASC
             """,
-            (domain, domain),
+                        (current_shop_uuid, current_shop_id, domain, current_shop_uuid, current_shop_id, domain),
         )
         rows = cur.fetchall() or []
 
@@ -4124,6 +4472,11 @@ async def list_records_tech_payouts(
     cur = conn.cursor()
     try:
         _ensure_ro_flagout_lines_table(cur)
+        _ensure_shop_isolation_infrastructure(cur)
+        current_shop_id = _resolve_request_shop_id(request, cur, domain)
+        current_shop_uuid = _resolve_request_shop_uuid(request, cur, domain)
+        if not current_shop_id or not current_shop_uuid:
+            return JSONResponse(status_code=403, content={"error": "Shop scope not resolved", "rows": []})
 
         cur.execute(
             """
@@ -4141,7 +4494,10 @@ async def list_records_tech_payouts(
                         ORDER BY f.paid_at DESC NULLS LAST, f.id DESC
                     ) AS row_rank
                 FROM ro_flagout_lines f
-                WHERE f.domain = %s
+                                WHERE (
+                                                f.shop_uuid = %s::uuid
+                                         OR (f.shop_uuid IS NULL AND f.shop_id = %s AND f.domain = %s)
+                                    )
                   AND f.tech_id IS NOT NULL
                   AND f.paid_at IS NOT NULL
                                     AND (%s::date IS NULL OR f.paid_at::date >= %s::date)
@@ -4167,7 +4523,7 @@ async def list_records_tech_payouts(
              AND p.row_rank = 1
             ORDER BY tech_name ASC
             """,
-            (domain, start_date_value, start_date_value, end_date_value, end_date_value),
+                        (current_shop_uuid, current_shop_id, domain, start_date_value, start_date_value, end_date_value, end_date_value),
         )
         rows = cur.fetchall() or []
 
@@ -4219,6 +4575,11 @@ async def list_records_tech_paid_ros(
     try:
         _ensure_ro_flagout_lines_table(cur)
         _ensure_saved_estimates_table(cur)
+        _ensure_shop_isolation_infrastructure(cur)
+        current_shop_id = _resolve_request_shop_id(request, cur, domain)
+        current_shop_uuid = _resolve_request_shop_uuid(request, cur, domain)
+        if not current_shop_id or not current_shop_uuid:
+            return JSONResponse(status_code=403, content={"error": "Shop scope not resolved", "rows": []})
 
         cur.execute(
             """
@@ -4230,7 +4591,10 @@ async def list_records_tech_paid_ros(
                     COALESCE(SUM(COALESCE(f.pay_amount, COALESCE(f.hours, 0) * COALESCE(f.pay_rate, 0))), 0) AS total_paid,
                     MAX(f.paid_at) AS paid_at
                 FROM ro_flagout_lines f
-                WHERE f.domain = %s
+                                WHERE (
+                                                f.shop_uuid = %s::uuid
+                                         OR (f.shop_uuid IS NULL AND f.shop_id = %s AND f.domain = %s)
+                                    )
                   AND f.paid_at IS NOT NULL
                   AND f.tech_id = %s
                                     AND (%s::date IS NULL OR f.paid_at::date >= %s::date)
@@ -4252,7 +4616,10 @@ async def list_records_tech_paid_ros(
                     se.grand_total,
                     se.saved_at
                 FROM saved_estimates se
-                WHERE se.domain = %s
+                                WHERE (
+                                                se.shop_uuid = %s::uuid
+                                         OR (se.shop_uuid IS NULL AND se.shop_id = %s AND se.domain = %s)
+                                    )
                 ORDER BY se.ro, se.saved_at DESC, se.id DESC
             )
             SELECT
@@ -4274,7 +4641,7 @@ async def list_records_tech_paid_ros(
             LEFT JOIN latest_estimates le ON le.ro = p.ro
             ORDER BY p.ro ASC
             """,
-            (domain, tech_id, start_date_value, start_date_value, end_date_value, end_date_value, domain),
+            (current_shop_uuid, current_shop_id, domain, tech_id, start_date_value, start_date_value, end_date_value, end_date_value, current_shop_uuid, current_shop_id, domain),
         )
         rows = cur.fetchall() or []
 
@@ -4343,6 +4710,11 @@ async def list_records_parts_vendors_summary(
     try:
         _ensure_parts_vendors_table(cur)
         _ensure_parts_received_table(cur)
+        _ensure_shop_isolation_infrastructure(cur)
+        current_shop_id = _resolve_request_shop_id(request, cur, domain)
+        current_shop_uuid = _resolve_request_shop_uuid(request, cur, domain)
+        if not current_shop_id or not current_shop_uuid:
+            return JSONResponse(status_code=403, content={"error": "Shop scope not resolved", "rows": []})
 
         cur.execute(
             """
@@ -4372,16 +4744,22 @@ async def list_records_parts_vendors_summary(
                 ) AS total_cost
             FROM parts_vendors v
             LEFT JOIN parts_received pr
-                   ON pr.domain = v.domain
-                  AND LOWER(TRIM(pr.vendor)) = LOWER(TRIM(v.name))
+                     ON LOWER(TRIM(pr.vendor)) = LOWER(TRIM(v.name))
+                    AND (
+                        pr.shop_uuid = %s::uuid
+                       OR (pr.shop_uuid IS NULL AND pr.shop_id = %s AND pr.domain = %s)
+                    )
                                     AND (%s::date IS NULL OR COALESCE(pr.received_business_date, pr.received_at::date) >= %s::date)
                                     AND (%s::date IS NULL OR COALESCE(pr.received_business_date, pr.received_at::date) <= %s::date)
-            WHERE v.domain = %s
+                WHERE (
+                      v.shop_uuid = %s::uuid
+                     OR (v.shop_uuid IS NULL AND v.shop_id = %s AND v.domain = %s)
+                    )
               AND v.active = TRUE
             GROUP BY v.id, v.name, v.vendor_type
             ORDER BY LOWER(TRIM(v.name)) ASC
             """,
-                        (start_date_value, start_date_value, end_date_value, end_date_value, domain),
+                (current_shop_uuid, current_shop_id, domain, start_date_value, start_date_value, end_date_value, end_date_value, current_shop_uuid, current_shop_id, domain),
         )
         rows = cur.fetchall() or []
 
@@ -4432,15 +4810,25 @@ async def list_records_parts_vendor_invoices(
     try:
         _ensure_parts_vendors_table(cur)
         _ensure_parts_received_table(cur)
+                _ensure_shop_isolation_infrastructure(cur)
+                current_shop_id = _resolve_request_shop_id(request, cur, domain)
+                current_shop_uuid = _resolve_request_shop_uuid(request, cur, domain)
+                if not current_shop_id or not current_shop_uuid:
+                        return JSONResponse(status_code=403, content={"error": "Shop scope not resolved", "rows": []})
 
         cur.execute(
             """
             SELECT name
             FROM parts_vendors
-            WHERE id = %s AND domain = %s AND active = TRUE
+                        WHERE id = %s
+                            AND active = TRUE
+                            AND (
+                                        shop_uuid = %s::uuid
+                                 OR (shop_uuid IS NULL AND shop_id = %s AND domain = %s)
+                            )
             LIMIT 1
             """,
-            (vendor_id, domain),
+                        (vendor_id, current_shop_uuid, current_shop_id, domain),
         )
         vendor_row = cur.fetchone()
         if not vendor_row:
@@ -4459,7 +4847,10 @@ async def list_records_parts_vendor_invoices(
                 COUNT(*) AS parts_count,
                 COALESCE(SUM(pr.cost), 0) AS total_cost
             FROM parts_received pr
-            WHERE pr.domain = %s
+                        WHERE (
+                                        pr.shop_uuid = %s::uuid
+                                 OR (pr.shop_uuid IS NULL AND pr.shop_id = %s AND pr.domain = %s)
+                                    )
               AND LOWER(TRIM(pr.vendor)) = LOWER(TRIM(%s))
               AND pr.invoice_number IS NOT NULL
               AND TRIM(pr.invoice_number) <> ''
@@ -4468,7 +4859,7 @@ async def list_records_parts_vendor_invoices(
             GROUP BY pr.ro, TRIM(pr.invoice_number)
             ORDER BY MAX(COALESCE(pr.received_business_date, pr.received_at::date)) DESC, pr.ro ASC, TRIM(pr.invoice_number) ASC
             """,
-            (domain, vendor_name, start_date_value, start_date_value, end_date_value, end_date_value),
+                        (current_shop_uuid, current_shop_id, domain, vendor_name, start_date_value, start_date_value, end_date_value, end_date_value),
         )
         rows = cur.fetchall() or []
 
@@ -4507,15 +4898,25 @@ async def list_records_parts_vendor_invoice_parts(request: Request, vendor_id: i
         _ensure_parts_vendors_table(cur)
         _ensure_parts_received_table(cur)
         _ensure_saved_estimates_table(cur)
+                _ensure_shop_isolation_infrastructure(cur)
+                current_shop_id = _resolve_request_shop_id(request, cur, domain)
+                current_shop_uuid = _resolve_request_shop_uuid(request, cur, domain)
+                if not current_shop_id or not current_shop_uuid:
+                        return JSONResponse(status_code=403, content={"error": "Shop scope not resolved", "parts": []})
 
         cur.execute(
             """
             SELECT name
             FROM parts_vendors
-            WHERE id = %s AND domain = %s AND active = TRUE
+                        WHERE id = %s
+                            AND active = TRUE
+                            AND (
+                                        shop_uuid = %s::uuid
+                                 OR (shop_uuid IS NULL AND shop_id = %s AND domain = %s)
+                            )
             LIMIT 1
             """,
-            (vendor_id, domain),
+                        (vendor_id, current_shop_uuid, current_shop_id, domain),
         )
         vendor_row = cur.fetchone()
         if not vendor_row:
@@ -4529,11 +4930,15 @@ async def list_records_parts_vendor_invoice_parts(request: Request, vendor_id: i
             """
             SELECT parts_repairs
             FROM saved_estimates
-            WHERE domain = %s AND ro = %s
+                        WHERE (
+                                        shop_uuid = %s::uuid
+                                 OR (shop_uuid IS NULL AND shop_id = %s AND domain = %s)
+                                    )
+                            AND ro = %s
             ORDER BY saved_at DESC, id DESC
             LIMIT 1
             """,
-            (domain, ro_value),
+                        (current_shop_uuid, current_shop_id, domain, ro_value),
         )
         estimate_row = cur.fetchone() or {}
         parts_repairs = _parse_json_field(estimate_row.get("parts_repairs"))
@@ -4563,13 +4968,16 @@ async def list_records_parts_vendor_invoice_parts(request: Request, vendor_id: i
                 list_price,
                 cost
             FROM parts_received
-            WHERE domain = %s
+                        WHERE (
+                                        shop_uuid = %s::uuid
+                                 OR (shop_uuid IS NULL AND shop_id = %s AND domain = %s)
+                                    )
               AND ro = %s
               AND TRIM(invoice_number) = %s
               AND LOWER(TRIM(vendor)) = LOWER(TRIM(%s))
             ORDER BY line_id
             """,
-            (domain, ro_value, invoice_value, vendor_name),
+                        (current_shop_uuid, current_shop_id, domain, ro_value, invoice_value, vendor_name),
         )
         rows = cur.fetchall() or []
 
@@ -4658,18 +5066,26 @@ async def save_ro_payments(request: Request):
         _ensure_saved_estimates_table(cur)
         _ensure_ro_payment_totals_table(cur)
         _ensure_ro_payment_entries_table(cur)
+                _ensure_shop_isolation_infrastructure(cur)
+                current_shop_id = _resolve_request_shop_id(request, cur, domain)
+                current_shop_uuid = _resolve_request_shop_uuid(request, cur, domain)
+                if not current_shop_id or not current_shop_uuid:
+                        return JSONResponse(status_code=403, content={"error": "Shop scope not resolved"})
         created_by = _resolve_request_user_display_name(request, cur, domain)
 
         cur.execute(
             """
             SELECT grand_total
             FROM saved_estimates
-            WHERE domain = %s
+                        WHERE (
+                                        shop_uuid = %s::uuid
+                                 OR (shop_uuid IS NULL AND shop_id = %s AND domain = %s)
+                                    )
               AND ro = %s
             ORDER BY saved_at DESC, id DESC
             LIMIT 1
             """,
-            (domain, ro_value),
+                        (current_shop_uuid, current_shop_id, domain, ro_value),
         )
         ro_row = cur.fetchone()
         if not ro_row:
@@ -4681,11 +5097,14 @@ async def save_ro_payments(request: Request):
             """
             SELECT insurance_paid, customer_paid
             FROM ro_payment_totals
-            WHERE domain = %s
+                        WHERE (
+                                        shop_uuid = %s::uuid
+                                 OR (shop_uuid IS NULL AND shop_id = %s AND domain = %s)
+                                    )
               AND ro = %s
             LIMIT 1
             """,
-            (domain, ro_value),
+                        (current_shop_uuid, current_shop_id, domain, ro_value),
         )
         existing_row = cur.fetchone() or {}
         existing_insurance_paid = _parse_float_value(existing_row.get("insurance_paid"))
@@ -4712,15 +5131,17 @@ async def save_ro_payments(request: Request):
 
         cur.execute(
             """
-            INSERT INTO ro_payment_totals (ro, domain, insurance_paid, customer_paid, updated_at)
-            VALUES (%s, %s, %s, %s, CURRENT_TIMESTAMP)
+            INSERT INTO ro_payment_totals (ro, domain, shop_id, shop_uuid, insurance_paid, customer_paid, updated_at)
+            VALUES (%s, %s, %s, %s::uuid, %s, %s, CURRENT_TIMESTAMP)
             ON CONFLICT (domain, ro)
             DO UPDATE SET
+                shop_id = EXCLUDED.shop_id,
+                shop_uuid = EXCLUDED.shop_uuid,
                 insurance_paid = EXCLUDED.insurance_paid,
                 customer_paid = EXCLUDED.customer_paid,
                 updated_at = CURRENT_TIMESTAMP
             """,
-            (ro_value, domain, insurance_paid, customer_paid),
+            (ro_value, domain, current_shop_id, current_shop_uuid, insurance_paid, customer_paid),
         )
 
         if insurance_entry_amount > 0:
@@ -4730,6 +5151,8 @@ async def save_ro_payments(request: Request):
                 INSERT INTO ro_payment_entries (
                     ro,
                     domain,
+                    shop_id,
+                    shop_uuid,
                     payer_type,
                     payment_method,
                     check_number,
@@ -4738,11 +5161,13 @@ async def save_ro_payments(request: Request):
                     business_date,
                     created_at
                 )
-                VALUES (%s, %s, 'insurance', %s, %s, %s, %s, %s, CURRENT_TIMESTAMP)
+                VALUES (%s, %s, %s, %s::uuid, 'insurance', %s, %s, %s, %s, %s, CURRENT_TIMESTAMP)
                 """,
                 (
                     ro_value,
                     domain,
+                    current_shop_id,
+                    current_shop_uuid,
                     insurance_payment_type or None,
                     insurance_check_number or None,
                     created_by,
@@ -4758,6 +5183,8 @@ async def save_ro_payments(request: Request):
                 INSERT INTO ro_payment_entries (
                     ro,
                     domain,
+                    shop_id,
+                    shop_uuid,
                     payer_type,
                     payment_method,
                     check_number,
@@ -4766,11 +5193,13 @@ async def save_ro_payments(request: Request):
                     business_date,
                     created_at
                 )
-                VALUES (%s, %s, 'customer', %s, %s, %s, %s, %s, CURRENT_TIMESTAMP)
+                VALUES (%s, %s, %s, %s::uuid, 'customer', %s, %s, %s, %s, %s, CURRENT_TIMESTAMP)
                 """,
                 (
                     ro_value,
                     domain,
+                    current_shop_id,
+                    current_shop_uuid,
                     customer_payment_type or None,
                     customer_check_number or None,
                     created_by,
@@ -4817,6 +5246,12 @@ async def close_ro_from_payments(request: Request):
 
         _ensure_saved_estimates_table(cur)
         _ensure_ro_phases_table(cur)
+        _ensure_shop_isolation_infrastructure(cur)
+        current_shop_id = _resolve_request_shop_id(request, cur, domain)
+        current_shop_uuid = _resolve_request_shop_uuid(request, cur, domain)
+        if not current_shop_id or not current_shop_uuid:
+            conn.rollback()
+            return JSONResponse(status_code=403, content={"error": "Shop scope not resolved"})
 
         if ro_value:
             cur.execute(
@@ -4824,10 +5259,13 @@ async def close_ro_from_payments(request: Request):
                 SELECT 1
                 FROM saved_estimates
                 WHERE ro = %s
-                  AND domain = %s
+                  AND (
+                        shop_uuid = %s::uuid
+                     OR (shop_uuid IS NULL AND shop_id = %s AND domain = %s)
+                  )
                 LIMIT 1
                 """,
-                (ro_value, domain),
+                (ro_value, current_shop_uuid, current_shop_id, domain),
             )
             if not cur.fetchone():
                 conn.rollback()
@@ -4835,13 +5273,15 @@ async def close_ro_from_payments(request: Request):
 
             cur.execute(
                 """
-                INSERT INTO ro_phases (ro, phase, domain)
-                VALUES (%s, %s, %s)
+                INSERT INTO ro_phases (ro, phase, domain, shop_id, shop_uuid)
+                VALUES (%s, %s, %s, %s, %s::uuid)
                 ON CONFLICT (ro, domain)
                 DO UPDATE SET phase = EXCLUDED.phase,
+                              shop_id = EXCLUDED.shop_id,
+                              shop_uuid = EXCLUDED.shop_uuid,
                               updated_at = CURRENT_TIMESTAMP
                 """,
-                (ro_value, "complete/finish", domain),
+                (ro_value, "complete/finish", domain, current_shop_id, current_shop_uuid),
             )
 
         conn.commit()
@@ -4872,6 +5312,11 @@ async def get_ro_payment_log(request: Request, ro: str):
     cur = conn.cursor()
     try:
         _ensure_ro_flagout_lines_table(cur)
+        _ensure_shop_isolation_infrastructure(cur)
+        current_shop_id = _resolve_request_shop_id(request, cur, domain)
+        current_shop_uuid = _resolve_request_shop_uuid(request, cur, domain)
+        if not current_shop_id or not current_shop_uuid:
+            return JSONResponse(status_code=403, content={"error": "Shop scope not resolved", "entries": []})
 
         cur.execute(
             """
@@ -4880,13 +5325,16 @@ async def get_ro_payment_log(request: Request, ro: str):
                 COALESCE(NULLIF(TRIM(tech_name), ''), 'Unassigned') AS tech_name,
                 COALESCE(SUM(pay_amount), 0) AS amount
             FROM ro_flagout_lines
-            WHERE domain = %s
+            WHERE (
+                    shop_uuid = %s::uuid
+                 OR (shop_uuid IS NULL AND shop_id = %s AND domain = %s)
+                  )
               AND ro = %s
               AND paid_at IS NOT NULL
             GROUP BY paid_at, COALESCE(NULLIF(TRIM(tech_name), ''), 'Unassigned')
             ORDER BY paid_at DESC, tech_name ASC
             """,
-            (domain, ro_value),
+            (current_shop_uuid, current_shop_id, domain, ro_value),
         )
         rows = cur.fetchall() or []
 
@@ -5431,6 +5879,11 @@ async def get_ro_assignment_lines(
         _ensure_ro_line_assignments_table(cur)
         _ensure_techs_table(cur)
         _ensure_ro_activity_log_table(cur)
+        _ensure_shop_isolation_infrastructure(cur)
+        current_shop_id = _resolve_request_shop_id(request, cur, domain)
+        current_shop_uuid = _resolve_request_shop_uuid(request, cur, domain)
+        if not current_shop_id or not current_shop_uuid:
+            return JSONResponse(status_code=403, content={"error": "Shop scope not resolved"})
         _ensure_ro_line_assignments_for_ro(cur, domain, ro_value)
 
         cur.execute(
@@ -5503,10 +5956,13 @@ async def get_ro_assignment_lines(
             FROM techs
             WHERE active = TRUE
               AND status = 'Active'
-              AND (domain = %s OR domain IS NULL)
+                            AND (
+                                        shop_uuid = %s::uuid
+                                 OR (shop_uuid IS NULL AND shop_id = %s AND (domain = %s OR domain IS NULL))
+                            )
             ORDER BY first_name, last_name
             """,
-            (domain,),
+                        (current_shop_uuid, current_shop_id, domain),
         )
         tech_rows = cur.fetchall()
 
@@ -5573,6 +6029,11 @@ async def save_ro_assignment_lines(request: Request):
         _ensure_ro_line_assignments_table(cur)
         _ensure_techs_table(cur)
         _ensure_ro_activity_log_table(cur)
+        _ensure_shop_isolation_infrastructure(cur)
+        current_shop_id = _resolve_request_shop_id(request, cur, domain)
+        current_shop_uuid = _resolve_request_shop_uuid(request, cur, domain)
+        if not current_shop_id or not current_shop_uuid:
+            return JSONResponse(status_code=403, content={"error": "Shop scope not resolved"})
         _ensure_ro_line_assignments_for_ro(cur, domain, ro_value)
 
         cur.execute(
@@ -5601,9 +6062,12 @@ async def save_ro_assignment_lines(request: Request):
                 WHERE id = %s
                   AND active = TRUE
                                     AND status = 'Active'
-                  AND (domain = %s OR domain IS NULL)
+                                    AND (
+                                                shop_uuid = %s::uuid
+                                         OR (shop_uuid IS NULL AND shop_id = %s AND (domain = %s OR domain IS NULL))
+                                    )
                 """,
-                (target_tech_id, domain),
+                                (target_tech_id, current_shop_uuid, current_shop_id, domain),
             )
             tech_row = cur.fetchone()
             if not tech_row:
@@ -5618,11 +6082,14 @@ async def save_ro_assignment_lines(request: Request):
                 FROM techs
                 WHERE active = TRUE
                                     AND status = 'Active'
-                  AND (domain = %s OR domain IS NULL)
+                                    AND (
+                                                shop_uuid = %s::uuid
+                                         OR (shop_uuid IS NULL AND shop_id = %s AND (domain = %s OR domain IS NULL))
+                                    )
                   AND TRIM(CONCAT(COALESCE(first_name, ''), ' ', COALESCE(last_name, ''))) = %s
                 LIMIT 1
                 """,
-                (domain, target_tech_name),
+                                (current_shop_uuid, current_shop_id, domain, target_tech_name),
             )
             active_named = cur.fetchone()
             if not active_named:
@@ -5734,9 +6201,11 @@ async def save_ro_assignment_lines(request: Request):
                         tech_id,
                         tech_name,
                         is_pending,
-                        domain
+                        domain,
+                        shop_id,
+                        shop_uuid
                     )
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, FALSE, %s)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, FALSE, %s, %s, %s::uuid)
                     """,
                     (
                         ro_value,
@@ -5749,6 +6218,8 @@ async def save_ro_assignment_lines(request: Request):
                         target_tech_id,
                         target_tech_name or None,
                         domain,
+                        current_shop_id,
+                        current_shop_uuid,
                     ),
                 )
                 manual_insert_count += 1
@@ -5844,6 +6315,11 @@ async def unassign_ro_assignment_lines(request: Request):
         _ensure_saved_estimates_table(cur)
         _ensure_ro_line_assignments_table(cur)
         _ensure_ro_activity_log_table(cur)
+        _ensure_shop_isolation_infrastructure(cur)
+        current_shop_id = _resolve_request_shop_id(request, cur, domain)
+        current_shop_uuid = _resolve_request_shop_uuid(request, cur, domain)
+        if not current_shop_id or not current_shop_uuid:
+            return JSONResponse(status_code=403, content={"error": "Shop scope not resolved"})
         _ensure_ro_line_assignments_for_ro(cur, domain, ro_value)
 
         cur.execute(
@@ -5988,16 +6464,25 @@ async def save_ro_assignments(request: Request):
         _ensure_saved_estimates_table(cur)
         _ensure_ro_assignments_table(cur)
         _ensure_techs_table(cur)
+        _ensure_shop_isolation_infrastructure(cur)
+        current_shop_id = _resolve_request_shop_id(request, cur, domain)
+        current_shop_uuid = _resolve_request_shop_uuid(request, cur, domain)
+        if not current_shop_id or not current_shop_uuid:
+            return JSONResponse(status_code=403, content={"error": "Shop scope not resolved"})
 
         cur.execute(
             """
             SELECT labor_repairs, paint_repairs
             FROM saved_estimates
-            WHERE domain = %s AND ro = %s
+            WHERE (
+                    shop_uuid = %s::uuid
+                 OR (shop_uuid IS NULL AND shop_id = %s AND domain = %s)
+                  )
+              AND ro = %s
             ORDER BY saved_at DESC, id DESC
             LIMIT 1
             """,
-            (domain, ro_value),
+            (current_shop_uuid, current_shop_id, domain, ro_value),
         )
         estimate_row = cur.fetchone() or {}
         labor_repairs = _parse_json_field(estimate_row.get("labor_repairs"))
@@ -6018,9 +6503,12 @@ async def save_ro_assignments(request: Request):
                 WHERE id = %s
                   AND active = TRUE
                                     AND status = 'Active'
-                  AND (domain = %s OR domain IS NULL)
+                                    AND (
+                                                shop_uuid = %s::uuid
+                                         OR (shop_uuid IS NULL AND shop_id = %s AND (domain = %s OR domain IS NULL))
+                                    )
                 """,
-                (tech_id, domain),
+                                (tech_id, current_shop_uuid, current_shop_id, domain),
             )
             row = cur.fetchone()
             if not row:
@@ -6035,11 +6523,14 @@ async def save_ro_assignments(request: Request):
                 FROM techs
                 WHERE active = TRUE
                                     AND status = 'Active'
-                  AND (domain = %s OR domain IS NULL)
+                                    AND (
+                                                shop_uuid = %s::uuid
+                                         OR (shop_uuid IS NULL AND shop_id = %s AND (domain = %s OR domain IS NULL))
+                                    )
                   AND TRIM(CONCAT(COALESCE(first_name, ''), ' ', COALESCE(last_name, ''))) = %s
                 LIMIT 1
                 """,
-                (domain, tech_name),
+                                (current_shop_uuid, current_shop_id, domain, tech_name),
             )
             active_named = cur.fetchone()
             if not active_named:
@@ -6047,14 +6538,16 @@ async def save_ro_assignments(request: Request):
 
         cur.execute(
             """
-            INSERT INTO ro_assignments (ro, role, tech_id, tech_name, excluded_lines, assigned_hours, domain)
-            VALUES (%s, %s, %s, %s, %s, %s, %s)
+            INSERT INTO ro_assignments (ro, role, tech_id, tech_name, excluded_lines, assigned_hours, domain, shop_id, shop_uuid)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s::uuid)
             ON CONFLICT (ro, role, domain)
             DO UPDATE SET
                 tech_id = EXCLUDED.tech_id,
                 tech_name = EXCLUDED.tech_name,
                 excluded_lines = EXCLUDED.excluded_lines,
                 assigned_hours = EXCLUDED.assigned_hours,
+                shop_id = EXCLUDED.shop_id,
+                shop_uuid = EXCLUDED.shop_uuid,
                 updated_at = CURRENT_TIMESTAMP
             """,
             (
@@ -6065,6 +6558,8 @@ async def save_ro_assignments(request: Request):
                 json.dumps(excluded_lines),
                 assigned_hours,
                 domain,
+                current_shop_id,
+                current_shop_uuid,
             ),
         )
         conn.commit()
@@ -6089,6 +6584,11 @@ async def get_tech_assignments(request: Request, tech_id: int):
         _ensure_ro_line_assignments_table(cur)
         _ensure_ro_flagout_lines_table(cur)
         _ensure_saved_estimates_table(cur)
+        _ensure_shop_isolation_infrastructure(cur)
+        current_shop_id = _resolve_request_shop_id(request, cur, domain)
+        current_shop_uuid = _resolve_request_shop_uuid(request, cur, domain)
+        if not current_shop_id or not current_shop_uuid:
+            return JSONResponse(status_code=403, content={"error": "Shop scope not resolved"})
 
         cur.execute(
             """
@@ -6104,7 +6604,10 @@ async def get_tech_assignments(request: Request, tech_id: int):
                                         estimator,
                                         written_by
                 FROM saved_estimates
-                WHERE domain = %s
+                                WHERE (
+                                                shop_uuid = %s::uuid
+                                         OR (shop_uuid IS NULL AND shop_id = %s AND domain = %s)
+                                    )
                   AND ro IS NOT NULL
                   AND ro <> ''
                 ORDER BY ro, saved_at DESC, id DESC
@@ -6122,14 +6625,17 @@ async def get_tech_assignments(request: Request, tech_id: int):
                                 le.written_by
             FROM ro_line_assignments a
             LEFT JOIN latest_estimates le ON le.ro = a.ro
-            WHERE a.domain = %s
+                        WHERE (
+                                        a.shop_uuid = %s::uuid
+                                 OR (a.shop_uuid IS NULL AND a.shop_id = %s AND a.domain = %s)
+                                    )
               AND a.tech_id = %s
               AND a.tech_name IS NOT NULL
               AND COALESCE(a.ready_to_flag, FALSE) = FALSE
                         GROUP BY a.ro, le.year, le.make, le.model, le.vehicle, le.vin, le.insurance_company, le.estimator, le.written_by
             ORDER BY ro
             """,
-            (domain, domain, tech_id),
+                        (current_shop_uuid, current_shop_id, domain, current_shop_uuid, current_shop_id, domain, tech_id),
         )
         assignment_rows = cur.fetchall()
 
@@ -6174,6 +6680,11 @@ async def get_tech_assignment_lines(request: Request, tech_id: int, ro: str):
     try:
         _ensure_saved_estimates_table(cur)
         _ensure_ro_line_assignments_table(cur)
+        _ensure_shop_isolation_infrastructure(cur)
+        current_shop_id = _resolve_request_shop_id(request, cur, domain)
+        current_shop_uuid = _resolve_request_shop_uuid(request, cur, domain)
+        if not current_shop_id or not current_shop_uuid:
+            return JSONResponse(status_code=403, content={"error": "Shop scope not resolved"})
         _ensure_ro_line_assignments_for_ro(cur, domain, ro_value)
 
         cur.execute(
@@ -6185,13 +6696,16 @@ async def get_tech_assignment_lines(request: Request, tech_id: int, ro: str):
                                 hours,
                                 repair_type
             FROM ro_line_assignments
-            WHERE domain = %s
+                        WHERE (
+                                        shop_uuid = %s::uuid
+                                 OR (shop_uuid IS NULL AND shop_id = %s AND domain = %s)
+                                    )
               AND ro = %s
               AND tech_id = %s
               AND COALESCE(ready_to_flag, FALSE) = FALSE
             ORDER BY line_number
             """,
-            (domain, ro_value, tech_id),
+                        (current_shop_uuid, current_shop_id, domain, ro_value, tech_id),
         )
         rows = cur.fetchall()
 
@@ -6751,26 +7265,38 @@ async def phase_update(request: Request):
     try:
         _ensure_ro_phases_table(cur)
         _ensure_ro_activity_log_table(cur)
+                _ensure_shop_isolation_infrastructure(cur)
+                current_shop_id = _resolve_request_shop_id(request, cur, domain)
+                current_shop_uuid = _resolve_request_shop_uuid(request, cur, domain)
+                if not current_shop_id or not current_shop_uuid:
+                        return JSONResponse(status_code=403, content={"error": "Shop scope not resolved"})
 
         cur.execute(
             """
             SELECT phase
             FROM ro_phases
-            WHERE ro = %s AND domain = %s
+                        WHERE ro = %s
+                            AND (
+                                        shop_uuid = %s::uuid
+                                 OR (shop_uuid IS NULL AND shop_id = %s AND domain = %s)
+                            )
             """,
-            (ro, domain),
+                        (ro, current_shop_uuid, current_shop_id, domain),
         )
         prev_row = cur.fetchone() or {}
         previous_phase = (prev_row.get("phase") or "").strip().lower()
 
         cur.execute(
             """
-            INSERT INTO ro_phases (ro, phase, domain)
-            VALUES (%s, %s, %s)
+            INSERT INTO ro_phases (ro, phase, domain, shop_id, shop_uuid)
+            VALUES (%s, %s, %s, %s, %s::uuid)
             ON CONFLICT (ro, domain)
-            DO UPDATE SET phase = EXCLUDED.phase, updated_at = CURRENT_TIMESTAMP
+            DO UPDATE SET phase = EXCLUDED.phase,
+                          shop_id = EXCLUDED.shop_id,
+                          shop_uuid = EXCLUDED.shop_uuid,
+                          updated_at = CURRENT_TIMESTAMP
             """,
-            (ro, phase, domain),
+            (ro, phase, domain, current_shop_id, current_shop_uuid),
         )
 
         if previous_phase != phase:
@@ -6814,6 +7340,11 @@ async def phase_board(request: Request):
     try:
         _ensure_saved_estimates_table(cur)
         _ensure_ro_phases_table(cur)
+        _ensure_shop_isolation_infrastructure(cur)
+        current_shop_id = _resolve_request_shop_id(request, cur, domain)
+        current_shop_uuid = _resolve_request_shop_uuid(request, cur, domain)
+        if not current_shop_id or not current_shop_uuid:
+            return JSONResponse(status_code=403, content={"error": "Shop scope not resolved"})
 
         cur.execute(
             """
@@ -6828,12 +7359,15 @@ async def phase_board(request: Request):
                    labor_repairs,
                    paint_repairs
             FROM saved_estimates
-            WHERE domain = %s
+                        WHERE (
+                                        shop_uuid = %s::uuid
+                                 OR (shop_uuid IS NULL AND shop_id = %s AND domain = %s)
+                                    )
               AND ro IS NOT NULL
               AND ro <> ''
             ORDER BY ro, saved_at DESC, id DESC
             """,
-            (domain,),
+                        (current_shop_uuid, current_shop_id, domain),
         )
         estimate_rows = cur.fetchall()
 
@@ -6841,9 +7375,12 @@ async def phase_board(request: Request):
             """
             SELECT ro, phase
             FROM ro_phases
-            WHERE domain = %s
+            WHERE (
+                    shop_uuid = %s::uuid
+                 OR (shop_uuid IS NULL AND shop_id = %s AND domain = %s)
+                  )
             """,
-            (domain,),
+            (current_shop_uuid, current_shop_id, domain),
         )
         phase_rows = cur.fetchall()
         phase_map = {row.get("ro"): row.get("phase") for row in phase_rows}
@@ -6858,10 +7395,13 @@ async def phase_board(request: Request):
             """
             SELECT ro, repair_type, tech_name, COALESCE(SUM(hours), 0) AS total_hours
             FROM ro_line_assignments
-            WHERE domain = %s
+            WHERE (
+                    shop_uuid = %s::uuid
+                 OR (shop_uuid IS NULL AND shop_id = %s AND domain = %s)
+                  )
             GROUP BY ro, repair_type, tech_name
             """,
-            (domain,),
+            (current_shop_uuid, current_shop_id, domain),
         )
         assignment_rows = cur.fetchall()
         tech_map = {}
@@ -7129,6 +7669,11 @@ async def list_parts_ros(request: Request):
         _ensure_parts_received_table(cur)
         _ensure_ro_line_assignments_table(cur)
         _ensure_ro_phases_table(cur)
+        _ensure_shop_isolation_infrastructure(cur)
+        current_shop_id = _resolve_request_shop_id(request, cur, domain)
+        current_shop_uuid = _resolve_request_shop_uuid(request, cur, domain)
+        if not current_shop_id or not current_shop_uuid:
+            return JSONResponse(status_code=403, content={"error": "Shop scope not resolved", "ros": []})
 
         cur.execute(
             """
@@ -7139,12 +7684,15 @@ async def list_parts_ros(request: Request):
                    parts_repairs,
                    saved_at
             FROM saved_estimates
-            WHERE domain = %s
+                        WHERE (
+                                        shop_uuid = %s::uuid
+                                 OR (shop_uuid IS NULL AND shop_id = %s AND domain = %s)
+                                    )
               AND ro IS NOT NULL
               AND ro <> ''
             ORDER BY ro, saved_at DESC, id DESC
             """,
-            (domain,),
+                        (current_shop_uuid, current_shop_id, domain),
         )
         rows = cur.fetchall()
 
@@ -7152,9 +7700,12 @@ async def list_parts_ros(request: Request):
             """
             SELECT ro, phase
             FROM ro_phases
-            WHERE domain = %s
+            WHERE (
+                    shop_uuid = %s::uuid
+                 OR (shop_uuid IS NULL AND shop_id = %s AND domain = %s)
+                  )
             """,
-            (domain,),
+            (current_shop_uuid, current_shop_id, domain),
         )
         phase_rows = cur.fetchall() or []
         phase_map = {str(row.get("ro") or "").strip(): str(row.get("phase") or "").strip().lower() for row in phase_rows}
@@ -7164,10 +7715,13 @@ async def list_parts_ros(request: Request):
             """
             SELECT ro, arrival_date, ordered_lines, arrived_count, returned_count, created_at
             FROM parts_orders
-            WHERE domain = %s
+            WHERE (
+                    shop_uuid = %s::uuid
+                 OR (shop_uuid IS NULL AND shop_id = %s AND domain = %s)
+                  )
             ORDER BY created_at DESC
             """,
-            (domain,),
+            (current_shop_uuid, current_shop_id, domain),
         )
         orders = cur.fetchall()
 
@@ -7175,10 +7729,13 @@ async def list_parts_ros(request: Request):
             """
             SELECT ro, COUNT(*) as arrived
             FROM parts_received
-            WHERE domain = %s
+            WHERE (
+                    shop_uuid = %s::uuid
+                 OR (shop_uuid IS NULL AND shop_id = %s AND domain = %s)
+                  )
             GROUP BY ro
             """,
-            (domain,),
+            (current_shop_uuid, current_shop_id, domain),
         )
         received_rows = cur.fetchall()
         received_map = {row["ro"]: int(row.get("arrived") or 0) for row in received_rows}
@@ -7187,10 +7744,13 @@ async def list_parts_ros(request: Request):
             """
             SELECT ro, line_id
             FROM parts_received
-            WHERE domain = %s
+                        WHERE (
+                                        shop_uuid = %s::uuid
+                                 OR (shop_uuid IS NULL AND shop_id = %s AND domain = %s)
+                                    )
               AND COALESCE(returned, FALSE) = FALSE
             """,
-            (domain,),
+                        (current_shop_uuid, current_shop_id, domain),
         )
         received_not_returned_rows = cur.fetchall() or []
         received_not_returned_by_ro = {}
@@ -7209,11 +7769,14 @@ async def list_parts_ros(request: Request):
             """
             SELECT ro, COUNT(*) as returned
             FROM parts_received
-            WHERE domain = %s
+                        WHERE (
+                                        shop_uuid = %s::uuid
+                                 OR (shop_uuid IS NULL AND shop_id = %s AND domain = %s)
+                                    )
               AND COALESCE(returned, FALSE) = TRUE
             GROUP BY ro
             """,
-            (domain,),
+                        (current_shop_uuid, current_shop_id, domain),
         )
         returned_rows = cur.fetchall() or []
         returned_map = {row["ro"]: int(row.get("returned") or 0) for row in returned_rows}
@@ -7222,14 +7785,17 @@ async def list_parts_ros(request: Request):
             """
             SELECT ro, repair_type, tech_name
             FROM ro_line_assignments
-            WHERE domain = %s
+                        WHERE (
+                                        shop_uuid = %s::uuid
+                                 OR (shop_uuid IS NULL AND shop_id = %s AND domain = %s)
+                                    )
               AND ro IS NOT NULL
               AND ro <> ''
               AND tech_name IS NOT NULL
               AND TRIM(tech_name) <> ''
             ORDER BY ro, CASE WHEN repair_type = 'body' THEN 0 WHEN repair_type = 'paint' THEN 1 ELSE 2 END
             """,
-            (domain,),
+                        (current_shop_uuid, current_shop_id, domain),
         )
         tech_rows = cur.fetchall() or []
         tech_by_ro = {}
@@ -7338,14 +7904,22 @@ async def list_parts_lines(request: Request, ro: str):
         _ensure_saved_estimates_table(cur)
         _ensure_parts_orders_table(cur)
         _ensure_parts_received_table(cur)
+        _ensure_shop_isolation_infrastructure(cur)
+        current_shop_id = _resolve_request_shop_id(request, cur, domain)
+        current_shop_uuid = _resolve_request_shop_uuid(request, cur, domain)
+        if not current_shop_id or not current_shop_uuid:
+            return JSONResponse(status_code=403, content={"error": "Shop scope not resolved", "lines": []})
 
         cur.execute(
             """
             SELECT ordered_lines
             FROM parts_orders
-            WHERE domain = %s AND ro = %s
+            WHERE (
+                    shop_uuid = %s::uuid
+                 OR (shop_uuid IS NULL AND shop_id = %s AND domain = %s)
+            ) AND ro = %s
             """,
-            (domain, ro),
+            (current_shop_uuid, current_shop_id, domain, ro),
         )
         order_rows = cur.fetchall() or []
         ordered_ids = set()
@@ -7356,9 +7930,12 @@ async def list_parts_lines(request: Request, ro: str):
             """
             SELECT line_id
             FROM parts_received
-            WHERE domain = %s AND ro = %s AND COALESCE(returned, FALSE) = FALSE
+            WHERE (
+                    shop_uuid = %s::uuid
+                 OR (shop_uuid IS NULL AND shop_id = %s AND domain = %s)
+            ) AND ro = %s AND COALESCE(returned, FALSE) = FALSE
             """,
-            (domain, ro),
+            (current_shop_uuid, current_shop_id, domain, ro),
         )
         received_rows = cur.fetchall() or []
         received_not_returned_ids = {
@@ -7371,9 +7948,12 @@ async def list_parts_lines(request: Request, ro: str):
             """
             SELECT line_id
             FROM parts_received
-            WHERE domain = %s AND ro = %s AND COALESCE(returned, FALSE) = TRUE
+            WHERE (
+                    shop_uuid = %s::uuid
+                 OR (shop_uuid IS NULL AND shop_id = %s AND domain = %s)
+            ) AND ro = %s AND COALESCE(returned, FALSE) = TRUE
             """,
-            (domain, ro),
+            (current_shop_uuid, current_shop_id, domain, ro),
         )
         returned_rows = cur.fetchall() or []
         returned_ids = {
@@ -7388,11 +7968,14 @@ async def list_parts_lines(request: Request, ro: str):
             """
             SELECT parts_repairs
             FROM saved_estimates
-            WHERE domain = %s AND ro = %s
+            WHERE (
+                    shop_uuid = %s::uuid
+                 OR (shop_uuid IS NULL AND shop_id = %s AND domain = %s)
+            ) AND ro = %s
             ORDER BY saved_at DESC, id DESC
             LIMIT 1
             """,
-            (domain, ro),
+            (current_shop_uuid, current_shop_id, domain, ro),
         )
         row = cur.fetchone()
         parts_repairs = _parse_json_field(row.get("parts_repairs")) if row else []
@@ -7452,14 +8035,22 @@ async def save_parts_order(request: Request):
     try:
         _ensure_parts_orders_table(cur)
         _ensure_parts_received_table(cur)
+        _ensure_shop_isolation_infrastructure(cur)
+        current_shop_id = _resolve_request_shop_id(request, cur, domain)
+        current_shop_uuid = _resolve_request_shop_uuid(request, cur, domain)
+        if not current_shop_id or not current_shop_uuid:
+            return JSONResponse(status_code=403, content={"error": "Shop scope not resolved"})
 
         cur.execute(
             """
             SELECT ordered_lines
             FROM parts_orders
-            WHERE domain = %s AND ro = %s
+            WHERE (
+                    shop_uuid = %s::uuid
+                 OR (shop_uuid IS NULL AND shop_id = %s AND domain = %s)
+            ) AND ro = %s
             """,
-            (domain, ro),
+            (current_shop_uuid, current_shop_id, domain, ro),
         )
         existing_orders = cur.fetchall() or []
         already_ordered = set()
@@ -7470,9 +8061,12 @@ async def save_parts_order(request: Request):
             """
             SELECT line_id
             FROM parts_received
-            WHERE domain = %s AND ro = %s AND COALESCE(returned, FALSE) = FALSE
+            WHERE (
+                    shop_uuid = %s::uuid
+                 OR (shop_uuid IS NULL AND shop_id = %s AND domain = %s)
+            ) AND ro = %s AND COALESCE(returned, FALSE) = FALSE
             """,
-            (domain, ro),
+            (current_shop_uuid, current_shop_id, domain, ro),
         )
         received_rows = cur.fetchall() or []
         received_not_returned_ids = {
@@ -7485,9 +8079,12 @@ async def save_parts_order(request: Request):
             """
             SELECT line_id
             FROM parts_received
-            WHERE domain = %s AND ro = %s AND COALESCE(returned, FALSE) = TRUE
+            WHERE (
+                    shop_uuid = %s::uuid
+                 OR (shop_uuid IS NULL AND shop_id = %s AND domain = %s)
+            ) AND ro = %s AND COALESCE(returned, FALSE) = TRUE
             """,
-            (domain, ro),
+            (current_shop_uuid, current_shop_id, domain, ro),
         )
         returned_rows = cur.fetchall() or []
         returned_ids = {
@@ -7510,8 +8107,16 @@ async def save_parts_order(request: Request):
         if vendor_id and not vendor_name:
             _ensure_parts_vendors_table(cur)
             cur.execute(
-                "SELECT name FROM parts_vendors WHERE id = %s AND domain = %s",
-                (vendor_id, domain),
+                """
+                SELECT name
+                FROM parts_vendors
+                WHERE id = %s
+                  AND (
+                        shop_uuid = %s::uuid
+                     OR (shop_uuid IS NULL AND shop_id = %s AND domain = %s)
+                  )
+                """,
+                (vendor_id, current_shop_uuid, current_shop_id, domain),
             )
             row = cur.fetchone()
             vendor_name = row["name"] if row else None
@@ -7519,8 +8124,8 @@ async def save_parts_order(request: Request):
         cur.execute(
             """
             INSERT INTO parts_orders
-            (ro, vendor_id, vendor_name, arrival_date, ordered_lines, domain)
-            VALUES (%s, %s, %s, %s, %s, %s)
+            (ro, vendor_id, vendor_name, arrival_date, ordered_lines, domain, shop_id, shop_uuid)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s::uuid)
             """,
             (
                 ro,
@@ -7529,6 +8134,8 @@ async def save_parts_order(request: Request):
                 arrival_date,
                 json.dumps(sorted(ordered_lines)),
                 domain,
+                current_shop_id,
+                current_shop_uuid,
             ),
         )
         conn.commit()
@@ -7547,15 +8154,24 @@ async def list_parts_received(request: Request, ro: str):
     cur = conn.cursor()
     try:
         _ensure_parts_received_table(cur)
+                _ensure_shop_isolation_infrastructure(cur)
+                current_shop_id = _resolve_request_shop_id(request, cur, domain)
+                current_shop_uuid = _resolve_request_shop_uuid(request, cur, domain)
+                if not current_shop_id or not current_shop_uuid:
+                        return JSONResponse(status_code=403, content={"error": "Shop scope not resolved", "items": []})
         cur.execute(
             """
             SELECT line_id, vendor, part_number, list_price, cost, eta, invoice_number, invoice_total,
                    returned, received_business_date, received_at
             FROM parts_received
-            WHERE ro = %s AND domain = %s
+                        WHERE ro = %s
+                            AND (
+                                        shop_uuid = %s::uuid
+                                 OR (shop_uuid IS NULL AND shop_id = %s AND domain = %s)
+                            )
             ORDER BY COALESCE(received_business_date, received_at::date) DESC, received_at DESC
             """,
-            (ro, domain),
+                        (ro, current_shop_uuid, current_shop_id, domain),
         )
         rows = cur.fetchall()
         items = [
@@ -7598,16 +8214,24 @@ async def list_arrived_lines(request: Request, ro: str):
     try:
         _ensure_parts_received_table(cur)
         _ensure_saved_estimates_table(cur)
+        _ensure_shop_isolation_infrastructure(cur)
+        current_shop_id = _resolve_request_shop_id(request, cur, domain)
+        current_shop_uuid = _resolve_request_shop_uuid(request, cur, domain)
+        if not current_shop_id or not current_shop_uuid:
+            return JSONResponse(status_code=403, content={"error": "Shop scope not resolved", "items": []})
 
         cur.execute(
             """
             SELECT parts_repairs
             FROM saved_estimates
-            WHERE domain = %s AND ro = %s
+            WHERE (
+                    shop_uuid = %s::uuid
+                 OR (shop_uuid IS NULL AND shop_id = %s AND domain = %s)
+            ) AND ro = %s
             ORDER BY saved_at DESC, id DESC
             LIMIT 1
             """,
-            (domain, ro_value),
+            (current_shop_uuid, current_shop_id, domain, ro_value),
         )
         estimate_row = cur.fetchone()
         parts_repairs = _parse_json_field(estimate_row.get("parts_repairs")) if estimate_row else []
@@ -7630,12 +8254,15 @@ async def list_arrived_lines(request: Request, ro: str):
             """
                                                 SELECT line_id, vendor, description, part_number, list_price, cost, invoice_number, received_business_date, received_at
             FROM parts_received
-            WHERE domain = %s
+                        WHERE (
+                                        shop_uuid = %s::uuid
+                                 OR (shop_uuid IS NULL AND shop_id = %s AND domain = %s)
+                        )
               AND ro = %s
               AND COALESCE(returned, FALSE) = FALSE
                         ORDER BY COALESCE(received_business_date, received_at::date) DESC, line_id
             """,
-            (domain, ro_value),
+                        (current_shop_uuid, current_shop_id, domain, ro_value),
         )
         rows = cur.fetchall() or []
 
@@ -7694,6 +8321,11 @@ async def return_arrived_lines(request: Request):
     try:
         _ensure_parts_received_table(cur)
         _ensure_parts_orders_table(cur)
+        _ensure_shop_isolation_infrastructure(cur)
+        current_shop_id = _resolve_request_shop_id(request, cur, domain)
+        current_shop_uuid = _resolve_request_shop_uuid(request, cur, domain)
+        if not current_shop_id or not current_shop_uuid:
+            return JSONResponse(status_code=403, content={"error": "Shop scope not resolved"})
 
         updated_count = 0
         for line_id in line_ids:
@@ -7703,12 +8335,15 @@ async def return_arrived_lines(request: Request):
                                 SET returned = TRUE,
                                                                                 returned_at = CURRENT_TIMESTAMP,
                                                                                 returned_business_date = COALESCE(%s, CURRENT_DATE)
-                WHERE domain = %s
+                                WHERE (
+                                                shop_uuid = %s::uuid
+                                         OR (shop_uuid IS NULL AND shop_id = %s AND domain = %s)
+                                )
                   AND ro = %s
                   AND line_id = %s
                   AND COALESCE(returned, FALSE) = FALSE
                 """,
-                                (local_business_date, domain, ro_value, line_id),
+                                                                (local_business_date, current_shop_uuid, current_shop_id, domain, ro_value, line_id),
             )
             updated_count += int(cur.rowcount or 0)
 
@@ -7730,9 +8365,10 @@ async def return_arrived_lines(request: Request):
                       AND pr.ro = parts_orders.ro
                 )
             WHERE parts_orders.domain = %s
+                            AND (parts_orders.shop_uuid = %s::uuid OR (parts_orders.shop_uuid IS NULL AND parts_orders.shop_id = %s))
               AND parts_orders.ro = %s
             """,
-            (domain, ro_value),
+                        (domain, current_shop_uuid, current_shop_id, ro_value),
         )
 
         conn.commit()
@@ -7756,16 +8392,24 @@ async def list_returned_lines(request: Request, ro: str):
     try:
         _ensure_parts_received_table(cur)
         _ensure_saved_estimates_table(cur)
+        _ensure_shop_isolation_infrastructure(cur)
+        current_shop_id = _resolve_request_shop_id(request, cur, domain)
+        current_shop_uuid = _resolve_request_shop_uuid(request, cur, domain)
+        if not current_shop_id or not current_shop_uuid:
+            return JSONResponse(status_code=403, content={"error": "Shop scope not resolved", "items": []})
 
         cur.execute(
             """
             SELECT parts_repairs
             FROM saved_estimates
-            WHERE domain = %s AND ro = %s
+            WHERE (
+                    shop_uuid = %s::uuid
+                 OR (shop_uuid IS NULL AND shop_id = %s AND domain = %s)
+            ) AND ro = %s
             ORDER BY saved_at DESC, id DESC
             LIMIT 1
             """,
-            (domain, ro_value),
+            (current_shop_uuid, current_shop_id, domain, ro_value),
         )
         estimate_row = cur.fetchone()
         parts_repairs = _parse_json_field(estimate_row.get("parts_repairs")) if estimate_row else []
@@ -7787,12 +8431,15 @@ async def list_returned_lines(request: Request, ro: str):
             """
                         SELECT line_id, vendor, description, part_number, cost, returned_business_date, returned_at, received_business_date, received_at
             FROM parts_received
-            WHERE domain = %s
+                        WHERE (
+                                        shop_uuid = %s::uuid
+                                 OR (shop_uuid IS NULL AND shop_id = %s AND domain = %s)
+                        )
               AND ro = %s
               AND COALESCE(returned, FALSE) = TRUE
                         ORDER BY COALESCE(returned_business_date, returned_at::date, received_business_date, received_at::date) DESC, line_id
             """,
-            (domain, ro_value),
+                        (current_shop_uuid, current_shop_id, domain, ro_value),
         )
         rows = cur.fetchall() or []
 
@@ -7839,14 +8486,22 @@ async def list_on_order_lines(request: Request, ro: str):
         _ensure_saved_estimates_table(cur)
         _ensure_parts_orders_table(cur)
         _ensure_parts_received_table(cur)
+        _ensure_shop_isolation_infrastructure(cur)
+        current_shop_id = _resolve_request_shop_id(request, cur, domain)
+        current_shop_uuid = _resolve_request_shop_uuid(request, cur, domain)
+        if not current_shop_id or not current_shop_uuid:
+            return JSONResponse(status_code=403, content={"error": "Shop scope not resolved", "items": []})
 
         cur.execute(
             """
             SELECT line_id
             FROM parts_received
-            WHERE domain = %s AND ro = %s AND COALESCE(returned, FALSE) = FALSE
+            WHERE (
+                    shop_uuid = %s::uuid
+                 OR (shop_uuid IS NULL AND shop_id = %s AND domain = %s)
+            ) AND ro = %s AND COALESCE(returned, FALSE) = FALSE
             """,
-            (domain, ro_value),
+            (current_shop_uuid, current_shop_id, domain, ro_value),
         )
         received_rows = cur.fetchall() or []
         received_ids = {
@@ -7859,11 +8514,14 @@ async def list_on_order_lines(request: Request, ro: str):
             """
             SELECT parts_repairs
             FROM saved_estimates
-            WHERE domain = %s AND ro = %s
+            WHERE (
+                    shop_uuid = %s::uuid
+                 OR (shop_uuid IS NULL AND shop_id = %s AND domain = %s)
+            ) AND ro = %s
             ORDER BY saved_at DESC, id DESC
             LIMIT 1
             """,
-            (domain, ro_value),
+            (current_shop_uuid, current_shop_id, domain, ro_value),
         )
         estimate_row = cur.fetchone()
         parts_repairs = _parse_json_field(estimate_row.get("parts_repairs")) if estimate_row else []
@@ -7887,10 +8545,13 @@ async def list_on_order_lines(request: Request, ro: str):
             """
             SELECT id, vendor_name, arrival_date, ordered_lines
             FROM parts_orders
-            WHERE domain = %s AND ro = %s
+            WHERE (
+                    shop_uuid = %s::uuid
+                 OR (shop_uuid IS NULL AND shop_id = %s AND domain = %s)
+            ) AND ro = %s
             ORDER BY created_at DESC, id DESC
             """,
-            (domain, ro_value),
+            (current_shop_uuid, current_shop_id, domain, ro_value),
         )
         order_rows = cur.fetchall() or []
 
@@ -8064,6 +8725,11 @@ async def receive_on_order_lines(request: Request):
     try:
         _ensure_parts_orders_table(cur)
         _ensure_parts_received_table(cur)
+        _ensure_shop_isolation_infrastructure(cur)
+        current_shop_id = _resolve_request_shop_id(request, cur, domain)
+        current_shop_uuid = _resolve_request_shop_uuid(request, cur, domain)
+        if not current_shop_id or not current_shop_uuid:
+            return JSONResponse(status_code=403, content={"error": "Shop scope not resolved"})
 
         line_ids_by_order = {}
         for item in normalized_items:
@@ -8075,10 +8741,15 @@ async def receive_on_order_lines(request: Request):
                 """
                 SELECT ordered_lines
                 FROM parts_orders
-                WHERE id = %s AND domain = %s AND ro = %s
+                                WHERE id = %s
+                                    AND ro = %s
+                                    AND (
+                                                shop_uuid = %s::uuid
+                                         OR (shop_uuid IS NULL AND shop_id = %s AND domain = %s)
+                                    )
                 LIMIT 1
                 """,
-                (order_id, domain, ro_value),
+                                (order_id, ro_value, current_shop_uuid, current_shop_id, domain),
             )
             order_row = cur.fetchone()
             if not order_row:
@@ -8092,9 +8763,9 @@ async def receive_on_order_lines(request: Request):
             cur.execute(
                 """
                 INSERT INTO parts_received
-                    (ro, line_id, vendor, description, part_number, qty_received, list_price, cost, eta, invoice_number, invoice_total, returned, received_business_date, domain)
+                    (ro, line_id, vendor, description, part_number, qty_received, list_price, cost, eta, invoice_number, invoice_total, returned, received_business_date, domain, shop_id, shop_uuid)
                 VALUES
-                    (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, FALSE, COALESCE(%s, CURRENT_DATE), %s)
+                    (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, FALSE, COALESCE(%s, CURRENT_DATE), %s, %s, %s::uuid)
                 ON CONFLICT (ro, line_id, domain)
                 DO UPDATE SET
                     vendor = EXCLUDED.vendor,
@@ -8108,6 +8779,8 @@ async def receive_on_order_lines(request: Request):
                     invoice_total = EXCLUDED.invoice_total,
                     returned = FALSE,
                     received_business_date = EXCLUDED.received_business_date,
+                    shop_id = EXCLUDED.shop_id,
+                    shop_uuid = EXCLUDED.shop_uuid,
                     received_at = CURRENT_TIMESTAMP
                 """,
                 (
@@ -8124,6 +8797,8 @@ async def receive_on_order_lines(request: Request):
                     invoice_total,
                     local_business_date,
                     domain,
+                    current_shop_id,
+                    current_shop_uuid,
                 ),
             )
 
@@ -8132,10 +8807,13 @@ async def receive_on_order_lines(request: Request):
                 """
                 SELECT COALESCE(MIN(line_id), 0) AS min_line_id
                 FROM parts_received
-                WHERE domain = %s
+                                WHERE (
+                                                shop_uuid = %s::uuid
+                                         OR (shop_uuid IS NULL AND shop_id = %s AND domain = %s)
+                                )
                   AND ro = %s
                 """,
-                (domain, ro_value),
+                                (current_shop_uuid, current_shop_id, domain, ro_value),
             )
             min_line_row = cur.fetchone() or {}
             min_line_id = int(min_line_row.get("min_line_id") or 0)
@@ -8145,9 +8823,9 @@ async def receive_on_order_lines(request: Request):
                 cur.execute(
                     """
                     INSERT INTO parts_received
-                        (ro, line_id, vendor, description, part_number, qty_received, list_price, cost, eta, invoice_number, invoice_total, returned, received_business_date, domain)
+                        (ro, line_id, vendor, description, part_number, qty_received, list_price, cost, eta, invoice_number, invoice_total, returned, received_business_date, domain, shop_id, shop_uuid)
                     VALUES
-                        (%s, %s, %s, %s, %s, %s, NULL, %s, NULL, %s, %s, FALSE, COALESCE(%s, CURRENT_DATE), %s)
+                        (%s, %s, %s, %s, %s, %s, NULL, %s, NULL, %s, %s, FALSE, COALESCE(%s, CURRENT_DATE), %s, %s, %s::uuid)
                     """,
                     (
                         ro_value,
@@ -8161,6 +8839,8 @@ async def receive_on_order_lines(request: Request):
                         invoice_total,
                         local_business_date,
                         domain,
+                        current_shop_id,
+                        current_shop_uuid,
                     ),
                 )
                 next_manual_line_id -= 1
@@ -8170,10 +8850,15 @@ async def receive_on_order_lines(request: Request):
                 """
                 SELECT ordered_lines
                 FROM parts_orders
-                WHERE id = %s AND domain = %s AND ro = %s
+                                WHERE id = %s
+                                    AND ro = %s
+                                    AND (
+                                                shop_uuid = %s::uuid
+                                         OR (shop_uuid IS NULL AND shop_id = %s AND domain = %s)
+                                    )
                 LIMIT 1
                 """,
-                (order_id, domain, ro_value),
+                                (order_id, ro_value, current_shop_uuid, current_shop_id, domain),
             )
             order_row = cur.fetchone()
             if not order_row:
@@ -8211,9 +8896,10 @@ async def receive_on_order_lines(request: Request):
                       AND pr.ro = parts_orders.ro
                 )
             WHERE parts_orders.domain = %s
+                            AND (parts_orders.shop_uuid = %s::uuid OR (parts_orders.shop_uuid IS NULL AND parts_orders.shop_id = %s))
               AND parts_orders.ro = %s
             """,
-            (domain, ro_value),
+                        (domain, current_shop_uuid, current_shop_id, ro_value),
         )
 
         conn.commit()

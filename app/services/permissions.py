@@ -71,6 +71,8 @@ def build_permission_snapshot(
     role: str | None,
     domain: str | None,
     shop_id: int | None,
+    shop_uuid: str | None = None,
+    user_uuid: str | None = None,
     is_architect: bool = False,
 ) -> dict:
     access_level = normalize_access_level(role, is_architect=is_architect)
@@ -86,6 +88,8 @@ def build_permission_snapshot(
         "access_level": access_level,
         "shop_domain": str(domain or "").strip().lower(),
         "shop_id": int(shop_id or 0) or None,
+        "shop_uuid": str(shop_uuid or "").strip() or None,
+        "user_uuid": str(user_uuid or "").strip() or None,
         "features": features,
         "actions": actions,
     }
