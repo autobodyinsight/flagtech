@@ -134,9 +134,6 @@ async def update_ro_phone(request: Request):
     conn = get_conn()
     cur = conn.cursor()
     try:
-        _ensure_saved_estimates_table(cur)
-        _ensure_ro_activity_log_table(cur)
-        _ensure_shop_isolation_infrastructure(cur)
         current_shop_id = _resolve_request_shop_id(request, cur, domain)
         current_shop_uuid = _resolve_request_shop_uuid(request, cur, domain)
         if not current_shop_id or not current_shop_uuid:
@@ -304,9 +301,6 @@ async def get_ro_repairs(request: Request, ro: str):
     conn = get_conn()
     cur = conn.cursor()
     try:
-        _ensure_saved_estimates_table(cur)
-        _ensure_ro_assignments_table(cur)
-        _ensure_shop_isolation_infrastructure(cur)
         current_shop_id = _resolve_request_shop_id(request, cur, domain)
         current_shop_uuid = _resolve_request_shop_uuid(request, cur, domain)
         if not current_shop_id or not current_shop_uuid:
@@ -380,11 +374,6 @@ async def get_ro_tech_lines(request: Request, ro: str):
     conn = get_conn()
     cur = conn.cursor()
     try:
-        _ensure_saved_estimates_table(cur)
-        _ensure_ro_line_assignments_table(cur)
-        _ensure_techs_table(cur)
-        _ensure_ro_activity_log_table(cur)
-        _ensure_shop_isolation_infrastructure(cur)
         current_shop_id = _resolve_request_shop_id(request, cur, domain)
         current_shop_uuid = _resolve_request_shop_uuid(request, cur, domain)
         if not current_shop_id or not current_shop_uuid:
@@ -563,11 +552,6 @@ async def get_ro_assignment_lines(
     conn = get_conn()
     cur = conn.cursor()
     try:
-        _ensure_saved_estimates_table(cur)
-        _ensure_ro_line_assignments_table(cur)
-        _ensure_techs_table(cur)
-        _ensure_ro_activity_log_table(cur)
-        _ensure_shop_isolation_infrastructure(cur)
         current_shop_id = _resolve_request_shop_id(request, cur, domain)
         current_shop_uuid = _resolve_request_shop_uuid(request, cur, domain)
         if not current_shop_id or not current_shop_uuid:
@@ -726,11 +710,6 @@ async def save_ro_assignment_lines(request: Request):
     conn = get_conn()
     cur = conn.cursor()
     try:
-        _ensure_saved_estimates_table(cur)
-        _ensure_ro_line_assignments_table(cur)
-        _ensure_techs_table(cur)
-        _ensure_ro_activity_log_table(cur)
-        _ensure_shop_isolation_infrastructure(cur)
         current_shop_id = _resolve_request_shop_id(request, cur, domain)
         current_shop_uuid = _resolve_request_shop_uuid(request, cur, domain)
         if not current_shop_id or not current_shop_uuid:
@@ -1030,10 +1009,6 @@ async def unassign_ro_assignment_lines(request: Request):
     conn = get_conn()
     cur = conn.cursor()
     try:
-        _ensure_saved_estimates_table(cur)
-        _ensure_ro_line_assignments_table(cur)
-        _ensure_ro_activity_log_table(cur)
-        _ensure_shop_isolation_infrastructure(cur)
         current_shop_id = _resolve_request_shop_id(request, cur, domain)
         current_shop_uuid = _resolve_request_shop_uuid(request, cur, domain)
         if not current_shop_id or not current_shop_uuid:
@@ -1193,10 +1168,6 @@ async def save_ro_assignments(request: Request):
     conn = get_conn()
     cur = conn.cursor()
     try:
-        _ensure_saved_estimates_table(cur)
-        _ensure_ro_assignments_table(cur)
-        _ensure_techs_table(cur)
-        _ensure_shop_isolation_infrastructure(cur)
         current_shop_id = _resolve_request_shop_id(request, cur, domain)
         current_shop_uuid = _resolve_request_shop_uuid(request, cur, domain)
         if not current_shop_id or not current_shop_uuid:
@@ -1310,9 +1281,6 @@ async def get_flagout_techs(request: Request):
     conn = get_conn()
     cur = conn.cursor()
     try:
-        _ensure_ro_flagout_lines_table(cur)
-        _ensure_techs_table(cur)
-        _ensure_shop_isolation_infrastructure(cur)
         current_shop_id = _resolve_request_shop_id(request, cur, domain)
         current_shop_uuid = _resolve_request_shop_uuid(request, cur, domain)
         if not current_shop_id or not current_shop_uuid:
@@ -1458,9 +1426,6 @@ async def save_flagout_payout(request: Request):
     conn = get_conn()
     cur = conn.cursor()
     try:
-        _ensure_ro_flagout_lines_table(cur)
-        _ensure_saved_estimates_table(cur)
-        _ensure_shop_isolation_infrastructure(cur)
         current_shop_id = _resolve_request_shop_id(request, cur, domain)
         current_shop_uuid = _resolve_request_shop_uuid(request, cur, domain)
         if not current_shop_id or not current_shop_uuid:
@@ -1595,9 +1560,6 @@ async def phase_update(request: Request):
     conn = get_conn()
     cur = conn.cursor()
     try:
-        _ensure_ro_phases_table(cur)
-        _ensure_ro_activity_log_table(cur)
-        _ensure_shop_isolation_infrastructure(cur)
         current_shop_id = _resolve_request_shop_id(request, cur, domain)
         current_shop_uuid = _resolve_request_shop_uuid(request, cur, domain)
         if not current_shop_id or not current_shop_uuid:
@@ -1671,9 +1633,6 @@ async def phase_board(request: Request):
     conn = get_conn()
     cur = conn.cursor()
     try:
-        _ensure_saved_estimates_table(cur)
-        _ensure_ro_phases_table(cur)
-        _ensure_shop_isolation_infrastructure(cur)
         current_shop_id = _resolve_request_shop_id(request, cur, domain)
         current_shop_uuid = _resolve_request_shop_uuid(request, cur, domain)
         if not current_shop_id or not current_shop_uuid:
@@ -1801,8 +1760,6 @@ async def list_ro_notes(request: Request, ro: str):
     conn = get_conn()
     cur = conn.cursor()
     try:
-        _ensure_ro_notes_table(cur)
-        _ensure_shop_isolation_infrastructure(cur)
         current_shop_id = _resolve_request_shop_id(request, cur, domain)
         current_shop_uuid = _resolve_request_shop_uuid(request, cur, domain)
         if not current_shop_id or not current_shop_uuid:
@@ -1849,10 +1806,6 @@ async def list_ro_activity(request: Request, ro: str):
     conn = get_conn()
     cur = conn.cursor()
     try:
-        _ensure_saved_estimates_table(cur)
-        _ensure_ro_activity_log_table(cur)
-        _ensure_ro_flagout_lines_table(cur)
-        _ensure_shop_isolation_infrastructure(cur)
         current_shop_id = _resolve_request_shop_id(request, cur, domain)
         current_shop_uuid = _resolve_request_shop_uuid(request, cur, domain)
         if not current_shop_id or not current_shop_uuid:
@@ -1994,8 +1947,6 @@ async def add_ro_note(request: Request):
     conn = get_conn()
     cur = conn.cursor()
     try:
-        _ensure_ro_notes_table(cur)
-        _ensure_shop_isolation_infrastructure(cur)
         current_shop_id = _resolve_request_shop_id(request, cur, domain)
         current_shop_uuid = _resolve_request_shop_uuid(request, cur, domain)
         if not current_shop_id or not current_shop_uuid:
@@ -2029,12 +1980,6 @@ async def list_parts_ros(request: Request):
     cur = conn.cursor()
 
     try:
-        _ensure_saved_estimates_table(cur)
-        _ensure_parts_orders_table(cur)
-        _ensure_parts_received_table(cur)
-        _ensure_ro_line_assignments_table(cur)
-        _ensure_ro_phases_table(cur)
-        _ensure_shop_isolation_infrastructure(cur)
         current_shop_id = _resolve_request_shop_id(request, cur, domain)
         current_shop_uuid = _resolve_request_shop_uuid(request, cur, domain)
         if not current_shop_id or not current_shop_uuid:
@@ -2264,10 +2209,6 @@ async def list_parts_lines(request: Request, ro: str):
     conn = get_conn()
     cur = conn.cursor()
     try:
-        _ensure_saved_estimates_table(cur)
-        _ensure_parts_orders_table(cur)
-        _ensure_parts_received_table(cur)
-        _ensure_shop_isolation_infrastructure(cur)
         current_shop_id = _resolve_request_shop_id(request, cur, domain)
         current_shop_uuid = _resolve_request_shop_uuid(request, cur, domain)
         if not current_shop_id or not current_shop_uuid:
@@ -2397,9 +2338,6 @@ async def save_parts_order(request: Request):
     conn = get_conn()
     cur = conn.cursor()
     try:
-        _ensure_parts_orders_table(cur)
-        _ensure_parts_received_table(cur)
-        _ensure_shop_isolation_infrastructure(cur)
         current_shop_id = _resolve_request_shop_id(request, cur, domain)
         current_shop_uuid = _resolve_request_shop_uuid(request, cur, domain)
         if not current_shop_id or not current_shop_uuid:
@@ -2469,7 +2407,6 @@ async def save_parts_order(request: Request):
             )
 
         if vendor_id and not vendor_name:
-            _ensure_parts_vendors_table(cur)
             cur.execute(
                 """
                 SELECT name
@@ -2518,8 +2455,6 @@ async def list_parts_received(request: Request, ro: str):
     conn = get_conn()
     cur = conn.cursor()
     try:
-        _ensure_parts_received_table(cur)
-        _ensure_shop_isolation_infrastructure(cur)
         current_shop_id = _resolve_request_shop_id(request, cur, domain)
         current_shop_uuid = _resolve_request_shop_uuid(request, cur, domain)
         if not current_shop_id or not current_shop_uuid:
@@ -2578,9 +2513,6 @@ async def list_arrived_lines(request: Request, ro: str):
     conn = get_conn()
     cur = conn.cursor()
     try:
-        _ensure_parts_received_table(cur)
-        _ensure_saved_estimates_table(cur)
-        _ensure_shop_isolation_infrastructure(cur)
         current_shop_id = _resolve_request_shop_id(request, cur, domain)
         current_shop_uuid = _resolve_request_shop_uuid(request, cur, domain)
         if not current_shop_id or not current_shop_uuid:
@@ -2686,9 +2618,6 @@ async def return_arrived_lines(request: Request):
     conn = get_conn()
     cur = conn.cursor()
     try:
-        _ensure_parts_received_table(cur)
-        _ensure_parts_orders_table(cur)
-        _ensure_shop_isolation_infrastructure(cur)
         current_shop_id = _resolve_request_shop_id(request, cur, domain)
         current_shop_uuid = _resolve_request_shop_uuid(request, cur, domain)
         if not current_shop_id or not current_shop_uuid:
@@ -2758,9 +2687,6 @@ async def list_returned_lines(request: Request, ro: str):
     conn = get_conn()
     cur = conn.cursor()
     try:
-        _ensure_parts_received_table(cur)
-        _ensure_saved_estimates_table(cur)
-        _ensure_shop_isolation_infrastructure(cur)
         current_shop_id = _resolve_request_shop_id(request, cur, domain)
         current_shop_uuid = _resolve_request_shop_uuid(request, cur, domain)
         if not current_shop_id or not current_shop_uuid:
@@ -2852,10 +2778,6 @@ async def list_on_order_lines(request: Request, ro: str):
     conn = get_conn()
     cur = conn.cursor()
     try:
-        _ensure_saved_estimates_table(cur)
-        _ensure_parts_orders_table(cur)
-        _ensure_parts_received_table(cur)
-        _ensure_shop_isolation_infrastructure(cur)
         current_shop_id = _resolve_request_shop_id(request, cur, domain)
         current_shop_uuid = _resolve_request_shop_uuid(request, cur, domain)
         if not current_shop_id or not current_shop_uuid:
@@ -3093,9 +3015,6 @@ async def receive_on_order_lines(request: Request):
     conn = get_conn()
     cur = conn.cursor()
     try:
-        _ensure_parts_orders_table(cur)
-        _ensure_parts_received_table(cur)
-        _ensure_shop_isolation_infrastructure(cur)
         current_shop_id = _resolve_request_shop_id(request, cur, domain)
         current_shop_uuid = _resolve_request_shop_uuid(request, cur, domain)
         if not current_shop_id or not current_shop_uuid:
@@ -3297,8 +3216,6 @@ async def save_parts_received(request: Request):
     conn = get_conn()
     cur = conn.cursor()
     try:
-        _ensure_parts_received_table(cur)
-        _ensure_shop_isolation_infrastructure(cur)
         current_shop_id = _resolve_request_shop_id(request, cur, domain)
         current_shop_uuid = _resolve_request_shop_uuid(request, cur, domain)
         if not current_shop_id or not current_shop_uuid:
@@ -3373,10 +3290,6 @@ async def get_ro_tech_assignments(request: Request, ro: str):
     conn = get_conn()
     cur = conn.cursor()
     try:
-        _ensure_ro_assignments_table(cur)
-        _ensure_techs_table(cur)
-        _ensure_saved_estimates_table(cur)
-        _ensure_shop_isolation_infrastructure(cur)
         current_shop_id = _resolve_request_shop_id(request, cur, domain)
         current_shop_uuid = _resolve_request_shop_uuid(request, cur, domain)
         if not current_shop_id or not current_shop_uuid:
@@ -3462,9 +3375,6 @@ async def get_ro_tech_detail(request: Request, ro: str, tech_id: int, role: str)
     conn = get_conn()
     cur = conn.cursor()
     try:
-        _ensure_ro_assignments_table(cur)
-        _ensure_saved_estimates_table(cur)
-        _ensure_shop_isolation_infrastructure(cur)
         current_shop_id = _resolve_request_shop_id(request, cur, domain)
         current_shop_uuid = _resolve_request_shop_uuid(request, cur, domain)
         if not current_shop_id or not current_shop_uuid:
@@ -3556,8 +3466,6 @@ async def get_ro_estimate_snapshot(request: Request, ro: str):
     conn = get_conn()
     cur = conn.cursor()
     try:
-        _ensure_saved_estimates_table(cur)
-        _ensure_shop_isolation_infrastructure(cur)
         current_shop_id = _resolve_request_shop_id(request, cur, domain)
         current_shop_uuid = _resolve_request_shop_uuid(request, cur, domain)
         if not current_shop_id or not current_shop_uuid:
@@ -3674,11 +3582,6 @@ async def get_ro_print_data(request: Request, ro: str):
     conn = get_conn()
     cur = conn.cursor()
     try:
-        _ensure_saved_estimates_table(cur)
-        _ensure_ro_assignments_table(cur)
-        _ensure_ro_notes_table(cur)
-        _ensure_ro_line_assignments_table(cur)
-        _ensure_shop_isolation_infrastructure(cur)
         current_shop_id = _resolve_request_shop_id(request, cur, domain)
         current_shop_uuid = _resolve_request_shop_uuid(request, cur, domain)
         if not current_shop_id or not current_shop_uuid:

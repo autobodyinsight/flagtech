@@ -1,6 +1,8 @@
 import re
 import uuid
 
+from app.services.schema_state import skip_if_schema_bootstrapped
+
 
 def _quote_ident(value: str) -> str:
     identifier = str(value or "").strip()
@@ -9,6 +11,7 @@ def _quote_ident(value: str) -> str:
     return f'"{identifier}"'
 
 
+@skip_if_schema_bootstrapped
 def _ensure_shops_table(cur) -> None:
     cur.execute(
         """
@@ -49,6 +52,7 @@ def _ensure_shops_table(cur) -> None:
         cur.execute("UPDATE shops SET shop_id = %s::uuid WHERE id = %s", (str(uuid.uuid4()), legacy_id))
 
 
+@skip_if_schema_bootstrapped
 def _ensure_parts_vendors_table(cur) -> None:
     cur.execute(
         """
@@ -77,6 +81,7 @@ def _ensure_parts_vendors_table(cur) -> None:
     cur.execute("CREATE INDEX IF NOT EXISTS idx_parts_vendors_domain ON parts_vendors(domain)")
 
 
+@skip_if_schema_bootstrapped
 def _ensure_shop_settings_table(cur) -> None:
     _ensure_shops_table(cur)
     cur.execute(
@@ -112,6 +117,7 @@ def _ensure_shop_settings_table(cur) -> None:
     cur.execute("CREATE INDEX IF NOT EXISTS idx_shop_settings_shop_uuid ON shop_settings(shop_uuid)")
 
 
+@skip_if_schema_bootstrapped
 def _ensure_shop_users_table(cur) -> None:
     _ensure_shops_table(cur)
     cur.execute(
@@ -157,6 +163,7 @@ def _ensure_shop_users_table(cur) -> None:
         cur.execute("UPDATE shop_users SET user_id = %s::uuid WHERE id = %s", (str(uuid.uuid4()), legacy_id))
 
 
+@skip_if_schema_bootstrapped
 def _sync_shop_id_bindings(cur) -> None:
     _ensure_shops_table(cur)
     _ensure_shop_settings_table(cur)
@@ -240,6 +247,7 @@ def _sync_shop_id_bindings(cur) -> None:
     )
 
 
+@skip_if_schema_bootstrapped
 def _ensure_chat_messages_table(cur) -> None:
     cur.execute(
         """
@@ -285,6 +293,7 @@ def _ensure_chat_messages_table(cur) -> None:
     cur.execute("CREATE INDEX IF NOT EXISTS idx_chat_messages_shop_uuid_created ON chat_messages(shop_uuid, sender_user_id, recipient_user_id, created_at)")
 
 
+@skip_if_schema_bootstrapped
 def _ensure_saved_estimates_table(cur) -> None:
     cur.execute(
         """
@@ -346,6 +355,7 @@ def _ensure_saved_estimates_table(cur) -> None:
     cur.execute("CREATE INDEX IF NOT EXISTS idx_saved_estimates_ro_domain ON saved_estimates(ro, domain)")
 
 
+@skip_if_schema_bootstrapped
 def _ensure_ro_payment_totals_table(cur) -> None:
     cur.execute(
         """
@@ -368,6 +378,7 @@ def _ensure_ro_payment_totals_table(cur) -> None:
     cur.execute("CREATE INDEX IF NOT EXISTS idx_ro_payment_totals_domain_ro ON ro_payment_totals(domain, ro)")
 
 
+@skip_if_schema_bootstrapped
 def _ensure_ro_payment_entries_table(cur) -> None:
     cur.execute(
         """
@@ -398,6 +409,7 @@ def _ensure_ro_payment_entries_table(cur) -> None:
     cur.execute("CREATE INDEX IF NOT EXISTS idx_ro_payment_entries_domain_ro_type ON ro_payment_entries(domain, ro, payer_type)")
 
 
+@skip_if_schema_bootstrapped
 def _ensure_parts_orders_table(cur) -> None:
     cur.execute(
         """
@@ -419,6 +431,7 @@ def _ensure_parts_orders_table(cur) -> None:
     cur.execute("CREATE INDEX IF NOT EXISTS idx_parts_orders_ro ON parts_orders(ro)")
 
 
+@skip_if_schema_bootstrapped
 def _ensure_parts_received_table(cur) -> None:
     cur.execute(
         """
@@ -459,6 +472,7 @@ def _ensure_parts_received_table(cur) -> None:
     cur.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_parts_received_unique ON parts_received(ro, line_id, domain)")
 
 
+@skip_if_schema_bootstrapped
 def _ensure_ro_phases_table(cur) -> None:
     cur.execute(
         """
@@ -474,6 +488,7 @@ def _ensure_ro_phases_table(cur) -> None:
     cur.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_ro_phases_ro_domain ON ro_phases(ro, domain)")
 
 
+@skip_if_schema_bootstrapped
 def _ensure_ro_notes_table(cur) -> None:
     cur.execute(
         """
@@ -490,6 +505,7 @@ def _ensure_ro_notes_table(cur) -> None:
     cur.execute("CREATE INDEX IF NOT EXISTS idx_ro_notes_ro_domain ON ro_notes(ro, domain)")
 
 
+@skip_if_schema_bootstrapped
 def _ensure_ro_activity_log_table(cur) -> None:
     cur.execute(
         """
@@ -507,6 +523,7 @@ def _ensure_ro_activity_log_table(cur) -> None:
     cur.execute("CREATE INDEX IF NOT EXISTS idx_ro_activity_ro_domain ON ro_activity_log(ro, domain, created_at DESC)")
 
 
+@skip_if_schema_bootstrapped
 def _ensure_ro_assignments_table(cur) -> None:
     cur.execute(
         """
@@ -549,6 +566,7 @@ def _ensure_ro_assignments_table(cur) -> None:
         )
 
 
+@skip_if_schema_bootstrapped
 def _ensure_ro_line_assignments_table(cur) -> None:
     cur.execute(
         """
@@ -606,6 +624,7 @@ def _ensure_ro_line_assignments_table(cur) -> None:
     )
 
 
+@skip_if_schema_bootstrapped
 def _ensure_ro_flagout_lines_table(cur) -> None:
     cur.execute(
         """
@@ -645,6 +664,7 @@ def _ensure_ro_flagout_lines_table(cur) -> None:
     )
 
 
+@skip_if_schema_bootstrapped
 def _ensure_techs_table(cur) -> None:
     cur.execute(
         """
@@ -671,6 +691,7 @@ def _ensure_techs_table(cur) -> None:
     cur.execute("CREATE INDEX IF NOT EXISTS idx_techs_active ON techs(active)")
 
 
+@skip_if_schema_bootstrapped
 def _ensure_archived_techs_table(cur) -> None:
     cur.execute(
         """

@@ -111,8 +111,6 @@ async def add_tech(request: Request):
     cur = conn.cursor()
 
     try:
-        _ensure_techs_table(cur)
-        _ensure_shop_isolation_infrastructure(cur)
         current_shop_id = _resolve_request_shop_id(request, cur, domain)
         current_shop_uuid = _resolve_request_shop_uuid(request, cur, domain)
         if not current_shop_id or not current_shop_uuid:
@@ -161,9 +159,6 @@ async def list_techs(request: Request):
     cur = conn.cursor()
     
     try:
-        _ensure_techs_table(cur)
-        _ensure_ro_line_assignments_table(cur)
-        _ensure_shop_isolation_infrastructure(cur)
         current_shop_id = _resolve_request_shop_id(request, cur, domain)
         current_shop_uuid = _resolve_request_shop_uuid(request, cur, domain)
         if not current_shop_id or not current_shop_uuid:
@@ -236,8 +231,6 @@ async def update_tech_status(request: Request):
     conn = get_conn()
     cur = conn.cursor()
     try:
-        _ensure_techs_table(cur)
-        _ensure_shop_isolation_infrastructure(cur)
         current_shop_id = _resolve_request_shop_id(request, cur, domain)
         current_shop_uuid = _resolve_request_shop_uuid(request, cur, domain)
         if not current_shop_id or not current_shop_uuid:
@@ -317,8 +310,6 @@ async def update_tech_line(request: Request):
     conn = get_conn()
     cur = conn.cursor()
     try:
-        _ensure_techs_table(cur)
-        _ensure_shop_isolation_infrastructure(cur)
         current_shop_id = _resolve_request_shop_id(request, cur, domain)
         current_shop_uuid = _resolve_request_shop_uuid(request, cur, domain)
         if not current_shop_id or not current_shop_uuid:
@@ -375,8 +366,6 @@ async def delete_tech(request: Request):
     cur = conn.cursor()
 
     try:
-        _ensure_techs_table(cur)
-        _ensure_shop_isolation_infrastructure(cur)
         current_shop_id = _resolve_request_shop_id(request, cur, domain)
         current_shop_uuid = _resolve_request_shop_uuid(request, cur, domain)
         if not current_shop_id or not current_shop_uuid:
@@ -429,10 +418,6 @@ async def archive_techs(request: Request):
     cur = conn.cursor()
     archived = []
     try:
-        _ensure_techs_table(cur)
-        _ensure_ro_line_assignments_table(cur)
-        _ensure_archived_techs_table(cur)
-        _ensure_shop_isolation_infrastructure(cur)
         current_shop_id = _resolve_request_shop_id(request, cur, domain)
         current_shop_uuid = _resolve_request_shop_uuid(request, cur, domain)
         if not current_shop_id or not current_shop_uuid:
@@ -543,8 +528,6 @@ async def list_archived_techs(request: Request):
     conn = get_conn()
     cur = conn.cursor()
     try:
-        _ensure_archived_techs_table(cur)
-        _ensure_shop_isolation_infrastructure(cur)
         current_shop_id = _resolve_request_shop_id(request, cur, domain)
         current_shop_uuid = _resolve_request_shop_uuid(request, cur, domain)
         if not current_shop_id or not current_shop_uuid:
@@ -599,11 +582,6 @@ async def get_tech_assignments(request: Request, tech_id: int):
     conn = get_conn()
     cur = conn.cursor()
     try:
-        _ensure_saved_estimates_table(cur)
-        _ensure_ro_line_assignments_table(cur)
-        _ensure_ro_flagout_lines_table(cur)
-        _ensure_saved_estimates_table(cur)
-        _ensure_shop_isolation_infrastructure(cur)
         current_shop_id = _resolve_request_shop_id(request, cur, domain)
         current_shop_uuid = _resolve_request_shop_uuid(request, cur, domain)
         if not current_shop_id or not current_shop_uuid:
@@ -698,9 +676,6 @@ async def get_tech_assignment_lines(request: Request, tech_id: int, ro: str):
     conn = get_conn()
     cur = conn.cursor()
     try:
-        _ensure_saved_estimates_table(cur)
-        _ensure_ro_line_assignments_table(cur)
-        _ensure_shop_isolation_infrastructure(cur)
         current_shop_id = _resolve_request_shop_id(request, cur, domain)
         current_shop_uuid = _resolve_request_shop_uuid(request, cur, domain)
         if not current_shop_id or not current_shop_uuid:
@@ -775,9 +750,6 @@ async def tech_flag_out_lines(request: Request):
     conn = get_conn()
     cur = conn.cursor()
     try:
-        _ensure_ro_line_assignments_table(cur)
-        _ensure_ro_flagout_lines_table(cur)
-        _ensure_shop_isolation_infrastructure(cur)
         current_shop_id = _resolve_request_shop_id(request, cur, domain)
         current_shop_uuid = _resolve_request_shop_uuid(request, cur, domain)
         if not current_shop_id or not current_shop_uuid:
@@ -935,9 +907,6 @@ async def tech_flag_out_ros(request: Request):
     conn = get_conn()
     cur = conn.cursor()
     try:
-        _ensure_ro_line_assignments_table(cur)
-        _ensure_ro_flagout_lines_table(cur)
-        _ensure_shop_isolation_infrastructure(cur)
         current_shop_id = _resolve_request_shop_id(request, cur, domain)
         current_shop_uuid = _resolve_request_shop_uuid(request, cur, domain)
         if not current_shop_id or not current_shop_uuid:

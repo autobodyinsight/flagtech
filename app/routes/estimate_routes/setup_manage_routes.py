@@ -104,7 +104,6 @@ async def get_setup_shop(request: Request):
     conn = get_conn()
     cur = conn.cursor()
     try:
-        _ensure_shops_table(cur)
         requested_scope_domain = _resolve_setup_scope_domain(request, domain, request.query_params.get("shop_domain"))
         selected_domain = _resolve_effective_shop_domain(
             cur,
@@ -281,7 +280,6 @@ async def get_setup_context(request: Request):
         conn = get_conn()
         cur = conn.cursor()
         try:
-            _ensure_shops_table(cur)
             effective_domain = _resolve_effective_shop_domain(cur, default_domain, allow_fallback=True)
             if effective_domain:
                 default_domain = effective_domain
@@ -374,7 +372,6 @@ async def list_manage_shops(request: Request):
         conn = get_conn()
         cur = conn.cursor()
         try:
-            _ensure_shop_isolation_infrastructure(cur)
             cur.execute(
                 """
                 WITH all_domains AS (
@@ -433,8 +430,6 @@ async def list_manage_users(request: Request, shop_domain: str | None = None):
         conn = get_conn()
         cur = conn.cursor()
         try:
-            _ensure_shop_users_table(cur)
-            _ensure_shops_table(cur)
             selected_domain = _resolve_effective_shop_domain(
                 cur,
                 str(shop_domain or "").strip().lower(),
@@ -503,7 +498,6 @@ async def update_manage_shop_active(request: Request):
     conn = get_conn()
     cur = conn.cursor()
     try:
-        _ensure_shops_table(cur)
         cur.execute(
             """
             INSERT INTO shops (domain, active, updated_at)
@@ -560,7 +554,6 @@ async def update_manage_user(request: Request):
     conn = get_conn()
     cur = conn.cursor()
     try:
-        _ensure_shop_users_table(cur)
         cur.execute("SELECT id, shop_id, shop_uuid FROM shops WHERE domain = %s LIMIT 1", (selected_domain,))
         shop_row = cur.fetchone() or {}
         selected_shop_id = int(shop_row.get("id") or 0)
@@ -638,7 +631,6 @@ async def create_manage_user(request: Request):
     conn = get_conn()
     cur = conn.cursor()
     try:
-        _ensure_shop_users_table(cur)
         cur.execute("SELECT id, shop_id, shop_uuid FROM shops WHERE domain = %s LIMIT 1", (selected_domain,))
         shop_row = cur.fetchone() or {}
         selected_shop_id = int(shop_row.get("id") or 0)
@@ -906,7 +898,6 @@ async def list_setup_users(request: Request, shop_domain: str | None = None):
     conn = get_conn()
     cur = conn.cursor()
     try:
-        _ensure_shops_table(cur)
         requester_is_architect = _request_is_architect(request)
         requester_row = _resolve_current_user_row(request, cur, domain)
         if not requester_row and not requester_is_architect:

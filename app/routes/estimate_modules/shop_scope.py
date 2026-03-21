@@ -1,5 +1,6 @@
 from fastapi import Request
 from app.services.middleware import get_authenticated_user, get_user_domain, get_user_shop_uuid
+from app.services.schema_state import skip_if_schema_bootstrapped
 
 from .db_schema import (
     _ensure_shops_table,
@@ -36,6 +37,7 @@ def _resolve_effective_shop_domain(cur, preferred_domain: str, allow_fallback: b
     return normalized
 
 
+@skip_if_schema_bootstrapped
 def _ensure_shop_id_columns_for_domain_tables(cur) -> None:
     _ensure_shops_table(cur)
     cur.execute(
@@ -88,6 +90,7 @@ def _ensure_shop_id_columns_for_domain_tables(cur) -> None:
         cur.execute(f"CREATE INDEX IF NOT EXISTS {quoted_uuid_index} ON {quoted_table}(shop_uuid)")
 
 
+@skip_if_schema_bootstrapped
 def _ensure_shop_id_sync_triggers(cur) -> None:
     _ensure_shops_table(cur)
     cur.execute(
@@ -136,13 +139,18 @@ def _ensure_shop_id_sync_triggers(cur) -> None:
         trigger_name = f"trg_{table_name}_shop_scope"
         quoted_table = _quote_ident(table_name)
         quoted_trigger = _quote_ident(trigger_name)
-        cur.execute(f"DROP TRIGGER IF EXISTS {quoted_trigger} ON {quoted_table}")
         cur.execute(
             f"""
-            CREATE TRIGGER {quoted_trigger}
-            BEFORE INSERT OR UPDATE ON {quoted_table}
-            FOR EACH ROW
-            EXECUTE FUNCTION set_shop_scope_fields()
+            DO $shop_scope$
+            BEGIN
+                CREATE TRIGGER {quoted_trigger}
+                BEFORE INSERT OR UPDATE ON {quoted_table}
+                FOR EACH ROW
+                EXECUTE FUNCTION set_shop_scope_fields();
+            EXCEPTION
+                WHEN duplicate_object THEN NULL;
+            END
+            $shop_scope$;
             """
         )
 
@@ -192,6 +200,7 @@ def _resolve_request_shop_uuid(request: Request, cur, domain: str | None = None)
     return value or None
 
 
+@skip_if_schema_bootstrapped
 def _ensure_shop_isolation_infrastructure(cur) -> None:
     _sync_shop_id_bindings(cur)
     _ensure_shop_id_columns_for_domain_tables(cur)

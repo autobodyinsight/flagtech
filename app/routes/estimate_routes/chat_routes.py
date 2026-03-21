@@ -118,10 +118,6 @@ async def chat_send(request: Request):
     conn = get_conn()
     cur = conn.cursor()
     try:
-        _ensure_shop_users_table(cur)
-        _ensure_chat_messages_table(cur)
-        _ensure_shop_isolation_infrastructure(cur)
-
         sender = _resolve_current_user_row(request, cur, domain)
         if not sender:
             return JSONResponse(status_code=401, content={"error": "Not authenticated"})
@@ -186,10 +182,6 @@ async def chat_messages(request: Request):
     conn = get_conn()
     cur = conn.cursor()
     try:
-        _ensure_shop_users_table(cur)
-        _ensure_chat_messages_table(cur)
-        _ensure_shop_isolation_infrastructure(cur)
-
         current_user = _resolve_current_user_row(request, cur, domain)
         if not current_user:
             return JSONResponse(status_code=401, content={"error": "Not authenticated"})
@@ -267,9 +259,6 @@ async def chat_users(request: Request):
     conn = get_conn()
     cur = conn.cursor()
     try:
-        _ensure_shop_users_table(cur)
-        _ensure_shop_isolation_infrastructure(cur)
-
         current_user = _resolve_current_user_row(request, cur, domain)
         if not current_user:
             return JSONResponse(status_code=401, content={"error": "Not authenticated", "users": []})
@@ -330,9 +319,6 @@ async def chat_mark_read(request: Request):
     conn = get_conn()
     cur = conn.cursor()
     try:
-        _ensure_chat_messages_table(cur)
-        _ensure_shop_users_table(cur)
-        _ensure_shop_isolation_infrastructure(cur)
         current_user = _resolve_current_user_row(request, cur, domain)
         if not current_user:
             return JSONResponse(status_code=401, content={"error": "Not authenticated"})
@@ -379,9 +365,6 @@ async def chat_complete_task(request: Request):
     conn = get_conn()
     cur = conn.cursor()
     try:
-        _ensure_chat_messages_table(cur)
-        _ensure_shop_users_table(cur)
-        _ensure_shop_isolation_infrastructure(cur)
         current_user = _resolve_current_user_row(request, cur, domain)
         if not current_user:
             return JSONResponse(status_code=401, content={"error": "Not authenticated"})

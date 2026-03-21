@@ -109,8 +109,6 @@ async def auth_login(request: Request):
     conn = get_conn()
     cur = conn.cursor()
     try:
-        _ensure_shop_users_table(cur)
-        _ensure_shop_isolation_infrastructure(cur)
         cur.execute(
             """
                         SELECT

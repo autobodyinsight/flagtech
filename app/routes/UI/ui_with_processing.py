@@ -4,6 +4,7 @@ from app.services.extractor import extract_text_from_pdf, extract_words_from_pdf
 from app.services.parser import parse_estimate_text
 from app.services.grid_processor import process_pdf_grid, generate_pages_html
 from app.services.db import get_conn
+from app.services.schema_state import skip_if_schema_bootstrapped
 from app.services.middleware import get_user_domain
 from .flagout import get_flagtech_screen_html
 from .parts import get_parts_screen_html, get_parts_script
@@ -37,6 +38,7 @@ from datetime import date, timedelta
 router = APIRouter()
 
 
+@skip_if_schema_bootstrapped
 def _ensure_estimate_uploads_table(cur) -> None:
     cur.execute(
         """
@@ -52,6 +54,7 @@ def _ensure_estimate_uploads_table(cur) -> None:
     cur.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_estimate_uploads_ro_domain ON estimate_uploads(ro, domain)")
 
 
+@skip_if_schema_bootstrapped
 def _ensure_saved_estimates_table(cur) -> None:
     cur.execute(
         """
@@ -107,6 +110,7 @@ def _ensure_saved_estimates_table(cur) -> None:
     cur.execute("CREATE INDEX IF NOT EXISTS idx_saved_estimates_ro_domain ON saved_estimates(ro, domain)")
 
 
+@skip_if_schema_bootstrapped
 def _ensure_ro_auto_sequence(cur) -> None:
     cur.execute("CREATE SEQUENCE IF NOT EXISTS ro_auto_counter_seq START WITH 12365 MINVALUE 12365")
 
@@ -287,6 +291,7 @@ def _estimate_has_changes_against_saved(saved_row: dict | None, labor_items, pai
     return False
 
 
+@skip_if_schema_bootstrapped
 def _ensure_ro_assignments_table(cur) -> None:
     cur.execute(
         """
@@ -312,6 +317,7 @@ def _ensure_ro_assignments_table(cur) -> None:
     )
 
 
+@skip_if_schema_bootstrapped
 def _ensure_ro_line_assignments_table(cur) -> None:
     cur.execute(
         """
@@ -1193,10 +1199,6 @@ async def save_estimate(request: Request):
     ecd_date_value = _add_weekdays(in_date_value, _weekday_days_from_hours(_estimate_hours_for_ecd(data)))
 
     try:
-        _ensure_saved_estimates_table(cur)
-        _ensure_ro_line_assignments_table(cur)
-        _ensure_ro_assignments_table(cur)
-
         cur.execute(
             """
             SELECT id
@@ -1320,9 +1322,6 @@ async def auto_generate_ro(request: Request):
         return JSONResponse(status_code=401, content={"error": "Not authenticated"})
 
     try:
-        _ensure_ro_auto_sequence(cur)
-        _ensure_saved_estimates_table(cur)
-
         cur.execute(
             """
             SELECT COALESCE(MAX(CAST(SUBSTRING(ro FROM 3 FOR 5) AS INTEGER)), 0) AS max_saved

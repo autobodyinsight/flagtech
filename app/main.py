@@ -2,7 +2,9 @@ from fastapi import FastAPI
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from contextlib import asynccontextmanager
 from pathlib import Path
+from app.services.schema_bootstrap import initialize_application_schema
 from app.services.middleware import get_authenticated_user
 from app.services.permissions import has_feature_access, resolve_feature_for_path
 
@@ -15,7 +17,14 @@ from app.routes.UI.reports import router as reports_router
 from app.routes.payments import router as payments_router
 
 
-app = FastAPI(title="FlagTech Estimate Parser")
+
+@asynccontextmanager
+async def app_lifespan(app: FastAPI):
+    initialize_application_schema()
+    yield
+
+
+app = FastAPI(title="FlagTech Estimate Parser", lifespan=app_lifespan)
 
 static_dir = Path(__file__).parent / "static"
 if static_dir.exists():
