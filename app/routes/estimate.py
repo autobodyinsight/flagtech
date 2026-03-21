@@ -1945,11 +1945,11 @@ async def update_tech_status(request: Request):
     cur = conn.cursor()
     try:
         _ensure_techs_table(cur)
-                _ensure_shop_isolation_infrastructure(cur)
-                current_shop_id = _resolve_request_shop_id(request, cur, domain)
-                current_shop_uuid = _resolve_request_shop_uuid(request, cur, domain)
-                if not current_shop_id or not current_shop_uuid:
-                        return JSONResponse(status_code=403, content={"error": "Shop scope not resolved"})
+        _ensure_shop_isolation_infrastructure(cur)
+        current_shop_id = _resolve_request_shop_id(request, cur, domain)
+        current_shop_uuid = _resolve_request_shop_uuid(request, cur, domain)
+        if not current_shop_id or not current_shop_uuid:
+            return JSONResponse(status_code=403, content={"error": "Shop scope not resolved"})
         cur.execute(
             """
             UPDATE techs
@@ -2025,11 +2025,11 @@ async def update_tech_line(request: Request):
     cur = conn.cursor()
     try:
         _ensure_techs_table(cur)
-                _ensure_shop_isolation_infrastructure(cur)
-                current_shop_id = _resolve_request_shop_id(request, cur, domain)
-                current_shop_uuid = _resolve_request_shop_uuid(request, cur, domain)
-                if not current_shop_id or not current_shop_uuid:
-                        return JSONResponse(status_code=403, content={"error": "Shop scope not resolved"})
+        _ensure_shop_isolation_infrastructure(cur)
+        current_shop_id = _resolve_request_shop_id(request, cur, domain)
+        current_shop_uuid = _resolve_request_shop_uuid(request, cur, domain)
+        if not current_shop_id or not current_shop_uuid:
+            return JSONResponse(status_code=403, content={"error": "Shop scope not resolved"})
         cur.execute(
             f"""
             UPDATE techs
@@ -2082,11 +2082,11 @@ async def delete_tech(request: Request):
 
     try:
         _ensure_techs_table(cur)
-                _ensure_shop_isolation_infrastructure(cur)
-                current_shop_id = _resolve_request_shop_id(request, cur, domain)
-                current_shop_uuid = _resolve_request_shop_uuid(request, cur, domain)
-                if not current_shop_id or not current_shop_uuid:
-                        return JSONResponse(status_code=403, content={"error": "Shop scope not resolved"})
+        _ensure_shop_isolation_infrastructure(cur)
+        current_shop_id = _resolve_request_shop_id(request, cur, domain)
+        current_shop_uuid = _resolve_request_shop_uuid(request, cur, domain)
+        if not current_shop_id or not current_shop_uuid:
+            return JSONResponse(status_code=403, content={"error": "Shop scope not resolved"})
         cur.execute(
             """
             UPDATE techs
@@ -2137,11 +2137,11 @@ async def archive_techs(request: Request):
         _ensure_techs_table(cur)
         _ensure_ro_line_assignments_table(cur)
         _ensure_archived_techs_table(cur)
-                _ensure_shop_isolation_infrastructure(cur)
-                current_shop_id = _resolve_request_shop_id(request, cur, domain)
-                current_shop_uuid = _resolve_request_shop_uuid(request, cur, domain)
-                if not current_shop_id or not current_shop_uuid:
-                        return JSONResponse(status_code=403, content={"error": "Shop scope not resolved"})
+        _ensure_shop_isolation_infrastructure(cur)
+        current_shop_id = _resolve_request_shop_id(request, cur, domain)
+        current_shop_uuid = _resolve_request_shop_uuid(request, cur, domain)
+        if not current_shop_id or not current_shop_uuid:
+            return JSONResponse(status_code=403, content={"error": "Shop scope not resolved"})
 
         cur.execute(
             """
@@ -2372,11 +2372,11 @@ async def list_vendors(request: Request):
     cur = conn.cursor()
     try:
         _ensure_parts_vendors_table(cur)
-                _ensure_shop_isolation_infrastructure(cur)
-                current_shop_id = _resolve_request_shop_id(request, cur, domain)
-                current_shop_uuid = _resolve_request_shop_uuid(request, cur, domain)
-                if not current_shop_id or not current_shop_uuid:
-                        return JSONResponse(status_code=403, content={"error": "Shop scope not resolved", "vendors": []})
+        _ensure_shop_isolation_infrastructure(cur)
+        current_shop_id = _resolve_request_shop_id(request, cur, domain)
+        current_shop_uuid = _resolve_request_shop_uuid(request, cur, domain)
+        if not current_shop_id or not current_shop_uuid:
+            return JSONResponse(status_code=403, content={"error": "Shop scope not resolved", "vendors": []})
         cur.execute(
             """
             SELECT id, name, vendor_type, contact_person, phone, street, city, state, zip, active
@@ -3596,9 +3596,9 @@ async def list_setup_users(request: Request):
         if not (_request_is_architect(request) or _is_manager_or_hr_role(requester_role)):
             return JSONResponse(status_code=403, content={"error": "Forbidden", "users": []})
 
-                current_shop_uuid = _resolve_request_shop_uuid(request, cur, selected_domain)
-                if not current_shop_uuid:
-                        return JSONResponse(status_code=400, content={"error": "Unable to resolve shop scope", "users": []})
+        current_shop_uuid = _resolve_request_shop_uuid(request, cur, selected_domain)
+        if not current_shop_uuid:
+            return JSONResponse(status_code=400, content={"error": "Unable to resolve shop scope", "users": []})
         cur.execute(
             """
                         SELECT id, user_id, first_name, last_name, email, role, shop_id, shop_uuid, created_at
@@ -3887,11 +3887,11 @@ async def get_dashboard_data(request: Request):
         _ensure_ro_assignments_table(cur)
         _ensure_ro_line_assignments_table(cur)
         _ensure_techs_table(cur)
-                _ensure_shop_isolation_infrastructure(cur)
-                current_shop_id = _resolve_request_shop_id(request, cur, domain)
-                current_shop_uuid = _resolve_request_shop_uuid(request, cur, domain)
-                if not current_shop_id or not current_shop_uuid:
-                        return JSONResponse(status_code=403, content={"error": "Shop scope not resolved"})
+        _ensure_shop_isolation_infrastructure(cur)
+        current_shop_id = _resolve_request_shop_id(request, cur, domain)
+        current_shop_uuid = _resolve_request_shop_uuid(request, cur, domain)
+        if not current_shop_id or not current_shop_uuid:
+            return JSONResponse(status_code=403, content={"error": "Shop scope not resolved"})
 
         cur.execute(
             """
@@ -4970,11 +4970,11 @@ async def list_records_parts_vendor_invoices(
     try:
         _ensure_parts_vendors_table(cur)
         _ensure_parts_received_table(cur)
-                _ensure_shop_isolation_infrastructure(cur)
-                current_shop_id = _resolve_request_shop_id(request, cur, domain)
-                current_shop_uuid = _resolve_request_shop_uuid(request, cur, domain)
-                if not current_shop_id or not current_shop_uuid:
-                        return JSONResponse(status_code=403, content={"error": "Shop scope not resolved", "rows": []})
+        _ensure_shop_isolation_infrastructure(cur)
+        current_shop_id = _resolve_request_shop_id(request, cur, domain)
+        current_shop_uuid = _resolve_request_shop_uuid(request, cur, domain)
+        if not current_shop_id or not current_shop_uuid:
+            return JSONResponse(status_code=403, content={"error": "Shop scope not resolved", "rows": []})
 
         cur.execute(
             """
@@ -5058,11 +5058,11 @@ async def list_records_parts_vendor_invoice_parts(request: Request, vendor_id: i
         _ensure_parts_vendors_table(cur)
         _ensure_parts_received_table(cur)
         _ensure_saved_estimates_table(cur)
-                _ensure_shop_isolation_infrastructure(cur)
-                current_shop_id = _resolve_request_shop_id(request, cur, domain)
-                current_shop_uuid = _resolve_request_shop_uuid(request, cur, domain)
-                if not current_shop_id or not current_shop_uuid:
-                        return JSONResponse(status_code=403, content={"error": "Shop scope not resolved", "parts": []})
+        _ensure_shop_isolation_infrastructure(cur)
+        current_shop_id = _resolve_request_shop_id(request, cur, domain)
+        current_shop_uuid = _resolve_request_shop_uuid(request, cur, domain)
+        if not current_shop_id or not current_shop_uuid:
+            return JSONResponse(status_code=403, content={"error": "Shop scope not resolved", "parts": []})
 
         cur.execute(
             """
@@ -5226,11 +5226,11 @@ async def save_ro_payments(request: Request):
         _ensure_saved_estimates_table(cur)
         _ensure_ro_payment_totals_table(cur)
         _ensure_ro_payment_entries_table(cur)
-                _ensure_shop_isolation_infrastructure(cur)
-                current_shop_id = _resolve_request_shop_id(request, cur, domain)
-                current_shop_uuid = _resolve_request_shop_uuid(request, cur, domain)
-                if not current_shop_id or not current_shop_uuid:
-                        return JSONResponse(status_code=403, content={"error": "Shop scope not resolved"})
+        _ensure_shop_isolation_infrastructure(cur)
+        current_shop_id = _resolve_request_shop_id(request, cur, domain)
+        current_shop_uuid = _resolve_request_shop_uuid(request, cur, domain)
+        if not current_shop_id or not current_shop_uuid:
+            return JSONResponse(status_code=403, content={"error": "Shop scope not resolved"})
         created_by = _resolve_request_user_display_name(request, cur, domain)
 
         cur.execute(
@@ -7576,11 +7576,11 @@ async def phase_update(request: Request):
     try:
         _ensure_ro_phases_table(cur)
         _ensure_ro_activity_log_table(cur)
-                _ensure_shop_isolation_infrastructure(cur)
-                current_shop_id = _resolve_request_shop_id(request, cur, domain)
-                current_shop_uuid = _resolve_request_shop_uuid(request, cur, domain)
-                if not current_shop_id or not current_shop_uuid:
-                        return JSONResponse(status_code=403, content={"error": "Shop scope not resolved"})
+        _ensure_shop_isolation_infrastructure(cur)
+        current_shop_id = _resolve_request_shop_id(request, cur, domain)
+        current_shop_uuid = _resolve_request_shop_uuid(request, cur, domain)
+        if not current_shop_id or not current_shop_uuid:
+            return JSONResponse(status_code=403, content={"error": "Shop scope not resolved"})
 
         cur.execute(
             """
@@ -8493,11 +8493,11 @@ async def list_parts_received(request: Request, ro: str):
     cur = conn.cursor()
     try:
         _ensure_parts_received_table(cur)
-                _ensure_shop_isolation_infrastructure(cur)
-                current_shop_id = _resolve_request_shop_id(request, cur, domain)
-                current_shop_uuid = _resolve_request_shop_uuid(request, cur, domain)
-                if not current_shop_id or not current_shop_uuid:
-                        return JSONResponse(status_code=403, content={"error": "Shop scope not resolved", "items": []})
+        _ensure_shop_isolation_infrastructure(cur)
+        current_shop_id = _resolve_request_shop_id(request, cur, domain)
+        current_shop_uuid = _resolve_request_shop_uuid(request, cur, domain)
+        if not current_shop_id or not current_shop_uuid:
+            return JSONResponse(status_code=403, content={"error": "Shop scope not resolved", "items": []})
         cur.execute(
             """
             SELECT line_id, vendor, part_number, list_price, cost, eta, invoice_number, invoice_total,
@@ -9258,11 +9258,11 @@ async def list_vendor_invoices(request: Request, vendor_id: int):
     try:
         _ensure_parts_vendors_table(cur)
         _ensure_parts_received_table(cur)
-                _ensure_shop_isolation_infrastructure(cur)
-                current_shop_id = _resolve_request_shop_id(request, cur, domain)
-                current_shop_uuid = _resolve_request_shop_uuid(request, cur, domain)
-                if not current_shop_id or not current_shop_uuid:
-                        return JSONResponse(status_code=403, content={"error": "Shop scope not resolved", "invoices": []})
+        _ensure_shop_isolation_infrastructure(cur)
+        current_shop_id = _resolve_request_shop_id(request, cur, domain)
+        current_shop_uuid = _resolve_request_shop_uuid(request, cur, domain)
+        if not current_shop_id or not current_shop_uuid:
+            return JSONResponse(status_code=403, content={"error": "Shop scope not resolved", "invoices": []})
 
         cur.execute(
             """
@@ -9335,11 +9335,11 @@ async def list_vendor_invoice_parts(request: Request, vendor_id: int, invoice_nu
         _ensure_parts_vendors_table(cur)
         _ensure_parts_received_table(cur)
         _ensure_saved_estimates_table(cur)
-                _ensure_shop_isolation_infrastructure(cur)
-                current_shop_id = _resolve_request_shop_id(request, cur, domain)
-                current_shop_uuid = _resolve_request_shop_uuid(request, cur, domain)
-                if not current_shop_id or not current_shop_uuid:
-                        return JSONResponse(status_code=403, content={"error": "Shop scope not resolved", "parts": []})
+        _ensure_shop_isolation_infrastructure(cur)
+        current_shop_id = _resolve_request_shop_id(request, cur, domain)
+        current_shop_uuid = _resolve_request_shop_uuid(request, cur, domain)
+        if not current_shop_id or not current_shop_uuid:
+            return JSONResponse(status_code=403, content={"error": "Shop scope not resolved", "parts": []})
 
         cur.execute(
             """
