@@ -1548,17 +1548,39 @@ def _normalize_repair_type(value: str) -> str:
     return "body"
 
 
-def _load_latest_repairs_for_ro(cur, domain: str, ro_value: str) -> tuple[list, list]:
-    cur.execute(
-        """
-        SELECT labor_repairs, paint_repairs
-        FROM saved_estimates
-        WHERE domain = %s AND ro = %s
-        ORDER BY saved_at DESC, id DESC
-        LIMIT 1
-        """,
-        (domain, ro_value),
-    )
+def _load_latest_repairs_for_ro(
+    cur,
+    domain: str,
+    ro_value: str,
+    shop_id: int | None = None,
+    shop_uuid: str | None = None,
+) -> tuple[list, list]:
+    if shop_id and shop_uuid:
+        cur.execute(
+            """
+            SELECT labor_repairs, paint_repairs
+            FROM saved_estimates
+            WHERE (
+                    shop_uuid = %s::uuid
+                 OR (shop_uuid IS NULL AND shop_id = %s AND domain = %s)
+                  )
+              AND ro = %s
+            ORDER BY saved_at DESC, id DESC
+            LIMIT 1
+            """,
+            (shop_uuid, shop_id, domain, ro_value),
+        )
+    else:
+        cur.execute(
+            """
+            SELECT labor_repairs, paint_repairs
+            FROM saved_estimates
+            WHERE domain = %s AND ro = %s
+            ORDER BY saved_at DESC, id DESC
+            LIMIT 1
+            """,
+            (domain, ro_value),
+        )
     row = cur.fetchone() or {}
     labor_repairs = _parse_json_field(row.get("labor_repairs"))
     paint_repairs = _parse_json_field(row.get("paint_repairs"))
@@ -1569,7 +1591,15 @@ def _load_latest_repairs_for_ro(cur, domain: str, ro_value: str) -> tuple[list, 
     return labor_repairs, paint_repairs
 
 
-def _upsert_ro_lines(cur, domain: str, ro_value: str, repair_type: str, lines: list) -> None:
+def _upsert_ro_lines(
+    cur,
+    domain: str,
+    ro_value: str,
+    repair_type: str,
+    lines: list,
+    shop_id: int | None = None,
+    shop_uuid: str | None = None,
+) -> None:
     normalized_type = _normalize_repair_type(repair_type)
     if not isinstance(lines, list):
         return
@@ -1580,40 +1610,106 @@ def _upsert_ro_lines(cur, domain: str, ro_value: str, repair_type: str, lines: l
         line_number = str(item.get("line") or line_key)
         description = (item.get("description") or "").strip()
         hours = _parse_float_value(item.get("value"))
-        cur.execute(
-            """
-            INSERT INTO ro_line_assignments (
-                ro,
-                repair_type,
-                source_repair_type,
-                line_key,
-                line_number,
-                description,
-                hours,
-                tech_id,
-                tech_name,
-                is_pending,
-                domain
+        if shop_id and shop_uuid:
+            cur.execute(
+                """
+                INSERT INTO ro_line_assignments (
+                    ro,
+                    repair_type,
+                    source_repair_type,
+                    line_key,
+                    line_number,
+                    description,
+                    hours,
+                    tech_id,
+                    tech_name,
+                    is_pending,
+                    domain,
+                    shop_id,
+                    shop_uuid
+                )
+                VALUES (%s, %s, %s, %s, %s, %s, %s, NULL, NULL, FALSE, %s, %s, %s::uuid)
+                ON CONFLICT (ro, source_repair_type, line_key, domain)
+                DO UPDATE SET
+                    line_number = EXCLUDED.line_number,
+                    description = EXCLUDED.description,
+                    hours = EXCLUDED.hours,
+                    shop_id = EXCLUDED.shop_id,
+                    shop_uuid = EXCLUDED.shop_uuid,
+                    updated_at = CURRENT_TIMESTAMP
+                """,
+                (ro_value, normalized_type, normalized_type, line_key, line_number, description, hours, domain, shop_id, shop_uuid),
             )
-            VALUES (%s, %s, %s, %s, %s, %s, %s, NULL, NULL, FALSE, %s)
-            ON CONFLICT (ro, source_repair_type, line_key, domain)
-            DO UPDATE SET
-                line_number = EXCLUDED.line_number,
-                description = EXCLUDED.description,
-                hours = EXCLUDED.hours,
-                updated_at = CURRENT_TIMESTAMP
-            """,
-            (ro_value, normalized_type, normalized_type, line_key, line_number, description, hours, domain),
-        )
+        else:
+            cur.execute(
+                """
+                INSERT INTO ro_line_assignments (
+                    ro,
+                    repair_type,
+                    source_repair_type,
+                    line_key,
+                    line_number,
+                    description,
+                    hours,
+                    tech_id,
+                    tech_name,
+                    is_pending,
+                    domain
+                )
+                VALUES (%s, %s, %s, %s, %s, %s, %s, NULL, NULL, FALSE, %s)
+                ON CONFLICT (ro, source_repair_type, line_key, domain)
+                DO UPDATE SET
+                    line_number = EXCLUDED.line_number,
+                    description = EXCLUDED.description,
+                    hours = EXCLUDED.hours,
+                    updated_at = CURRENT_TIMESTAMP
+                """,
+                (ro_value, normalized_type, normalized_type, line_key, line_number, description, hours, domain),
+            )
 
 
-def _ensure_ro_line_assignments_for_ro(cur, domain: str, ro_value: str) -> None:
-    labor_repairs, paint_repairs = _load_latest_repairs_for_ro(cur, domain, ro_value)
-    _upsert_ro_lines(cur, domain, ro_value, "body", labor_repairs)
-    _upsert_ro_lines(cur, domain, ro_value, "paint", paint_repairs)
+def _ensure_ro_line_assignments_for_ro(
+    cur,
+    domain: str,
+    ro_value: str,
+    shop_id: int | None = None,
+    shop_uuid: str | None = None,
+) -> None:
+    labor_repairs, paint_repairs = _load_latest_repairs_for_ro(
+        cur,
+        domain,
+        ro_value,
+        shop_id=shop_id,
+        shop_uuid=shop_uuid,
+    )
+    _upsert_ro_lines(
+        cur,
+        domain,
+        ro_value,
+        "body",
+        labor_repairs,
+        shop_id=shop_id,
+        shop_uuid=shop_uuid,
+    )
+    _upsert_ro_lines(
+        cur,
+        domain,
+        ro_value,
+        "paint",
+        paint_repairs,
+        shop_id=shop_id,
+        shop_uuid=shop_uuid,
+    )
 
 
-def _get_scope_rows(cur, domain: str, ro_value: str, source: dict) -> list:
+def _get_scope_rows(
+    cur,
+    domain: str,
+    ro_value: str,
+    source: dict,
+    shop_id: int,
+    shop_uuid: str,
+) -> list:
     mode = (source.get("mode") or "").strip().lower()
     if mode == "unassigned":
         repair_type = _normalize_repair_type(source.get("repair_type"))
@@ -1621,13 +1717,16 @@ def _get_scope_rows(cur, domain: str, ro_value: str, source: dict) -> list:
             """
             SELECT id, repair_type, line_key
             FROM ro_line_assignments
-            WHERE domain = %s
+            WHERE (
+                    shop_uuid = %s::uuid
+                 OR (shop_uuid IS NULL AND shop_id = %s AND domain = %s)
+                  )
               AND ro = %s
               AND tech_name IS NULL
               AND COALESCE(is_pending, FALSE) = FALSE
               AND repair_type = %s
             """,
-            (domain, ro_value, repair_type),
+            (shop_uuid, shop_id, domain, ro_value, repair_type),
         )
         return cur.fetchall()
 
@@ -1636,12 +1735,15 @@ def _get_scope_rows(cur, domain: str, ro_value: str, source: dict) -> list:
             """
             SELECT id, repair_type, line_key
             FROM ro_line_assignments
-            WHERE domain = %s
+            WHERE (
+                    shop_uuid = %s::uuid
+                 OR (shop_uuid IS NULL AND shop_id = %s AND domain = %s)
+                  )
               AND ro = %s
               AND tech_name IS NULL
               AND COALESCE(is_pending, FALSE) = TRUE
             """,
-            (domain, ro_value),
+            (shop_uuid, shop_id, domain, ro_value),
         )
         return cur.fetchall()
 
@@ -1652,12 +1754,15 @@ def _get_scope_rows(cur, domain: str, ro_value: str, source: dict) -> list:
             """
             SELECT id, repair_type, line_key
             FROM ro_line_assignments
-            WHERE domain = %s
+            WHERE (
+                    shop_uuid = %s::uuid
+                 OR (shop_uuid IS NULL AND shop_id = %s AND domain = %s)
+                  )
               AND ro = %s
               AND tech_name = %s
               AND repair_type = %s
             """,
-            (domain, ro_value, tech_name, repair_type),
+            (shop_uuid, shop_id, domain, ro_value, tech_name, repair_type),
         )
         return cur.fetchall()
 
@@ -2484,10 +2589,10 @@ async def save_setup_shop(request: Request):
         if not requester_is_architect and selected_domain != str(domain or "").strip().lower():
             return JSONResponse(status_code=403, content={"error": "Forbidden"})
 
-        cur.execute("SELECT id, shop_id FROM shops WHERE domain = %s LIMIT 1", (selected_domain,))
+        cur.execute("SELECT id, shop_id, shop_uuid FROM shops WHERE domain = %s LIMIT 1", (selected_domain,))
         shop_row = cur.fetchone() or {}
         selected_shop_id = int(shop_row.get("id") or 0)
-        selected_shop_uuid = str(shop_row.get("shop_id") or "").strip() or None
+        selected_shop_uuid = str(shop_row.get("shop_uuid") or "").strip() or None
 
         if not selected_shop_id and requester_is_architect:
             cur.execute(
@@ -2502,13 +2607,13 @@ async def save_setup_shop(request: Request):
                     state = COALESCE(EXCLUDED.state, shops.state),
                     zip = COALESCE(EXCLUDED.zip, shops.zip),
                     updated_at = CURRENT_TIMESTAMP
-                RETURNING id, shop_id
+                RETURNING id, shop_id, shop_uuid
                 """,
                 (selected_domain, shop_name or None, address or None, city or None, state or None, zip_code or None),
             )
             inserted_shop_row = cur.fetchone() or {}
             selected_shop_id = int(inserted_shop_row.get("id") or 0)
-            selected_shop_uuid = str(inserted_shop_row.get("shop_id") or "").strip() or None
+            selected_shop_uuid = str(inserted_shop_row.get("shop_uuid") or "").strip() or None
 
         if not selected_shop_id or not selected_shop_uuid:
             return JSONResponse(status_code=400, content={"error": "Unable to resolve shop scope"})
@@ -3144,10 +3249,10 @@ async def update_manage_user(request: Request):
     cur = conn.cursor()
     try:
         _ensure_shop_users_table(cur)
-        cur.execute("SELECT id, shop_id FROM shops WHERE domain = %s LIMIT 1", (selected_domain,))
+        cur.execute("SELECT id, shop_id, shop_uuid FROM shops WHERE domain = %s LIMIT 1", (selected_domain,))
         shop_row = cur.fetchone() or {}
         selected_shop_id = int(shop_row.get("id") or 0)
-        selected_shop_uuid = str(shop_row.get("shop_id") or "").strip() or None
+        selected_shop_uuid = str(shop_row.get("shop_uuid") or "").strip() or None
         if not selected_shop_id or not selected_shop_uuid:
             return JSONResponse(status_code=400, content={"error": "Unable to resolve shop scope"})
 
@@ -3221,10 +3326,10 @@ async def create_manage_user(request: Request):
     cur = conn.cursor()
     try:
         _ensure_shop_users_table(cur)
-        cur.execute("SELECT id, shop_id FROM shops WHERE domain = %s LIMIT 1", (selected_domain,))
+        cur.execute("SELECT id, shop_id, shop_uuid FROM shops WHERE domain = %s LIMIT 1", (selected_domain,))
         shop_row = cur.fetchone() or {}
         selected_shop_id = int(shop_row.get("id") or 0)
-        selected_shop_uuid = str(shop_row.get("shop_id") or "").strip() or None
+        selected_shop_uuid = str(shop_row.get("shop_uuid") or "").strip() or None
         if not selected_shop_id or not selected_shop_uuid:
             return JSONResponse(status_code=400, content={"error": "Unable to resolve shop scope"})
 
@@ -3358,10 +3463,10 @@ async def update_setup_user(request: Request):
         if not (_request_is_architect(request) or _is_manager_or_hr_role(requester_role)):
             return JSONResponse(status_code=403, content={"error": "Forbidden"})
 
-                cur.execute("SELECT id, shop_id FROM shops WHERE domain = %s LIMIT 1", (selected_domain,))
+                cur.execute("SELECT id, shop_id, shop_uuid FROM shops WHERE domain = %s LIMIT 1", (selected_domain,))
         shop_row = cur.fetchone() or {}
         selected_shop_id = int(shop_row.get("id") or 0)
-                selected_shop_uuid = str(shop_row.get("shop_id") or "").strip() or None
+                selected_shop_uuid = str(shop_row.get("shop_uuid") or "").strip() or None
                 if not selected_shop_id or not selected_shop_uuid:
             return JSONResponse(status_code=400, content={"error": "Unable to resolve shop scope"})
         cur.execute(
@@ -3373,13 +3478,14 @@ async def update_setup_user(request: Request):
                                 role = %s,
                                 shop_uuid = %s::uuid
             WHERE id = %s
-              AND shop_id = %s
-                            AND shop_uuid = %s::uuid
-              AND domain = %s
+                            AND (
+                                        shop_uuid = %s::uuid
+                                 OR (shop_uuid IS NULL AND shop_id = %s AND domain = %s)
+                                    )
               AND active = TRUE
                         RETURNING id, user_id, first_name, last_name, email, role, shop_id, shop_uuid, created_at
             """,
-                        (first_name, last_name, email, role, selected_shop_uuid, user_id, selected_shop_id, selected_shop_uuid, selected_domain),
+                                                (first_name, last_name, email, role, selected_shop_uuid, user_id, selected_shop_uuid, selected_shop_id, selected_domain),
         )
         row = cur.fetchone() or {}
         conn.commit()
@@ -3446,23 +3552,24 @@ async def reset_setup_user_password(request: Request):
         if not (_request_is_architect(request) or _is_manager_or_hr_role(requester_role)):
             return JSONResponse(status_code=403, content={"error": "Forbidden"})
 
-                cur.execute("SELECT id, shop_id FROM shops WHERE domain = %s LIMIT 1", (selected_domain,))
+                cur.execute("SELECT id, shop_id, shop_uuid FROM shops WHERE domain = %s LIMIT 1", (selected_domain,))
         shop_row = cur.fetchone() or {}
         selected_shop_id = int(shop_row.get("id") or 0)
-                selected_shop_uuid = str(shop_row.get("shop_id") or "").strip() or None
+                selected_shop_uuid = str(shop_row.get("shop_uuid") or "").strip() or None
                 if not selected_shop_id or not selected_shop_uuid:
             return JSONResponse(status_code=400, content={"error": "Unable to resolve shop scope"})
         cur.execute(
             """
             UPDATE shop_users
             SET password_hash = %s
-            WHERE domain = %s
-              AND shop_id = %s
-                            AND shop_uuid = %s::uuid
+                        WHERE (
+                                        shop_uuid = %s::uuid
+                                 OR (shop_uuid IS NULL AND shop_id = %s AND domain = %s)
+                                    )
               AND active = TRUE
               AND id = ANY(%s)
             """,
-                        (password_hash, selected_domain, selected_shop_id, selected_shop_uuid, user_ids),
+                                                (password_hash, selected_shop_uuid, selected_shop_id, selected_domain, user_ids),
         )
         updated_count = int(cur.rowcount or 0)
         conn.commit()
@@ -3563,10 +3670,10 @@ async def create_setup_user(request: Request):
         if not (_request_is_architect(request) or _is_manager_or_hr_role(requester_role)):
             return JSONResponse(status_code=403, content={"error": "Forbidden"})
 
-        cur.execute("SELECT id, shop_id FROM shops WHERE domain = %s LIMIT 1", (selected_domain,))
+        cur.execute("SELECT id, shop_id, shop_uuid FROM shops WHERE domain = %s LIMIT 1", (selected_domain,))
         shop_row = cur.fetchone() or {}
         selected_shop_id = int(shop_row.get("id") or 0)
-        selected_shop_uuid = str(shop_row.get("shop_id") or "").strip() or None
+        selected_shop_uuid = str(shop_row.get("shop_uuid") or "").strip() or None
         if not selected_shop_id or not selected_shop_uuid:
             return JSONResponse(status_code=400, content={"error": "Unable to resolve shop scope"})
         cur.execute(
@@ -3643,10 +3750,10 @@ async def delete_setup_users(request: Request):
         if not (_request_is_architect(request) or _is_manager_or_hr_role(requester_role)):
             return JSONResponse(status_code=403, content={"error": "Forbidden"})
 
-                cur.execute("SELECT id, shop_id FROM shops WHERE domain = %s LIMIT 1", (selected_domain,))
+                cur.execute("SELECT id, shop_id, shop_uuid FROM shops WHERE domain = %s LIMIT 1", (selected_domain,))
         shop_row = cur.fetchone() or {}
         selected_shop_id = int(shop_row.get("id") or 0)
-                selected_shop_uuid = str(shop_row.get("shop_id") or "").strip() or None
+                selected_shop_uuid = str(shop_row.get("shop_uuid") or "").strip() or None
                 if not selected_shop_id or not selected_shop_uuid:
             return JSONResponse(status_code=400, content={"error": "Unable to resolve shop scope"})
 
@@ -3654,14 +3761,15 @@ async def delete_setup_users(request: Request):
             """
             SELECT id
             FROM shop_users
-            WHERE domain = %s
-              AND shop_id = %s
-                            AND shop_uuid = %s::uuid
+                        WHERE (
+                                        shop_uuid = %s::uuid
+                                 OR (shop_uuid IS NULL AND shop_id = %s AND domain = %s)
+                                    )
               AND id = ANY(%s)
               AND active = TRUE
               AND LOWER(email) <> %s
             """,
-                        (selected_domain, selected_shop_id, selected_shop_uuid, user_ids, _ARCHITECT_EMAIL),
+                                                (selected_shop_uuid, selected_shop_id, selected_domain, user_ids, _ARCHITECT_EMAIL),
         )
         deletable_ids = [int((row or {}).get("id") or 0) for row in (cur.fetchall() or [])]
         deletable_ids = [value for value in deletable_ids if value > 0]
@@ -3676,12 +3784,13 @@ async def delete_setup_users(request: Request):
         cur.execute(
             """
             DELETE FROM shop_users
-            WHERE domain = %s
-              AND shop_id = %s
-                            AND shop_uuid = %s::uuid
+                        WHERE (
+                                        shop_uuid = %s::uuid
+                                 OR (shop_uuid IS NULL AND shop_id = %s AND domain = %s)
+                                    )
               AND id = ANY(%s)
             """,
-                        (selected_domain, selected_shop_id, selected_shop_uuid, deletable_ids),
+                                                (selected_shop_uuid, selected_shop_id, selected_domain, deletable_ids),
         )
         deleted_count = int(cur.rowcount or 0)
         conn.commit()
@@ -3706,13 +3815,41 @@ async def delete_setup_shop(request: Request):
     conn = get_conn()
     cur = conn.cursor()
     try:
-        cur.execute("DELETE FROM shop_settings WHERE domain = %s", (selected_domain,))
+        cur.execute("SELECT id, shop_id, shop_uuid FROM shops WHERE domain = %s LIMIT 1", (selected_domain,))
+        shop_row = cur.fetchone() or {}
+        selected_shop_id = int(shop_row.get("id") or 0)
+        selected_shop_uuid = str(shop_row.get("shop_uuid") or "").strip() or None
+
+        if not selected_shop_id:
+            return JSONResponse(status_code=404, content={"error": "Shop not found"})
+
+        if selected_shop_uuid:
+            cur.execute(
+                """
+                DELETE FROM shop_settings
+                WHERE shop_uuid = %s::uuid
+                   OR (shop_uuid IS NULL AND shop_id = %s AND domain = %s)
+                """,
+                (selected_shop_uuid, selected_shop_id, selected_domain),
+            )
+        else:
+            cur.execute("DELETE FROM shop_settings WHERE domain = %s", (selected_domain,))
         settings_deleted = int(cur.rowcount or 0)
 
-        cur.execute("DELETE FROM shop_users WHERE domain = %s", (selected_domain,))
+        if selected_shop_uuid:
+            cur.execute(
+                """
+                DELETE FROM shop_users
+                WHERE shop_uuid = %s::uuid
+                   OR (shop_uuid IS NULL AND shop_id = %s AND domain = %s)
+                """,
+                (selected_shop_uuid, selected_shop_id, selected_domain),
+            )
+        else:
+            cur.execute("DELETE FROM shop_users WHERE domain = %s", (selected_domain,))
         users_deleted = int(cur.rowcount or 0)
 
-        cur.execute("DELETE FROM shops WHERE domain = %s", (selected_domain,))
+        cur.execute("DELETE FROM shops WHERE id = %s", (selected_shop_id,))
         shops_deleted = int(cur.rowcount or 0)
 
         conn.commit()
@@ -3750,6 +3887,11 @@ async def get_dashboard_data(request: Request):
         _ensure_ro_assignments_table(cur)
         _ensure_ro_line_assignments_table(cur)
         _ensure_techs_table(cur)
+                _ensure_shop_isolation_infrastructure(cur)
+                current_shop_id = _resolve_request_shop_id(request, cur, domain)
+                current_shop_uuid = _resolve_request_shop_uuid(request, cur, domain)
+                if not current_shop_id or not current_shop_uuid:
+                        return JSONResponse(status_code=403, content={"error": "Shop scope not resolved"})
 
         cur.execute(
             """
@@ -3757,9 +3899,12 @@ async def get_dashboard_data(request: Request):
             FROM techs
             WHERE active = TRUE
               AND status = 'Active'
-              AND (domain = %s OR domain IS NULL)
+                            AND (
+                                        shop_uuid = %s::uuid
+                                 OR (shop_uuid IS NULL AND shop_id = %s AND (domain = %s OR domain IS NULL))
+                                    )
             """,
-            (domain,),
+                        (current_shop_uuid, current_shop_id, domain),
         )
         active_name_set = {
             " ".join(part for part in [(row.get("first_name") or "").strip(), (row.get("last_name") or "").strip()] if part)
@@ -3794,12 +3939,15 @@ async def get_dashboard_data(request: Request):
                                      picked_up,
                                      saved_at
             FROM saved_estimates
-            WHERE domain = %s
+                        WHERE (
+                                        shop_uuid = %s::uuid
+                                 OR (shop_uuid IS NULL AND shop_id = %s AND domain = %s)
+                                    )
               AND ro IS NOT NULL
               AND ro <> ''
             ORDER BY ro, saved_at DESC, id DESC
             """,
-            (domain,),
+                        (current_shop_uuid, current_shop_id, domain),
         )
         rows = cur.fetchall()
 
@@ -3807,9 +3955,12 @@ async def get_dashboard_data(request: Request):
             """
             SELECT ro, phase
             FROM ro_phases
-            WHERE domain = %s
+            WHERE (
+                    shop_uuid = %s::uuid
+                 OR (shop_uuid IS NULL AND shop_id = %s AND domain = %s)
+                  )
             """,
-            (domain,),
+            (current_shop_uuid, current_shop_id, domain),
         )
         phase_rows = cur.fetchall()
         phase_map = {row.get("ro"): row.get("phase") for row in phase_rows}
@@ -3898,17 +4049,26 @@ async def get_dashboard_data(request: Request):
             in_date_value = _coerce_date(row.get("in_date")) or _to_local_business_date(row.get("saved_at"))
             ecd_date_value = _coerce_date(row.get("ecd_date")) or _calculate_ecd_date(in_date_value, ro_hours)
 
-            _ensure_ro_line_assignments_for_ro(cur, domain, ro)
+            _ensure_ro_line_assignments_for_ro(
+                cur,
+                domain,
+                ro,
+                shop_id=current_shop_id,
+                shop_uuid=current_shop_uuid,
+            )
 
             cur.execute(
                 """
                 SELECT repair_type, tech_name, COALESCE(SUM(hours), 0) AS total_hours
                 FROM ro_line_assignments
-                WHERE domain = %s
+                        WHERE (
+                                        shop_uuid = %s::uuid
+                                 OR (shop_uuid IS NULL AND shop_id = %s AND domain = %s)
+                                    )
                   AND ro = %s
                 GROUP BY repair_type, tech_name
                 """,
-                (domain, ro),
+                        (current_shop_uuid, current_shop_id, domain, ro),
             )
             grouped_lines = cur.fetchall()
 
@@ -5402,15 +5562,24 @@ async def update_ro_phone(request: Request):
     try:
         _ensure_saved_estimates_table(cur)
         _ensure_ro_activity_log_table(cur)
+        _ensure_shop_isolation_infrastructure(cur)
+        current_shop_id = _resolve_request_shop_id(request, cur, domain)
+        current_shop_uuid = _resolve_request_shop_uuid(request, cur, domain)
+        if not current_shop_id or not current_shop_uuid:
+            return JSONResponse(status_code=403, content={"error": "Shop scope not resolved"})
         cur.execute(
             """
             SELECT id, owner_info, phone_original, phone_override, customer_phones, customer_email
             FROM saved_estimates
-            WHERE domain = %s AND ro = %s
+            WHERE (
+                    shop_uuid = %s::uuid
+                 OR (shop_uuid IS NULL AND shop_id = %s AND domain = %s)
+                  )
+              AND ro = %s
             ORDER BY saved_at DESC, id DESC
             LIMIT 1
             """,
-            (domain, ro_value),
+            (current_shop_uuid, current_shop_id, domain, ro_value),
         )
         row = cur.fetchone()
         if not row:
@@ -5571,15 +5740,24 @@ async def update_ro_dates(request: Request):
     try:
         _ensure_saved_estimates_table(cur)
         _ensure_ro_activity_log_table(cur)
+        _ensure_shop_isolation_infrastructure(cur)
+        current_shop_id = _resolve_request_shop_id(request, cur, domain)
+        current_shop_uuid = _resolve_request_shop_uuid(request, cur, domain)
+        if not current_shop_id or not current_shop_uuid:
+            return JSONResponse(status_code=403, content={"error": "Shop scope not resolved"})
         cur.execute(
             """
             SELECT id, in_date, ecd_date, picked_up
             FROM saved_estimates
-            WHERE domain = %s AND ro = %s
+            WHERE (
+                    shop_uuid = %s::uuid
+                 OR (shop_uuid IS NULL AND shop_id = %s AND domain = %s)
+                  )
+              AND ro = %s
             ORDER BY saved_at DESC, id DESC
             LIMIT 1
             """,
-            (domain, ro_value),
+            (current_shop_uuid, current_shop_id, domain, ro_value),
         )
         row = cur.fetchone()
         if not row:
@@ -5650,15 +5828,24 @@ async def get_ro_repairs(request: Request, ro: str):
     try:
         _ensure_saved_estimates_table(cur)
         _ensure_ro_assignments_table(cur)
+        _ensure_shop_isolation_infrastructure(cur)
+        current_shop_id = _resolve_request_shop_id(request, cur, domain)
+        current_shop_uuid = _resolve_request_shop_uuid(request, cur, domain)
+        if not current_shop_id or not current_shop_uuid:
+            return JSONResponse(status_code=403, content={"error": "Shop scope not resolved"})
         cur.execute(
             """
             SELECT labor_repairs, paint_repairs
             FROM saved_estimates
-            WHERE domain = %s AND ro = %s
+            WHERE (
+                    shop_uuid = %s::uuid
+                 OR (shop_uuid IS NULL AND shop_id = %s AND domain = %s)
+                  )
+              AND ro = %s
             ORDER BY saved_at DESC, id DESC
             LIMIT 1
             """,
-            (domain, ro_value),
+            (current_shop_uuid, current_shop_id, domain, ro_value),
         )
         row = cur.fetchone()
         labor_repairs = _parse_json_field(row.get("labor_repairs")) if row else []
@@ -5673,9 +5860,13 @@ async def get_ro_repairs(request: Request, ro: str):
             """
             SELECT role, tech_id, tech_name, excluded_lines
             FROM ro_assignments
-            WHERE domain = %s AND ro = %s
+                        WHERE (
+                                        shop_uuid = %s::uuid
+                                 OR (shop_uuid IS NULL AND shop_id = %s AND domain = %s)
+                                    )
+                            AND ro = %s
             """,
-            (domain, ro_value),
+                        (current_shop_uuid, current_shop_id, domain, ro_value),
         )
         assignment_rows = cur.fetchall()
         assignments = {
@@ -5714,18 +5905,26 @@ async def get_ro_tech_lines(request: Request, ro: str):
         _ensure_ro_line_assignments_table(cur)
         _ensure_techs_table(cur)
         _ensure_ro_activity_log_table(cur)
+        _ensure_shop_isolation_infrastructure(cur)
+        current_shop_id = _resolve_request_shop_id(request, cur, domain)
+        current_shop_uuid = _resolve_request_shop_uuid(request, cur, domain)
+        if not current_shop_id or not current_shop_uuid:
+            return JSONResponse(status_code=403, content={"error": "Shop scope not resolved"})
         _ensure_ro_line_assignments_for_ro(cur, domain, ro_value)
 
         cur.execute(
             """
             SELECT repair_type, COALESCE(SUM(hours), 0) AS total_hours
             FROM ro_line_assignments
-            WHERE domain = %s
+                        WHERE (
+                                        shop_uuid = %s::uuid
+                                 OR (shop_uuid IS NULL AND shop_id = %s AND domain = %s)
+                                    )
               AND ro = %s
               AND tech_name IS NOT NULL
             GROUP BY repair_type
             """,
-            (domain, ro_value),
+                        (current_shop_uuid, current_shop_id, domain, ro_value),
         )
         before_rows = cur.fetchall() or []
         before_by_type = {
@@ -5740,9 +5939,12 @@ async def get_ro_tech_lines(request: Request, ro: str):
             FROM techs
             WHERE active = TRUE
               AND status = 'Active'
-              AND (domain = %s OR domain IS NULL)
+                            AND (
+                                        shop_uuid = %s::uuid
+                                 OR (shop_uuid IS NULL AND shop_id = %s AND (domain = %s OR domain IS NULL))
+                            )
             """,
-            (domain,),
+                        (current_shop_uuid, current_shop_id, domain),
         )
         active_ids = {int(row.get("id")) for row in (cur.fetchall() or []) if row.get("id") is not None}
         cur.execute(
@@ -5751,9 +5953,12 @@ async def get_ro_tech_lines(request: Request, ro: str):
             FROM techs
             WHERE active = TRUE
               AND status = 'Active'
-              AND (domain = %s OR domain IS NULL)
+                            AND (
+                                        shop_uuid = %s::uuid
+                                 OR (shop_uuid IS NULL AND shop_id = %s AND (domain = %s OR domain IS NULL))
+                            )
             """,
-            (domain,),
+                        (current_shop_uuid, current_shop_id, domain),
         )
         active_names = {
             " ".join(part for part in [(row.get("first_name") or "").strip(), (row.get("last_name") or "").strip()] if part)
@@ -5770,12 +5975,15 @@ async def get_ro_tech_lines(request: Request, ro: str):
                 COALESCE(SUM(hours), 0) AS hours,
                 COUNT(*) AS line_count
             FROM ro_line_assignments
-            WHERE domain = %s
+                        WHERE (
+                                        shop_uuid = %s::uuid
+                                 OR (shop_uuid IS NULL AND shop_id = %s AND domain = %s)
+                                    )
               AND ro = %s
             GROUP BY repair_type, tech_id, tech_name, COALESCE(is_pending, FALSE)
             ORDER BY tech_name NULLS FIRST, repair_type
             """,
-            (domain, ro_value),
+                        (current_shop_uuid, current_shop_id, domain, ro_value),
         )
         rows = cur.fetchall()
 
@@ -5890,12 +6098,15 @@ async def get_ro_assignment_lines(
             """
             SELECT repair_type, COALESCE(SUM(hours), 0) AS total_hours
             FROM ro_line_assignments
-            WHERE domain = %s
+                        WHERE (
+                                        shop_uuid = %s::uuid
+                                 OR (shop_uuid IS NULL AND shop_id = %s AND domain = %s)
+                                    )
               AND ro = %s
               AND tech_name IS NOT NULL
             GROUP BY repair_type
             """,
-            (domain, ro_value),
+                        (current_shop_uuid, current_shop_id, domain, ro_value),
         )
         before_rows = cur.fetchall() or []
         before_by_type = {
@@ -5910,27 +6121,33 @@ async def get_ro_assignment_lines(
                 """
                 SELECT repair_type, line_key, line_number, description, hours
                 FROM ro_line_assignments
-                WHERE domain = %s
+                                WHERE (
+                                                shop_uuid = %s::uuid
+                                         OR (shop_uuid IS NULL AND shop_id = %s AND domain = %s)
+                                            )
                   AND ro = %s
                   AND tech_name IS NULL
                   AND COALESCE(is_pending, FALSE) = FALSE
                   AND repair_type = %s
                 ORDER BY line_number
                 """,
-                (domain, ro_value, filter_type),
+                                (current_shop_uuid, current_shop_id, domain, ro_value, filter_type),
             )
         elif mode_value == "pending":
             cur.execute(
                 """
                 SELECT repair_type, line_key, line_number, description, hours
                 FROM ro_line_assignments
-                WHERE domain = %s
+                                WHERE (
+                                                shop_uuid = %s::uuid
+                                         OR (shop_uuid IS NULL AND shop_id = %s AND domain = %s)
+                                            )
                   AND ro = %s
                   AND tech_name IS NULL
                   AND COALESCE(is_pending, FALSE) = TRUE
                 ORDER BY repair_type, line_number
                 """,
-                (domain, ro_value),
+                                (current_shop_uuid, current_shop_id, domain, ro_value),
             )
         else:
             filter_type = _normalize_repair_type(repair_type)
@@ -5939,13 +6156,16 @@ async def get_ro_assignment_lines(
                 """
                 SELECT repair_type, line_key, line_number, description, hours
                 FROM ro_line_assignments
-                WHERE domain = %s
+                                WHERE (
+                                                shop_uuid = %s::uuid
+                                         OR (shop_uuid IS NULL AND shop_id = %s AND domain = %s)
+                                            )
                   AND ro = %s
                   AND tech_name = %s
                   AND repair_type = %s
                 ORDER BY line_number
                 """,
-                (domain, ro_value, selected_tech, filter_type),
+                                (current_shop_uuid, current_shop_id, domain, ro_value, selected_tech, filter_type),
             )
 
         line_rows = cur.fetchall()
@@ -6040,12 +6260,15 @@ async def save_ro_assignment_lines(request: Request):
             """
             SELECT repair_type, COALESCE(SUM(hours), 0) AS total_hours
             FROM ro_line_assignments
-            WHERE domain = %s
+                        WHERE (
+                                        shop_uuid = %s::uuid
+                                 OR (shop_uuid IS NULL AND shop_id = %s AND domain = %s)
+                                    )
               AND ro = %s
               AND tech_name IS NOT NULL
             GROUP BY repair_type
             """,
-            (domain, ro_value),
+                        (current_shop_uuid, current_shop_id, domain, ro_value),
         )
         before_rows = cur.fetchall() or []
         before_by_type = {
@@ -6124,7 +6347,14 @@ async def save_ro_assignment_lines(request: Request):
                 continue
             selected_keys.add((repair_type, line_key))
 
-        scope_rows = _get_scope_rows(cur, domain, ro_value, source)
+        scope_rows = _get_scope_rows(
+            cur,
+            domain,
+            ro_value,
+            source,
+            shop_id=current_shop_id,
+            shop_uuid=current_shop_uuid,
+        )
         scope_keys = {
             (str(row.get("repair_type") or ""), str(row.get("line_key") or "")): int(row.get("id"))
             for row in scope_rows
@@ -6171,10 +6401,13 @@ async def save_ro_assignment_lines(request: Request):
                 """
                 SELECT line_key
                 FROM ro_line_assignments
-                WHERE domain = %s
+                                WHERE (
+                                                shop_uuid = %s::uuid
+                                         OR (shop_uuid IS NULL AND shop_id = %s AND domain = %s)
+                                            )
                   AND ro = %s
                 """,
-                (domain, ro_value),
+                                (current_shop_uuid, current_shop_id, domain, ro_value),
             )
             existing_line_keys = {str(row.get("line_key") or "") for row in (cur.fetchall() or [])}
             base_stamp = int(datetime.utcnow().timestamp())
@@ -6228,12 +6461,15 @@ async def save_ro_assignment_lines(request: Request):
             """
             SELECT repair_type, COALESCE(SUM(hours), 0) AS total_hours
             FROM ro_line_assignments
-            WHERE domain = %s
+                        WHERE (
+                                        shop_uuid = %s::uuid
+                                 OR (shop_uuid IS NULL AND shop_id = %s AND domain = %s)
+                                    )
               AND ro = %s
               AND tech_name IS NOT NULL
             GROUP BY repair_type
             """,
-            (domain, ro_value),
+                        (current_shop_uuid, current_shop_id, domain, ro_value),
         )
         after_rows = cur.fetchall() or []
         after_by_type = {
@@ -6326,12 +6562,15 @@ async def unassign_ro_assignment_lines(request: Request):
             """
             SELECT repair_type, COALESCE(SUM(hours), 0) AS total_hours
             FROM ro_line_assignments
-            WHERE domain = %s
+                        WHERE (
+                                        shop_uuid = %s::uuid
+                                 OR (shop_uuid IS NULL AND shop_id = %s AND domain = %s)
+                                    )
               AND ro = %s
               AND tech_name IS NOT NULL
             GROUP BY repair_type
             """,
-            (domain, ro_value),
+                        (current_shop_uuid, current_shop_id, domain, ro_value),
         )
         before_rows = cur.fetchall() or []
         before_by_type = {
@@ -6349,7 +6588,14 @@ async def unassign_ro_assignment_lines(request: Request):
             if source_mode not in {"tech", "pending", "unassigned"}:
                 continue
 
-            rows = _get_scope_rows(cur, domain, ro_value, source)
+            rows = _get_scope_rows(
+                cur,
+                domain,
+                ro_value,
+                source,
+                shop_id=current_shop_id,
+                shop_uuid=current_shop_uuid,
+            )
             for row in rows:
                 row_id = row.get("id")
                 if row_id is None:
@@ -6378,12 +6624,15 @@ async def unassign_ro_assignment_lines(request: Request):
             """
             SELECT repair_type, COALESCE(SUM(hours), 0) AS total_hours
             FROM ro_line_assignments
-            WHERE domain = %s
+                        WHERE (
+                                        shop_uuid = %s::uuid
+                                 OR (shop_uuid IS NULL AND shop_id = %s AND domain = %s)
+                                    )
               AND ro = %s
               AND tech_name IS NOT NULL
             GROUP BY repair_type
             """,
-            (domain, ro_value),
+                        (current_shop_uuid, current_shop_id, domain, ro_value),
         )
         after_rows = cur.fetchall() or []
         after_by_type = {
@@ -6756,19 +7005,27 @@ async def tech_flag_out_lines(request: Request):
     try:
         _ensure_ro_line_assignments_table(cur)
         _ensure_ro_flagout_lines_table(cur)
+        _ensure_shop_isolation_infrastructure(cur)
+        current_shop_id = _resolve_request_shop_id(request, cur, domain)
+        current_shop_uuid = _resolve_request_shop_uuid(request, cur, domain)
+        if not current_shop_id or not current_shop_uuid:
+            return JSONResponse(status_code=403, content={"error": "Shop scope not resolved"})
         _ensure_ro_line_assignments_for_ro(cur, domain, ro_value)
 
         cur.execute(
             """
             SELECT id, line_key, line_number, description, hours, tech_name, repair_type
             FROM ro_line_assignments
-            WHERE domain = %s
+                        WHERE (
+                                        shop_uuid = %s::uuid
+                                 OR (shop_uuid IS NULL AND shop_id = %s AND domain = %s)
+                                    )
               AND ro = %s
               AND tech_id = %s
               AND COALESCE(ready_to_flag, FALSE) = FALSE
               AND line_key = ANY(%s)
             """,
-            (domain, ro_value, tech_id, normalized_keys),
+                        (current_shop_uuid, current_shop_id, domain, ro_value, tech_id, normalized_keys),
         )
         rows = cur.fetchall()
 
@@ -6798,9 +7055,11 @@ async def tech_flag_out_lines(request: Request):
                     pay_amount,
                     status,
                     domain,
+                    shop_id,
+                    shop_uuid,
                     flagged_at
                 )
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 'ready_to_flag', %s, CURRENT_TIMESTAMP)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 'ready_to_flag', %s, %s, %s::uuid, CURRENT_TIMESTAMP)
                 ON CONFLICT (ro, tech_id, repair_type, line_key, domain)
                 DO UPDATE SET
                     line_number = EXCLUDED.line_number,
@@ -6809,6 +7068,8 @@ async def tech_flag_out_lines(request: Request):
                     pay_rate = EXCLUDED.pay_rate,
                     pay_amount = EXCLUDED.pay_amount,
                     status = 'ready_to_flag',
+                    shop_id = EXCLUDED.shop_id,
+                    shop_uuid = EXCLUDED.shop_uuid,
                     flagged_at = CURRENT_TIMESTAMP
                 """,
                 (
@@ -6823,6 +7084,8 @@ async def tech_flag_out_lines(request: Request):
                     pay_rate,
                     line_pay,
                     domain,
+                    current_shop_id,
+                    current_shop_uuid,
                 ),
             )
 
@@ -6842,13 +7105,16 @@ async def tech_flag_out_lines(request: Request):
             """
             SELECT COUNT(*) AS remaining_count
             FROM ro_line_assignments
-            WHERE domain = %s
+                        WHERE (
+                                        shop_uuid = %s::uuid
+                                 OR (shop_uuid IS NULL AND shop_id = %s AND domain = %s)
+                                    )
               AND ro = %s
               AND tech_id = %s
               AND repair_type = 'body'
               AND COALESCE(ready_to_flag, FALSE) = FALSE
             """,
-            (domain, ro_value, tech_id),
+                        (current_shop_uuid, current_shop_id, domain, ro_value, tech_id),
         )
         remaining_row = cur.fetchone() or {}
         remaining_count = int(remaining_row.get("remaining_count") or 0)
@@ -6898,6 +7164,11 @@ async def tech_flag_out_ros(request: Request):
     try:
         _ensure_ro_line_assignments_table(cur)
         _ensure_ro_flagout_lines_table(cur)
+        _ensure_shop_isolation_infrastructure(cur)
+        current_shop_id = _resolve_request_shop_id(request, cur, domain)
+        current_shop_uuid = _resolve_request_shop_uuid(request, cur, domain)
+        if not current_shop_id or not current_shop_uuid:
+            return JSONResponse(status_code=403, content={"error": "Shop scope not resolved"})
 
         total_flagged_count = 0
         total_flagged_hours = 0.0
@@ -6909,12 +7180,15 @@ async def tech_flag_out_ros(request: Request):
                 """
                 SELECT id, line_key, line_number, description, hours, tech_name, repair_type
                 FROM ro_line_assignments
-                WHERE domain = %s
+                                WHERE (
+                                                shop_uuid = %s::uuid
+                                         OR (shop_uuid IS NULL AND shop_id = %s AND domain = %s)
+                                            )
                   AND ro = %s
                   AND tech_id = %s
                   AND COALESCE(ready_to_flag, FALSE) = FALSE
                 """,
-                (domain, ro_value, tech_id),
+                                (current_shop_uuid, current_shop_id, domain, ro_value, tech_id),
             )
             rows = cur.fetchall() or []
             if not rows:
@@ -6943,9 +7217,11 @@ async def tech_flag_out_ros(request: Request):
                         pay_amount,
                         status,
                         domain,
+                        shop_id,
+                        shop_uuid,
                         flagged_at
                     )
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 'ready_to_flag', %s, CURRENT_TIMESTAMP)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 'ready_to_flag', %s, %s, %s::uuid, CURRENT_TIMESTAMP)
                     ON CONFLICT (ro, tech_id, repair_type, line_key, domain)
                     DO UPDATE SET
                         line_number = EXCLUDED.line_number,
@@ -6954,6 +7230,8 @@ async def tech_flag_out_ros(request: Request):
                         pay_rate = EXCLUDED.pay_rate,
                         pay_amount = EXCLUDED.pay_amount,
                         status = 'ready_to_flag',
+                        shop_id = EXCLUDED.shop_id,
+                        shop_uuid = EXCLUDED.shop_uuid,
                         flagged_at = CURRENT_TIMESTAMP
                     """,
                     (
@@ -6968,6 +7246,8 @@ async def tech_flag_out_ros(request: Request):
                         pay_rate,
                         line_pay,
                         domain,
+                        current_shop_id,
+                        current_shop_uuid,
                     ),
                 )
 
@@ -7013,6 +7293,11 @@ async def get_flagout_techs(request: Request):
     try:
         _ensure_ro_flagout_lines_table(cur)
         _ensure_techs_table(cur)
+        _ensure_shop_isolation_infrastructure(cur)
+        current_shop_id = _resolve_request_shop_id(request, cur, domain)
+        current_shop_uuid = _resolve_request_shop_uuid(request, cur, domain)
+        if not current_shop_id or not current_shop_uuid:
+            return JSONResponse(status_code=403, content={"error": "Shop scope not resolved"})
 
         cur.execute(
             """
@@ -7026,13 +7311,19 @@ async def get_flagout_techs(request: Request):
             FROM ro_flagout_lines f
                         LEFT JOIN techs t
                             ON t.id = f.tech_id
-                         AND (t.domain = %s OR t.domain IS NULL)
-            WHERE f.domain = %s
+                                                 AND (
+                                                                t.shop_uuid = %s::uuid
+                                                         OR (t.shop_uuid IS NULL AND t.shop_id = %s AND (t.domain = %s OR t.domain IS NULL))
+                                                 )
+                        WHERE (
+                                        f.shop_uuid = %s::uuid
+                                 OR (f.shop_uuid IS NULL AND f.shop_id = %s AND f.domain = %s)
+                                    )
               AND f.status = 'ready_to_flag'
             GROUP BY f.tech_id
             ORDER BY COALESCE(MAX(NULLIF(TRIM(f.tech_name), '')), CONCAT('Tech #', f.tech_id::text))
             """,
-                        (domain, domain),
+                        (current_shop_uuid, current_shop_id, domain, current_shop_uuid, current_shop_id, domain),
         )
         tech_rows = cur.fetchall() or []
 
@@ -7046,7 +7337,10 @@ async def get_flagout_techs(request: Request):
                     model,
                     vehicle
                 FROM saved_estimates
-                WHERE domain = %s
+                WHERE (
+                        shop_uuid = %s::uuid
+                     OR (shop_uuid IS NULL AND shop_id = %s AND domain = %s)
+                      )
                 ORDER BY ro, saved_at DESC, id DESC
             )
             SELECT
@@ -7062,12 +7356,15 @@ async def get_flagout_techs(request: Request):
                 MAX(le.vehicle) AS vehicle
             FROM ro_flagout_lines f
             LEFT JOIN latest_estimates le ON le.ro = f.ro
-            WHERE f.domain = %s
+                        WHERE (
+                                        f.shop_uuid = %s::uuid
+                                 OR (f.shop_uuid IS NULL AND f.shop_id = %s AND f.domain = %s)
+                                    )
               AND f.status = 'ready_to_flag'
             GROUP BY f.tech_id, f.ro
             ORDER BY f.tech_id, f.ro
             """,
-            (domain, domain),
+                        (current_shop_uuid, current_shop_id, domain, current_shop_uuid, current_shop_id, domain),
         )
         ro_rows = cur.fetchall() or []
 
@@ -7143,6 +7440,11 @@ async def save_flagout_payout(request: Request):
     try:
         _ensure_ro_flagout_lines_table(cur)
         _ensure_saved_estimates_table(cur)
+        _ensure_shop_isolation_infrastructure(cur)
+        current_shop_id = _resolve_request_shop_id(request, cur, domain)
+        current_shop_uuid = _resolve_request_shop_uuid(request, cur, domain)
+        if not current_shop_id or not current_shop_uuid:
+            return JSONResponse(status_code=403, content={"error": "Shop scope not resolved"})
 
         summaries = []
 
@@ -7160,7 +7462,10 @@ async def save_flagout_payout(request: Request):
                         model,
                         vehicle
                     FROM saved_estimates
-                    WHERE domain = %s
+                    WHERE (
+                            shop_uuid = %s::uuid
+                         OR (shop_uuid IS NULL AND shop_id = %s AND domain = %s)
+                          )
                     ORDER BY ro, saved_at DESC, id DESC
                 )
                 SELECT
@@ -7176,14 +7481,17 @@ async def save_flagout_payout(request: Request):
                     MAX(le.vehicle) AS vehicle
                 FROM ro_flagout_lines f
                 LEFT JOIN latest_estimates le ON le.ro = f.ro
-                WHERE f.domain = %s
+                                WHERE (
+                                                f.shop_uuid = %s::uuid
+                                         OR (f.shop_uuid IS NULL AND f.shop_id = %s AND f.domain = %s)
+                                            )
                   AND f.status = 'ready_to_flag'
                   AND f.tech_id = %s
                   AND f.ro = ANY(%s)
                 GROUP BY f.tech_id, f.ro
                 ORDER BY f.ro
                 """,
-                (domain, domain, tech_id, ro_values),
+                                (current_shop_uuid, current_shop_id, domain, current_shop_uuid, current_shop_id, domain, tech_id, ro_values),
             )
             ro_rows = cur.fetchall() or []
             if not ro_rows:
@@ -7233,12 +7541,15 @@ async def save_flagout_payout(request: Request):
                 UPDATE ro_flagout_lines
                 SET status = 'paid',
                     paid_at = CURRENT_TIMESTAMP
-                WHERE domain = %s
+                WHERE (
+                        shop_uuid = %s::uuid
+                     OR (shop_uuid IS NULL AND shop_id = %s AND domain = %s)
+                      )
                   AND status = 'ready_to_flag'
                   AND tech_id = %s
                   AND ro = ANY(%s)
                 """,
-                (domain, tech_id, ro_values),
+                (current_shop_uuid, current_shop_id, domain, tech_id, ro_values),
             )
 
         conn.commit()
@@ -7468,14 +7779,23 @@ async def list_ro_notes(request: Request, ro: str):
     cur = conn.cursor()
     try:
         _ensure_ro_notes_table(cur)
+        _ensure_shop_isolation_infrastructure(cur)
+        current_shop_id = _resolve_request_shop_id(request, cur, domain)
+        current_shop_uuid = _resolve_request_shop_uuid(request, cur, domain)
+        if not current_shop_id or not current_shop_uuid:
+            return JSONResponse(status_code=403, content={"error": "Shop scope not resolved", "notes": []})
         cur.execute(
             """
             SELECT note, created_at, created_by
             FROM ro_notes
-            WHERE ro = %s AND domain = %s
+            WHERE ro = %s
+              AND (
+                    shop_uuid = %s::uuid
+                 OR (shop_uuid IS NULL AND shop_id = %s AND domain = %s)
+                  )
             ORDER BY created_at DESC
             """,
-            (ro, domain),
+            (ro, current_shop_uuid, current_shop_id, domain),
         )
         rows = cur.fetchall()
         notes = []
@@ -7508,6 +7828,11 @@ async def list_ro_activity(request: Request, ro: str):
         _ensure_saved_estimates_table(cur)
         _ensure_ro_activity_log_table(cur)
         _ensure_ro_flagout_lines_table(cur)
+        _ensure_shop_isolation_infrastructure(cur)
+        current_shop_id = _resolve_request_shop_id(request, cur, domain)
+        current_shop_uuid = _resolve_request_shop_uuid(request, cur, domain)
+        if not current_shop_id or not current_shop_uuid:
+            return JSONResponse(status_code=403, content={"error": "Shop scope not resolved"})
 
         timeline = []
 
@@ -7527,11 +7852,14 @@ async def list_ro_activity(request: Request, ro: str):
             """
             SELECT saved_at, in_date, ecd_date, labor_repairs, paint_repairs
             FROM saved_estimates
-            WHERE domain = %s
+                        WHERE (
+                                        shop_uuid = %s::uuid
+                                 OR (shop_uuid IS NULL AND shop_id = %s AND domain = %s)
+                                    )
               AND ro = %s
             ORDER BY saved_at ASC, id ASC
             """,
-            (domain, ro_value),
+                        (current_shop_uuid, current_shop_id, domain, ro_value),
         )
         estimate_rows = cur.fetchall() or []
 
@@ -7574,11 +7902,14 @@ async def list_ro_activity(request: Request, ro: str):
             """
             SELECT activity_type, message, occurred_on, created_at
             FROM ro_activity_log
-            WHERE domain = %s
+                        WHERE (
+                                        shop_uuid = %s::uuid
+                                 OR (shop_uuid IS NULL AND shop_id = %s AND domain = %s)
+                                    )
               AND ro = %s
             ORDER BY created_at DESC, id DESC
             """,
-            (domain, ro_value),
+                        (current_shop_uuid, current_shop_id, domain, ro_value),
         )
         activity_rows = cur.fetchall() or []
         for row in activity_rows:
@@ -7591,13 +7922,16 @@ async def list_ro_activity(request: Request, ro: str):
                 paid_at,
                 COALESCE(SUM(pay_amount), 0) AS total_paid
             FROM ro_flagout_lines
-            WHERE domain = %s
+                        WHERE (
+                                        shop_uuid = %s::uuid
+                                 OR (shop_uuid IS NULL AND shop_id = %s AND domain = %s)
+                                    )
               AND ro = %s
               AND paid_at IS NOT NULL
             GROUP BY COALESCE(NULLIF(TRIM(tech_name), ''), 'Unassigned'), paid_at
             ORDER BY paid_at DESC
             """,
-            (domain, ro_value),
+                        (current_shop_uuid, current_shop_id, domain, ro_value),
         )
         payment_rows = cur.fetchall() or []
         for row in payment_rows:
@@ -7636,13 +7970,18 @@ async def add_ro_note(request: Request):
     cur = conn.cursor()
     try:
         _ensure_ro_notes_table(cur)
+        _ensure_shop_isolation_infrastructure(cur)
+        current_shop_id = _resolve_request_shop_id(request, cur, domain)
+        current_shop_uuid = _resolve_request_shop_uuid(request, cur, domain)
+        if not current_shop_id or not current_shop_uuid:
+            return JSONResponse(status_code=403, content={"error": "Shop scope not resolved"})
         created_by = _resolve_request_user_display_name(request, cur, domain)
         cur.execute(
             """
-            INSERT INTO ro_notes (ro, note, domain, created_by)
-            VALUES (%s, %s, %s, %s)
+            INSERT INTO ro_notes (ro, note, domain, shop_id, shop_uuid, created_by)
+            VALUES (%s, %s, %s, %s, %s::uuid, %s)
             """,
-            (ro, note, domain, created_by),
+            (ro, note, domain, current_shop_id, current_shop_uuid, created_by),
         )
         conn.commit()
         return {"status": "ok"}
@@ -8919,15 +9258,25 @@ async def list_vendor_invoices(request: Request, vendor_id: int):
     try:
         _ensure_parts_vendors_table(cur)
         _ensure_parts_received_table(cur)
+                _ensure_shop_isolation_infrastructure(cur)
+                current_shop_id = _resolve_request_shop_id(request, cur, domain)
+                current_shop_uuid = _resolve_request_shop_uuid(request, cur, domain)
+                if not current_shop_id or not current_shop_uuid:
+                        return JSONResponse(status_code=403, content={"error": "Shop scope not resolved", "invoices": []})
 
         cur.execute(
             """
             SELECT name
             FROM parts_vendors
-            WHERE id = %s AND domain = %s AND active = TRUE
+                        WHERE id = %s
+                            AND active = TRUE
+                            AND (
+                                        shop_uuid = %s::uuid
+                                 OR (shop_uuid IS NULL AND shop_id = %s AND domain = %s)
+                            )
             LIMIT 1
             """,
-            (vendor_id, domain),
+                        (vendor_id, current_shop_uuid, current_shop_id, domain),
         )
         vendor_row = cur.fetchone()
         if not vendor_row:
@@ -8944,12 +9293,15 @@ async def list_vendor_invoices(request: Request, vendor_id: int):
                 MAX(COALESCE(received_business_date, received_at::date)) AS invoice_date,
                 COALESCE(SUM(cost), 0) AS total_cost
             FROM parts_received
-            WHERE domain = %s
+                        WHERE (
+                                        shop_uuid = %s::uuid
+                                 OR (shop_uuid IS NULL AND shop_id = %s AND domain = %s)
+                                    )
               AND LOWER(TRIM(vendor)) = LOWER(TRIM(%s))
             GROUP BY COALESCE(NULLIF(BTRIM(invoice_number), ''), ro)
             ORDER BY MAX(COALESCE(received_business_date, received_at::date)) DESC
             """,
-            (domain, vendor_name),
+                        (current_shop_uuid, current_shop_id, domain, vendor_name),
         )
         rows = cur.fetchall() or []
 
@@ -8983,15 +9335,25 @@ async def list_vendor_invoice_parts(request: Request, vendor_id: int, invoice_nu
         _ensure_parts_vendors_table(cur)
         _ensure_parts_received_table(cur)
         _ensure_saved_estimates_table(cur)
+                _ensure_shop_isolation_infrastructure(cur)
+                current_shop_id = _resolve_request_shop_id(request, cur, domain)
+                current_shop_uuid = _resolve_request_shop_uuid(request, cur, domain)
+                if not current_shop_id or not current_shop_uuid:
+                        return JSONResponse(status_code=403, content={"error": "Shop scope not resolved", "parts": []})
 
         cur.execute(
             """
             SELECT name
             FROM parts_vendors
-            WHERE id = %s AND domain = %s AND active = TRUE
+                        WHERE id = %s
+                            AND active = TRUE
+                            AND (
+                                        shop_uuid = %s::uuid
+                                 OR (shop_uuid IS NULL AND shop_id = %s AND domain = %s)
+                            )
             LIMIT 1
             """,
-            (vendor_id, domain),
+                        (vendor_id, current_shop_uuid, current_shop_id, domain),
         )
         vendor_row = cur.fetchone()
         if not vendor_row:
@@ -9005,7 +9367,10 @@ async def list_vendor_invoice_parts(request: Request, vendor_id: int, invoice_nu
             """
             SELECT ro, line_id, cost, received_at
             FROM parts_received
-            WHERE domain = %s
+                        WHERE (
+                                        shop_uuid = %s::uuid
+                                 OR (shop_uuid IS NULL AND shop_id = %s AND domain = %s)
+                                    )
               AND LOWER(TRIM(vendor)) = LOWER(TRIM(%s))
               AND (
                 COALESCE(NULLIF(BTRIM(invoice_number), ''), ro) = %s
@@ -9013,7 +9378,7 @@ async def list_vendor_invoice_parts(request: Request, vendor_id: int, invoice_nu
               )
             ORDER BY line_id
             """,
-            (domain, vendor_name, invoice_value, invoice_value),
+                        (current_shop_uuid, current_shop_id, domain, vendor_name, invoice_value, invoice_value),
         )
         rows = cur.fetchall() or []
 
@@ -9026,11 +9391,15 @@ async def list_vendor_invoice_parts(request: Request, vendor_id: int, invoice_nu
                 """
                 SELECT parts_repairs
                 FROM saved_estimates
-                WHERE domain = %s AND ro = %s
+                                WHERE (
+                                                shop_uuid = %s::uuid
+                                         OR (shop_uuid IS NULL AND shop_id = %s AND domain = %s)
+                                            )
+                                    AND ro = %s
                 ORDER BY saved_at DESC, id DESC
                 LIMIT 1
                 """,
-                (domain, ro_for_lookup),
+                                (current_shop_uuid, current_shop_id, domain, ro_for_lookup),
             )
             estimate_row = cur.fetchone()
             parts_repairs = _parse_json_field(estimate_row.get("parts_repairs")) if estimate_row else []
@@ -9084,7 +9453,22 @@ async def save_parts_received(request: Request):
     cur = conn.cursor()
     try:
         _ensure_parts_received_table(cur)
-        cur.execute("DELETE FROM parts_received WHERE ro = %s AND domain = %s", (ro, domain))
+        _ensure_shop_isolation_infrastructure(cur)
+        current_shop_id = _resolve_request_shop_id(request, cur, domain)
+        current_shop_uuid = _resolve_request_shop_uuid(request, cur, domain)
+        if not current_shop_id or not current_shop_uuid:
+            return JSONResponse(status_code=403, content={"error": "Shop scope not resolved"})
+        cur.execute(
+            """
+            DELETE FROM parts_received
+            WHERE ro = %s
+              AND (
+                    shop_uuid = %s::uuid
+                 OR (shop_uuid IS NULL AND shop_id = %s AND domain = %s)
+              )
+            """,
+            (ro, current_shop_uuid, current_shop_id, domain),
+        )
 
         for item in items:
             line_id = item.get("line_id")
@@ -9095,10 +9479,10 @@ async def save_parts_received(request: Request):
                 continue
             cur.execute(
                 """
-                INSERT INTO parts_received (ro, line_id, vendor, cost, returned, domain)
-                VALUES (%s, %s, %s, %s, %s, %s)
+                INSERT INTO parts_received (ro, line_id, vendor, cost, returned, domain, shop_id, shop_uuid)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s::uuid)
                 """,
-                (ro, line_id, vendor, cost, returned, domain),
+                (ro, line_id, vendor, cost, returned, domain, current_shop_id, current_shop_uuid),
             )
 
         cur.execute(
@@ -9119,9 +9503,10 @@ async def save_parts_received(request: Request):
                       AND pr.ro = parts_orders.ro
                 )
             WHERE parts_orders.domain = %s
+                            AND (parts_orders.shop_uuid = %s::uuid OR (parts_orders.shop_uuid IS NULL AND parts_orders.shop_id = %s))
               AND parts_orders.ro = %s
             """,
-            (domain, ro),
+                        (domain, current_shop_uuid, current_shop_id, ro),
         )
 
         conn.commit()
@@ -9145,6 +9530,11 @@ async def get_ro_tech_assignments(request: Request, ro: str):
         _ensure_ro_assignments_table(cur)
         _ensure_techs_table(cur)
         _ensure_saved_estimates_table(cur)
+        _ensure_shop_isolation_infrastructure(cur)
+        current_shop_id = _resolve_request_shop_id(request, cur, domain)
+        current_shop_uuid = _resolve_request_shop_uuid(request, cur, domain)
+        if not current_shop_id or not current_shop_uuid:
+            return JSONResponse(status_code=403, content={"error": "Shop scope not resolved"})
 
         # Get assignments with tech info
         cur.execute(
@@ -9153,9 +9543,13 @@ async def get_ro_tech_assignments(request: Request, ro: str):
                    t.hourly_rate as tech_rate
             FROM ro_assignments a
             LEFT JOIN techs t ON a.tech_id = t.id
-            WHERE a.domain = %s AND a.ro = %s
+            WHERE (
+                    a.shop_uuid = %s::uuid
+                 OR (a.shop_uuid IS NULL AND a.shop_id = %s AND a.domain = %s)
+                  )
+              AND a.ro = %s
             """,
-            (domain, ro),
+            (current_shop_uuid, current_shop_id, domain, ro),
         )
         assignment_rows = cur.fetchall()
 
@@ -9167,11 +9561,15 @@ async def get_ro_tech_assignments(request: Request, ro: str):
             """
             SELECT labor_repairs, paint_repairs
             FROM saved_estimates
-            WHERE domain = %s AND ro = %s
+            WHERE (
+                    shop_uuid = %s::uuid
+                 OR (shop_uuid IS NULL AND shop_id = %s AND domain = %s)
+                  )
+              AND ro = %s
             ORDER BY saved_at DESC, id DESC
             LIMIT 1
             """,
-            (domain, ro),
+            (current_shop_uuid, current_shop_id, domain, ro),
         )
         estimate_row = cur.fetchone()
         
@@ -9219,15 +9617,24 @@ async def get_ro_tech_detail(request: Request, ro: str, tech_id: int, role: str)
     try:
         _ensure_ro_assignments_table(cur)
         _ensure_saved_estimates_table(cur)
+        _ensure_shop_isolation_infrastructure(cur)
+        current_shop_id = _resolve_request_shop_id(request, cur, domain)
+        current_shop_uuid = _resolve_request_shop_uuid(request, cur, domain)
+        if not current_shop_id or not current_shop_uuid:
+            return JSONResponse(status_code=403, content={"error": "Shop scope not resolved"})
 
         # Get the assignment
         cur.execute(
             """
             SELECT excluded_lines
             FROM ro_assignments
-            WHERE domain = %s AND ro = %s AND tech_id = %s AND role = %s
+            WHERE (
+                    shop_uuid = %s::uuid
+                 OR (shop_uuid IS NULL AND shop_id = %s AND domain = %s)
+                  )
+              AND ro = %s AND tech_id = %s AND role = %s
             """,
-            (domain, ro, tech_id, role),
+            (current_shop_uuid, current_shop_id, domain, ro, tech_id, role),
         )
         assignment_row = cur.fetchone()
         
@@ -9241,11 +9648,15 @@ async def get_ro_tech_detail(request: Request, ro: str, tech_id: int, role: str)
             """
             SELECT labor_repairs, paint_repairs
             FROM saved_estimates
-            WHERE domain = %s AND ro = %s
+            WHERE (
+                    shop_uuid = %s::uuid
+                 OR (shop_uuid IS NULL AND shop_id = %s AND domain = %s)
+                  )
+              AND ro = %s
             ORDER BY saved_at DESC, id DESC
             LIMIT 1
             """,
-            (domain, ro),
+            (current_shop_uuid, current_shop_id, domain, ro),
         )
         estimate_row = cur.fetchone()
         
@@ -9298,6 +9709,11 @@ async def get_ro_estimate_snapshot(request: Request, ro: str):
     cur = conn.cursor()
     try:
         _ensure_saved_estimates_table(cur)
+        _ensure_shop_isolation_infrastructure(cur)
+        current_shop_id = _resolve_request_shop_id(request, cur, domain)
+        current_shop_uuid = _resolve_request_shop_uuid(request, cur, domain)
+        if not current_shop_id or not current_shop_uuid:
+            return JSONResponse(status_code=403, content={"error": "Shop scope not resolved"})
         cur.execute(
             """
             SELECT
@@ -9319,11 +9735,15 @@ async def get_ro_estimate_snapshot(request: Request, ro: str):
                 estimate_snapshot,
                 saved_at
             FROM saved_estimates
-            WHERE domain = %s AND ro = %s
+            WHERE (
+                    shop_uuid = %s::uuid
+                 OR (shop_uuid IS NULL AND shop_id = %s AND domain = %s)
+                  )
+              AND ro = %s
             ORDER BY saved_at DESC, id DESC
             LIMIT 1
             """,
-            (domain, ro_value),
+            (current_shop_uuid, current_shop_id, domain, ro_value),
         )
         row = cur.fetchone()
         if not row:
@@ -9409,6 +9829,11 @@ async def get_ro_print_data(request: Request, ro: str):
         _ensure_ro_assignments_table(cur)
         _ensure_ro_notes_table(cur)
         _ensure_ro_line_assignments_table(cur)
+        _ensure_shop_isolation_infrastructure(cur)
+        current_shop_id = _resolve_request_shop_id(request, cur, domain)
+        current_shop_uuid = _resolve_request_shop_uuid(request, cur, domain)
+        if not current_shop_id or not current_shop_uuid:
+            return JSONResponse(status_code=403, content={"error": "Shop scope not resolved"})
         
         # Get estimate data
         cur.execute(
@@ -9421,11 +9846,15 @@ async def get_ro_print_data(request: Request, ro: str):
                 labor_repairs, paint_repairs, parts_repairs,
                 parts_total, grand_total, deductible, customer_pay, insurance_pay
             FROM saved_estimates
-            WHERE domain = %s AND ro = %s
+            WHERE (
+                    shop_uuid = %s::uuid
+                 OR (shop_uuid IS NULL AND shop_id = %s AND domain = %s)
+                  )
+              AND ro = %s
             ORDER BY saved_at DESC, id DESC
             LIMIT 1
             """,
-            (domain, ro_value),
+            (current_shop_uuid, current_shop_id, domain, ro_value),
         )
         estimate_row = cur.fetchone()
         
@@ -9451,10 +9880,14 @@ async def get_ro_print_data(request: Request, ro: str):
             """
             SELECT repair_type, tech_name, line_key, line_number, description, hours
             FROM ro_line_assignments
-            WHERE domain = %s AND ro = %s
+            WHERE (
+                    shop_uuid = %s::uuid
+                 OR (shop_uuid IS NULL AND shop_id = %s AND domain = %s)
+                  )
+              AND ro = %s
             ORDER BY repair_type, line_number
             """,
-            (domain, ro_value),
+            (current_shop_uuid, current_shop_id, domain, ro_value),
         )
         line_assignments = cur.fetchall()
         
@@ -9463,10 +9896,14 @@ async def get_ro_print_data(request: Request, ro: str):
             """
             SELECT repair_type, tech_name, COALESCE(SUM(hours), 0) AS total_hours
             FROM ro_line_assignments
-            WHERE domain = %s AND ro = %s
+            WHERE (
+                    shop_uuid = %s::uuid
+                 OR (shop_uuid IS NULL AND shop_id = %s AND domain = %s)
+                  )
+              AND ro = %s
             GROUP BY repair_type, tech_name
             """,
-            (domain, ro_value),
+            (current_shop_uuid, current_shop_id, domain, ro_value),
         )
         grouped_lines = cur.fetchall()
         
@@ -9512,10 +9949,14 @@ async def get_ro_print_data(request: Request, ro: str):
             """
             SELECT note, created_at
             FROM ro_notes
-            WHERE domain = %s AND ro = %s
+            WHERE (
+                    shop_uuid = %s::uuid
+                 OR (shop_uuid IS NULL AND shop_id = %s AND domain = %s)
+                  )
+              AND ro = %s
             ORDER BY created_at DESC
             """,
-            (domain, ro_value),
+            (current_shop_uuid, current_shop_id, domain, ro_value),
         )
         note_rows = cur.fetchall()
         notes = [row.get("note") for row in note_rows]
