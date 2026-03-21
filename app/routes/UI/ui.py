@@ -931,8 +931,8 @@ async def home_screen(request: Request):
             <button type="button" class="side-menu-item" data-screen="tech" aria-label="Techs"><span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="8" r="3" stroke="currentColor" stroke-width="1.8"/><path d="M5 20c0-3.3 3.1-6 7-6s7 2.7 7 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></span><span class="nav-label">Techs</span></button>
             <button type="button" class="side-menu-item" data-screen="flagtech" aria-label="Flagout"><span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M6 3v18" stroke="currentColor" stroke-width="1.8"/><path d="M6 4h11l-2.2 3L17 10H6" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg></span><span class="nav-label">Flagout</span></button>
             <button type="button" class="side-menu-item" data-screen="reports" aria-label="Reports"><span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M5 5h14v14H5z" stroke="currentColor" stroke-width="1.8"/><path d="M8 9h8M8 13h8M8 17h5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></span><span class="nav-label">Reports</span></button>
-            <button id="sideSetupBtn" type="button" class="side-menu-item" data-screen="setup" aria-label="Setup" style="display:none;"><span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M5 19l6-6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M10.2 7.8a2.8 2.8 0 0 1-3.9 3.9L3.8 14.2a1.4 1.4 0 0 0 2 2l2.5-2.5a2.8 2.8 0 0 1 3.9-3.9" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M19 5l-6 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M13.8 16.2a2.8 2.8 0 0 1 3.9-3.9l2.5-2.5a1.4 1.4 0 1 0-2-2l-2.5 2.5a2.8 2.8 0 0 1-3.9 3.9" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span class="nav-label">Setup</span></button>
-            <button id="sideManageBtn" type="button" class="side-menu-item" data-action="manage" aria-label="Manage" style="display:none;"><span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M4 6h16" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M4 12h16" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M4 18h16" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></span><span class="nav-label">Manage</span></button>
+            <button id="sideSetupBtn" type="button" class="side-menu-item" data-screen="setup" aria-label="Setup"><span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M5 19l6-6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M10.2 7.8a2.8 2.8 0 0 1-3.9 3.9L3.8 14.2a1.4 1.4 0 0 0 2 2l2.5-2.5a2.8 2.8 0 0 1 3.9-3.9" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M19 5l-6 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M13.8 16.2a2.8 2.8 0 0 1 3.9-3.9l2.5-2.5a1.4 1.4 0 1 0-2-2l-2.5 2.5a2.8 2.8 0 0 1-3.9 3.9" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span class="nav-label">Setup</span></button>
+            <button id="sideManageBtn" type="button" class="side-menu-item" data-screen="manage" aria-label="Manage"><span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M4 6h16" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M4 12h16" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M4 18h16" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></span><span class="nav-label">Manage</span></button>
             <button type="button" class="side-menu-item" data-action="chat" aria-label="Chat"><span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M4 5h16v10H8l-4 4V5z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg></span><span class="nav-label">Chat</span></button>
         </div>
         <div class="side-user-wrap">
@@ -1038,6 +1038,14 @@ async def home_screen(request: Request):
         {get_flagtech_screen_html()}
         {get_reports_screen_html()}
         {get_setup_screen_html()}
+        <section id="manage" class="screen" style="height:calc(100vh - 96px);">
+            <iframe
+                id="manageScreenFrame"
+                title="Manage"
+                data-src="/ui/manage"
+                style="width:100%; height:100%; border:0; border-radius:10px; background:#fff;"
+            ></iframe>
+        </section>
     </div>
     
     <script>
@@ -1503,8 +1511,15 @@ async def home_screen(request: Request):
         }}
 
         function openSidebarManageWindow() {{
-            if (!canAccessFeature('manage')) return;
             window.open('/ui/manage', '_blank', 'noopener,noreferrer,width=1320,height=880');
+        }}
+
+        function ensureManageScreenLoaded() {{
+            const frame = document.getElementById('manageScreenFrame');
+            if (!frame) return;
+            if (frame.getAttribute('src')) return;
+            const src = String(frame.getAttribute('data-src') || '/ui/manage');
+            frame.setAttribute('src', src);
         }}
 
         async function sendHeaderMessage(kind) {{
@@ -1622,9 +1637,9 @@ async def home_screen(request: Request):
                 const userLabelEl = document.getElementById('sideUserLabel');
                 if (userLabelEl && (firstName || lastName)) userLabelEl.textContent = (firstName + ' ' + lastName).trim();
                 const sideManageBtn = document.getElementById('sideManageBtn');
-                if (sideManageBtn) sideManageBtn.style.display = canAccessFeature('manage') ? 'flex' : 'none';
+                if (sideManageBtn) sideManageBtn.style.display = 'flex';
                 const sideSetupBtn = document.getElementById('sideSetupBtn');
-                if (sideSetupBtn) sideSetupBtn.style.display = canAccessFeature('setup') ? 'flex' : 'none';
+                if (sideSetupBtn) sideSetupBtn.style.display = 'flex';
                 const resetPasswordBtn = document.getElementById('profileResetPasswordBtn');
                 if (resetPasswordBtn) resetPasswordBtn.style.display = canPerformAction('reset_profile_password') ? 'inline-flex' : 'none';
 
@@ -1692,14 +1707,6 @@ async def home_screen(request: Request):
                 }});
             }});
 
-            document.querySelectorAll('.side-menu-item[data-action="manage"]').forEach((item) => {{
-                item.addEventListener('click', () => {{
-                    if (sidebar) sidebar.classList.remove('expanded');
-                    sidebarSuppressed = true;
-                    openSidebarManageWindow();
-                }});
-            }});
-
             [document.getElementById('chatModal'), document.getElementById('profileModal')].forEach((modal) => {{
                 if (!modal) return;
                 modal.addEventListener('click', (event) => {{
@@ -1716,7 +1723,6 @@ async def home_screen(request: Request):
         }}
 
         function switchScreen(screenName, sourceEl = null) {{
-            if (!canAccessScreen(screenName)) return;
             const screens = document.querySelectorAll('.screen');
             screens.forEach(screen => screen.classList.remove('active'));
 
@@ -1758,6 +1764,10 @@ async def home_screen(request: Request):
 
             if (screenName === 'setup' && typeof setupLoadData === 'function') {{
                 setupLoadData();
+            }}
+
+            if (screenName === 'manage') {{
+                ensureManageScreenLoaded();
             }}
         }}
 
