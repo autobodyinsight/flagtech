@@ -943,18 +943,18 @@ def _ensure_chat_messages_table(cur) -> None:
     cur.execute("ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS read_at TIMESTAMP NULL")
     cur.execute("ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS completed_at TIMESTAMP NULL")
     cur.execute("ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP")
-        cur.execute(
-                """
-                UPDATE chat_messages m
-                SET shop_uuid = s.shop_id
-                FROM shops s
-                WHERE m.shop_uuid IS NULL
-                    AND (
-                                (m.shop_id IS NOT NULL AND s.id = m.shop_id)
-                         OR (COALESCE(m.domain, '') <> '' AND s.domain = m.domain)
-                    )
-                """
-        )
+    cur.execute(
+        """
+        UPDATE chat_messages m
+        SET shop_uuid = s.shop_id
+        FROM shops s
+        WHERE m.shop_uuid IS NULL
+          AND (
+                (m.shop_id IS NOT NULL AND s.id = m.shop_id)
+             OR (COALESCE(m.domain, '') <> '' AND s.domain = m.domain)
+          )
+        """
+    )
     cur.execute("CREATE INDEX IF NOT EXISTS idx_chat_messages_domain_pair_created ON chat_messages(domain, sender_user_id, recipient_user_id, created_at)")
     cur.execute("CREATE INDEX IF NOT EXISTS idx_chat_messages_domain_recipient_unread ON chat_messages(domain, recipient_user_id, read_at)")
     cur.execute("CREATE INDEX IF NOT EXISTS idx_chat_messages_shop_uuid_created ON chat_messages(shop_uuid, sender_user_id, recipient_user_id, created_at)")
