@@ -167,30 +167,30 @@ def _sync_shop_id_bindings(cur) -> None:
           AND s.domain = su.domain
         """
     )
-        cur.execute(
-                """
-                UPDATE shop_settings ss
-                SET shop_uuid = s.shop_id
-                FROM shops s
-                WHERE (ss.shop_uuid IS NULL OR ss.shop_uuid IS DISTINCT FROM s.shop_id)
-                    AND (
-                                (ss.shop_id IS NOT NULL AND s.id = ss.shop_id)
-                         OR (COALESCE(ss.domain, '') <> '' AND s.domain = ss.domain)
-                    )
-                """
-        )
-        cur.execute(
-                """
-                UPDATE shop_users su
-                SET shop_uuid = s.shop_id
-                FROM shops s
-                WHERE (su.shop_uuid IS NULL OR su.shop_uuid IS DISTINCT FROM s.shop_id)
-                    AND (
-                                (su.shop_id IS NOT NULL AND s.id = su.shop_id)
-                         OR (COALESCE(su.domain, '') <> '' AND s.domain = su.domain)
-                    )
-                """
-        )
+    cur.execute(
+        """
+        UPDATE shop_settings ss
+        SET shop_uuid = s.shop_id
+        FROM shops s
+        WHERE (ss.shop_uuid IS NULL OR ss.shop_uuid IS DISTINCT FROM s.shop_id)
+          AND (
+                (ss.shop_id IS NOT NULL AND s.id = ss.shop_id)
+             OR (COALESCE(ss.domain, '') <> '' AND s.domain = ss.domain)
+          )
+        """
+    )
+    cur.execute(
+        """
+        UPDATE shop_users su
+        SET shop_uuid = s.shop_id
+        FROM shops s
+        WHERE (su.shop_uuid IS NULL OR su.shop_uuid IS DISTINCT FROM s.shop_id)
+          AND (
+                (su.shop_id IS NOT NULL AND s.id = su.shop_id)
+             OR (COALESCE(su.domain, '') <> '' AND s.domain = su.domain)
+          )
+        """
+    )
 
 
 def _ensure_shop_id_columns_for_domain_tables(cur) -> None:
