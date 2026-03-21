@@ -1822,6 +1822,51 @@ async def manage_screen(request: Request):
         th { background: #f7f7f7; font-size: 13px; }
         input[type='text'], input[type='email'], select { width: 100%; padding: 6px 8px; border: 1px solid #ccc; border-radius: 4px; }
         .muted { color: #777; font-size: 12px; }
+        .manage-loading-wrap {
+            display: none;
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+            gap: 12px;
+            min-height: 220px;
+            width: 100%;
+            background: #fff;
+            border: 1px dashed #d8d8d8;
+            border-radius: 8px;
+        }
+        .manage-loading-wrap.visible { display: flex; }
+        .manage-loading-spinner {
+            position: relative;
+            width: 64px;
+            height: 64px;
+        }
+        .manage-loading-dot {
+            position: absolute;
+            left: 50%;
+            top: 50%;
+            width: 8px;
+            height: 8px;
+            margin-left: -4px;
+            margin-top: -4px;
+            border-radius: 50%;
+            background: #b22222;
+            transform-origin: center -26px;
+            animation: manageDotPulse 1.05s ease-in-out infinite;
+            opacity: 0.35;
+        }
+        .manage-loading-dot:nth-child(1) { transform: rotate(0deg) translateY(-26px); animation-delay: 0s; }
+        .manage-loading-dot:nth-child(2) { transform: rotate(45deg) translateY(-26px); animation-delay: 0.08s; }
+        .manage-loading-dot:nth-child(3) { transform: rotate(90deg) translateY(-26px); animation-delay: 0.16s; }
+        .manage-loading-dot:nth-child(4) { transform: rotate(135deg) translateY(-26px); animation-delay: 0.24s; }
+        .manage-loading-dot:nth-child(5) { transform: rotate(180deg) translateY(-26px); animation-delay: 0.32s; }
+        .manage-loading-dot:nth-child(6) { transform: rotate(225deg) translateY(-26px); animation-delay: 0.40s; }
+        .manage-loading-dot:nth-child(7) { transform: rotate(270deg) translateY(-26px); animation-delay: 0.48s; }
+        .manage-loading-dot:nth-child(8) { transform: rotate(315deg) translateY(-26px); animation-delay: 0.56s; }
+        @keyframes manageDotPulse {
+            0% { opacity: 0.35; transform: scale(0.9) translateY(-26px); }
+            50% { opacity: 1; transform: scale(1.45) translateY(-30px); }
+            100% { opacity: 0.35; transform: scale(0.9) translateY(-26px); }
+        }
     </style>
 </head>
 <body>
@@ -1834,10 +1879,24 @@ async def manage_screen(request: Request):
                 <button class="btn" onclick="onAdd()">Add</button>
             </div>
         </div>
+        <div id="manageLoading" class="manage-loading-wrap visible" aria-live="polite" aria-busy="true">
+            <div class="manage-loading-spinner" aria-hidden="true">
+                <span class="manage-loading-dot"></span>
+                <span class="manage-loading-dot"></span>
+                <span class="manage-loading-dot"></span>
+                <span class="manage-loading-dot"></span>
+                <span class="manage-loading-dot"></span>
+                <span class="manage-loading-dot"></span>
+                <span class="manage-loading-dot"></span>
+                <span class="manage-loading-dot"></span>
+            </div>
+            <div id="manageLoadingText" class="muted" style="font-size:13px; font-weight:700;">Loading list...</div>
+        </div>
         <div id="shopsList" class="list"></div>
     </div>
 
     <script>
+        const manageReloadKey = 'manageWindowAutoReloadAttempted';
         const state = {
             shops: [],
             shopsLastLoadedAt: 0,
@@ -1862,6 +1921,22 @@ async def manage_screen(request: Request):
                 .replace(/>/g, '&gt;')
                 .replace(/\"/g, '&quot;')
                 .replace(/'/g, '&#39;');
+        }
+
+        function showManageLoading(message = 'Loading list...') {
+            const loader = document.getElementById('manageLoading');
+            const list = document.getElementById('shopsList');
+            const text = document.getElementById('manageLoadingText');
+            if (text) text.textContent = String(message || 'Loading list...');
+            if (loader) loader.classList.add('visible');
+            if (list) list.style.display = 'none';
+        }
+
+        function hideManageLoading() {
+            const loader = document.getElementById('manageLoading');
+            const list = document.getElementById('shopsList');
+            if (loader) loader.classList.remove('visible');
+            if (list) list.style.display = 'block';
         }
 
         async function api(url, options = {}, retryCount = 1) {
@@ -1902,6 +1977,8 @@ async def manage_screen(request: Request):
                 return;
             }
 
+            if (!hasCachedShops) showManageLoading('Loading list...');
+
             const requestToken = Number(state.shopsRequestToken || 0) + 1;
             state.shopsRequestToken = requestToken;
             const data = await api('/api/manage/shops');
@@ -1910,6 +1987,7 @@ async def manage_screen(request: Request):
             }
             state.shops = Array.isArray(data.shops) ? data.shops : [];
             state.shopsLastLoadedAt = Date.now();
+            hideManageLoading();
             if (!state.expandedDomain && state.shops.length) {
                 state.expandedDomain = String(state.shops[0].domain || '').trim().toLowerCase();
             }
@@ -2189,17 +2267,24 @@ async def manage_screen(request: Request):
 
         async function bootstrapManageWindow(retryCount = 2) {
             try {
+                showManageLoading('Loading list...');
                 await loadShops({ force: true });
+                sessionStorage.removeItem(manageReloadKey);
             } catch (error) {
                 if (retryCount > 0) {
-                    const wrap = document.getElementById('shopsList');
-                    if (wrap) {
-                        wrap.innerHTML = `<div style="padding:12px; color:#b22222;">${esc(error.message || 'Unable to load data')} — retrying...</div>`;
-                    }
+                    showManageLoading('Retrying list load...');
                     await new Promise((resolve) => setTimeout(resolve, 450));
                     await bootstrapManageWindow(retryCount - 1);
                     return;
                 }
+
+                if (sessionStorage.getItem(manageReloadKey) !== '1') {
+                    sessionStorage.setItem(manageReloadKey, '1');
+                    window.location.reload();
+                    return;
+                }
+
+                hideManageLoading();
                 const wrap = document.getElementById('shopsList');
                 if (wrap) wrap.innerHTML = `<div style="padding:12px; color:#b22222;">${esc(error.message || 'Unable to load data')}</div>`;
             }

@@ -1,3 +1,4 @@
+import asyncio
 from fastapi import APIRouter, UploadFile, File, Request, Response
 import os
 import json
@@ -2683,48 +2684,54 @@ async def list_manage_shops(request: Request):
     if not _request_is_architect(request):
         return JSONResponse(status_code=403, content={"error": "Forbidden", "shops": []})
 
-    conn = get_conn()
-    cur = conn.cursor()
-    try:
-        _ensure_shop_isolation_infrastructure(cur)
-        cur.execute(
-            """
-            WITH all_domains AS (
-                SELECT DISTINCT domain FROM shops
-                UNION
-                SELECT DISTINCT domain FROM shop_settings
-                UNION
-                SELECT DISTINCT domain FROM shop_users
+    max_attempts = 3
+    for attempt in range(max_attempts):
+        conn = get_conn()
+        cur = conn.cursor()
+        try:
+            _ensure_shop_isolation_infrastructure(cur)
+            cur.execute(
+                """
+                WITH all_domains AS (
+                    SELECT DISTINCT domain FROM shops
+                    UNION
+                    SELECT DISTINCT domain FROM shop_settings
+                    UNION
+                    SELECT DISTINCT domain FROM shop_users
+                )
+                SELECT
+                    sh.id AS shop_id,
+                    d.domain,
+                    COALESCE(sh.active, TRUE) AS active,
+                    COALESCE(ss.shop_name, sh.name, d.domain) AS shop_name,
+                    COUNT(DISTINCT su.id) FILTER (WHERE su.active = TRUE) AS user_count
+                FROM all_domains d
+                LEFT JOIN shops sh ON sh.domain = d.domain
+                LEFT JOIN shop_settings ss ON ss.domain = d.domain
+                LEFT JOIN shop_users su ON su.domain = d.domain
+                GROUP BY sh.id, d.domain, sh.active, ss.shop_name, sh.name
+                ORDER BY LOWER(COALESCE(NULLIF(ss.shop_name, ''), NULLIF(sh.name, ''), d.domain)) ASC
+                """
             )
-            SELECT
-                sh.id AS shop_id,
-                d.domain,
-                COALESCE(sh.active, TRUE) AS active,
-                COALESCE(ss.shop_name, sh.name, d.domain) AS shop_name,
-                COUNT(DISTINCT su.id) FILTER (WHERE su.active = TRUE) AS user_count
-            FROM all_domains d
-            LEFT JOIN shops sh ON sh.domain = d.domain
-            LEFT JOIN shop_settings ss ON ss.domain = d.domain
-            LEFT JOIN shop_users su ON su.domain = d.domain
-            GROUP BY sh.id, d.domain, sh.active, ss.shop_name, sh.name
-            ORDER BY LOWER(COALESCE(NULLIF(ss.shop_name, ''), NULLIF(sh.name, ''), d.domain)) ASC
-            """
-        )
-        rows = cur.fetchall() or []
-        shops = []
-        for row in rows:
-            shops.append(
-                {
-                    "id": int(row.get("shop_id") or 0) or None,
-                    "domain": str(row.get("domain") or "").strip().lower(),
-                    "shop_name": str(row.get("shop_name") or "").strip(),
-                    "active": bool(row.get("active", True)),
-                    "user_count": int(row.get("user_count") or 0),
-                }
-            )
-        return {"shops": shops}
-    finally:
-        cur.close()
+            rows = cur.fetchall() or []
+            shops = []
+            for row in rows:
+                shops.append(
+                    {
+                        "id": int(row.get("shop_id") or 0) or None,
+                        "domain": str(row.get("domain") or "").strip().lower(),
+                        "shop_name": str(row.get("shop_name") or "").strip(),
+                        "active": bool(row.get("active", True)),
+                        "user_count": int(row.get("user_count") or 0),
+                    }
+                )
+            return {"shops": shops}
+        except Exception:
+            if attempt >= max_attempts - 1:
+                return JSONResponse(status_code=500, content={"error": "Unable to load shops", "shops": []})
+            await asyncio.sleep(0.25)
+        finally:
+            cur.close()
 
 
 @router.get("/manage/users")
@@ -2739,47 +2746,53 @@ async def list_manage_users(request: Request, shop_domain: str | None = None):
     if not selected_domain:
         return JSONResponse(status_code=400, content={"error": "shop_domain is required", "users": []})
 
-    conn = get_conn()
-    cur = conn.cursor()
-    try:
-        _ensure_shop_users_table(cur)
-        cur.execute(
-            """
-            SELECT
-                su.id,
-                su.first_name,
-                su.last_name,
-                su.email,
-                su.role,
-                su.shop_id,
-                COALESCE(ss.shop_name, sh.name, su.domain) AS shop_name
-            FROM shop_users su
-            LEFT JOIN shops sh ON sh.id = su.shop_id
-            LEFT JOIN shop_settings ss ON ss.shop_id = su.shop_id AND ss.domain = su.domain
-            WHERE su.domain = %s
-              AND su.active = TRUE
-            ORDER BY su.created_at DESC, su.id DESC
-            """,
-            (selected_domain,),
-        )
-        rows = cur.fetchall() or []
-        users = []
-        for row in rows:
-            row_email = str(row.get("email") or "").strip().lower()
-            users.append(
-                {
-                    "id": int(row.get("id") or 0),
-                    "first_name": str(row.get("first_name") or "").strip(),
-                    "last_name": str(row.get("last_name") or "").strip(),
-                    "email": str(row.get("email") or "").strip(),
-                    "role": "ARCHITECT" if _is_architect_email(row_email) else str(row.get("role") or "").strip(),
-                    "shop_name": str(row.get("shop_name") or "").strip(),
-                    "shop_id": int(row.get("shop_id") or 0) or None,
-                }
+    max_attempts = 3
+    for attempt in range(max_attempts):
+        conn = get_conn()
+        cur = conn.cursor()
+        try:
+            _ensure_shop_users_table(cur)
+            cur.execute(
+                """
+                SELECT
+                    su.id,
+                    su.first_name,
+                    su.last_name,
+                    su.email,
+                    su.role,
+                    su.shop_id,
+                    COALESCE(ss.shop_name, sh.name, su.domain) AS shop_name
+                FROM shop_users su
+                LEFT JOIN shops sh ON sh.id = su.shop_id
+                LEFT JOIN shop_settings ss ON ss.shop_id = su.shop_id AND ss.domain = su.domain
+                WHERE su.domain = %s
+                  AND su.active = TRUE
+                ORDER BY su.created_at DESC, su.id DESC
+                """,
+                (selected_domain,),
             )
-        return {"users": users}
-    finally:
-        cur.close()
+            rows = cur.fetchall() or []
+            users = []
+            for row in rows:
+                row_email = str(row.get("email") or "").strip().lower()
+                users.append(
+                    {
+                        "id": int(row.get("id") or 0),
+                        "first_name": str(row.get("first_name") or "").strip(),
+                        "last_name": str(row.get("last_name") or "").strip(),
+                        "email": str(row.get("email") or "").strip(),
+                        "role": "ARCHITECT" if _is_architect_email(row_email) else str(row.get("role") or "").strip(),
+                        "shop_name": str(row.get("shop_name") or "").strip(),
+                        "shop_id": int(row.get("shop_id") or 0) or None,
+                    }
+                )
+            return {"users": users}
+        except Exception:
+            if attempt >= max_attempts - 1:
+                return JSONResponse(status_code=500, content={"error": "Unable to load users", "users": []})
+            await asyncio.sleep(0.25)
+        finally:
+            cur.close()
 
 
 @router.post("/manage/shops/active")
