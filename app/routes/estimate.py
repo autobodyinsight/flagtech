@@ -3463,11 +3463,11 @@ async def update_setup_user(request: Request):
         if not (_request_is_architect(request) or _is_manager_or_hr_role(requester_role)):
             return JSONResponse(status_code=403, content={"error": "Forbidden"})
 
-                cur.execute("SELECT id, shop_id, shop_uuid FROM shops WHERE domain = %s LIMIT 1", (selected_domain,))
+        cur.execute("SELECT id, shop_id, shop_uuid FROM shops WHERE domain = %s LIMIT 1", (selected_domain,))
         shop_row = cur.fetchone() or {}
         selected_shop_id = int(shop_row.get("id") or 0)
-                selected_shop_uuid = str(shop_row.get("shop_uuid") or "").strip() or None
-                if not selected_shop_id or not selected_shop_uuid:
+        selected_shop_uuid = str(shop_row.get("shop_uuid") or "").strip() or None
+        if not selected_shop_id or not selected_shop_uuid:
             return JSONResponse(status_code=400, content={"error": "Unable to resolve shop scope"})
         cur.execute(
             """
@@ -3552,11 +3552,11 @@ async def reset_setup_user_password(request: Request):
         if not (_request_is_architect(request) or _is_manager_or_hr_role(requester_role)):
             return JSONResponse(status_code=403, content={"error": "Forbidden"})
 
-                cur.execute("SELECT id, shop_id, shop_uuid FROM shops WHERE domain = %s LIMIT 1", (selected_domain,))
+        cur.execute("SELECT id, shop_id, shop_uuid FROM shops WHERE domain = %s LIMIT 1", (selected_domain,))
         shop_row = cur.fetchone() or {}
         selected_shop_id = int(shop_row.get("id") or 0)
-                selected_shop_uuid = str(shop_row.get("shop_uuid") or "").strip() or None
-                if not selected_shop_id or not selected_shop_uuid:
+        selected_shop_uuid = str(shop_row.get("shop_uuid") or "").strip() or None
+        if not selected_shop_id or not selected_shop_uuid:
             return JSONResponse(status_code=400, content={"error": "Unable to resolve shop scope"})
         cur.execute(
             """
@@ -3750,11 +3750,11 @@ async def delete_setup_users(request: Request):
         if not (_request_is_architect(request) or _is_manager_or_hr_role(requester_role)):
             return JSONResponse(status_code=403, content={"error": "Forbidden"})
 
-                cur.execute("SELECT id, shop_id, shop_uuid FROM shops WHERE domain = %s LIMIT 1", (selected_domain,))
+        cur.execute("SELECT id, shop_id, shop_uuid FROM shops WHERE domain = %s LIMIT 1", (selected_domain,))
         shop_row = cur.fetchone() or {}
         selected_shop_id = int(shop_row.get("id") or 0)
-                selected_shop_uuid = str(shop_row.get("shop_uuid") or "").strip() or None
-                if not selected_shop_id or not selected_shop_uuid:
+        selected_shop_uuid = str(shop_row.get("shop_uuid") or "").strip() or None
+        if not selected_shop_id or not selected_shop_uuid:
             return JSONResponse(status_code=400, content={"error": "Unable to resolve shop scope"})
 
         cur.execute(
