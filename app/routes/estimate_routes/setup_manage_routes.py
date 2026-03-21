@@ -56,6 +56,8 @@
     _resolve_request_shop_id,
     _resolve_request_shop_uuid,
     _ensure_shop_isolation_infrastructure,
+    resolve_request_scope,
+    build_shop_isolation_filter,
     _resolve_request_user_email,
     _is_architect_email,
     _build_cookie_secure_flag,
@@ -283,8 +285,9 @@ async def get_setup_context(request: Request):
             effective_domain = _resolve_effective_shop_domain(cur, default_domain, allow_fallback=True)
             if effective_domain:
                 default_domain = effective_domain
-                resolved_shop_id = _resolve_request_shop_id(request, cur, default_domain)
-                resolved_shop_uuid = _resolve_request_shop_uuid(request, cur, default_domain)
+                _dflt_scope = resolve_request_scope(request, cur, domain=default_domain)
+                resolved_shop_id = _dflt_scope["shop_id"]
+                resolved_shop_uuid = _dflt_scope["shop_uuid"]
                 if resolved_shop_id:
                     shop_id = resolved_shop_id
                 if resolved_shop_uuid:
@@ -915,7 +918,8 @@ async def list_setup_users(request: Request, shop_domain: str | None = None):
         if not selected_domain:
             return {"users": []}
 
-        current_shop_uuid = _resolve_request_shop_uuid(request, cur, selected_domain)
+        _users_scope = resolve_request_scope(request, cur, domain=selected_domain)
+        current_shop_uuid = _users_scope["shop_uuid"]
         if not current_shop_uuid:
             return {"users": []}
         cur.execute(

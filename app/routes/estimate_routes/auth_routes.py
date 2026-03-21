@@ -22,6 +22,7 @@
     EstimateResponse,
     get_conn,
     SESSION_COOKIE_NAME,
+    build_session_snapshot_payload,
     create_auth_session,
     get_authenticated_user,
     get_authenticated_user_email,
@@ -165,6 +166,25 @@ async def auth_login(request: Request):
         response = JSONResponse(
             content={
                 "status": "ok",
+                "session_snapshot": build_session_snapshot_payload(
+                    user={
+                        "id": int(row.get("id") or 0),
+                        "email": user_email,
+                        "first_name": first_name,
+                        "last_name": last_name,
+                        "role": user_role,
+                        "domain": user_domain,
+                        "shop_id": user_shop_id,
+                        "shop_uuid": user_shop_uuid,
+                        "user_uuid": user_uuid,
+                        "shop_name": "",
+                        "address": "",
+                        "access_level": permission_snapshot.get("access_level"),
+                        "permissions": permission_snapshot,
+                        "is_architect": _is_architect_email(user_email),
+                    },
+                    permission_snapshot=permission_snapshot,
+                ),
                 "user": {
                     "id": int(row.get("id") or 0),
                     "email": user_email,
@@ -256,23 +276,35 @@ async def auth_session(request: Request):
         is_architect=_is_architect_email(email_value),
     )
 
+    snapshot_user = {
+        "id": int(authenticated_user.get("id") or 0),
+        "email": email_value,
+        "first_name": str(authenticated_user.get("first_name") or "").strip(),
+        "last_name": str(authenticated_user.get("last_name") or "").strip(),
+        "role": role_value,
+        "domain": domain_value,
+        "shop_id": shop_id_value,
+        "shop_uuid": shop_uuid_value,
+        "user_uuid": user_uuid_value,
+        "shop_name": str(authenticated_user.get("shop_name") or "").strip(),
+        "address": str(authenticated_user.get("address") or "").strip(),
+        "access_level": str(permissions.get("access_level") or "").strip(),
+        "permissions": permissions,
+        "is_architect": _is_architect_email(email_value),
+    }
+
+    session_snapshot = build_session_snapshot_payload(
+        user=snapshot_user,
+        permission_snapshot=permissions,
+    )
+
+    request.state.session_snapshot = session_snapshot
+    request.state.permission_snapshot = permissions
+
     return {
         "authenticated": True,
-        "user": {
-            "id": int(authenticated_user.get("id") or 0),
-            "email": email_value,
-            "first_name": str(authenticated_user.get("first_name") or "").strip(),
-            "last_name": str(authenticated_user.get("last_name") or "").strip(),
-            "role": role_value,
-            "domain": domain_value,
-            "shop_id": shop_id_value,
-            "shop_uuid": shop_uuid_value,
-            "user_uuid": user_uuid_value,
-            "shop_name": str(authenticated_user.get("shop_name") or "").strip(),
-            "address": str(authenticated_user.get("address") or "").strip(),
-            "access_level": str(permissions.get("access_level") or "").strip(),
-            "permissions": permissions,
-        },
+        "session_snapshot": session_snapshot,
+        "user": snapshot_user,
     }
 
 

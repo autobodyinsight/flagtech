@@ -156,6 +156,23 @@ def _ensure_shop_id_sync_triggers(cur) -> None:
 
 
 def _resolve_request_shop_id(request: Request, cur, domain: str | None = None) -> int | None:
+    request_snapshot = getattr(request.state, "session_snapshot", None) or {}
+    request_isolation = request_snapshot.get("isolation_rules") or {}
+    try:
+        scoped_shop_id = int(request_isolation.get("shop_id") or 0)
+        if scoped_shop_id:
+            return scoped_shop_id
+    except Exception:
+        pass
+
+    request_permissions = getattr(request.state, "permission_snapshot", None) or {}
+    try:
+        scoped_permission_shop_id = int(request_permissions.get("shop_id") or 0)
+        if scoped_permission_shop_id:
+            return scoped_permission_shop_id
+    except Exception:
+        pass
+
     auth_user = get_authenticated_user(request)
     if auth_user:
         try:
@@ -178,6 +195,17 @@ def _resolve_request_shop_id(request: Request, cur, domain: str | None = None) -
 
 
 def _resolve_request_shop_uuid(request: Request, cur, domain: str | None = None) -> str | None:
+    request_snapshot = getattr(request.state, "session_snapshot", None) or {}
+    request_isolation = request_snapshot.get("isolation_rules") or {}
+    scoped_snapshot_uuid = str(request_isolation.get("shop_uuid") or "").strip()
+    if scoped_snapshot_uuid:
+        return scoped_snapshot_uuid
+
+    request_permissions = getattr(request.state, "permission_snapshot", None) or {}
+    scoped_permission_uuid = str(request_permissions.get("shop_uuid") or "").strip()
+    if scoped_permission_uuid:
+        return scoped_permission_uuid
+
     auth_shop_uuid = str(get_user_shop_uuid(request) or "").strip()
     if auth_shop_uuid:
         return auth_shop_uuid
@@ -205,3 +233,35 @@ def _ensure_shop_isolation_infrastructure(cur) -> None:
     _sync_shop_id_bindings(cur)
     _ensure_shop_id_columns_for_domain_tables(cur)
     _ensure_shop_id_sync_triggers(cur)
+
+
+def resolve_request_scope(request: Request, cur, domain: str | None = None) -> dict:
+    resolved_domain = str(domain or get_user_domain(request) or "").strip().lower()
+    shop_id = _resolve_request_shop_id(request, cur, resolved_domain)
+    shop_uuid = _resolve_request_shop_uuid(request, cur, resolved_domain)
+    return {
+        "domain": resolved_domain,
+        "shop_id": shop_id,
+        "shop_uuid": shop_uuid,
+    }
+
+
+def build_shop_isolation_filter(
+    request: Request,
+    cur,
+    *,
+    table_alias: str | None = None,
+    domain: str | None = None,
+) -> tuple[str, tuple, dict]:
+    scope = resolve_request_scope(request, cur, domain=domain)
+    resolved_domain = str(scope.get("domain") or "").strip().lower()
+    resolved_shop_id = scope.get("shop_id")
+    resolved_shop_uuid = str(scope.get("shop_uuid") or "").strip()
+
+    prefix = f"{table_alias}." if table_alias else ""
+    clause = (
+        f"({prefix}shop_uuid = %s::uuid OR "
+        f"({prefix}shop_uuid IS NULL AND {prefix}shop_id = %s AND {prefix}domain = %s))"
+    )
+    params = (resolved_shop_uuid, resolved_shop_id, resolved_domain)
+    return clause, params, scope

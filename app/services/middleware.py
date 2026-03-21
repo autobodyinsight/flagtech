@@ -72,6 +72,69 @@ def _normalize_permission_snapshot(raw_snapshot) -> dict | None:
     return None
 
 
+def build_session_snapshot_payload(
+    *,
+    user: dict,
+    permission_snapshot: dict | None = None,
+) -> dict:
+    normalized_user = user or {}
+    resolved_permissions = permission_snapshot or _normalize_permission_snapshot(normalized_user.get("permissions")) or {}
+    allowed_features = [
+        feature
+        for feature, enabled in (resolved_permissions.get("features") or {}).items()
+        if bool(enabled)
+    ]
+
+    role_value = str(normalized_user.get("role") or "").strip()
+    access_level = str(normalized_user.get("access_level") or resolved_permissions.get("access_level") or "").strip()
+    shop_domain = str(
+        normalized_user.get("domain")
+        or resolved_permissions.get("shop_domain")
+        or ""
+    ).strip().lower()
+    shop_id = int(
+        normalized_user.get("shop_id")
+        or resolved_permissions.get("shop_id")
+        or 0
+    ) or None
+    shop_uuid = str(
+        normalized_user.get("shop_uuid")
+        or resolved_permissions.get("shop_uuid")
+        or ""
+    ).strip() or None
+
+    return {
+        "user": {
+            "id": int(normalized_user.get("id") or 0),
+            "user_uuid": str(normalized_user.get("user_uuid") or "").strip() or None,
+            "email": str(normalized_user.get("email") or "").strip().lower(),
+            "first_name": str(normalized_user.get("first_name") or "").strip(),
+            "last_name": str(normalized_user.get("last_name") or "").strip(),
+        },
+        "role": {
+            "name": role_value,
+            "access_level": access_level,
+            "is_architect": bool(normalized_user.get("is_architect")),
+        },
+        "shop": {
+            "domain": shop_domain,
+            "shop_id": shop_id,
+            "shop_uuid": shop_uuid,
+            "shop_name": str(normalized_user.get("shop_name") or "").strip(),
+            "address": str(normalized_user.get("address") or "").strip(),
+        },
+        "permissions": resolved_permissions,
+        "allowed_features": allowed_features,
+        "isolation_rules": {
+            "enforce_shop_scope": bool(shop_id and shop_uuid and shop_domain),
+            "shop_domain": shop_domain,
+            "shop_id": shop_id,
+            "shop_uuid": shop_uuid,
+            "fallback_mode": "deny_if_scope_missing",
+        },
+    }
+
+
 def create_auth_session(
     user_id: int,
     permission_snapshot: dict | None = None,
@@ -99,6 +162,37 @@ def create_auth_session(
     return token
 
 
+def validate_request_session(request: Request) -> dict | None:
+    session_id = _clean(request.cookies.get(SESSION_COOKIE_NAME))
+    if not session_id:
+        return None
+
+    conn = get_conn()
+    cur = conn.cursor()
+    try:
+        _ensure_auth_sessions_table(cur)
+        cur.execute(
+            """
+            SELECT user_id, permission_snapshot, expires_at
+            FROM auth_sessions
+            WHERE session_id = %s
+              AND expires_at > CURRENT_TIMESTAMP
+            LIMIT 1
+            """,
+            (session_id,),
+        )
+        row = cur.fetchone() or {}
+        if not row:
+            return None
+
+        return {
+            "user_id": int(row.get("user_id") or 0) or None,
+            "permission_snapshot": _normalize_permission_snapshot(row.get("permission_snapshot")) or {},
+        }
+    finally:
+        cur.close()
+
+
 def revoke_auth_session(session_id: str | None) -> None:
     token = str(session_id or "").strip()
     if not token:
@@ -115,6 +209,10 @@ def revoke_auth_session(session_id: str | None) -> None:
 
 
 def get_authenticated_user(request: Request) -> dict | None:
+    cached_user = getattr(request.state, "authenticated_user", None)
+    if cached_user:
+        return cached_user
+
     session_id = _clean(request.cookies.get(SESSION_COOKIE_NAME))
     if not session_id:
         return None
@@ -175,7 +273,7 @@ def get_authenticated_user(request: Request) -> dict | None:
                 is_architect=is_architect,
             )
 
-        return {
+        user_payload = {
             "id": int(row.get("id") or 0),
             "first_name": str(row.get("first_name") or "").strip(),
             "last_name": str(row.get("last_name") or "").strip(),
@@ -191,6 +289,13 @@ def get_authenticated_user(request: Request) -> dict | None:
             "is_architect": is_architect,
             "permissions": permission_snapshot,
         }
+        request.state.authenticated_user = user_payload
+        request.state.session_snapshot = build_session_snapshot_payload(
+            user=user_payload,
+            permission_snapshot=permission_snapshot,
+        )
+        request.state.user_id = int(user_payload.get("id") or 0) or None
+        return user_payload
     finally:
         cur.close()
 
@@ -204,6 +309,17 @@ def get_authenticated_user_email(request: Request) -> str:
 
 def get_user_domain(request: Request) -> Optional[str]:
     """Resolve the active tenant domain scope for authenticated requests."""
+    session_snapshot = getattr(request.state, "session_snapshot", None) or {}
+    isolation_rules = session_snapshot.get("isolation_rules") or {}
+    scoped_domain = _clean(str(isolation_rules.get("shop_domain") or "").lower())
+    if scoped_domain:
+        return _build_scope_key(scoped_domain)
+
+    permission_snapshot = getattr(request.state, "permission_snapshot", None) or {}
+    snapshot_domain = _clean(str(permission_snapshot.get("shop_domain") or "").lower())
+    if snapshot_domain:
+        return _build_scope_key(snapshot_domain)
+
     user = get_authenticated_user(request)
     if not user:
         return None
@@ -214,8 +330,19 @@ def get_user_domain(request: Request) -> Optional[str]:
 
 
 def get_user_shop_uuid(request: Request) -> Optional[str]:
+    session_snapshot = getattr(request.state, "session_snapshot", None) or {}
+    isolation_rules = session_snapshot.get("isolation_rules") or {}
+    value = _clean(str(isolation_rules.get("shop_uuid") or ""))
+    if value:
+        return value
+
+    permission_snapshot = getattr(request.state, "permission_snapshot", None) or {}
+    permission_uuid = _clean(str(permission_snapshot.get("shop_uuid") or ""))
+    if permission_uuid:
+        return permission_uuid
+
     user = get_authenticated_user(request)
     if not user:
         return None
-    value = _clean(str(user.get("shop_uuid") or ""))
-    return value or None
+    user_value = _clean(str(user.get("shop_uuid") or ""))
+    return user_value or None

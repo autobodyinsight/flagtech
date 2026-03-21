@@ -56,6 +56,8 @@
     _resolve_request_shop_id,
     _resolve_request_shop_uuid,
     _ensure_shop_isolation_infrastructure,
+    resolve_request_scope,
+    build_shop_isolation_filter,
     _resolve_request_user_email,
     _is_architect_email,
     _build_cookie_secure_flag,
@@ -134,8 +136,9 @@ async def update_ro_phone(request: Request):
     conn = get_conn()
     cur = conn.cursor()
     try:
-        current_shop_id = _resolve_request_shop_id(request, cur, domain)
-        current_shop_uuid = _resolve_request_shop_uuid(request, cur, domain)
+        _scope = resolve_request_scope(request, cur, domain=domain)
+        current_shop_id = _scope["shop_id"]
+        current_shop_uuid = _scope["shop_uuid"]
         if not current_shop_id or not current_shop_uuid:
             return JSONResponse(status_code=403, content={"error": "Shop scope not resolved"})
         cur.execute(
@@ -301,8 +304,9 @@ async def get_ro_repairs(request: Request, ro: str):
     conn = get_conn()
     cur = conn.cursor()
     try:
-        current_shop_id = _resolve_request_shop_id(request, cur, domain)
-        current_shop_uuid = _resolve_request_shop_uuid(request, cur, domain)
+        _scope = resolve_request_scope(request, cur, domain=domain)
+        current_shop_id = _scope["shop_id"]
+        current_shop_uuid = _scope["shop_uuid"]
         if not current_shop_id or not current_shop_uuid:
             return JSONResponse(status_code=403, content={"error": "Shop scope not resolved"})
         cur.execute(
@@ -374,8 +378,9 @@ async def get_ro_tech_lines(request: Request, ro: str):
     conn = get_conn()
     cur = conn.cursor()
     try:
-        current_shop_id = _resolve_request_shop_id(request, cur, domain)
-        current_shop_uuid = _resolve_request_shop_uuid(request, cur, domain)
+        _scope = resolve_request_scope(request, cur, domain=domain)
+        current_shop_id = _scope["shop_id"]
+        current_shop_uuid = _scope["shop_uuid"]
         if not current_shop_id or not current_shop_uuid:
             return JSONResponse(status_code=403, content={"error": "Shop scope not resolved"})
         _ensure_ro_line_assignments_for_ro(cur, domain, ro_value)
@@ -552,8 +557,9 @@ async def get_ro_assignment_lines(
     conn = get_conn()
     cur = conn.cursor()
     try:
-        current_shop_id = _resolve_request_shop_id(request, cur, domain)
-        current_shop_uuid = _resolve_request_shop_uuid(request, cur, domain)
+        _scope = resolve_request_scope(request, cur, domain=domain)
+        current_shop_id = _scope["shop_id"]
+        current_shop_uuid = _scope["shop_uuid"]
         if not current_shop_id or not current_shop_uuid:
             return JSONResponse(status_code=403, content={"error": "Shop scope not resolved"})
         _ensure_ro_line_assignments_for_ro(cur, domain, ro_value)
@@ -710,8 +716,9 @@ async def save_ro_assignment_lines(request: Request):
     conn = get_conn()
     cur = conn.cursor()
     try:
-        current_shop_id = _resolve_request_shop_id(request, cur, domain)
-        current_shop_uuid = _resolve_request_shop_uuid(request, cur, domain)
+        _scope = resolve_request_scope(request, cur, domain=domain)
+        current_shop_id = _scope["shop_id"]
+        current_shop_uuid = _scope["shop_uuid"]
         if not current_shop_id or not current_shop_uuid:
             return JSONResponse(status_code=403, content={"error": "Shop scope not resolved"})
         _ensure_ro_line_assignments_for_ro(cur, domain, ro_value)
@@ -1009,8 +1016,9 @@ async def unassign_ro_assignment_lines(request: Request):
     conn = get_conn()
     cur = conn.cursor()
     try:
-        current_shop_id = _resolve_request_shop_id(request, cur, domain)
-        current_shop_uuid = _resolve_request_shop_uuid(request, cur, domain)
+        _scope = resolve_request_scope(request, cur, domain=domain)
+        current_shop_id = _scope["shop_id"]
+        current_shop_uuid = _scope["shop_uuid"]
         if not current_shop_id or not current_shop_uuid:
             return JSONResponse(status_code=403, content={"error": "Shop scope not resolved"})
         _ensure_ro_line_assignments_for_ro(cur, domain, ro_value)
@@ -1168,8 +1176,9 @@ async def save_ro_assignments(request: Request):
     conn = get_conn()
     cur = conn.cursor()
     try:
-        current_shop_id = _resolve_request_shop_id(request, cur, domain)
-        current_shop_uuid = _resolve_request_shop_uuid(request, cur, domain)
+        _scope = resolve_request_scope(request, cur, domain=domain)
+        current_shop_id = _scope["shop_id"]
+        current_shop_uuid = _scope["shop_uuid"]
         if not current_shop_id or not current_shop_uuid:
             return JSONResponse(status_code=403, content={"error": "Shop scope not resolved"})
 
@@ -1281,8 +1290,9 @@ async def get_flagout_techs(request: Request):
     conn = get_conn()
     cur = conn.cursor()
     try:
-        current_shop_id = _resolve_request_shop_id(request, cur, domain)
-        current_shop_uuid = _resolve_request_shop_uuid(request, cur, domain)
+        _scope = resolve_request_scope(request, cur, domain=domain)
+        current_shop_id = _scope["shop_id"]
+        current_shop_uuid = _scope["shop_uuid"]
         if not current_shop_id or not current_shop_uuid:
             return JSONResponse(status_code=403, content={"error": "Shop scope not resolved"})
 
@@ -1426,8 +1436,9 @@ async def save_flagout_payout(request: Request):
     conn = get_conn()
     cur = conn.cursor()
     try:
-        current_shop_id = _resolve_request_shop_id(request, cur, domain)
-        current_shop_uuid = _resolve_request_shop_uuid(request, cur, domain)
+        _scope = resolve_request_scope(request, cur, domain=domain)
+        current_shop_id = _scope["shop_id"]
+        current_shop_uuid = _scope["shop_uuid"]
         if not current_shop_id or not current_shop_uuid:
             return JSONResponse(status_code=403, content={"error": "Shop scope not resolved"})
 
@@ -1560,8 +1571,9 @@ async def phase_update(request: Request):
     conn = get_conn()
     cur = conn.cursor()
     try:
-        current_shop_id = _resolve_request_shop_id(request, cur, domain)
-        current_shop_uuid = _resolve_request_shop_uuid(request, cur, domain)
+        _scope = resolve_request_scope(request, cur, domain=domain)
+        current_shop_id = _scope["shop_id"]
+        current_shop_uuid = _scope["shop_uuid"]
         if not current_shop_id or not current_shop_uuid:
             return JSONResponse(status_code=403, content={"error": "Shop scope not resolved"})
 
@@ -1633,8 +1645,9 @@ async def phase_board(request: Request):
     conn = get_conn()
     cur = conn.cursor()
     try:
-        current_shop_id = _resolve_request_shop_id(request, cur, domain)
-        current_shop_uuid = _resolve_request_shop_uuid(request, cur, domain)
+        _scope = resolve_request_scope(request, cur, domain=domain)
+        current_shop_id = _scope["shop_id"]
+        current_shop_uuid = _scope["shop_uuid"]
         if not current_shop_id or not current_shop_uuid:
             return JSONResponse(status_code=403, content={"error": "Shop scope not resolved"})
 
@@ -1760,8 +1773,9 @@ async def list_ro_notes(request: Request, ro: str):
     conn = get_conn()
     cur = conn.cursor()
     try:
-        current_shop_id = _resolve_request_shop_id(request, cur, domain)
-        current_shop_uuid = _resolve_request_shop_uuid(request, cur, domain)
+        _scope = resolve_request_scope(request, cur, domain=domain)
+        current_shop_id = _scope["shop_id"]
+        current_shop_uuid = _scope["shop_uuid"]
         if not current_shop_id or not current_shop_uuid:
             return JSONResponse(status_code=403, content={"error": "Shop scope not resolved", "notes": []})
         cur.execute(
@@ -1806,8 +1820,9 @@ async def list_ro_activity(request: Request, ro: str):
     conn = get_conn()
     cur = conn.cursor()
     try:
-        current_shop_id = _resolve_request_shop_id(request, cur, domain)
-        current_shop_uuid = _resolve_request_shop_uuid(request, cur, domain)
+        _scope = resolve_request_scope(request, cur, domain=domain)
+        current_shop_id = _scope["shop_id"]
+        current_shop_uuid = _scope["shop_uuid"]
         if not current_shop_id or not current_shop_uuid:
             return JSONResponse(status_code=403, content={"error": "Shop scope not resolved"})
 
@@ -1947,8 +1962,9 @@ async def add_ro_note(request: Request):
     conn = get_conn()
     cur = conn.cursor()
     try:
-        current_shop_id = _resolve_request_shop_id(request, cur, domain)
-        current_shop_uuid = _resolve_request_shop_uuid(request, cur, domain)
+        _scope = resolve_request_scope(request, cur, domain=domain)
+        current_shop_id = _scope["shop_id"]
+        current_shop_uuid = _scope["shop_uuid"]
         if not current_shop_id or not current_shop_uuid:
             return JSONResponse(status_code=403, content={"error": "Shop scope not resolved"})
         created_by = _resolve_request_user_display_name(request, cur, domain)
@@ -1980,8 +1996,9 @@ async def list_parts_ros(request: Request):
     cur = conn.cursor()
 
     try:
-        current_shop_id = _resolve_request_shop_id(request, cur, domain)
-        current_shop_uuid = _resolve_request_shop_uuid(request, cur, domain)
+        _scope = resolve_request_scope(request, cur, domain=domain)
+        current_shop_id = _scope["shop_id"]
+        current_shop_uuid = _scope["shop_uuid"]
         if not current_shop_id or not current_shop_uuid:
             return JSONResponse(status_code=403, content={"error": "Shop scope not resolved", "ros": []})
 
@@ -2209,8 +2226,9 @@ async def list_parts_lines(request: Request, ro: str):
     conn = get_conn()
     cur = conn.cursor()
     try:
-        current_shop_id = _resolve_request_shop_id(request, cur, domain)
-        current_shop_uuid = _resolve_request_shop_uuid(request, cur, domain)
+        _scope = resolve_request_scope(request, cur, domain=domain)
+        current_shop_id = _scope["shop_id"]
+        current_shop_uuid = _scope["shop_uuid"]
         if not current_shop_id or not current_shop_uuid:
             return JSONResponse(status_code=403, content={"error": "Shop scope not resolved", "lines": []})
 
@@ -2338,8 +2356,9 @@ async def save_parts_order(request: Request):
     conn = get_conn()
     cur = conn.cursor()
     try:
-        current_shop_id = _resolve_request_shop_id(request, cur, domain)
-        current_shop_uuid = _resolve_request_shop_uuid(request, cur, domain)
+        _scope = resolve_request_scope(request, cur, domain=domain)
+        current_shop_id = _scope["shop_id"]
+        current_shop_uuid = _scope["shop_uuid"]
         if not current_shop_id or not current_shop_uuid:
             return JSONResponse(status_code=403, content={"error": "Shop scope not resolved"})
 
@@ -2455,8 +2474,9 @@ async def list_parts_received(request: Request, ro: str):
     conn = get_conn()
     cur = conn.cursor()
     try:
-        current_shop_id = _resolve_request_shop_id(request, cur, domain)
-        current_shop_uuid = _resolve_request_shop_uuid(request, cur, domain)
+        _scope = resolve_request_scope(request, cur, domain=domain)
+        current_shop_id = _scope["shop_id"]
+        current_shop_uuid = _scope["shop_uuid"]
         if not current_shop_id or not current_shop_uuid:
             return JSONResponse(status_code=403, content={"error": "Shop scope not resolved", "items": []})
         cur.execute(
@@ -2513,8 +2533,9 @@ async def list_arrived_lines(request: Request, ro: str):
     conn = get_conn()
     cur = conn.cursor()
     try:
-        current_shop_id = _resolve_request_shop_id(request, cur, domain)
-        current_shop_uuid = _resolve_request_shop_uuid(request, cur, domain)
+        _scope = resolve_request_scope(request, cur, domain=domain)
+        current_shop_id = _scope["shop_id"]
+        current_shop_uuid = _scope["shop_uuid"]
         if not current_shop_id or not current_shop_uuid:
             return JSONResponse(status_code=403, content={"error": "Shop scope not resolved", "items": []})
 
@@ -2618,8 +2639,9 @@ async def return_arrived_lines(request: Request):
     conn = get_conn()
     cur = conn.cursor()
     try:
-        current_shop_id = _resolve_request_shop_id(request, cur, domain)
-        current_shop_uuid = _resolve_request_shop_uuid(request, cur, domain)
+        _scope = resolve_request_scope(request, cur, domain=domain)
+        current_shop_id = _scope["shop_id"]
+        current_shop_uuid = _scope["shop_uuid"]
         if not current_shop_id or not current_shop_uuid:
             return JSONResponse(status_code=403, content={"error": "Shop scope not resolved"})
 
@@ -2687,8 +2709,9 @@ async def list_returned_lines(request: Request, ro: str):
     conn = get_conn()
     cur = conn.cursor()
     try:
-        current_shop_id = _resolve_request_shop_id(request, cur, domain)
-        current_shop_uuid = _resolve_request_shop_uuid(request, cur, domain)
+        _scope = resolve_request_scope(request, cur, domain=domain)
+        current_shop_id = _scope["shop_id"]
+        current_shop_uuid = _scope["shop_uuid"]
         if not current_shop_id or not current_shop_uuid:
             return JSONResponse(status_code=403, content={"error": "Shop scope not resolved", "items": []})
 
@@ -2778,8 +2801,9 @@ async def list_on_order_lines(request: Request, ro: str):
     conn = get_conn()
     cur = conn.cursor()
     try:
-        current_shop_id = _resolve_request_shop_id(request, cur, domain)
-        current_shop_uuid = _resolve_request_shop_uuid(request, cur, domain)
+        _scope = resolve_request_scope(request, cur, domain=domain)
+        current_shop_id = _scope["shop_id"]
+        current_shop_uuid = _scope["shop_uuid"]
         if not current_shop_id or not current_shop_uuid:
             return JSONResponse(status_code=403, content={"error": "Shop scope not resolved", "items": []})
 
@@ -3015,8 +3039,9 @@ async def receive_on_order_lines(request: Request):
     conn = get_conn()
     cur = conn.cursor()
     try:
-        current_shop_id = _resolve_request_shop_id(request, cur, domain)
-        current_shop_uuid = _resolve_request_shop_uuid(request, cur, domain)
+        _scope = resolve_request_scope(request, cur, domain=domain)
+        current_shop_id = _scope["shop_id"]
+        current_shop_uuid = _scope["shop_uuid"]
         if not current_shop_id or not current_shop_uuid:
             return JSONResponse(status_code=403, content={"error": "Shop scope not resolved"})
 
@@ -3216,8 +3241,9 @@ async def save_parts_received(request: Request):
     conn = get_conn()
     cur = conn.cursor()
     try:
-        current_shop_id = _resolve_request_shop_id(request, cur, domain)
-        current_shop_uuid = _resolve_request_shop_uuid(request, cur, domain)
+        _scope = resolve_request_scope(request, cur, domain=domain)
+        current_shop_id = _scope["shop_id"]
+        current_shop_uuid = _scope["shop_uuid"]
         if not current_shop_id or not current_shop_uuid:
             return JSONResponse(status_code=403, content={"error": "Shop scope not resolved"})
         cur.execute(
@@ -3290,8 +3316,9 @@ async def get_ro_tech_assignments(request: Request, ro: str):
     conn = get_conn()
     cur = conn.cursor()
     try:
-        current_shop_id = _resolve_request_shop_id(request, cur, domain)
-        current_shop_uuid = _resolve_request_shop_uuid(request, cur, domain)
+        _scope = resolve_request_scope(request, cur, domain=domain)
+        current_shop_id = _scope["shop_id"]
+        current_shop_uuid = _scope["shop_uuid"]
         if not current_shop_id or not current_shop_uuid:
             return JSONResponse(status_code=403, content={"error": "Shop scope not resolved"})
 
@@ -3375,8 +3402,9 @@ async def get_ro_tech_detail(request: Request, ro: str, tech_id: int, role: str)
     conn = get_conn()
     cur = conn.cursor()
     try:
-        current_shop_id = _resolve_request_shop_id(request, cur, domain)
-        current_shop_uuid = _resolve_request_shop_uuid(request, cur, domain)
+        _scope = resolve_request_scope(request, cur, domain=domain)
+        current_shop_id = _scope["shop_id"]
+        current_shop_uuid = _scope["shop_uuid"]
         if not current_shop_id or not current_shop_uuid:
             return JSONResponse(status_code=403, content={"error": "Shop scope not resolved"})
 
@@ -3466,8 +3494,9 @@ async def get_ro_estimate_snapshot(request: Request, ro: str):
     conn = get_conn()
     cur = conn.cursor()
     try:
-        current_shop_id = _resolve_request_shop_id(request, cur, domain)
-        current_shop_uuid = _resolve_request_shop_uuid(request, cur, domain)
+        _scope = resolve_request_scope(request, cur, domain=domain)
+        current_shop_id = _scope["shop_id"]
+        current_shop_uuid = _scope["shop_uuid"]
         if not current_shop_id or not current_shop_uuid:
             return JSONResponse(status_code=403, content={"error": "Shop scope not resolved"})
         cur.execute(
@@ -3582,8 +3611,9 @@ async def get_ro_print_data(request: Request, ro: str):
     conn = get_conn()
     cur = conn.cursor()
     try:
-        current_shop_id = _resolve_request_shop_id(request, cur, domain)
-        current_shop_uuid = _resolve_request_shop_uuid(request, cur, domain)
+        _scope = resolve_request_scope(request, cur, domain=domain)
+        current_shop_id = _scope["shop_id"]
+        current_shop_uuid = _scope["shop_uuid"]
         if not current_shop_id or not current_shop_uuid:
             return JSONResponse(status_code=403, content={"error": "Shop scope not resolved"})
         

@@ -2,7 +2,6 @@
 
 from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
-from app.services.middleware import get_authenticated_user
 
 from .flagout import get_flagtech_screen_html
 from .parts import get_parts_screen_html, get_parts_script
@@ -26,13 +25,9 @@ except ImportError:
 router = APIRouter()
 
 
-def _is_authenticated(request: Request) -> bool:
-    return bool(get_authenticated_user(request))
-
-
 def _is_architect(request: Request) -> bool:
-    user = get_authenticated_user(request) or {}
-    return bool(user.get("is_architect"))
+    permission_snapshot = getattr(request.state, "permission_snapshot", None) or {}
+    return str(permission_snapshot.get("access_level") or "").strip().upper() == "ARCHITECT"
 
 
 @router.get("/login", response_class=HTMLResponse)
@@ -215,6 +210,10 @@ async def login_screen(request: Request):
                     throw new Error(data.error || 'Login failed');
                 }
 
+                if (data && data.session_snapshot) {
+                    sessionStorage.setItem('flagtechSessionSnapshot', JSON.stringify(data.session_snapshot));
+                }
+
                 window.location.href = '/ui/';
             } catch (error) {
                 const message = String(error.message || 'Login failed');
@@ -236,9 +235,6 @@ async def login_screen(request: Request):
 @router.get("/", response_class=HTMLResponse)
 async def home_screen(request: Request):
     """Main UI screen with sidebar navigation."""
-
-    if not _is_authenticated(request):
-        return RedirectResponse(url="/ui/login")
 
     return f"""
 <!DOCTYPE html>
@@ -1094,6 +1090,7 @@ async def home_screen(request: Request):
         const appUiState = {{
             activeScreen: 'dashboard',
             sessionUser: null,
+            sessionSnapshot: null,
             shopDomain: '',
             shopName: '',
             users: [],
@@ -1122,7 +1119,7 @@ async def home_screen(request: Request):
         }};
 
         function getPermissionSnapshot() {{
-            return appUiState.sessionUser?.permissions || null;
+            return appUiState.sessionSnapshot?.permissions || null;
         }}
 
         function canAccessFeature(feature) {{
@@ -1601,17 +1598,36 @@ async def home_screen(request: Request):
 
         async function initHeaderData() {{
             try {{
-                const [sessionResp, userResp] = await Promise.all([
-                    fetch('/api/auth/session', {{ credentials: 'include' }}),
-                    fetch('/api/chat/users', {{ credentials: 'include' }}),
-                ]);
-                const sessionData = await sessionResp.json();
+                let sessionData = null;
+                const storedSnapshotRaw = sessionStorage.getItem('flagtechSessionSnapshot');
+                if (storedSnapshotRaw) {{
+                    try {{
+                        const parsedSnapshot = JSON.parse(storedSnapshotRaw);
+                        if (parsedSnapshot && typeof parsedSnapshot === 'object') {{
+                            sessionData = {{ authenticated: true, session_snapshot: parsedSnapshot }};
+                        }}
+                    }} catch (_error) {{
+                        sessionStorage.removeItem('flagtechSessionSnapshot');
+                    }}
+                }}
+
+                if (!sessionData) {{
+                    const sessionResp = await fetch('/api/auth/session', {{ credentials: 'include' }});
+                    sessionData = await sessionResp.json();
+                    if (!sessionResp.ok || !sessionData.authenticated) return;
+                    if (sessionData.session_snapshot) {{
+                        sessionStorage.setItem('flagtechSessionSnapshot', JSON.stringify(sessionData.session_snapshot));
+                    }}
+                }}
+
+                const userResp = await fetch('/api/chat/users', {{ credentials: 'include' }});
                 const userData = await userResp.json();
-                if (!sessionResp.ok || !sessionData.authenticated) return;
-                appUiState.sessionUser = sessionData.user || null;
+                const snapshot = sessionData?.session_snapshot || null;
+                appUiState.sessionSnapshot = snapshot;
+                appUiState.sessionUser = snapshot?.user || null;
                 appUiState.currentUser = appUiState.sessionUser || null;
-                appUiState.shopDomain = String(sessionData.user?.permissions?.shop_domain || sessionData.user?.domain || '').trim();
-                appUiState.shopName = String(sessionData.user?.shop_name || '').trim();
+                appUiState.shopDomain = String(snapshot?.isolation_rules?.shop_domain || snapshot?.shop?.domain || '').trim();
+                appUiState.shopName = String(snapshot?.shop?.shop_name || '').trim();
                 appUiState.users = Array.isArray(userData.users) ? userData.users : [];
 
                 const shopScopeQuery = appUiState.shopDomain
@@ -1627,10 +1643,10 @@ async def home_screen(request: Request):
                 const firstName = String(appUiState.currentUser?.first_name || '').trim();
                 const lastName = String(appUiState.currentUser?.last_name || '').trim();
                 const initials = `${{(firstName[0] || '').toUpperCase()}}${{(lastName[0] || '').toUpperCase()}}` || 'U';
-                const role = String(appUiState.sessionUser?.access_level || '').toUpperCase() === 'ARCHITECT'
+                const role = String(appUiState.sessionSnapshot?.role?.access_level || '').toUpperCase() === 'ARCHITECT'
                     ? 'ARCHITECT'
-                    : String(appUiState.currentUser?.role || appUiState.sessionUser?.access_level || '-');
-                const email = String(appUiState.currentUser?.email || appUiState.sessionUser?.email || '-');
+                    : String(appUiState.sessionSnapshot?.role?.name || appUiState.sessionSnapshot?.role?.access_level || '-');
+                const email = String(appUiState.currentUser?.email || '-');
 
                 const initialsEl = document.getElementById('sideUserInitials');
                 if (initialsEl) initialsEl.textContent = initials;
@@ -1784,6 +1800,7 @@ async def home_screen(request: Request):
             }} catch (e) {{
                 console.error('Logout error:', e);
             }} finally {{
+                sessionStorage.removeItem('flagtechSessionSnapshot');
                 window.location.href = '/ui/login';
             }}
         }}
@@ -1804,8 +1821,6 @@ async def home_screen(request: Request):
 
 @router.get("/manage", response_class=HTMLResponse)
 async def manage_screen(request: Request):
-    if not _is_authenticated(request):
-        return RedirectResponse(url="/ui/login")
     if not _is_architect(request):
         return HTMLResponse("<h2 style='font-family:Segoe UI,Arial,sans-serif; padding:24px;'>Forbidden</h2>", status_code=403)
 

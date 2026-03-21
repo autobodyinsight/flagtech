@@ -5,8 +5,7 @@ from fastapi.staticfiles import StaticFiles
 from contextlib import asynccontextmanager
 from pathlib import Path
 from app.services.schema_bootstrap import initialize_application_schema
-from app.services.middleware import get_authenticated_user
-from app.services.permissions import has_feature_access, resolve_feature_for_path
+from app.services.middleware import validate_request_session
 
 # Routers
 from app.routes.estimate import router as estimate_router
@@ -92,18 +91,14 @@ async def permission_guard_middleware(request, call_next):
     if not (path.startswith("/ui") or path.startswith("/api")):
         return await call_next(request)
 
-    authenticated_user = get_authenticated_user(request)
-    if not authenticated_user:
+    session_info = validate_request_session(request)
+    if not session_info:
         if path.startswith("/ui") and request.method.upper() == "GET":
             return RedirectResponse(url="/ui/login")
         return JSONResponse(status_code=401, content={"error": "Not authenticated"})
 
-    feature = resolve_feature_for_path(path, request.method)
-    permissions = authenticated_user.get("permissions") or {}
-    if feature and not has_feature_access(permissions, feature):
-        if path.startswith("/ui") and request.method.upper() == "GET":
-            return HTMLResponse("<h2 style='font-family:Segoe UI,Arial,sans-serif; padding:24px;'>Forbidden</h2>", status_code=403)
-        return JSONResponse(status_code=403, content={"error": "Forbidden"})
+    request.state.user_id = session_info.get("user_id")
+    request.state.permission_snapshot = session_info.get("permission_snapshot") or {}
 
     return await call_next(request)
 

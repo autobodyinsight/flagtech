@@ -56,6 +56,8 @@
     _resolve_request_shop_id,
     _resolve_request_shop_uuid,
     _ensure_shop_isolation_infrastructure,
+    resolve_request_scope,
+    build_shop_isolation_filter,
     _resolve_request_user_email,
     _is_architect_email,
     _build_cookie_secure_flag,
@@ -104,8 +106,9 @@ async def list_open_ros_for_payments(request: Request):
     conn = get_conn()
     cur = conn.cursor()
     try:
-        current_shop_id = _resolve_request_shop_id(request, cur, domain)
-        current_shop_uuid = _resolve_request_shop_uuid(request, cur, domain)
+        _scope = resolve_request_scope(request, cur, domain=domain)
+        current_shop_id = _scope["shop_id"]
+        current_shop_uuid = _scope["shop_uuid"]
         if not current_shop_id or not current_shop_uuid:
             return JSONResponse(status_code=403, content={"error": "Shop scope not resolved", "rows": []})
 
@@ -319,8 +322,9 @@ async def get_ro_payments(request: Request):
     conn = get_conn()
     cur = conn.cursor()
     try:
-        current_shop_id = _resolve_request_shop_id(request, cur, domain)
-        current_shop_uuid = _resolve_request_shop_uuid(request, cur, domain)
+        _scope = resolve_request_scope(request, cur, domain=domain)
+        current_shop_id = _scope["shop_id"]
+        current_shop_uuid = _scope["shop_uuid"]
         if not current_shop_id or not current_shop_uuid:
             return JSONResponse(status_code=403, content={"error": "Shop scope not resolved"})
 
@@ -458,8 +462,9 @@ async def list_records_closed_ros(request: Request):
     conn = get_conn()
     cur = conn.cursor()
     try:
-        current_shop_id = _resolve_request_shop_id(request, cur, domain)
-        current_shop_uuid = _resolve_request_shop_uuid(request, cur, domain)
+        _scope = resolve_request_scope(request, cur, domain=domain)
+        current_shop_id = _scope["shop_id"]
+        current_shop_uuid = _scope["shop_uuid"]
         if not current_shop_id or not current_shop_uuid:
             return JSONResponse(status_code=403, content={"error": "Shop scope not resolved", "rows": []})
 
@@ -560,8 +565,9 @@ async def list_records_tech_payouts(
     conn = get_conn()
     cur = conn.cursor()
     try:
-        current_shop_id = _resolve_request_shop_id(request, cur, domain)
-        current_shop_uuid = _resolve_request_shop_uuid(request, cur, domain)
+        _scope = resolve_request_scope(request, cur, domain=domain)
+        current_shop_id = _scope["shop_id"]
+        current_shop_uuid = _scope["shop_uuid"]
         if not current_shop_id or not current_shop_uuid:
             return JSONResponse(status_code=403, content={"error": "Shop scope not resolved", "rows": []})
 
@@ -661,8 +667,9 @@ async def list_records_tech_paid_ros(
     conn = get_conn()
     cur = conn.cursor()
     try:
-        current_shop_id = _resolve_request_shop_id(request, cur, domain)
-        current_shop_uuid = _resolve_request_shop_uuid(request, cur, domain)
+        _scope = resolve_request_scope(request, cur, domain=domain)
+        current_shop_id = _scope["shop_id"]
+        current_shop_uuid = _scope["shop_uuid"]
         if not current_shop_id or not current_shop_uuid:
             return JSONResponse(status_code=403, content={"error": "Shop scope not resolved", "rows": []})
 
@@ -794,8 +801,9 @@ async def list_records_parts_vendors_summary(
     conn = get_conn()
     cur = conn.cursor()
     try:
-        current_shop_id = _resolve_request_shop_id(request, cur, domain)
-        current_shop_uuid = _resolve_request_shop_uuid(request, cur, domain)
+        _scope = resolve_request_scope(request, cur, domain=domain)
+        current_shop_id = _scope["shop_id"]
+        current_shop_uuid = _scope["shop_uuid"]
         if not current_shop_id or not current_shop_uuid:
             return JSONResponse(status_code=403, content={"error": "Shop scope not resolved", "rows": []})
 
@@ -892,8 +900,9 @@ async def list_records_parts_vendor_invoices(
     conn = get_conn()
     cur = conn.cursor()
     try:
-        current_shop_id = _resolve_request_shop_id(request, cur, domain)
-        current_shop_uuid = _resolve_request_shop_uuid(request, cur, domain)
+        _scope = resolve_request_scope(request, cur, domain=domain)
+        current_shop_id = _scope["shop_id"]
+        current_shop_uuid = _scope["shop_uuid"]
         if not current_shop_id or not current_shop_uuid:
             return JSONResponse(status_code=403, content={"error": "Shop scope not resolved", "rows": []})
 
@@ -977,8 +986,9 @@ async def list_records_parts_vendor_invoice_parts(request: Request, vendor_id: i
     conn = get_conn()
     cur = conn.cursor()
     try:
-        current_shop_id = _resolve_request_shop_id(request, cur, domain)
-        current_shop_uuid = _resolve_request_shop_uuid(request, cur, domain)
+        _scope = resolve_request_scope(request, cur, domain=domain)
+        current_shop_id = _scope["shop_id"]
+        current_shop_uuid = _scope["shop_uuid"]
         if not current_shop_id or not current_shop_uuid:
             return JSONResponse(status_code=403, content={"error": "Shop scope not resolved", "parts": []})
 
@@ -1142,8 +1152,9 @@ async def save_ro_payments(request: Request):
     conn = get_conn()
     cur = conn.cursor()
     try:
-        current_shop_id = _resolve_request_shop_id(request, cur, domain)
-        current_shop_uuid = _resolve_request_shop_uuid(request, cur, domain)
+        _scope = resolve_request_scope(request, cur, domain=domain)
+        current_shop_id = _scope["shop_id"]
+        current_shop_uuid = _scope["shop_uuid"]
         if not current_shop_id or not current_shop_uuid:
             return JSONResponse(status_code=403, content={"error": "Shop scope not resolved"})
         created_by = _resolve_request_user_display_name(request, cur, domain)
@@ -1319,8 +1330,9 @@ async def close_ro_from_payments(request: Request):
 
     try:
         conn.autocommit = False
-        current_shop_id = _resolve_request_shop_id(request, cur, domain)
-        current_shop_uuid = _resolve_request_shop_uuid(request, cur, domain)
+        _scope = resolve_request_scope(request, cur, domain=domain)
+        current_shop_id = _scope["shop_id"]
+        current_shop_uuid = _scope["shop_uuid"]
         if not current_shop_id or not current_shop_uuid:
             conn.rollback()
             return JSONResponse(status_code=403, content={"error": "Shop scope not resolved"})
@@ -1384,8 +1396,9 @@ async def get_ro_payment_log(request: Request, ro: str):
     conn = get_conn()
     cur = conn.cursor()
     try:
-        current_shop_id = _resolve_request_shop_id(request, cur, domain)
-        current_shop_uuid = _resolve_request_shop_uuid(request, cur, domain)
+        _scope = resolve_request_scope(request, cur, domain=domain)
+        current_shop_id = _scope["shop_id"]
+        current_shop_uuid = _scope["shop_uuid"]
         if not current_shop_id or not current_shop_uuid:
             return JSONResponse(status_code=403, content={"error": "Shop scope not resolved", "entries": []})
 

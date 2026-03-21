@@ -17,6 +17,7 @@ from app.models.estimate import EstimateResponse
 from app.services.db import get_conn
 from app.services.middleware import (
     SESSION_COOKIE_NAME,
+    build_session_snapshot_payload,
     create_auth_session,
     get_authenticated_user,
     get_authenticated_user_email,
@@ -56,6 +57,8 @@ from app.routes.estimate_modules.shop_scope import (
     _resolve_request_shop_id,
     _resolve_request_shop_uuid,
     _ensure_shop_isolation_infrastructure,
+    resolve_request_scope,
+    build_shop_isolation_filter,
 )
 from app.routes.estimate_modules.auth_utils import (
     _resolve_request_user_email,
