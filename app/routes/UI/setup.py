@@ -171,6 +171,10 @@ def get_setup_script():
         let setupUsersData = [];
         let setupEditMode = false;
         let setupPendingDeleteUserIds = [];
+        let setupUsersLastLoadedAt = 0;
+        let setupUsersInFlightPromise = null;
+        let setupUsersRequestToken = 0;
+        const setupUsersTtlMs = 15000;
 
         function setupEscape(value) {
             return String(value || '')
@@ -181,35 +185,81 @@ def get_setup_script():
                 .replace(/'/g, '&#39;');
         }
 
-        async function setupLoadData() {
-            await setupLoadUsers();
+        async function setupLoadData(force = false) {
+            const hasCachedUsers = Array.isArray(setupUsersData) && setupUsersData.length > 0;
+            const isFresh = hasCachedUsers && (Date.now() - setupUsersLastLoadedAt) < setupUsersTtlMs;
+            if (!force && isFresh) {
+                setupRenderUsers();
+                return;
+            }
+            await setupLoadUsers({ force });
         }
 
-        async function setupLoadUsers(retryCount = 1) {
+        async function setupLoadUsers(options = {}) {
+            const force = !!options.force;
+            const retryCount = Number.isFinite(Number(options.retryCount)) ? Number(options.retryCount) : 1;
+            if (setupUsersInFlightPromise && !force) {
+                return setupUsersInFlightPromise;
+            }
+
+            const loadPromise = (async () => {
             const body = document.getElementById('setupUsersBody');
             if (!body) return;
-            body.innerHTML = '<tr><td colspan="5" style="padding:18px; text-align:center; color:#999;">Loading...</td></tr>';
-            try {
-                const resp = await fetch('/api/setup/users', { credentials: 'include' });
-                const data = await resp.json().catch(() => ({}));
-                if (!resp.ok || data.error) {
-                    throw new Error(data.error || `Failed to load users (${resp.status})`);
-                }
-                setupUsersData = Array.isArray(data.users) ? data.users : [];
-                if (!setupUsersData.length) {
-                    body.innerHTML = '<tr><td colspan="5" style="padding:18px; text-align:center; color:#999;">No users found.</td></tr>';
-                    return;
-                }
+            const hasCachedUsers = Array.isArray(setupUsersData) && setupUsersData.length > 0;
+            if (!hasCachedUsers) {
+                body.innerHTML = '<tr><td colspan="5" style="padding:18px; text-align:center; color:#999;">Loading...</td></tr>';
+            }
 
-                setupRenderUsers();
-            } catch (error) {
-                if (retryCount > 0) {
-                    await new Promise((resolve) => setTimeout(resolve, 250));
-                    await setupLoadUsers(retryCount - 1);
+            const requestToken = ++setupUsersRequestToken;
+            let lastError = null;
+
+            for (let attempt = 0; attempt <= retryCount; attempt += 1) {
+                try {
+                    const resp = await fetch('/api/setup/users', { credentials: 'include' });
+                    const data = await resp.json().catch(() => ({}));
+                    if (!resp.ok || data.error) {
+                        throw new Error(data.error || `Failed to load users (${resp.status})`);
+                    }
+                    if (requestToken !== setupUsersRequestToken) {
+                        return;
+                    }
+
+                    setupUsersData = Array.isArray(data.users) ? data.users : [];
+                    setupUsersLastLoadedAt = Date.now();
+                    if (!setupUsersData.length) {
+                        body.innerHTML = '<tr><td colspan="5" style="padding:18px; text-align:center; color:#999;">No users found.</td></tr>';
+                        return;
+                    }
+
+                    setupRenderUsers();
                     return;
+                } catch (error) {
+                    lastError = error;
+                    if (attempt < retryCount) {
+                        await new Promise((resolve) => setTimeout(resolve, 250));
+                    }
                 }
-                console.error('Error loading setup users:', error);
-                body.innerHTML = `<tr><td colspan="5" style="padding:18px; text-align:center; color:#c00;">${setupEscape(String(error.message || 'Error loading users.'))}</td></tr>`;
+            }
+
+            if (requestToken !== setupUsersRequestToken) {
+                return;
+            }
+
+            console.error('Error loading setup users:', lastError);
+            if (Array.isArray(setupUsersData) && setupUsersData.length) {
+                setupRenderUsers();
+                return;
+                }
+            body.innerHTML = `<tr><td colspan="5" style="padding:18px; text-align:center; color:#c00;">${setupEscape(String(lastError?.message || 'Error loading users.'))}</td></tr>`;
+            })();
+
+            setupUsersInFlightPromise = loadPromise;
+            try {
+                await loadPromise;
+            } finally {
+                if (setupUsersInFlightPromise === loadPromise) {
+                    setupUsersInFlightPromise = null;
+                }
             }
         }
 

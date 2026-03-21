@@ -1840,13 +1840,20 @@ async def manage_screen(request: Request):
     <script>
         const state = {
             shops: [],
+            shopsLastLoadedAt: 0,
+            shopsRequestToken: 0,
             usersByDomain: {},
+            usersLoadedAtByDomain: {},
+            usersRequestTokenByDomain: {},
+            usersInFlightByDomain: {},
             expandedDomain: '',
             selectedShopDomains: new Set(),
             selectedUserIds: new Set(),
             editMode: false,
             addingRowByDomain: {},
         };
+        const manageShopsTtlMs = 15000;
+        const manageUsersTtlMs = 15000;
 
         function esc(value) {
             return String(value || '')
@@ -1879,9 +1886,30 @@ async def manage_screen(request: Request):
             }
         }
 
-        async function loadShops() {
+        async function loadShops(options = {}) {
+            const force = !!options.force;
+            const hasCachedShops = Array.isArray(state.shops) && state.shops.length > 0;
+            const shopsFresh = hasCachedShops && (Date.now() - Number(state.shopsLastLoadedAt || 0)) < manageShopsTtlMs;
+            if (!force && shopsFresh) {
+                render();
+                if (state.expandedDomain) {
+                    try {
+                        await ensureUsersLoaded(state.expandedDomain);
+                    } catch (error) {
+                        console.error('Manage users preload failed:', error);
+                    }
+                }
+                return;
+            }
+
+            const requestToken = Number(state.shopsRequestToken || 0) + 1;
+            state.shopsRequestToken = requestToken;
             const data = await api('/api/manage/shops');
+            if (requestToken !== Number(state.shopsRequestToken || 0)) {
+                return;
+            }
             state.shops = Array.isArray(data.shops) ? data.shops : [];
+            state.shopsLastLoadedAt = Date.now();
             if (!state.expandedDomain && state.shops.length) {
                 state.expandedDomain = String(state.shops[0].domain || '').trim().toLowerCase();
             }
@@ -1895,12 +1923,40 @@ async def manage_screen(request: Request):
             }
         }
 
-        async function ensureUsersLoaded(domain) {
+        async function ensureUsersLoaded(domain, options = {}) {
             const normalized = String(domain || '').trim().toLowerCase();
             if (!normalized) return;
-            const data = await api(`/api/manage/users?shop_domain=${encodeURIComponent(normalized)}`);
-            state.usersByDomain[normalized] = Array.isArray(data.users) ? data.users : [];
-            render();
+            const force = !!options.force;
+            const hasCachedUsers = Array.isArray(state.usersByDomain[normalized]);
+            const usersFresh = hasCachedUsers && (Date.now() - Number(state.usersLoadedAtByDomain[normalized] || 0)) < manageUsersTtlMs;
+            if (!force && usersFresh) {
+                return;
+            }
+            if (state.usersInFlightByDomain[normalized] && !force) {
+                return state.usersInFlightByDomain[normalized];
+            }
+
+            const requestToken = Number(state.usersRequestTokenByDomain[normalized] || 0) + 1;
+            state.usersRequestTokenByDomain[normalized] = requestToken;
+
+            const loadPromise = (async () => {
+                const data = await api(`/api/manage/users?shop_domain=${encodeURIComponent(normalized)}`);
+                if (requestToken !== Number(state.usersRequestTokenByDomain[normalized] || 0)) {
+                    return;
+                }
+                state.usersByDomain[normalized] = Array.isArray(data.users) ? data.users : [];
+                state.usersLoadedAtByDomain[normalized] = Date.now();
+                render();
+            })();
+
+            state.usersInFlightByDomain[normalized] = loadPromise;
+            try {
+                await loadPromise;
+            } finally {
+                if (state.usersInFlightByDomain[normalized] === loadPromise) {
+                    delete state.usersInFlightByDomain[normalized];
+                }
+            }
         }
 
         function render() {
@@ -2026,7 +2082,13 @@ async def manage_screen(request: Request):
             const normalized = String(domain || '').trim().toLowerCase();
             state.expandedDomain = state.expandedDomain === normalized ? '' : normalized;
             render();
-            if (state.expandedDomain) await ensureUsersLoaded(state.expandedDomain);
+            if (state.expandedDomain) {
+                try {
+                    await ensureUsersLoaded(state.expandedDomain);
+                } catch (error) {
+                    console.error('Error loading manage users:', error);
+                }
+            }
         }
 
         function readEditableRow(domain, userId) {
@@ -2125,10 +2187,25 @@ async def manage_screen(request: Request):
             render();
         }
 
-        loadShops().catch((error) => {
-            const wrap = document.getElementById('shopsList');
-            if (wrap) wrap.innerHTML = `<div style="padding:12px; color:#b22222;">${esc(error.message || 'Unable to load data')}</div>`;
-        });
+        async function bootstrapManageWindow(retryCount = 2) {
+            try {
+                await loadShops({ force: true });
+            } catch (error) {
+                if (retryCount > 0) {
+                    const wrap = document.getElementById('shopsList');
+                    if (wrap) {
+                        wrap.innerHTML = `<div style="padding:12px; color:#b22222;">${esc(error.message || 'Unable to load data')} — retrying...</div>`;
+                    }
+                    await new Promise((resolve) => setTimeout(resolve, 450));
+                    await bootstrapManageWindow(retryCount - 1);
+                    return;
+                }
+                const wrap = document.getElementById('shopsList');
+                if (wrap) wrap.innerHTML = `<div style="padding:12px; color:#b22222;">${esc(error.message || 'Unable to load data')}</div>`;
+            }
+        }
+
+        bootstrapManageWindow();
     </script>
 </body>
 </html>
