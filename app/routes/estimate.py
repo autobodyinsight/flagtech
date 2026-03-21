@@ -1,4 +1,4 @@
-import asyncio
+﻿import asyncio
 from fastapi import APIRouter, UploadFile, File, Request, Response
 import os
 import json
@@ -25,370 +25,6 @@ from app.services.permissions import build_permission_snapshot
 from fastapi.responses import JSONResponse
 
 router = APIRouter()
-
-_ARCHITECT_EMAIL = "jorge@autobodyinsight.com"
-
-
-def _quote_ident(value: str) -> str:
-    identifier = str(value or "").strip()
-    if not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", identifier):
-        raise ValueError(f"Invalid SQL identifier: {identifier}")
-    return f'"{identifier}"'
-
-
-def _resolve_request_user_email(request: Request) -> str:
-    return get_authenticated_user_email(request)
-
-
-def _is_architect_email(email: str) -> bool:
-    normalized = str(email or "").strip().lower()
-    return bool(normalized) and normalized == _ARCHITECT_EMAIL
-
-
-def _build_cookie_secure_flag(request: Request) -> bool:
-    proto = str(request.headers.get("x-forwarded-proto") or "").strip().lower()
-    return proto == "https"
-
-
-def _resolve_internal_access_level(request: Request) -> str:
-    # Internal-only access level mapping. ARCHITECT is never user-selectable.
-    authenticated_user = get_authenticated_user(request) or {}
-    request_email = _resolve_request_user_email(request)
-    if _is_architect_email(request_email):
-        return "ARCHITECT"
-    access_level = str(authenticated_user.get("access_level") or "").strip().upper()
-    if access_level:
-        return access_level
-    return "USER"
-
-
-def _request_is_architect(request: Request) -> bool:
-    return _resolve_internal_access_level(request) == "ARCHITECT"
-
-
-def _resolve_setup_scope_domain(request: Request, fallback_domain: str, requested_domain: str | None) -> str:
-    requested = str(requested_domain or "").strip().lower()
-    if requested and _request_is_architect(request):
-        return requested
-    return str(fallback_domain or "").strip().lower()
-
-
-def _resolve_first_active_shop_domain(cur) -> str:
-    cur.execute(
-        """
-        SELECT domain
-        FROM shops
-        WHERE COALESCE(active, TRUE) = TRUE
-          AND COALESCE(domain, '') <> ''
-        ORDER BY LOWER(COALESCE(NULLIF(name, ''), domain)), id
-        LIMIT 1
-        """
-    )
-    row = cur.fetchone() or {}
-    return str(row.get("domain") or "").strip().lower()
-
-
-def _resolve_effective_shop_domain(cur, preferred_domain: str, allow_fallback: bool) -> str:
-    normalized = str(preferred_domain or "").strip().lower()
-    if normalized:
-        cur.execute("SELECT domain FROM shops WHERE domain = %s LIMIT 1", (normalized,))
-        match = cur.fetchone() or {}
-        resolved = str(match.get("domain") or "").strip().lower()
-        if resolved:
-            return resolved
-    if allow_fallback:
-        return _resolve_first_active_shop_domain(cur)
-    return normalized
-
-
-def _ensure_shops_table(cur) -> None:
-    cur.execute(
-        """
-        CREATE TABLE IF NOT EXISTS shops (
-            id SERIAL PRIMARY KEY,
-            shop_id UUID,
-            domain VARCHAR(255) NOT NULL UNIQUE,
-            name VARCHAR(255),
-            address TEXT,
-            city VARCHAR(120),
-            state VARCHAR(120),
-            zip VARCHAR(20),
-            active BOOLEAN DEFAULT TRUE,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-        """
-    )
-    cur.execute("ALTER TABLE shops ADD COLUMN IF NOT EXISTS shop_id UUID")
-    cur.execute("ALTER TABLE shops ADD COLUMN IF NOT EXISTS domain VARCHAR(255)")
-    cur.execute("ALTER TABLE shops ADD COLUMN IF NOT EXISTS name VARCHAR(255)")
-    cur.execute("ALTER TABLE shops ADD COLUMN IF NOT EXISTS address TEXT")
-    cur.execute("ALTER TABLE shops ADD COLUMN IF NOT EXISTS city VARCHAR(120)")
-    cur.execute("ALTER TABLE shops ADD COLUMN IF NOT EXISTS state VARCHAR(120)")
-    cur.execute("ALTER TABLE shops ADD COLUMN IF NOT EXISTS zip VARCHAR(20)")
-    cur.execute("ALTER TABLE shops ADD COLUMN IF NOT EXISTS active BOOLEAN DEFAULT TRUE")
-    cur.execute("UPDATE shops SET active = TRUE WHERE active IS NULL")
-    cur.execute("ALTER TABLE shops ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP")
-    cur.execute("ALTER TABLE shops ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP")
-    cur.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_shops_domain_unique ON shops(domain)")
-    cur.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_shops_shop_id_unique ON shops(shop_id)")
-    cur.execute("CREATE INDEX IF NOT EXISTS idx_shops_active ON shops(active)")
-    cur.execute("SELECT id FROM shops WHERE shop_id IS NULL")
-    for row in (cur.fetchall() or []):
-        legacy_id = int((row or {}).get("id") or 0)
-        if legacy_id <= 0:
-            continue
-        cur.execute("UPDATE shops SET shop_id = %s::uuid WHERE id = %s", (str(uuid.uuid4()), legacy_id))
-
-
-def _sync_shop_id_bindings(cur) -> None:
-    _ensure_shops_table(cur)
-    _ensure_shop_settings_table(cur)
-    _ensure_shop_users_table(cur)
-
-    cur.execute(
-        """
-        INSERT INTO shops (domain, name, address, city, state, zip, updated_at)
-        SELECT
-            ss.domain,
-            NULLIF(ss.shop_name, ''),
-            NULLIF(ss.address, ''),
-            NULLIF(ss.city, ''),
-            NULLIF(ss.state, ''),
-            NULLIF(ss.zip_code, ''),
-            CURRENT_TIMESTAMP
-        FROM shop_settings ss
-        WHERE COALESCE(ss.domain, '') <> ''
-        ON CONFLICT (domain)
-        DO UPDATE SET
-            name = COALESCE(NULLIF(EXCLUDED.name, ''), shops.name),
-            address = COALESCE(NULLIF(EXCLUDED.address, ''), shops.address),
-            city = COALESCE(NULLIF(EXCLUDED.city, ''), shops.city),
-            state = COALESCE(NULLIF(EXCLUDED.state, ''), shops.state),
-            zip = COALESCE(NULLIF(EXCLUDED.zip, ''), shops.zip),
-            updated_at = CURRENT_TIMESTAMP
-        """
-    )
-
-    cur.execute(
-        """
-        INSERT INTO shops (domain, updated_at)
-        SELECT DISTINCT su.domain, CURRENT_TIMESTAMP
-        FROM shop_users su
-        WHERE COALESCE(su.domain, '') <> ''
-        ON CONFLICT (domain) DO NOTHING
-        """
-    )
-
-    cur.execute(
-        """
-        UPDATE shop_settings ss
-        SET shop_id = s.id
-        FROM shops s
-        WHERE ss.shop_id IS DISTINCT FROM s.id
-          AND s.domain = ss.domain
-        """
-    )
-    cur.execute(
-        """
-        UPDATE shop_users su
-        SET shop_id = s.id
-        FROM shops s
-        WHERE su.shop_id IS DISTINCT FROM s.id
-          AND s.domain = su.domain
-        """
-    )
-    cur.execute(
-        """
-        UPDATE shop_settings ss
-        SET shop_uuid = s.shop_id
-        FROM shops s
-        WHERE (ss.shop_uuid IS NULL OR ss.shop_uuid IS DISTINCT FROM s.shop_id)
-          AND (
-                (ss.shop_id IS NOT NULL AND s.id = ss.shop_id)
-             OR (COALESCE(ss.domain, '') <> '' AND s.domain = ss.domain)
-          )
-        """
-    )
-    cur.execute(
-        """
-        UPDATE shop_users su
-        SET shop_uuid = s.shop_id
-        FROM shops s
-        WHERE (su.shop_uuid IS NULL OR su.shop_uuid IS DISTINCT FROM s.shop_id)
-          AND (
-                (su.shop_id IS NOT NULL AND s.id = su.shop_id)
-             OR (COALESCE(su.domain, '') <> '' AND s.domain = su.domain)
-          )
-        """
-    )
-
-
-def _ensure_shop_id_columns_for_domain_tables(cur) -> None:
-    _ensure_shops_table(cur)
-    cur.execute(
-        """
-                SELECT DISTINCT c.table_name
-                FROM information_schema.columns c
-                JOIN information_schema.tables t
-                    ON t.table_schema = c.table_schema
-                 AND t.table_name = c.table_name
-                WHERE c.table_schema = 'public'
-                    AND c.column_name = 'domain'
-                    AND t.table_type = 'BASE TABLE'
-        """
-    )
-    table_rows = cur.fetchall() or []
-    for row in table_rows:
-        table_name = str(row.get("table_name") or "").strip()
-        if not table_name:
-            continue
-        if table_name == "shops":
-            continue
-        quoted_table = _quote_ident(table_name)
-        cur.execute(f"ALTER TABLE {quoted_table} ADD COLUMN IF NOT EXISTS shop_id INTEGER")
-        cur.execute(f"ALTER TABLE {quoted_table} ADD COLUMN IF NOT EXISTS shop_uuid UUID")
-        cur.execute(
-            f"""
-            UPDATE {quoted_table} t
-            SET shop_id = s.id
-            FROM shops s
-            WHERE t.shop_id IS NULL
-              AND COALESCE(t.domain, '') <> ''
-              AND s.domain = t.domain
-            """
-        )
-        cur.execute(
-            f"""
-            UPDATE {quoted_table} t
-            SET shop_uuid = s.shop_id
-            FROM shops s
-            WHERE t.shop_uuid IS NULL
-              AND (
-                    (t.shop_id IS NOT NULL AND s.id = t.shop_id)
-                 OR (COALESCE(t.domain, '') <> '' AND s.domain = t.domain)
-              )
-            """
-        )
-        quoted_index = _quote_ident(f"idx_{table_name}_shop_id")
-        cur.execute(
-            f"CREATE INDEX IF NOT EXISTS {quoted_index} ON {quoted_table}(shop_id)"
-        )
-        quoted_uuid_index = _quote_ident(f"idx_{table_name}_shop_uuid")
-        cur.execute(
-            f"CREATE INDEX IF NOT EXISTS {quoted_uuid_index} ON {quoted_table}(shop_uuid)"
-        )
-
-
-def _ensure_shop_id_sync_triggers(cur) -> None:
-    _ensure_shops_table(cur)
-    cur.execute(
-        """
-        CREATE OR REPLACE FUNCTION set_shop_scope_fields()
-        RETURNS TRIGGER AS $$
-        BEGIN
-            IF NEW.shop_id IS NULL AND NEW.domain IS NOT NULL THEN
-                SELECT id INTO NEW.shop_id FROM shops WHERE domain = NEW.domain LIMIT 1;
-            END IF;
-            IF NEW.shop_uuid IS NULL AND NEW.shop_id IS NOT NULL THEN
-                SELECT shop_id INTO NEW.shop_uuid FROM shops WHERE id = NEW.shop_id LIMIT 1;
-            END IF;
-            IF NEW.shop_id IS NULL AND NEW.shop_uuid IS NOT NULL THEN
-                SELECT id INTO NEW.shop_id FROM shops WHERE shop_id = NEW.shop_uuid LIMIT 1;
-            END IF;
-            IF (NEW.domain IS NULL OR NEW.domain = '') AND NEW.shop_id IS NOT NULL THEN
-                SELECT domain INTO NEW.domain FROM shops WHERE id = NEW.shop_id LIMIT 1;
-            END IF;
-            IF (NEW.domain IS NULL OR NEW.domain = '') AND NEW.shop_uuid IS NOT NULL THEN
-                SELECT domain INTO NEW.domain FROM shops WHERE shop_id = NEW.shop_uuid LIMIT 1;
-            END IF;
-            RETURN NEW;
-        END;
-        $$ LANGUAGE plpgsql;
-        """
-    )
-
-    cur.execute(
-        """
-                SELECT DISTINCT c.table_name
-                FROM information_schema.columns c
-                JOIN information_schema.tables t
-                    ON t.table_schema = c.table_schema
-                 AND t.table_name = c.table_name
-                WHERE c.table_schema = 'public'
-                    AND c.column_name = 'domain'
-                    AND t.table_type = 'BASE TABLE'
-        """
-    )
-    table_rows = cur.fetchall() or []
-    for row in table_rows:
-        table_name = str(row.get("table_name") or "").strip()
-        if not table_name or table_name == "shops":
-            continue
-        trigger_name = f"trg_{table_name}_shop_scope"
-        quoted_table = _quote_ident(table_name)
-        quoted_trigger = _quote_ident(trigger_name)
-        cur.execute(f"DROP TRIGGER IF EXISTS {quoted_trigger} ON {quoted_table}")
-        cur.execute(
-            f"""
-            CREATE TRIGGER {quoted_trigger}
-            BEFORE INSERT OR UPDATE ON {quoted_table}
-            FOR EACH ROW
-            EXECUTE FUNCTION set_shop_scope_fields()
-            """
-        )
-
-
-def _resolve_request_shop_id(request: Request, cur, domain: str | None = None) -> int | None:
-    auth_user = get_authenticated_user(request)
-    if auth_user:
-        try:
-            resolved_shop_id = int(auth_user.get("shop_id") or 0)
-            if resolved_shop_id:
-                return resolved_shop_id
-        except Exception:
-            pass
-
-    domain_value = str(domain or get_user_domain(request) or "").strip().lower()
-    if not domain_value:
-        return None
-
-    cur.execute("SELECT id FROM shops WHERE domain = %s LIMIT 1", (domain_value,))
-    row = cur.fetchone() or {}
-    try:
-        return int(row.get("id") or 0) or None
-    except Exception:
-        return None
-
-
-def _resolve_request_shop_uuid(request: Request, cur, domain: str | None = None) -> str | None:
-    auth_shop_uuid = str(get_user_shop_uuid(request) or "").strip()
-    if auth_shop_uuid:
-        return auth_shop_uuid
-
-    auth_user = get_authenticated_user(request) or {}
-    fallback_shop_id = int(auth_user.get("shop_id") or 0) or None
-    if fallback_shop_id:
-        cur.execute("SELECT shop_id FROM shops WHERE id = %s LIMIT 1", (fallback_shop_id,))
-        row = cur.fetchone() or {}
-        value = str(row.get("shop_id") or "").strip()
-        if value:
-            return value
-
-    domain_value = str(domain or get_user_domain(request) or "").strip().lower()
-    if not domain_value:
-        return None
-    cur.execute("SELECT shop_id FROM shops WHERE domain = %s LIMIT 1", (domain_value,))
-    row = cur.fetchone() or {}
-    value = str(row.get("shop_id") or "").strip()
-    return value or None
-
-
-def _ensure_shop_isolation_infrastructure(cur) -> None:
-    _sync_shop_id_bindings(cur)
-    _ensure_shop_id_columns_for_domain_tables(cur)
-    _ensure_shop_id_sync_triggers(cur)
-
 
 @router.post("/auth/login")
 async def auth_login(request: Request):
@@ -571,1261 +207,79 @@ async def auth_session(request: Request):
     }
 
 
-def _to_local_business_date(value) -> date | None:
-    if isinstance(value, date) and not isinstance(value, datetime):
-        return value
-    if not isinstance(value, datetime):
-        return None
-    local_tz = datetime.now().astimezone().tzinfo or timezone.utc
-    if value.tzinfo is None:
-        value = value.replace(tzinfo=timezone.utc)
-    return value.astimezone(local_tz).date()
-
-
-def _normalize_line_ids(values) -> set[int]:
-    ids = set()
-    if not isinstance(values, list):
-        return ids
-    for value in values:
-        try:
-            parsed = int(value)
-        except (TypeError, ValueError):
-            continue
-        ids.add(parsed)
-    return ids
-
-
-_TRAILING_PART_NUMBER_RE = re.compile(r"\b([A-Z0-9-]{6,})\s*$", re.IGNORECASE)
-
-
-def _alpha_only_description(value: str) -> str:
-    tokens = re.split(r"\s+", str(value or "").strip())
-    kept = []
-    for token in tokens:
-        cleaned = (token or "").strip().strip(",;:|()[]{}")
-        if not cleaned:
-            continue
-        if any(ch.isdigit() for ch in cleaned):
-            continue
-        letters_only = re.sub(r"[^A-Za-z]", "", cleaned)
-        if letters_only:
-            kept.append(letters_only)
-    return " ".join(kept)
-
-
-def _serialize_datetime_for_client(value):
-    if isinstance(value, datetime):
-        if value.tzinfo is None:
-            value = value.replace(tzinfo=timezone.utc)
-        return value.isoformat()
-    return value
-
-
-def _resolve_note_created_by(cur, value: str) -> str:
-    created_by = str(value or "").strip()
-    if not created_by:
-        return "Unknown"
-    return created_by
-
-
-def _resolve_request_user_display_name(request: Request, cur, domain: str | None = None) -> str:
-    email = _resolve_request_user_email(request)
-    normalized_email = str(email or "").strip().lower()
-    if not normalized_email:
-        return "System"
-
-    resolved_domain = str(domain or "").strip().lower()
-    if not resolved_domain:
-        resolved_domain = str(get_user_domain(request) or "").strip().lower()
-
-    try:
-        _ensure_shop_users_table(cur)
-        if resolved_domain:
-            cur.execute(
-                """
-                SELECT first_name, last_name
-                FROM shop_users
-                WHERE domain = %s
-                  AND LOWER(email) = %s
-                ORDER BY id DESC
-                LIMIT 1
-                """,
-                (resolved_domain, normalized_email),
-            )
-        else:
-            cur.execute(
-                """
-                SELECT first_name, last_name
-                FROM shop_users
-                WHERE LOWER(email) = %s
-                ORDER BY id DESC
-                LIMIT 1
-                """,
-                (normalized_email,),
-            )
-        row = cur.fetchone() or {}
-    except Exception:
-        row = {}
-
-    first_name = str(row.get("first_name") or "").strip()
-    last_name = str(row.get("last_name") or "").strip()
-    full_name = " ".join(part for part in (first_name, last_name) if part).strip()
-    if full_name:
-        return full_name
-    return normalized_email
-
-
-def _extract_line_number(value) -> int | None:
-    if value is None:
-        return None
-    if isinstance(value, (int, float)):
-        try:
-            return int(value)
-        except Exception:
-            return None
-    text = str(value).strip()
-    if not text:
-        return None
-    match = re.search(r"\d+", text)
-    if not match:
-        return None
-    try:
-        return int(match.group(0))
-    except Exception:
-        return None
-
-
-def _coerce_number(value, default: float = 0.0) -> float:
-    try:
-        parsed = float(str(value).replace(",", "").strip())
-        if math.isfinite(parsed):
-            return parsed
-    except Exception:
-        pass
-    return default
-
-
-def _build_unified_estimate_lines(snapshot: dict | None) -> list[dict]:
-    if not isinstance(snapshot, dict):
-        return []
-
-    sections = snapshot.get("sections")
-    if not isinstance(sections, list):
-        return []
-
-    by_line: dict[int, dict] = {}
-    order: list[int] = []
-
-    def _get_or_create(line_number: int) -> dict:
-        if line_number not in by_line:
-            by_line[line_number] = {
-                "lineNumber": line_number,
-                "description": "",
-                "labor": 0.0,
-                "paint": 0.0,
-                "qty": None,
-                "partNumber": "",
-                "extendedPrice": None,
-            }
-            order.append(line_number)
-        return by_line[line_number]
-
-    for section in sections:
-        if not isinstance(section, dict):
-            continue
-        key = str(section.get("key") or "").strip().lower()
-        items = section.get("items")
-        if not isinstance(items, list):
-            continue
-
-        for item in items:
-            if not isinstance(item, dict):
-                continue
-
-            line_number = _extract_line_number(item.get("line") or item.get("lineNumber"))
-            if line_number is None:
-                continue
-
-            record = _get_or_create(line_number)
-            item_description = str(item.get("description") or "").strip()
-            if item_description and not record.get("description"):
-                record["description"] = item_description
-
-            if key == "labor":
-                record["labor"] = _coerce_number(item.get("value"), 0.0)
-                continue
-
-            if key == "paint":
-                record["paint"] = _coerce_number(item.get("value"), 0.0)
-                continue
-
-            if key == "parts":
-                qty_value = item.get("qty")
-                if qty_value is not None and str(qty_value).strip() != "":
-                    record["qty"] = _coerce_number(qty_value, 0.0)
-
-                part_number = (
-                    item.get("partNumber")
-                    or item.get("part_number")
-                    or item.get("part_no")
-                    or item.get("part#")
-                    or item.get("pn")
-                    or ""
-                )
-                part_number = str(part_number or "").strip()
-                if part_number:
-                    record["partNumber"] = part_number
-
-                price_value = item.get("extendedPrice")
-                if price_value is None:
-                    price_value = item.get("price")
-                if price_value is not None and str(price_value).strip() != "":
-                    record["extendedPrice"] = _coerce_number(price_value, 0.0)
-
-    return [by_line[line_number] for line_number in sorted(order)]
-
-
-def _parse_part_description_and_number(item: dict) -> tuple[str, str]:
-    description = str(item.get("description") or "").strip()
-    explicit_part_number = (
-        item.get("part_number")
-        or item.get("part_no")
-        or item.get("part#")
-        or item.get("pn")
-        or ""
-    )
-    part_number = str(explicit_part_number or "").strip()
-
-    def _clean_token(token: str) -> str:
-        return (token or "").strip().strip(",;:|()[]{}")
-
-    def _is_noise_token(token: str) -> bool:
-        cleaned = _clean_token(token)
-        if not cleaned:
-            return True
-        if re.fullmatch(r"\$?\d+(?:\.\d+)?", cleaned):
-            return True
-        if re.fullmatch(r"\d+(?:\.\d+)?(?:HRS?|HR)?", cleaned, re.IGNORECASE):
-            return True
-        if cleaned.lower() in {"qty", "incl", "incl.", "list", "price", "labor", "hrs", "hr", "ea", "each"}:
-            return True
-        return False
-
-    def _is_part_number_token(token: str) -> bool:
-        cleaned = _clean_token(token)
-        if not re.fullmatch(r"[A-Z0-9-]{5,}", cleaned, re.IGNORECASE):
-            return False
-        has_alpha = any(ch.isalpha() for ch in cleaned)
-        has_digit = any(ch.isdigit() for ch in cleaned)
-        return has_alpha and has_digit
-
-    tokens = description.split()
-    kept_tokens = []
-    for token in tokens:
-        if _is_noise_token(token):
-            continue
-        if _is_part_number_token(token):
-            if not part_number:
-                part_number = _clean_token(token)
-            continue
-        kept_tokens.append(token)
-
-    description = " ".join(kept_tokens).strip()
-
-    if not part_number:
-        trailing_match = _TRAILING_PART_NUMBER_RE.search(description)
-        if trailing_match:
-            candidate = _clean_token(trailing_match.group(1) or "")
-            has_alpha = any(ch.isalpha() for ch in candidate)
-            has_digit = any(ch.isdigit() for ch in candidate)
-            if has_alpha and has_digit:
-                part_number = candidate
-                description = description[:trailing_match.start()].strip()
-
-    description = re.sub(r"\s{2,}", " ", description).strip(" -|,;:")
-    description = _alpha_only_description(description)
-    return description, part_number
-
-
-def _ensure_parts_vendors_table(cur) -> None:
-    """Create parts_vendors table if it doesn't exist (safety for older DBs)."""
-    cur.execute(
-        """
-        CREATE TABLE IF NOT EXISTS parts_vendors (
-            id SERIAL PRIMARY KEY,
-            name VARCHAR(255) NOT NULL,
-            vendor_type VARCHAR(100),
-            contact_person VARCHAR(255),
-            phone VARCHAR(50),
-            street VARCHAR(255),
-            city VARCHAR(100),
-            state VARCHAR(100),
-            zip VARCHAR(20),
-            domain VARCHAR(255) NOT NULL,
-            active BOOLEAN DEFAULT TRUE,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-        """
-    )
-    cur.execute("ALTER TABLE parts_vendors ADD COLUMN IF NOT EXISTS vendor_type VARCHAR(100)")
-    cur.execute("ALTER TABLE parts_vendors ADD COLUMN IF NOT EXISTS contact_person VARCHAR(255)")
-    cur.execute("ALTER TABLE parts_vendors ADD COLUMN IF NOT EXISTS street VARCHAR(255)")
-    cur.execute("ALTER TABLE parts_vendors ADD COLUMN IF NOT EXISTS city VARCHAR(100)")
-    cur.execute("ALTER TABLE parts_vendors ADD COLUMN IF NOT EXISTS state VARCHAR(100)")
-    cur.execute("ALTER TABLE parts_vendors ADD COLUMN IF NOT EXISTS zip VARCHAR(20)")
-    cur.execute(
-        """
-        CREATE INDEX IF NOT EXISTS idx_parts_vendors_domain ON parts_vendors(domain)
-        """
-    )
-
-
-def _ensure_shop_settings_table(cur) -> None:
-    _ensure_shops_table(cur)
-    cur.execute(
-        """
-        CREATE TABLE IF NOT EXISTS shop_settings (
-            id SERIAL PRIMARY KEY,
-            domain VARCHAR(255) NOT NULL,
-            shop_id INTEGER,
-            shop_uuid UUID,
-            shop_name VARCHAR(255),
-            address TEXT,
-            city VARCHAR(120),
-            state VARCHAR(120),
-            zip_code VARCHAR(20),
-            phone VARCHAR(64),
-            email VARCHAR(255),
-            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-        """
-    )
-    cur.execute("ALTER TABLE shop_settings ADD COLUMN IF NOT EXISTS shop_id INTEGER")
-    cur.execute("ALTER TABLE shop_settings ADD COLUMN IF NOT EXISTS shop_uuid UUID")
-    cur.execute("ALTER TABLE shop_settings ADD COLUMN IF NOT EXISTS shop_name VARCHAR(255)")
-    cur.execute("ALTER TABLE shop_settings ADD COLUMN IF NOT EXISTS address TEXT")
-    cur.execute("ALTER TABLE shop_settings ADD COLUMN IF NOT EXISTS city VARCHAR(120)")
-    cur.execute("ALTER TABLE shop_settings ADD COLUMN IF NOT EXISTS state VARCHAR(120)")
-    cur.execute("ALTER TABLE shop_settings ADD COLUMN IF NOT EXISTS zip_code VARCHAR(20)")
-    cur.execute("ALTER TABLE shop_settings ADD COLUMN IF NOT EXISTS phone VARCHAR(64)")
-    cur.execute("ALTER TABLE shop_settings ADD COLUMN IF NOT EXISTS email VARCHAR(255)")
-    cur.execute("ALTER TABLE shop_settings ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP")
-    cur.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_shop_settings_domain_unique ON shop_settings(domain)")
-    cur.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_shop_settings_shop_id_unique ON shop_settings(shop_id)")
-    cur.execute("CREATE INDEX IF NOT EXISTS idx_shop_settings_shop_uuid ON shop_settings(shop_uuid)")
-
-
-def _ensure_shop_users_table(cur) -> None:
-    _ensure_shops_table(cur)
-    cur.execute(
-        """
-        CREATE TABLE IF NOT EXISTS shop_users (
-            id SERIAL PRIMARY KEY,
-            user_id UUID,
-            first_name VARCHAR(100) NOT NULL,
-            last_name VARCHAR(100) NOT NULL,
-            email VARCHAR(255) NOT NULL,
-            role VARCHAR(64) NOT NULL,
-            password_hash VARCHAR(255) NOT NULL,
-            domain VARCHAR(255) NOT NULL,
-            shop_id INTEGER,
-            shop_uuid UUID,
-            active BOOLEAN DEFAULT TRUE,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-        """
-    )
-    cur.execute("ALTER TABLE shop_users ADD COLUMN IF NOT EXISTS user_id UUID")
-    cur.execute("ALTER TABLE shop_users ADD COLUMN IF NOT EXISTS first_name VARCHAR(100)")
-    cur.execute("ALTER TABLE shop_users ADD COLUMN IF NOT EXISTS last_name VARCHAR(100)")
-    cur.execute("ALTER TABLE shop_users ADD COLUMN IF NOT EXISTS email VARCHAR(255)")
-    cur.execute("ALTER TABLE shop_users ADD COLUMN IF NOT EXISTS role VARCHAR(64)")
-    cur.execute("ALTER TABLE shop_users ADD COLUMN IF NOT EXISTS password_hash VARCHAR(255)")
-    cur.execute("ALTER TABLE shop_users ADD COLUMN IF NOT EXISTS domain VARCHAR(255)")
-    cur.execute("ALTER TABLE shop_users ADD COLUMN IF NOT EXISTS shop_id INTEGER")
-    cur.execute("ALTER TABLE shop_users ADD COLUMN IF NOT EXISTS shop_uuid UUID")
-    cur.execute("ALTER TABLE shop_users ADD COLUMN IF NOT EXISTS active BOOLEAN DEFAULT TRUE")
-    cur.execute("ALTER TABLE shop_users ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP")
-    cur.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_shop_users_domain_email_unique ON shop_users(domain, email)")
-    cur.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_shop_users_shop_id_email_unique ON shop_users(shop_id, email)")
-    cur.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_shop_users_user_id_unique ON shop_users(user_id)")
-    cur.execute("CREATE INDEX IF NOT EXISTS idx_shop_users_shop_uuid_active ON shop_users(shop_uuid, active)")
-    cur.execute("CREATE INDEX IF NOT EXISTS idx_shop_users_domain_active ON shop_users(domain, active)")
-    cur.execute("CREATE INDEX IF NOT EXISTS idx_shop_users_shop_id_active ON shop_users(shop_id, active)")
-    cur.execute("SELECT id FROM shop_users WHERE user_id IS NULL")
-    for row in (cur.fetchall() or []):
-        legacy_id = int((row or {}).get("id") or 0)
-        if legacy_id <= 0:
-            continue
-        cur.execute("UPDATE shop_users SET user_id = %s::uuid WHERE id = %s", (str(uuid.uuid4()), legacy_id))
-
-
-def _ensure_chat_messages_table(cur) -> None:
-    cur.execute(
-        """
-        CREATE TABLE IF NOT EXISTS chat_messages (
-            id SERIAL PRIMARY KEY,
-            domain VARCHAR(255) NOT NULL,
-            shop_id INTEGER,
-            shop_uuid UUID,
-            sender_user_id INTEGER NOT NULL,
-            recipient_user_id INTEGER NOT NULL,
-            kind VARCHAR(24) NOT NULL DEFAULT 'message',
-            body TEXT NOT NULL,
-            read_at TIMESTAMP NULL,
-            completed_at TIMESTAMP NULL,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-        """
-    )
-    cur.execute("ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS domain VARCHAR(255)")
-    cur.execute("ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS shop_id INTEGER")
-    cur.execute("ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS shop_uuid UUID")
-    cur.execute("ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS sender_user_id INTEGER")
-    cur.execute("ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS recipient_user_id INTEGER")
-    cur.execute("ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS kind VARCHAR(24) NOT NULL DEFAULT 'message'")
-    cur.execute("ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS body TEXT")
-    cur.execute("ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS read_at TIMESTAMP NULL")
-    cur.execute("ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS completed_at TIMESTAMP NULL")
-    cur.execute("ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP")
-    cur.execute(
-        """
-        UPDATE chat_messages m
-        SET shop_uuid = s.shop_id
-        FROM shops s
-        WHERE m.shop_uuid IS NULL
-          AND (
-                (m.shop_id IS NOT NULL AND s.id = m.shop_id)
-             OR (COALESCE(m.domain, '') <> '' AND s.domain = m.domain)
-          )
-        """
-    )
-    cur.execute("CREATE INDEX IF NOT EXISTS idx_chat_messages_domain_pair_created ON chat_messages(domain, sender_user_id, recipient_user_id, created_at)")
-    cur.execute("CREATE INDEX IF NOT EXISTS idx_chat_messages_domain_recipient_unread ON chat_messages(domain, recipient_user_id, read_at)")
-    cur.execute("CREATE INDEX IF NOT EXISTS idx_chat_messages_shop_uuid_created ON chat_messages(shop_uuid, sender_user_id, recipient_user_id, created_at)")
-
-
-def _resolve_current_user_row(request: Request, cur, domain: str) -> dict | None:
-    email = _resolve_request_user_email(request)
-    normalized_email = str(email or "").strip().lower()
-    if not normalized_email:
-        return None
-
-    current_shop_uuid = _resolve_request_shop_uuid(request, cur, domain)
-    normalized_domain = str(domain or "").strip().lower()
-    if not current_shop_uuid and not normalized_domain:
-        return None
-
-    _ensure_shop_users_table(cur)
-    if current_shop_uuid:
-        cur.execute(
-            """
-                SELECT id, user_id, first_name, last_name, email, role, shop_id, shop_uuid
-            FROM shop_users
-            WHERE shop_uuid = %s::uuid
-              AND LOWER(email) = %s
-              AND active = TRUE
-            ORDER BY created_at DESC, id DESC
-            LIMIT 1
-            """,
-            (current_shop_uuid, normalized_email),
-        )
-    else:
-        cur.execute(
-            """
-                SELECT id, user_id, first_name, last_name, email, role, shop_id, shop_uuid
-            FROM shop_users
-            WHERE domain = %s
-              AND LOWER(email) = %s
-              AND active = TRUE
-            ORDER BY created_at DESC, id DESC
-            LIMIT 1
-            """,
-            (normalized_domain, normalized_email),
-        )
-    return cur.fetchone() or None
-
-
-def _is_manager_or_hr_role(role: str | None) -> bool:
-    normalized = str(role or "").strip().lower()
-    return normalized in {"manager", "hr"}
-
-
-def _ensure_saved_estimates_table(cur) -> None:
-    cur.execute(
-        """
-        CREATE TABLE IF NOT EXISTS saved_estimates (
-            id SERIAL PRIMARY KEY,
-            ro VARCHAR(255),
-            vehicle TEXT,
-            year VARCHAR(10),
-            make VARCHAR(50),
-            model VARCHAR(50),
-            owner_info TEXT,
-            insurance_company TEXT,
-            claim_number VARCHAR(64),
-            phone_original TEXT,
-            phone_override TEXT,
-            customer_phones JSONB,
-            customer_email TEXT,
-            vin VARCHAR(32),
-            labor_repairs JSONB,
-            paint_repairs JSONB,
-            parts_repairs JSONB,
-            estimate_snapshot JSONB,
-            estimate_totals JSONB,
-            parts_total NUMERIC,
-            grand_total NUMERIC,
-            deductible NUMERIC,
-            customer_pay NUMERIC,
-            insurance_pay NUMERIC,
-            in_date DATE DEFAULT CURRENT_DATE,
-            ecd_date DATE,
-            picked_up DATE,
-            domain VARCHAR(255),
-            saved_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-        """
-    )
-    cur.execute("ALTER TABLE saved_estimates ADD COLUMN IF NOT EXISTS parts_repairs JSONB")
-    cur.execute("ALTER TABLE saved_estimates ADD COLUMN IF NOT EXISTS estimate_snapshot JSONB")
-    cur.execute("ALTER TABLE saved_estimates ADD COLUMN IF NOT EXISTS estimate_totals JSONB")
-    cur.execute("ALTER TABLE saved_estimates ADD COLUMN IF NOT EXISTS parts_total NUMERIC")
-    cur.execute("ALTER TABLE saved_estimates ADD COLUMN IF NOT EXISTS grand_total NUMERIC")
-    cur.execute("ALTER TABLE saved_estimates ADD COLUMN IF NOT EXISTS deductible NUMERIC")
-    cur.execute("ALTER TABLE saved_estimates ADD COLUMN IF NOT EXISTS customer_pay NUMERIC")
-    cur.execute("ALTER TABLE saved_estimates ADD COLUMN IF NOT EXISTS insurance_pay NUMERIC")
-    cur.execute("ALTER TABLE saved_estimates ADD COLUMN IF NOT EXISTS owner_info TEXT")
-    cur.execute("ALTER TABLE saved_estimates ADD COLUMN IF NOT EXISTS insurance_company TEXT")
-    cur.execute("ALTER TABLE saved_estimates ADD COLUMN IF NOT EXISTS claim_number VARCHAR(64)")
-    cur.execute("ALTER TABLE saved_estimates ADD COLUMN IF NOT EXISTS phone_original TEXT")
-    cur.execute("ALTER TABLE saved_estimates ADD COLUMN IF NOT EXISTS phone_override TEXT")
-    cur.execute("ALTER TABLE saved_estimates ADD COLUMN IF NOT EXISTS customer_phones JSONB")
-    cur.execute("ALTER TABLE saved_estimates ADD COLUMN IF NOT EXISTS customer_email TEXT")
-    cur.execute("ALTER TABLE saved_estimates ADD COLUMN IF NOT EXISTS written_by TEXT")
-    cur.execute("ALTER TABLE saved_estimates ADD COLUMN IF NOT EXISTS estimator TEXT")
-    cur.execute("ALTER TABLE saved_estimates ADD COLUMN IF NOT EXISTS vin VARCHAR(32)")
-    cur.execute("ALTER TABLE saved_estimates ADD COLUMN IF NOT EXISTS in_date DATE DEFAULT CURRENT_DATE")
-    cur.execute("ALTER TABLE saved_estimates ADD COLUMN IF NOT EXISTS ecd_date DATE")
-    cur.execute("ALTER TABLE saved_estimates ADD COLUMN IF NOT EXISTS picked_up DATE")
-    cur.execute("ALTER TABLE saved_estimates ADD COLUMN IF NOT EXISTS domain VARCHAR(255)")
-    cur.execute("CREATE INDEX IF NOT EXISTS idx_saved_estimates_ro_domain ON saved_estimates(ro, domain)")
-
-
-def _ensure_ro_payment_totals_table(cur) -> None:
-    cur.execute(
-        """
-        CREATE TABLE IF NOT EXISTS ro_payment_totals (
-            id SERIAL PRIMARY KEY,
-            ro VARCHAR(255) NOT NULL,
-            domain VARCHAR(255) NOT NULL,
-            insurance_paid NUMERIC DEFAULT 0,
-            customer_paid NUMERIC DEFAULT 0,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            UNIQUE(domain, ro)
-        )
-        """
-    )
-    cur.execute("ALTER TABLE ro_payment_totals ADD COLUMN IF NOT EXISTS insurance_paid NUMERIC DEFAULT 0")
-    cur.execute("ALTER TABLE ro_payment_totals ADD COLUMN IF NOT EXISTS customer_paid NUMERIC DEFAULT 0")
-    cur.execute("ALTER TABLE ro_payment_totals ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP")
-    cur.execute("ALTER TABLE ro_payment_totals ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP")
-    cur.execute("CREATE INDEX IF NOT EXISTS idx_ro_payment_totals_domain_ro ON ro_payment_totals(domain, ro)")
-
-
-def _ensure_ro_payment_entries_table(cur) -> None:
-    cur.execute(
-        """
-        CREATE TABLE IF NOT EXISTS ro_payment_entries (
-            id SERIAL PRIMARY KEY,
-            ro VARCHAR(255) NOT NULL,
-            domain VARCHAR(255) NOT NULL,
-            payer_type VARCHAR(32) NOT NULL,
-            payment_method VARCHAR(16),
-            check_number VARCHAR(64),
-            created_by VARCHAR(255),
-            amount NUMERIC NOT NULL,
-            business_date DATE,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-        """
-    )
-    cur.execute("ALTER TABLE ro_payment_entries ADD COLUMN IF NOT EXISTS ro VARCHAR(255)")
-    cur.execute("ALTER TABLE ro_payment_entries ADD COLUMN IF NOT EXISTS domain VARCHAR(255)")
-    cur.execute("ALTER TABLE ro_payment_entries ADD COLUMN IF NOT EXISTS payer_type VARCHAR(32)")
-    cur.execute("ALTER TABLE ro_payment_entries ADD COLUMN IF NOT EXISTS payment_method VARCHAR(16)")
-    cur.execute("ALTER TABLE ro_payment_entries ADD COLUMN IF NOT EXISTS check_number VARCHAR(64)")
-    cur.execute("ALTER TABLE ro_payment_entries ADD COLUMN IF NOT EXISTS created_by VARCHAR(255)")
-    cur.execute("ALTER TABLE ro_payment_entries ADD COLUMN IF NOT EXISTS amount NUMERIC")
-    cur.execute("ALTER TABLE ro_payment_entries ADD COLUMN IF NOT EXISTS business_date DATE")
-    cur.execute("ALTER TABLE ro_payment_entries ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP")
-    cur.execute("CREATE INDEX IF NOT EXISTS idx_ro_payment_entries_domain_ro ON ro_payment_entries(domain, ro)")
-    cur.execute("CREATE INDEX IF NOT EXISTS idx_ro_payment_entries_domain_ro_type ON ro_payment_entries(domain, ro, payer_type)")
-
-
-def _ensure_parts_orders_table(cur) -> None:
-    cur.execute(
-        """
-        CREATE TABLE IF NOT EXISTS parts_orders (
-            id SERIAL PRIMARY KEY,
-            ro VARCHAR(255) NOT NULL,
-            vendor_id INTEGER,
-            vendor_name VARCHAR(255),
-            arrival_date DATE,
-            ordered_lines JSONB,
-            arrived_count INTEGER DEFAULT 0,
-            returned_count INTEGER DEFAULT 0,
-            domain VARCHAR(255) NOT NULL,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-        """
-    )
-    cur.execute("CREATE INDEX IF NOT EXISTS idx_parts_orders_domain ON parts_orders(domain)")
-    cur.execute("CREATE INDEX IF NOT EXISTS idx_parts_orders_ro ON parts_orders(ro)")
-
-
-def _ensure_parts_received_table(cur) -> None:
-    cur.execute(
-        """
-        CREATE TABLE IF NOT EXISTS parts_received (
-            id SERIAL PRIMARY KEY,
-            ro VARCHAR(255) NOT NULL,
-            line_id INTEGER NOT NULL,
-            vendor VARCHAR(255) NOT NULL,
-            description TEXT,
-            part_number VARCHAR(255),
-            qty_received NUMERIC,
-            list_price NUMERIC,
-            cost NUMERIC,
-            eta DATE,
-            invoice_number VARCHAR(255),
-            invoice_total NUMERIC,
-            returned BOOLEAN DEFAULT FALSE,
-            returned_at TIMESTAMP,
-            received_business_date DATE,
-            returned_business_date DATE,
-            domain VARCHAR(255) NOT NULL,
-            received_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-        """
-    )
-    cur.execute("ALTER TABLE parts_received ADD COLUMN IF NOT EXISTS description TEXT")
-    cur.execute("ALTER TABLE parts_received ADD COLUMN IF NOT EXISTS part_number VARCHAR(255)")
-    cur.execute("ALTER TABLE parts_received ADD COLUMN IF NOT EXISTS qty_received NUMERIC")
-    cur.execute("ALTER TABLE parts_received ADD COLUMN IF NOT EXISTS list_price NUMERIC")
-    cur.execute("ALTER TABLE parts_received ADD COLUMN IF NOT EXISTS eta DATE")
-    cur.execute("ALTER TABLE parts_received ADD COLUMN IF NOT EXISTS invoice_number VARCHAR(255)")
-    cur.execute("ALTER TABLE parts_received ADD COLUMN IF NOT EXISTS invoice_total NUMERIC")
-    cur.execute("ALTER TABLE parts_received ADD COLUMN IF NOT EXISTS returned BOOLEAN DEFAULT FALSE")
-    cur.execute("ALTER TABLE parts_received ADD COLUMN IF NOT EXISTS returned_at TIMESTAMP")
-    cur.execute("ALTER TABLE parts_received ADD COLUMN IF NOT EXISTS received_business_date DATE")
-    cur.execute("ALTER TABLE parts_received ADD COLUMN IF NOT EXISTS returned_business_date DATE")
-    cur.execute("CREATE INDEX IF NOT EXISTS idx_parts_received_ro_domain ON parts_received(ro, domain)")
-    cur.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_parts_received_unique ON parts_received(ro, line_id, domain)")
-
-
-def _ensure_ro_phases_table(cur) -> None:
-    cur.execute(
-        """
-        CREATE TABLE IF NOT EXISTS ro_phases (
-            id SERIAL PRIMARY KEY,
-            ro VARCHAR(255) NOT NULL,
-            phase VARCHAR(50) NOT NULL,
-            domain VARCHAR(255) NOT NULL,
-            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-        """
-    )
-    cur.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_ro_phases_ro_domain ON ro_phases(ro, domain)")
-
-
-def _ensure_ro_notes_table(cur) -> None:
-    cur.execute(
-        """
-        CREATE TABLE IF NOT EXISTS ro_notes (
-            id SERIAL PRIMARY KEY,
-            ro VARCHAR(255) NOT NULL,
-            note TEXT NOT NULL,
-            domain VARCHAR(255) NOT NULL,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-        """
-    )
-    cur.execute("ALTER TABLE ro_notes ADD COLUMN IF NOT EXISTS created_by VARCHAR(255)")
-    cur.execute("CREATE INDEX IF NOT EXISTS idx_ro_notes_ro_domain ON ro_notes(ro, domain)")
-
-
-def _ensure_ro_activity_log_table(cur) -> None:
-    cur.execute(
-        """
-        CREATE TABLE IF NOT EXISTS ro_activity_log (
-            id SERIAL PRIMARY KEY,
-            ro VARCHAR(255) NOT NULL,
-            activity_type VARCHAR(64) NOT NULL,
-            message TEXT NOT NULL,
-            occurred_on DATE NOT NULL DEFAULT CURRENT_DATE,
-            domain VARCHAR(255) NOT NULL,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-        """
-    )
-    cur.execute("CREATE INDEX IF NOT EXISTS idx_ro_activity_ro_domain ON ro_activity_log(ro, domain, created_at DESC)")
-
-
-def _activity_to_datetime(value) -> datetime:
-    if isinstance(value, datetime):
-        return value
-    if isinstance(value, date):
-        return datetime.combine(value, datetime.min.time())
-    return datetime.utcnow()
-
-
-def _log_ro_activity(cur, domain: str, ro: str, activity_type: str, message: str, occurred_at=None) -> None:
-    if not domain or not ro or not message:
-        return
-    occurred_dt = _activity_to_datetime(occurred_at)
-    cur.execute(
-        """
-        INSERT INTO ro_activity_log (ro, activity_type, message, occurred_on, domain, created_at)
-        VALUES (%s, %s, %s, %s, %s, %s)
-        """,
-        (ro, activity_type, message, occurred_dt.date(), domain, occurred_dt),
-    )
-
-
-def _ensure_ro_assignments_table(cur) -> None:
-    cur.execute(
-        """
-        CREATE TABLE IF NOT EXISTS ro_assignments (
-            id SERIAL PRIMARY KEY,
-            ro VARCHAR(255) NOT NULL,
-            role VARCHAR(20) NOT NULL,
-            tech_id INTEGER,
-            tech_name VARCHAR(255),
-            excluded_lines JSONB,
-            assigned_hours NUMERIC,
-            domain VARCHAR(255) NOT NULL,
-            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-        """
-    )
-    cur.execute("ALTER TABLE ro_assignments ADD COLUMN IF NOT EXISTS assigned_hours NUMERIC")
-    
-    # Check if unique index exists
-    cur.execute(
-        """
-        SELECT indexname FROM pg_indexes 
-        WHERE indexname = 'idx_ro_assignments_ro_role_domain'
-        """
-    )
-    index_exists = cur.fetchone()
-    
-    if not index_exists:
-        # Clean up duplicates before creating unique index
-        # Keep the most recent record for each (ro, role, domain) combination
-        cur.execute(
-            """
-            DELETE FROM ro_assignments a
-            WHERE id NOT IN (
-                SELECT MAX(id) FROM ro_assignments
-                GROUP BY ro, role, domain
-            )
-            """
-        )
-        
-        # Now create the unique index
-        cur.execute(
-            """
-            CREATE UNIQUE INDEX idx_ro_assignments_ro_role_domain
-            ON ro_assignments(ro, role, domain)
-            """
-        )
-
-
-def _ensure_ro_line_assignments_table(cur) -> None:
-    cur.execute(
-        """
-        CREATE TABLE IF NOT EXISTS ro_line_assignments (
-            id SERIAL PRIMARY KEY,
-            ro VARCHAR(255) NOT NULL,
-            repair_type VARCHAR(20) NOT NULL,
-            line_key VARCHAR(64) NOT NULL,
-            line_number VARCHAR(64),
-            description TEXT,
-            hours NUMERIC,
-            tech_id INTEGER,
-            tech_name VARCHAR(255),
-            source_repair_type VARCHAR(20),
-            is_pending BOOLEAN DEFAULT FALSE,
-            domain VARCHAR(255) NOT NULL,
-            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-        """
-    )
-    cur.execute("ALTER TABLE ro_line_assignments ADD COLUMN IF NOT EXISTS is_pending BOOLEAN DEFAULT FALSE")
-    cur.execute("ALTER TABLE ro_line_assignments ADD COLUMN IF NOT EXISTS source_repair_type VARCHAR(20)")
-    cur.execute("ALTER TABLE ro_line_assignments ADD COLUMN IF NOT EXISTS ready_to_flag BOOLEAN DEFAULT FALSE")
-    cur.execute("ALTER TABLE ro_line_assignments ADD COLUMN IF NOT EXISTS flagged_at TIMESTAMP")
-    cur.execute(
-        """
-        UPDATE ro_line_assignments
-        SET source_repair_type = repair_type
-        WHERE source_repair_type IS NULL OR source_repair_type = ''
-        """
-    )
-    cur.execute(
-        """
-        CREATE UNIQUE INDEX IF NOT EXISTS idx_ro_line_assignments_unique
-        ON ro_line_assignments(ro, repair_type, line_key, domain)
-        """
-    )
-    cur.execute(
-        """
-        CREATE UNIQUE INDEX IF NOT EXISTS idx_ro_line_assignments_source_unique
-        ON ro_line_assignments(ro, source_repair_type, line_key, domain)
-        """
-    )
-    cur.execute(
-        """
-        CREATE INDEX IF NOT EXISTS idx_ro_line_assignments_ro_domain
-        ON ro_line_assignments(ro, domain)
-        """
-    )
-    cur.execute(
-        """
-        CREATE INDEX IF NOT EXISTS idx_ro_line_assignments_ready_flag
-        ON ro_line_assignments(domain, tech_id, ready_to_flag)
-        """
-    )
-
-
-def _ensure_ro_flagout_lines_table(cur) -> None:
-    cur.execute(
-        """
-        CREATE TABLE IF NOT EXISTS ro_flagout_lines (
-            id SERIAL PRIMARY KEY,
-            ro VARCHAR(255) NOT NULL,
-            tech_id INTEGER,
-            tech_name VARCHAR(255),
-            repair_type VARCHAR(20) NOT NULL,
-            line_key VARCHAR(64) NOT NULL,
-            line_number VARCHAR(64),
-            description TEXT,
-            hours NUMERIC,
-            pay_rate NUMERIC,
-            pay_amount NUMERIC,
-            status VARCHAR(32) NOT NULL DEFAULT 'ready_to_flag',
-            domain VARCHAR(255) NOT NULL,
-            flagged_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            paid_at TIMESTAMP
-        )
-        """
-    )
-    cur.execute("ALTER TABLE ro_flagout_lines ADD COLUMN IF NOT EXISTS pay_rate NUMERIC")
-    cur.execute("ALTER TABLE ro_flagout_lines ADD COLUMN IF NOT EXISTS pay_amount NUMERIC")
-    cur.execute("ALTER TABLE ro_flagout_lines ADD COLUMN IF NOT EXISTS paid_at TIMESTAMP")
-    cur.execute(
-        """
-        CREATE UNIQUE INDEX IF NOT EXISTS idx_ro_flagout_lines_unique
-        ON ro_flagout_lines(ro, tech_id, repair_type, line_key, domain)
-        """
-    )
-    cur.execute(
-        """
-        CREATE INDEX IF NOT EXISTS idx_ro_flagout_lines_domain_status
-        ON ro_flagout_lines(domain, status, flagged_at)
-        """
-    )
-
-
-def _ensure_techs_table(cur) -> None:
-    """Create techs table if it doesn't exist."""
-    cur.execute(
-        """
-        CREATE TABLE IF NOT EXISTS techs (
-            id SERIAL PRIMARY KEY,
-            first_name VARCHAR(100) NOT NULL,
-            last_name VARCHAR(100) NOT NULL,
-            pay_rate NUMERIC(10, 2) NOT NULL,
-            domain VARCHAR(255),
-            active BOOLEAN DEFAULT TRUE,
-            status VARCHAR(32) DEFAULT 'Active',
-            role VARCHAR(100) DEFAULT '',
-            total_ros INTEGER DEFAULT 0,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-        """
-    )
-    cur.execute("ALTER TABLE techs ADD COLUMN IF NOT EXISTS domain VARCHAR(255)")
-    cur.execute("ALTER TABLE techs ADD COLUMN IF NOT EXISTS active BOOLEAN DEFAULT TRUE")
-    cur.execute("ALTER TABLE techs ADD COLUMN IF NOT EXISTS status VARCHAR(32) DEFAULT 'Active'")
-    cur.execute("ALTER TABLE techs ADD COLUMN IF NOT EXISTS role VARCHAR(100) DEFAULT ''")
-    cur.execute("ALTER TABLE techs ADD COLUMN IF NOT EXISTS total_ros INTEGER DEFAULT 0")
-    cur.execute("CREATE INDEX IF NOT EXISTS idx_techs_domain ON techs(domain)")
-    cur.execute("CREATE INDEX IF NOT EXISTS idx_techs_active ON techs(active)")
-
-
-def _ensure_archived_techs_table(cur) -> None:
-    cur.execute(
-        """
-        CREATE TABLE IF NOT EXISTS archived_techs (
-            id SERIAL PRIMARY KEY,
-            tech_id INTEGER NOT NULL,
-            tech_name VARCHAR(255) NOT NULL,
-            pay_rate NUMERIC(10, 2),
-            assigned_ros JSONB,
-            total_hours NUMERIC,
-            domain VARCHAR(255),
-            archived_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-        """
-    )
-    cur.execute("ALTER TABLE archived_techs ADD COLUMN IF NOT EXISTS domain VARCHAR(255)")
-    cur.execute("ALTER TABLE archived_techs ADD COLUMN IF NOT EXISTS assigned_ros JSONB")
-    cur.execute("ALTER TABLE archived_techs ADD COLUMN IF NOT EXISTS total_hours NUMERIC")
-    cur.execute("CREATE INDEX IF NOT EXISTS idx_archived_techs_domain_archived ON archived_techs(domain, archived_at DESC)")
-
-
-def _parse_json_field(value):
-    if value is None:
-        return []
-    if isinstance(value, (list, dict)):
-        return value
-    try:
-        return json.loads(value)
-    except Exception:
-        return []
-
-
-def _parse_float_value(value) -> float:
-    if value is None:
-        return 0.0
-    if isinstance(value, (int, float)):
-        return float(value)
-    try:
-        return float(str(value).replace(",", ""))
-    except Exception:
-        return 0.0
-
-
-def _coerce_date(value) -> date | None:
-    if value is None:
-        return None
-    if isinstance(value, date) and not isinstance(value, datetime):
-        return value
-    if isinstance(value, datetime):
-        return value.date()
-    if isinstance(value, str):
-        cleaned = value.strip()
-        if not cleaned:
-            return None
-        try:
-            return datetime.fromisoformat(cleaned).date()
-        except Exception:
-            return None
-    return None
-
-
-def _weekday_days_from_hours(hours: float) -> int:
-    return max(0, math.ceil((hours / 4.0) + 3.0))
-
-
-def _add_weekdays(start_date: date, weekday_days: int) -> date:
-    if weekday_days <= 0:
-        return start_date
-
-    current = start_date
-    added = 0
-    while added < weekday_days:
-        current += timedelta(days=1)
-        if current.weekday() < 5:
-            added += 1
-    return current
-
-
-def _calculate_ecd_date(in_date: date | None, hours: float) -> date | None:
-    if in_date is None:
-        return None
-    return _add_weekdays(in_date, _weekday_days_from_hours(hours))
-
-
-def _parse_owner_info(owner_info: str) -> tuple[str, str]:
-    cleaned = (owner_info or "").strip()
-    if not cleaned:
-        return "", ""
-    lines = [line.strip() for line in cleaned.split("\n") if line.strip()]
-    if not lines:
-        return "", ""
-    name = lines[0]
-    if re.fullmatch(r"\(?\d{3}\)?[\s\-]*\d{3}[\-\s]*\d{4}(?:\s*(?:cell|work|home|mobile))?", name, re.IGNORECASE):
-        name = ""
-    phone = lines[1] if len(lines) > 1 else ""
-    if not phone and len(lines) > 0 and re.search(r"\(?\d{3}\)?[\s\-]*\d{3}[\-\s]*\d{4}", lines[0]):
-        phone = lines[0]
-    return name, phone
-
-
-def _sum_hours(items) -> float:
-    if not isinstance(items, list):
-        return 0.0
-    total = 0.0
-    for item in items:
-        if not isinstance(item, dict):
-            continue
-        total += _parse_float_value(item.get("value"))
-    return total
-
-
-def _line_key(item: dict, index: int) -> str:
-    line = item.get("line") if isinstance(item, dict) else None
-    if line is None or line == "":
-        return str(index + 1)
-    return str(line)
-
-
-def _normalize_repair_type(value: str) -> str:
-    normalized = (value or "").strip().lower()
-    if normalized == "labor":
-        return "body"
-    if normalized in {"body", "paint", "mech", "frame"}:
-        return normalized
-    return "body"
-
-
-def _load_latest_repairs_for_ro(
-    cur,
-    domain: str,
-    ro_value: str,
-    shop_id: int | None = None,
-    shop_uuid: str | None = None,
-) -> tuple[list, list]:
-    if shop_id and shop_uuid:
-        cur.execute(
-            """
-            SELECT labor_repairs, paint_repairs
-            FROM saved_estimates
-            WHERE (
-                    shop_uuid = %s::uuid
-                 OR (shop_uuid IS NULL AND shop_id = %s AND domain = %s)
-                  )
-              AND ro = %s
-            ORDER BY saved_at DESC, id DESC
-            LIMIT 1
-            """,
-            (shop_uuid, shop_id, domain, ro_value),
-        )
-    else:
-        cur.execute(
-            """
-            SELECT labor_repairs, paint_repairs
-            FROM saved_estimates
-            WHERE domain = %s AND ro = %s
-            ORDER BY saved_at DESC, id DESC
-            LIMIT 1
-            """,
-            (domain, ro_value),
-        )
-    row = cur.fetchone() or {}
-    labor_repairs = _parse_json_field(row.get("labor_repairs"))
-    paint_repairs = _parse_json_field(row.get("paint_repairs"))
-    if not isinstance(labor_repairs, list):
-        labor_repairs = []
-    if not isinstance(paint_repairs, list):
-        paint_repairs = []
-    return labor_repairs, paint_repairs
-
-
-def _upsert_ro_lines(
-    cur,
-    domain: str,
-    ro_value: str,
-    repair_type: str,
-    lines: list,
-    shop_id: int | None = None,
-    shop_uuid: str | None = None,
-) -> None:
-    normalized_type = _normalize_repair_type(repair_type)
-    if not isinstance(lines, list):
-        return
-    for idx, item in enumerate(lines):
-        if not isinstance(item, dict):
-            continue
-        line_key = _line_key(item, idx)
-        line_number = str(item.get("line") or line_key)
-        description = (item.get("description") or "").strip()
-        hours = _parse_float_value(item.get("value"))
-        if shop_id and shop_uuid:
-            cur.execute(
-                """
-                INSERT INTO ro_line_assignments (
-                    ro,
-                    repair_type,
-                    source_repair_type,
-                    line_key,
-                    line_number,
-                    description,
-                    hours,
-                    tech_id,
-                    tech_name,
-                    is_pending,
-                    domain,
-                    shop_id,
-                    shop_uuid
-                )
-                VALUES (%s, %s, %s, %s, %s, %s, %s, NULL, NULL, FALSE, %s, %s, %s::uuid)
-                ON CONFLICT (ro, source_repair_type, line_key, domain)
-                DO UPDATE SET
-                    line_number = EXCLUDED.line_number,
-                    description = EXCLUDED.description,
-                    hours = EXCLUDED.hours,
-                    shop_id = EXCLUDED.shop_id,
-                    shop_uuid = EXCLUDED.shop_uuid,
-                    updated_at = CURRENT_TIMESTAMP
-                """,
-                (ro_value, normalized_type, normalized_type, line_key, line_number, description, hours, domain, shop_id, shop_uuid),
-            )
-        else:
-            cur.execute(
-                """
-                INSERT INTO ro_line_assignments (
-                    ro,
-                    repair_type,
-                    source_repair_type,
-                    line_key,
-                    line_number,
-                    description,
-                    hours,
-                    tech_id,
-                    tech_name,
-                    is_pending,
-                    domain
-                )
-                VALUES (%s, %s, %s, %s, %s, %s, %s, NULL, NULL, FALSE, %s)
-                ON CONFLICT (ro, source_repair_type, line_key, domain)
-                DO UPDATE SET
-                    line_number = EXCLUDED.line_number,
-                    description = EXCLUDED.description,
-                    hours = EXCLUDED.hours,
-                    updated_at = CURRENT_TIMESTAMP
-                """,
-                (ro_value, normalized_type, normalized_type, line_key, line_number, description, hours, domain),
-            )
-
-
-def _ensure_ro_line_assignments_for_ro(
-    cur,
-    domain: str,
-    ro_value: str,
-    shop_id: int | None = None,
-    shop_uuid: str | None = None,
-) -> None:
-    labor_repairs, paint_repairs = _load_latest_repairs_for_ro(
-        cur,
-        domain,
-        ro_value,
-        shop_id=shop_id,
-        shop_uuid=shop_uuid,
-    )
-    _upsert_ro_lines(
-        cur,
-        domain,
-        ro_value,
-        "body",
-        labor_repairs,
-        shop_id=shop_id,
-        shop_uuid=shop_uuid,
-    )
-    _upsert_ro_lines(
-        cur,
-        domain,
-        ro_value,
-        "paint",
-        paint_repairs,
-        shop_id=shop_id,
-        shop_uuid=shop_uuid,
-    )
-
-
-def _get_scope_rows(
-    cur,
-    domain: str,
-    ro_value: str,
-    source: dict,
-    shop_id: int,
-    shop_uuid: str,
-) -> list:
-    mode = (source.get("mode") or "").strip().lower()
-    if mode == "unassigned":
-        repair_type = _normalize_repair_type(source.get("repair_type"))
-        cur.execute(
-            """
-            SELECT id, repair_type, line_key
-            FROM ro_line_assignments
-            WHERE (
-                    shop_uuid = %s::uuid
-                 OR (shop_uuid IS NULL AND shop_id = %s AND domain = %s)
-                  )
-              AND ro = %s
-              AND tech_name IS NULL
-              AND COALESCE(is_pending, FALSE) = FALSE
-              AND repair_type = %s
-            """,
-            (shop_uuid, shop_id, domain, ro_value, repair_type),
-        )
-        return cur.fetchall()
-
-    if mode == "pending":
-        cur.execute(
-            """
-            SELECT id, repair_type, line_key
-            FROM ro_line_assignments
-            WHERE (
-                    shop_uuid = %s::uuid
-                 OR (shop_uuid IS NULL AND shop_id = %s AND domain = %s)
-                  )
-              AND ro = %s
-              AND tech_name IS NULL
-              AND COALESCE(is_pending, FALSE) = TRUE
-            """,
-            (shop_uuid, shop_id, domain, ro_value),
-        )
-        return cur.fetchall()
-
-    if mode == "tech":
-        repair_type = _normalize_repair_type(source.get("repair_type"))
-        tech_name = (source.get("tech_name") or "").strip()
-        cur.execute(
-            """
-            SELECT id, repair_type, line_key
-            FROM ro_line_assignments
-            WHERE (
-                    shop_uuid = %s::uuid
-                 OR (shop_uuid IS NULL AND shop_id = %s AND domain = %s)
-                  )
-              AND ro = %s
-              AND tech_name = %s
-              AND repair_type = %s
-            """,
-            (shop_uuid, shop_id, domain, ro_value, tech_name, repair_type),
-        )
-        return cur.fetchall()
-
-    return []
-
-
-def _sum_assigned_hours(items, excluded_lines) -> float:
-    if not isinstance(items, list):
-        return 0.0
-    excluded = {str(val) for val in (excluded_lines or [])}
-    total = 0.0
-    for idx, item in enumerate(items):
-        if not isinstance(item, dict):
-            continue
-        if _line_key(item, idx) in excluded:
-            continue
-        total += _parse_float_value(item.get("value"))
-    return total
+from app.routes.estimate_modules.db_schema import (
+    _quote_ident,
+    _ensure_shops_table,
+    _sync_shop_id_bindings,
+    _ensure_parts_vendors_table,
+    _ensure_shop_settings_table,
+    _ensure_shop_users_table,
+    _ensure_chat_messages_table,
+    _ensure_saved_estimates_table,
+    _ensure_ro_payment_totals_table,
+    _ensure_ro_payment_entries_table,
+    _ensure_parts_orders_table,
+    _ensure_parts_received_table,
+    _ensure_ro_phases_table,
+    _ensure_ro_notes_table,
+    _ensure_ro_activity_log_table,
+    _ensure_ro_assignments_table,
+    _ensure_ro_line_assignments_table,
+    _ensure_ro_flagout_lines_table,
+    _ensure_techs_table,
+    _ensure_archived_techs_table,
+)
+from app.routes.estimate_modules.shop_scope import (
+    _resolve_first_active_shop_domain,
+    _resolve_effective_shop_domain,
+    _ensure_shop_id_columns_for_domain_tables,
+    _ensure_shop_id_sync_triggers,
+    _resolve_request_shop_id,
+    _resolve_request_shop_uuid,
+    _ensure_shop_isolation_infrastructure,
+)
+from app.routes.estimate_modules.auth_utils import (
+    _resolve_request_user_email,
+    _is_architect_email,
+    _build_cookie_secure_flag,
+    _resolve_internal_access_level,
+    _request_is_architect,
+    _resolve_setup_scope_domain,
+)
+from app.routes.estimate_modules.ro_utils import (
+    _resolve_note_created_by,
+    _resolve_request_user_display_name,
+    _load_latest_repairs_for_ro,
+    _upsert_ro_lines,
+    _ensure_ro_line_assignments_for_ro,
+    _get_scope_rows,
+    _sum_assigned_hours,
+)
+from app.routes.estimate_modules.tech_utils import _is_manager_or_hr_role
+from app.routes.estimate_modules.vendor_utils import _parse_part_description_and_number
+from app.routes.estimate_modules.chat_utils import _resolve_current_user_row
+from app.routes.estimate_modules.payments_utils import (
+    _to_local_business_date,
+    _parse_json_field,
+    _parse_float_value,
+)
+from app.routes.estimate_modules.activity_log import _activity_to_datetime, _log_ro_activity
+from app.routes.estimate_modules.parsing_utils import (
+    _normalize_line_ids,
+    _alpha_only_description,
+    _serialize_datetime_for_client,
+    _extract_line_number,
+    _coerce_number,
+    _build_unified_estimate_lines,
+    _coerce_date,
+    _weekday_days_from_hours,
+    _add_weekdays,
+    _calculate_ecd_date,
+    _parse_owner_info,
+    _sum_hours,
+    _line_key,
+    _normalize_repair_type,
+)
 
 
 @router.post("/parse-labor", response_model=EstimateResponse)
@@ -5756,7 +4210,7 @@ async def update_ro_phone(request: Request):
                 domain,
                 ro_value,
                 "phone_changed",
-                f"Phone changed: {old_display} → {new_phone}",
+                f"Phone changed: {old_display} â†’ {new_phone}",
             )
         elif action == "add_phone" and new_phone:
             _log_ro_activity(
@@ -5772,7 +4226,7 @@ async def update_ro_phone(request: Request):
                 domain,
                 ro_value,
                 "phone_changed",
-                f"Phone changed: {old_phone_at_index or '-'} → {new_phone}",
+                f"Phone changed: {old_phone_at_index or '-'} â†’ {new_phone}",
             )
         elif action == "delete_phone_at_index":
             _log_ro_activity(
@@ -5791,7 +4245,7 @@ async def update_ro_phone(request: Request):
                 domain,
                 ro_value,
                 "email_changed",
-                f"Email changed: {old_display} → {new_display}",
+                f"Email changed: {old_display} â†’ {new_display}",
             )
 
         conn.commit()
@@ -5894,7 +4348,7 @@ async def update_ro_dates(request: Request):
                 domain,
                 ro_value,
                 "date_changed",
-                f"{label} changed: {old_display} → {parsed_date.isoformat()}",
+                f"{label} changed: {old_display} â†’ {parsed_date.isoformat()}",
             )
 
         conn.commit()
@@ -6585,7 +5039,7 @@ async def save_ro_assignment_lines(request: Request):
                 domain,
                 ro_value,
                 "tech_assignment",
-                f"{role_label} tech assigned → {tech_label or 'Unassigned'}",
+                f"{role_label} tech assigned â†’ {tech_label or 'Unassigned'}",
             )
 
         for repair_type in sorted(set(before_by_type.keys()) | set(after_by_type.keys())):
@@ -6599,7 +5053,7 @@ async def save_ro_assignment_lines(request: Request):
                 domain,
                 ro_value,
                 "assigned_hours_changed",
-                f"Assigned hours changed ({role_label}): {before_hours:.1f} → {after_hours:.1f}",
+                f"Assigned hours changed ({role_label}): {before_hours:.1f} â†’ {after_hours:.1f}",
             )
 
         if abs(before_total_assigned - after_total_assigned) >= 1e-6:
@@ -6608,7 +5062,7 @@ async def save_ro_assignment_lines(request: Request):
                 domain,
                 ro_value,
                 "total_assigned_hours_changed",
-                f"Total assigned hours changed: {before_total_assigned:.1f} → {after_total_assigned:.1f}",
+                f"Total assigned hours changed: {before_total_assigned:.1f} â†’ {after_total_assigned:.1f}",
             )
 
         conn.commit()
@@ -6741,7 +5195,7 @@ async def unassign_ro_assignment_lines(request: Request):
         if target_ids:
             if touched_tech_labels:
                 label = ", ".join(sorted(touched_tech_labels))
-                detail = f"Tech unassigned → {label}"
+                detail = f"Tech unassigned â†’ {label}"
             else:
                 detail = "Selected repair lines reset to unassigned"
             _log_ro_activity(cur, domain, ro_value, "tech_assignment", detail)
@@ -6757,7 +5211,7 @@ async def unassign_ro_assignment_lines(request: Request):
                 domain,
                 ro_value,
                 "assigned_hours_changed",
-                f"Assigned hours changed ({role_label}): {before_hours:.1f} → {after_hours:.1f}",
+                f"Assigned hours changed ({role_label}): {before_hours:.1f} â†’ {after_hours:.1f}",
             )
 
         if abs(before_total_assigned - after_total_assigned) >= 1e-6:
@@ -6766,7 +5220,7 @@ async def unassign_ro_assignment_lines(request: Request):
                 domain,
                 ro_value,
                 "total_assigned_hours_changed",
-                f"Total assigned hours changed: {before_total_assigned:.1f} → {after_total_assigned:.1f}",
+                f"Total assigned hours changed: {before_total_assigned:.1f} â†’ {after_total_assigned:.1f}",
             )
 
         conn.commit()
@@ -7721,7 +6175,7 @@ async def phase_update(request: Request):
                 domain,
                 ro,
                 "phase_changed",
-                f"Phase changed: {old_label} → {new_label}",
+                f"Phase changed: {old_label} â†’ {new_label}",
             )
 
         conn.commit()
@@ -7972,17 +6426,17 @@ async def list_ro_activity(request: Request, ro: str):
                 saved_at = row.get("saved_at")
 
                 if prev_total_hours is not None and abs(total_hours - prev_total_hours) >= 1e-6:
-                    add_entry(f"Total hours changed: {prev_total_hours:.1f} → {total_hours:.1f}", saved_at)
+                    add_entry(f"Total hours changed: {prev_total_hours:.1f} â†’ {total_hours:.1f}", saved_at)
 
                 if prev_in_date is not None and current_in_date != prev_in_date:
                     old_display = prev_in_date.isoformat() if prev_in_date else "-"
                     new_display = current_in_date.isoformat() if current_in_date else "-"
-                    add_entry(f"In-date changed: {old_display} → {new_display}", saved_at)
+                    add_entry(f"In-date changed: {old_display} â†’ {new_display}", saved_at)
 
                 if prev_ecd_date is not None and current_ecd_date != prev_ecd_date:
                     old_display = prev_ecd_date.isoformat() if prev_ecd_date else "-"
                     new_display = current_ecd_date.isoformat() if current_ecd_date else "-"
-                    add_entry(f"ECD changed: {old_display} → {new_display}", saved_at)
+                    add_entry(f"ECD changed: {old_display} â†’ {new_display}", saved_at)
 
                 prev_total_hours = total_hours
                 prev_in_date = current_in_date
@@ -8305,8 +6759,8 @@ async def list_parts_ros(request: Request):
                 {
                     "ro": ro,
                     "vehicle": row.get("vehicle"),
-                    "estimator": (row.get("estimator") or "").strip() or "—",
-                    "tech": tech_by_ro.get(ro, "—"),
+                    "estimator": (row.get("estimator") or "").strip() or "â€”",
+                    "tech": tech_by_ro.get(ro, "â€”"),
                     "parts_qty": float(parts_qty or line_count or 0),
                     "on_order": on_order,
                     "on_order_warning_count": on_order_warning_counts.get(ro, 0),
@@ -10114,3 +8568,6 @@ async def get_ro_print_data(request: Request, ro: str):
         }
     finally:
         cur.close()
+
+
+
