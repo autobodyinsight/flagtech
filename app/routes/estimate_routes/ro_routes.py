@@ -2218,9 +2218,6 @@ async def list_parts_ros(request: Request):
             if not isinstance(parts_repairs, list):
                 parts_repairs = []
 
-            if not parts_repairs:
-                continue
-
             parts_qty = 0.0
             line_count = 0
             for item in parts_repairs:
