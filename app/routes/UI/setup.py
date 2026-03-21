@@ -185,13 +185,13 @@ def get_setup_script():
             await setupLoadUsers();
         }
 
-        async function setupLoadUsers() {
+        async function setupLoadUsers(retryCount = 1) {
             const body = document.getElementById('setupUsersBody');
             if (!body) return;
             body.innerHTML = '<tr><td colspan="5" style="padding:18px; text-align:center; color:#999;">Loading...</td></tr>';
             try {
                 const resp = await fetch('/api/setup/users', { credentials: 'include' });
-                const data = await resp.json();
+                const data = await resp.json().catch(() => ({}));
                 if (!resp.ok || data.error) {
                     throw new Error(data.error || `Failed to load users (${resp.status})`);
                 }
@@ -203,8 +203,13 @@ def get_setup_script():
 
                 setupRenderUsers();
             } catch (error) {
+                if (retryCount > 0) {
+                    await new Promise((resolve) => setTimeout(resolve, 250));
+                    await setupLoadUsers(retryCount - 1);
+                    return;
+                }
                 console.error('Error loading setup users:', error);
-                body.innerHTML = '<tr><td colspan="5" style="padding:18px; text-align:center; color:#c00;">Error loading users.</td></tr>';
+                body.innerHTML = `<tr><td colspan="5" style="padding:18px; text-align:center; color:#c00;">${setupEscape(String(error.message || 'Error loading users.'))}</td></tr>`;
             }
         }
 

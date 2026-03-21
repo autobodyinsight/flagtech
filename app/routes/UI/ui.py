@@ -1857,11 +1857,26 @@ async def manage_screen(request: Request):
                 .replace(/'/g, '&#39;');
         }
 
-        async function api(url, options = {}) {
-            const resp = await fetch(url, { credentials: 'include', ...options });
-            const data = await resp.json();
-            if (!resp.ok || data.error) throw new Error(data.error || 'Request failed');
-            return data;
+        async function api(url, options = {}, retryCount = 1) {
+            try {
+                const resp = await fetch(url, { credentials: 'include', ...options });
+                const data = await resp.json().catch(() => ({}));
+                if (!resp.ok || data.error) {
+                    const message = data.error || `Request failed (${resp.status})`;
+                    if (retryCount > 0 && [401, 500, 502, 503, 504].includes(Number(resp.status || 0))) {
+                        await new Promise((resolve) => setTimeout(resolve, 250));
+                        return api(url, options, retryCount - 1);
+                    }
+                    throw new Error(message);
+                }
+                return data;
+            } catch (error) {
+                if (retryCount > 0) {
+                    await new Promise((resolve) => setTimeout(resolve, 250));
+                    return api(url, options, retryCount - 1);
+                }
+                throw error;
+            }
         }
 
         async function loadShops() {
@@ -1871,7 +1886,13 @@ async def manage_screen(request: Request):
                 state.expandedDomain = String(state.shops[0].domain || '').trim().toLowerCase();
             }
             render();
-            if (state.expandedDomain) await ensureUsersLoaded(state.expandedDomain);
+            if (state.expandedDomain) {
+                try {
+                    await ensureUsersLoaded(state.expandedDomain);
+                } catch (error) {
+                    console.error('Manage users preload failed:', error);
+                }
+            }
         }
 
         async function ensureUsersLoaded(domain) {
