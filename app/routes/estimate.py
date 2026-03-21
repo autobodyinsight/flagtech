@@ -535,23 +535,37 @@ async def auth_session(request: Request):
     authenticated_user = get_authenticated_user(request)
     if not authenticated_user:
         return JSONResponse(status_code=401, content={"authenticated": False})
-    permissions = authenticated_user.get("permissions") or {}
+    email_value = str(authenticated_user.get("email") or "").strip().lower()
+    role_value = str(authenticated_user.get("role") or "").strip()
+    domain_value = str(authenticated_user.get("domain") or "").strip().lower()
+    shop_id_value = int(authenticated_user.get("shop_id") or 0) or None
+    shop_uuid_value = str(authenticated_user.get("shop_uuid") or "").strip() or None
+    user_uuid_value = str(authenticated_user.get("user_uuid") or "").strip() or None
+
+    permissions = build_permission_snapshot(
+        role=role_value,
+        domain=domain_value,
+        shop_id=shop_id_value,
+        shop_uuid=shop_uuid_value,
+        user_uuid=user_uuid_value,
+        is_architect=_is_architect_email(email_value),
+    )
 
     return {
         "authenticated": True,
         "user": {
             "id": int(authenticated_user.get("id") or 0),
-            "email": str(authenticated_user.get("email") or "").strip().lower(),
+            "email": email_value,
             "first_name": str(authenticated_user.get("first_name") or "").strip(),
             "last_name": str(authenticated_user.get("last_name") or "").strip(),
-            "role": str(authenticated_user.get("role") or "").strip(),
-            "domain": str(authenticated_user.get("domain") or "").strip().lower(),
-            "shop_id": int(authenticated_user.get("shop_id") or 0) or None,
-            "shop_uuid": str(authenticated_user.get("shop_uuid") or "").strip() or None,
-            "user_uuid": str(authenticated_user.get("user_uuid") or "").strip() or None,
+            "role": role_value,
+            "domain": domain_value,
+            "shop_id": shop_id_value,
+            "shop_uuid": shop_uuid_value,
+            "user_uuid": user_uuid_value,
             "shop_name": str(authenticated_user.get("shop_name") or "").strip(),
             "address": str(authenticated_user.get("address") or "").strip(),
-            "access_level": str(authenticated_user.get("access_level") or "").strip(),
+            "access_level": str(permissions.get("access_level") or "").strip(),
             "permissions": permissions,
         },
     }

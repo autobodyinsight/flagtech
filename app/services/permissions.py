@@ -45,8 +45,8 @@ FEATURE_RULES: dict[str, tuple[str, ...]] = {
     "chat": ALL_ACCESS_LEVELS,
     "profile": ALL_ACCESS_LEVELS,
     "shop_context": ALL_ACCESS_LEVELS,
-    "setup": (ACCESS_ARCHITECT, ACCESS_MANAGER, ACCESS_HR),
-    "manage": (ACCESS_ARCHITECT,),
+    "setup": ALL_ACCESS_LEVELS,
+    "manage": ALL_ACCESS_LEVELS,
 }
 
 ACTION_RULES: dict[str, tuple[str, ...]] = {
