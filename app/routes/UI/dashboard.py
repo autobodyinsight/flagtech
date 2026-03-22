@@ -1152,18 +1152,16 @@ def get_dashboard_screen_html():
                 roClosePrintOptionsModal();
                 try {
                     const shopHeaderHtml = buildRoPrintShopHeaderHtml(await getRoPrintShopInfo());
-                    const [linesRes, onOrderRes, arrivedRes, returnedRes, receivedRes] = await Promise.all([
+                    const [linesRes, partsFullRes, receivedRes] = await Promise.all([
                         popupFetchJson(`/api/parts/ro-lines?ro=${encodeURIComponent(ro.ro)}`),
-                        popupFetchJson(`/api/parts/on-order-lines?ro=${encodeURIComponent(ro.ro)}`),
-                        popupFetchJson(`/api/parts/arrived-lines?ro=${encodeURIComponent(ro.ro)}`),
-                        popupFetchJson(`/api/parts/returned-lines?ro=${encodeURIComponent(ro.ro)}`),
+                        popupFetchJson(`/api/parts/ro/${encodeURIComponent(ro.ro)}/full`),
                         popupFetchJson(`/api/parts/received?ro=${encodeURIComponent(ro.ro)}`),
                     ]);
 
                     const lines = Array.isArray(linesRes.lines) ? linesRes.lines : [];
-                    const onOrder = Array.isArray(onOrderRes.items) ? onOrderRes.items : [];
-                    const arrived = Array.isArray(arrivedRes.items) ? arrivedRes.items : [];
-                    const returned = Array.isArray(returnedRes.items) ? returnedRes.items : [];
+                    const onOrder = Array.isArray(partsFullRes.on_order) ? partsFullRes.on_order : [];
+                    const arrived = Array.isArray(partsFullRes.arrived) ? partsFullRes.arrived : [];
+                    const returned = Array.isArray(partsFullRes.returned) ? partsFullRes.returned : [];
                     const received = Array.isArray(receivedRes.items) ? receivedRes.items : [];
 
                     const arrivedSet = new Set(arrived.map((item) => Number(item.line_id)));
@@ -2370,20 +2368,18 @@ def get_dashboard_screen_html():
                 const invoicesEl = roWindowDoc.getElementById('roPopupPartsInvoices');
 
                 try {
-                    const [rosRes, linesRes, onOrderRes, arrivedRes, returnedRes, receivedRes] = await Promise.all([
+                    const [rosRes, linesRes, partsFullRes, receivedRes] = await Promise.all([
                         popupFetchJson('/api/parts/ros'),
                         popupFetchJson(`/api/parts/ro-lines?ro=${encodeURIComponent(ro.ro)}`),
-                        popupFetchJson(`/api/parts/on-order-lines?ro=${encodeURIComponent(ro.ro)}`),
-                        popupFetchJson(`/api/parts/arrived-lines?ro=${encodeURIComponent(ro.ro)}`),
-                        popupFetchJson(`/api/parts/returned-lines?ro=${encodeURIComponent(ro.ro)}`),
+                        popupFetchJson(`/api/parts/ro/${encodeURIComponent(ro.ro)}/full`),
                         popupFetchJson(`/api/parts/received?ro=${encodeURIComponent(ro.ro)}`),
                     ]);
 
                     const roRow = (Array.isArray(rosRes.ros) ? rosRes.ros : []).find((item) => String(item.ro || '') === String(ro.ro)) || {};
                     const lines = Array.isArray(linesRes.lines) ? linesRes.lines : [];
-                    const onOrder = Array.isArray(onOrderRes.items) ? onOrderRes.items : [];
-                    const arrived = Array.isArray(arrivedRes.items) ? arrivedRes.items : [];
-                    const returned = Array.isArray(returnedRes.items) ? returnedRes.items : [];
+                    const onOrder = Array.isArray(partsFullRes.on_order) ? partsFullRes.on_order : [];
+                    const arrived = Array.isArray(partsFullRes.arrived) ? partsFullRes.arrived : [];
+                    const returned = Array.isArray(partsFullRes.returned) ? partsFullRes.returned : [];
                     const received = Array.isArray(receivedRes.items) ? receivedRes.items : [];
 
                     const arrivedSet = new Set(arrived.map((item) => Number(item.line_id)));
