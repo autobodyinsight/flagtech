@@ -260,11 +260,15 @@ def get_setup_script():
             const city = setupEscape(shop.city || '');
             const state = setupEscape(shop.state || '');
             const zip = setupEscape(shop.zip_code || '');
+            const phone = setupEscape(shop.phone || '');
+            const email = setupEscape(shop.email || '');
             
             let html = `<strong>${name}</strong>`;
             if (address) html += `<div>${address}</div>`;
             const cityStateZip = [city, state].filter(v => v).join(', ') + (zip ? ` ${zip}` : '');
             if (cityStateZip.trim()) html += `<div>${cityStateZip}</div>`;
+            if (phone) html += `<div>${phone}</div>`;
+            if (email) html += `<div>${email}</div>`;
             
             infoEl.innerHTML = html;
         }

@@ -1839,6 +1839,8 @@ async def manage_screen(request: Request):
         .list { background: #fff; border: 1px solid #ddd; border-radius: 8px; overflow: hidden; }
         .shop-row { display: grid; grid-template-columns: 42px 140px 1fr 120px; align-items: center; gap: 10px; padding: 10px 12px; border-bottom: 1px solid #eee; }
         .shop-name { color: #0055aa; cursor: pointer; font-weight: 700; text-decoration: none; background: none; border: none; text-align: left; }
+        .shop-meta { min-width: 0; }
+        .shop-details { margin-top: 3px; color: #666; font-size: 12px; line-height: 1.3; }
         .toggle { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 700; }
         .slide { display: none; padding: 10px 12px 14px 12px; background: #fafafa; border-bottom: 1px solid #eee; }
         .slide.open { display: block; }
@@ -2080,12 +2082,27 @@ async def manage_screen(request: Request):
                 const users = state.usersByDomain[domain] || [];
                 const addRow = state.addingRowByDomain[domain] || null;
                 const tableRows = users.map((u) => renderUserRow(u, domain)).join('') + (addRow ? renderUserRow(addRow, domain, true) : '');
+                const address = esc(shop.address || '');
+                const city = esc(shop.city || '');
+                const stateVal = esc(shop.state || '');
+                const zip = esc(shop.zip_code || '');
+                const phone = esc(shop.phone || '');
+                const email = esc(shop.email || '');
+                const cityState = [city, stateVal].filter(v => v).join(', ');
+                const cityStateZip = `${cityState}${zip ? (cityState ? ` ${zip}` : zip) : ''}`;
+                const detailLines = [address, cityStateZip, phone, email].filter(v => String(v || '').trim());
+                const detailsHtml = detailLines.length
+                    ? `<div class="shop-details">${detailLines.map((line) => `<div>${line}</div>`).join('')}</div>`
+                    : '';
 
                 return `
                     <div class="shop-row">
                         <div><input type="checkbox" data-shop-domain="${esc(domain)}" ${state.selectedShopDomains.has(domain) ? 'checked' : ''} onchange="toggleShopSelection('${esc(domain)}', this.checked)" /></div>
                         <label class="toggle"><input type="checkbox" ${shop.active ? 'checked' : ''} onchange="toggleShopActive('${esc(domain)}', this.checked)" /> ${shop.active ? 'ACTIVE' : 'INACTIVE'}</label>
-                        <button type="button" class="shop-name" onclick="toggleExpand('${esc(domain)}')">${esc(shop.shop_name || domain)}</button>
+                        <div class="shop-meta">
+                            <button type="button" class="shop-name" onclick="toggleExpand('${esc(domain)}')">${esc(shop.shop_name || domain)}</button>
+                            ${detailsHtml}
+                        </div>
                         <div class="muted">Users: ${Number(shop.user_count || 0)}</div>
                     </div>
                     <div class="slide ${open ? 'open' : ''}">

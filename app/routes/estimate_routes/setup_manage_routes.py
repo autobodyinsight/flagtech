@@ -423,12 +423,18 @@ async def list_manage_shops(request: Request):
                     d.domain,
                     COALESCE(sh.active, TRUE) AS active,
                     COALESCE(ss.shop_name, sh.name, d.domain) AS shop_name,
+                    COALESCE(ss.address, sh.address) AS address,
+                    COALESCE(ss.city, sh.city) AS city,
+                    COALESCE(ss.state, sh.state) AS state,
+                    COALESCE(ss.zip_code, sh.zip) AS zip_code,
+                    ss.phone AS phone,
+                    ss.email AS email,
                     COUNT(DISTINCT su.id) FILTER (WHERE su.active = TRUE) AS user_count
                 FROM all_domains d
                 LEFT JOIN shops sh ON sh.domain = d.domain
                 LEFT JOIN shop_settings ss ON ss.domain = d.domain
                 LEFT JOIN shop_users su ON su.domain = d.domain
-                GROUP BY sh.id, d.domain, sh.active, ss.shop_name, sh.name
+                GROUP BY sh.id, d.domain, sh.active, ss.shop_name, sh.name, ss.address, sh.address, ss.city, sh.city, ss.state, sh.state, ss.zip_code, sh.zip, ss.phone, ss.email
                 ORDER BY LOWER(COALESCE(NULLIF(ss.shop_name, ''), NULLIF(sh.name, ''), d.domain)) ASC
                 """
             )
@@ -441,6 +447,12 @@ async def list_manage_shops(request: Request):
                         "domain": str(row.get("domain") or "").strip().lower(),
                         "shop_name": str(row.get("shop_name") or "").strip(),
                         "active": bool(row.get("active", True)),
+                        "address": str(row.get("address") or "").strip(),
+                        "city": str(row.get("city") or "").strip(),
+                        "state": str(row.get("state") or "").strip(),
+                        "zip_code": str(row.get("zip_code") or "").strip(),
+                        "phone": str(row.get("phone") or "").strip(),
+                        "email": str(row.get("email") or "").strip(),
                         "user_count": int(row.get("user_count") or 0),
                     }
                 )
