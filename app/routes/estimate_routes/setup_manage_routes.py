@@ -389,12 +389,16 @@ async def list_manage_shops(request: Request):
                     d.domain,
                     COALESCE(sh.active, TRUE) AS active,
                     COALESCE(ss.shop_name, sh.name, d.domain) AS shop_name,
+                    ss.address,
+                    ss.city,
+                    ss.state,
+                    ss.zip_code,
                     COUNT(DISTINCT su.id) FILTER (WHERE su.active = TRUE) AS user_count
                 FROM all_domains d
                 LEFT JOIN shops sh ON sh.domain = d.domain
                 LEFT JOIN shop_settings ss ON ss.domain = d.domain
                 LEFT JOIN shop_users su ON su.domain = d.domain
-                GROUP BY sh.id, d.domain, sh.active, ss.shop_name, sh.name
+                GROUP BY sh.id, d.domain, sh.active, ss.shop_name, sh.name, ss.address, ss.city, ss.state, ss.zip_code
                 ORDER BY LOWER(COALESCE(NULLIF(ss.shop_name, ''), NULLIF(sh.name, ''), d.domain)) ASC
                 """
             )
@@ -406,6 +410,10 @@ async def list_manage_shops(request: Request):
                         "id": int(row.get("shop_id") or 0) or None,
                         "domain": str(row.get("domain") or "").strip().lower(),
                         "shop_name": str(row.get("shop_name") or "").strip(),
+                        "address": str(row.get("address") or "").strip(),
+                        "city": str(row.get("city") or "").strip(),
+                        "state": str(row.get("state") or "").strip(),
+                        "zip_code": str(row.get("zip_code") or "").strip(),
                         "active": bool(row.get("active", True)),
                         "user_count": int(row.get("user_count") or 0),
                     }
