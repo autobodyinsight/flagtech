@@ -832,6 +832,18 @@ def get_parts_script():
                 });
         }
 
+        function partsBuildOrderLinesFromFullData(data) {
+            const allLines = Array.isArray(data?.all_lines) ? data.all_lines : [];
+            return allLines.map((line) => {
+                const status = String(line?.status || '').toLowerCase();
+                const isOrdered = status === 'on_order' || status === 'arrived';
+                return {
+                    ...line,
+                    is_ordered: isOrdered,
+                };
+            });
+        }
+
         function partsLoadVendorOptions() {
             const select = document.getElementById('partsOrderVendor');
             if (!select) return;
@@ -1739,12 +1751,12 @@ def get_parts_script():
             // Use consolidated endpoint
             const fromCache = partsDataCache[ro];
             if (fromCache && fromCache.all_lines) {
-                partsCurrentLines = fromCache.all_lines;
+                partsCurrentLines = partsBuildOrderLinesFromFullData(fromCache);
                 partsRenderOrderLines();
             } else {
                 partsLoadRoFullData(ro)
                     .then(data => {
-                        partsCurrentLines = data.all_lines || [];
+                        partsCurrentLines = partsBuildOrderLinesFromFullData(data);
                         partsRenderOrderLines();
                     })
                     .catch(err => {
@@ -1832,12 +1844,27 @@ def get_parts_script():
                 .trim();
 
             let estimatorName = String(options?.estimatorName || '').trim();
+            let vehicleDisplay = '';
+            let vinDisplay = '';
             try {
                 const snapshotResp = await fetch(`/api/ro-estimate?ro=${encodeURIComponent(ro)}`, { credentials: 'include' });
                 const snapshotData = await snapshotResp.json();
                 const snapshotEstimator = String(snapshotData?.estimate?.header?.estimator || '').trim();
                 if (snapshotEstimator && snapshotEstimator !== '—') {
                     estimatorName = snapshotEstimator;
+                }
+
+                const snapshotVehicle = snapshotData?.estimate?.header?.vehicle;
+                if (snapshotVehicle && typeof snapshotVehicle === 'object') {
+                    const year = String(snapshotVehicle.year || '').trim();
+                    const make = String(snapshotVehicle.make || '').trim();
+                    const model = String(snapshotVehicle.model || '').trim();
+                    const raw = String(snapshotVehicle.raw || '').trim();
+                    const composed = [year, make, model].filter(Boolean).join(' ').trim();
+                    vehicleDisplay = composed || raw;
+                    vinDisplay = String(snapshotVehicle.vin || '').trim();
+                } else if (snapshotVehicle) {
+                    vehicleDisplay = String(snapshotVehicle || '').trim();
                 }
             } catch (error) {
                 // keep estimatorName fallback from options/table when API read fails
@@ -1851,12 +1878,21 @@ def get_parts_script():
                     if (apiEstimator && apiEstimator !== '—') {
                         estimatorName = apiEstimator;
                     }
+                    if (!vehicleDisplay) {
+                        vehicleDisplay = String(matchedRo?.vehicle || '').trim();
+                    }
                 } catch (error) {
                     // keep fallback chain
                 }
             }
             if (!estimatorName) {
                 estimatorName = partsGetRoEstimatorFromTable(ro);
+            }
+            if (!vehicleDisplay) {
+                vehicleDisplay = '—';
+            }
+            if (!vinDisplay) {
+                vinDisplay = '—';
             }
             const userEmail = String(appUiState?.currentUser?.email || appUiState?.sessionUser?.email || '').trim();
 
@@ -1914,9 +1950,12 @@ def get_parts_script():
                         body { font-family: Arial, sans-serif; color: #1f2937; margin: 0; }
                         .sheet { max-width: 980px; margin: 0 auto; }
                         .header { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px solid #e5e7eb; padding-bottom: 12px; margin-bottom: 14px; }
+                        .header-right { text-align: right; min-width: 260px; }
                         .title { font-size: 26px; font-weight: 700; letter-spacing: 0.2px; color: #111827; }
                         .sub { font-size: 13px; color: #4b5563; margin-top: 4px; }
                         .ro-emphasis { font-size: 26px; font-weight: 800; color: #111827; line-height: 1.1; }
+                        .meta-label { font-size: 12px; text-transform: uppercase; letter-spacing: 0.4px; color: #6b7280; margin-top: 6px; }
+                        .meta-value { font-size: 14px; font-weight: 700; color: #111827; }
                         .cards { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 14px; }
                         .card { border: 1px solid #e5e7eb; border-radius: 10px; padding: 12px; background: #fafafa; }
                         .card h4 { margin: 0 0 8px 0; font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px; color: #374151; }
@@ -1943,6 +1982,12 @@ def get_parts_script():
                                 <div class="title">Parts Order</div>
                                 <div class="ro-emphasis">RO #${safe(ro)}</div>
                                 <div class="sub">Generated ${safe(generatedAt)}</div>
+                            </div>
+                            <div class="header-right">
+                                <div class="meta-label">Vehicle</div>
+                                <div class="meta-value">${safe(vehicleDisplay)}</div>
+                                <div class="meta-label">VIN</div>
+                                <div class="meta-value">${safe(vinDisplay)}</div>
                             </div>
                         </div>
 
