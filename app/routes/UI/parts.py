@@ -122,7 +122,7 @@ def get_parts_screen_html():
                 </div>
 
                 <div style="margin-top:20px; text-align:right;">
-                    <button onclick="savePartsOrder()" style="padding:10px 20px; background-color:#505050; color:white; border:none; border-radius:4px; cursor:pointer; font-size:14px;">Save</button>
+                    <button id="partsOrderSaveBtn" type="button" onclick="savePartsOrder()" style="padding:10px 20px; background-color:#505050; color:white; border:none; border-radius:4px; cursor:pointer; font-size:14px;">Save</button>
                 </div>
             </div>
         </div>
@@ -349,6 +349,7 @@ def get_parts_script():
         let partsCurrentRo = null;
         let partsCurrentLines = [];
         let partsOrderSelectedIds = new Set();
+        let partsOrderSaveInFlight = false;
         let partsOrderSortField = 'line';
         let partsOrderSortDirection = 'asc';
         let partsVendorsCache = [];
@@ -1758,6 +1759,17 @@ def get_parts_script():
         function closePartsOrderModal() {
             const modal = document.getElementById('partsOrderModal');
             if (modal) modal.style.display = 'none';
+            partsOrderSaveInFlight = false;
+            partsSetOrderSaveButtonState(false);
+        }
+
+        function partsSetOrderSaveButtonState(isSaving) {
+            const saveBtn = document.getElementById('partsOrderSaveBtn');
+            if (!saveBtn) return;
+            saveBtn.disabled = Boolean(isSaving);
+            saveBtn.textContent = isSaving ? 'Saving...' : 'Save';
+            saveBtn.style.opacity = isSaving ? '0.7' : '1';
+            saveBtn.style.cursor = isSaving ? 'not-allowed' : 'pointer';
         }
 
         function partsGetRoEstimatorFromTable(ro) {
@@ -1988,6 +2000,10 @@ def get_parts_script():
         }
 
         function savePartsOrder() {
+            if (partsOrderSaveInFlight) {
+                return;
+            }
+
             if (!partsCurrentRo) {
                 alert('No RO selected.');
                 return;
@@ -2023,6 +2039,9 @@ def get_parts_script():
                 return;
             }
 
+            partsOrderSaveInFlight = true;
+            partsSetOrderSaveButtonState(true);
+
             fetch('/api/parts/order', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -2035,7 +2054,20 @@ def get_parts_script():
                     ordered_lines: checked
                 })
             })
-            .then(r => r.json())
+            .then(async (r) => {
+                let res = {};
+                try {
+                    res = await r.json();
+                } catch (_) {
+                    res = {};
+                }
+
+                if (!r.ok) {
+                    throw new Error(res.error || 'Error saving parts order. Please try again.');
+                }
+
+                return res;
+            })
             .then(res => {
                 if (res.error) {
                     if (Array.isArray(res.duplicate_lines) && res.duplicate_lines.length > 0) {
@@ -2074,7 +2106,11 @@ def get_parts_script():
             })
             .catch(err => {
                 console.error('Error saving parts order:', err);
-                alert('Error saving parts order. Please try again.');
+                alert(err.message || 'Error saving parts order. Please try again.');
+            })
+            .finally(() => {
+                partsOrderSaveInFlight = false;
+                partsSetOrderSaveButtonState(false);
             });
         }
     """
