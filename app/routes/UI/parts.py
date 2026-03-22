@@ -2054,20 +2054,7 @@ def get_parts_script():
                     ordered_lines: checked
                 })
             })
-            .then(async (r) => {
-                let res = {};
-                try {
-                    res = await r.json();
-                } catch (_) {
-                    res = {};
-                }
-
-                if (!r.ok) {
-                    throw new Error(res.error || 'Error saving parts order. Please try again.');
-                }
-
-                return res;
-            })
+            .then(r => r.json())
             .then(res => {
                 if (res.error) {
                     if (Array.isArray(res.duplicate_lines) && res.duplicate_lines.length > 0) {
@@ -2106,7 +2093,7 @@ def get_parts_script():
             })
             .catch(err => {
                 console.error('Error saving parts order:', err);
-                alert(err.message || 'Error saving parts order. Please try again.');
+                alert('Error saving parts order. Please try again.');
             })
             .finally(() => {
                 partsOrderSaveInFlight = false;
