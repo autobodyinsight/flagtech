@@ -183,7 +183,7 @@ async def update_ro_dates(request: Request):
                 domain,
                 ro_value,
                 "date_changed",
-                f"{label} changed: {old_display} â†’ {parsed_date.isoformat()}",
+                f"{label} changed: {old_display} → {parsed_date.isoformat()}",
             )
 
         conn.commit()

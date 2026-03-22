@@ -240,7 +240,7 @@ async def update_ro_phone(request: Request):
                 domain,
                 ro_value,
                 "phone_changed",
-                f"Phone changed: {old_display} â†’ {new_phone}",
+                f"Phone changed: {old_display} → {new_phone}",
             )
         elif action == "add_phone" and new_phone:
             _log_ro_activity(
@@ -256,7 +256,7 @@ async def update_ro_phone(request: Request):
                 domain,
                 ro_value,
                 "phone_changed",
-                f"Phone changed: {old_phone_at_index or '-'} â†’ {new_phone}",
+                f"Phone changed: {old_phone_at_index or '-'} → {new_phone}",
             )
         elif action == "delete_phone_at_index":
             _log_ro_activity(
@@ -275,7 +275,7 @@ async def update_ro_phone(request: Request):
                 domain,
                 ro_value,
                 "email_changed",
-                f"Email changed: {old_display} â†’ {new_display}",
+                f"Email changed: {old_display} → {new_display}",
             )
 
         conn.commit()
@@ -962,7 +962,7 @@ async def save_ro_assignment_lines(request: Request):
                 domain,
                 ro_value,
                 "tech_assignment",
-                f"{role_label} tech assigned â†’ {tech_label or 'Unassigned'}",
+                f"{role_label} tech assigned → {tech_label or 'Unassigned'}",
             )
 
         for repair_type in sorted(set(before_by_type.keys()) | set(after_by_type.keys())):
@@ -976,7 +976,7 @@ async def save_ro_assignment_lines(request: Request):
                 domain,
                 ro_value,
                 "assigned_hours_changed",
-                f"Assigned hours changed ({role_label}): {before_hours:.1f} â†’ {after_hours:.1f}",
+                f"Assigned hours changed ({role_label}): {before_hours:.1f} → {after_hours:.1f}",
             )
 
         if abs(before_total_assigned - after_total_assigned) >= 1e-6:
@@ -985,7 +985,7 @@ async def save_ro_assignment_lines(request: Request):
                 domain,
                 ro_value,
                 "total_assigned_hours_changed",
-                f"Total assigned hours changed: {before_total_assigned:.1f} â†’ {after_total_assigned:.1f}",
+                f"Total assigned hours changed: {before_total_assigned:.1f} → {after_total_assigned:.1f}",
             )
 
         conn.commit()
@@ -1116,7 +1116,7 @@ async def unassign_ro_assignment_lines(request: Request):
         if target_ids:
             if touched_tech_labels:
                 label = ", ".join(sorted(touched_tech_labels))
-                detail = f"Tech unassigned â†’ {label}"
+                detail = f"Tech unassigned → {label}"
             else:
                 detail = "Selected repair lines reset to unassigned"
             _log_ro_activity(cur, domain, ro_value, "tech_assignment", detail)
@@ -1132,7 +1132,7 @@ async def unassign_ro_assignment_lines(request: Request):
                 domain,
                 ro_value,
                 "assigned_hours_changed",
-                f"Assigned hours changed ({role_label}): {before_hours:.1f} â†’ {after_hours:.1f}",
+                f"Assigned hours changed ({role_label}): {before_hours:.1f} → {after_hours:.1f}",
             )
 
         if abs(before_total_assigned - after_total_assigned) >= 1e-6:
@@ -1141,7 +1141,7 @@ async def unassign_ro_assignment_lines(request: Request):
                 domain,
                 ro_value,
                 "total_assigned_hours_changed",
-                f"Total assigned hours changed: {before_total_assigned:.1f} â†’ {after_total_assigned:.1f}",
+                f"Total assigned hours changed: {before_total_assigned:.1f} → {after_total_assigned:.1f}",
             )
 
         conn.commit()
@@ -1626,7 +1626,7 @@ async def phase_update(request: Request):
                 domain,
                 ro,
                 "phase_changed",
-                f"Phase changed: {old_label} â†’ {new_label}",
+                f"Phase changed: {old_label} → {new_label}",
             )
 
         conn.commit()
@@ -1874,17 +1874,17 @@ async def list_ro_activity(request: Request, ro: str):
                 saved_at = row.get("saved_at")
 
                 if prev_total_hours is not None and abs(total_hours - prev_total_hours) >= 1e-6:
-                    add_entry(f"Total hours changed: {prev_total_hours:.1f} â†’ {total_hours:.1f}", saved_at)
+                    add_entry(f"Total hours changed: {prev_total_hours:.1f} → {total_hours:.1f}", saved_at)
 
                 if prev_in_date is not None and current_in_date != prev_in_date:
                     old_display = prev_in_date.isoformat() if prev_in_date else "-"
                     new_display = current_in_date.isoformat() if current_in_date else "-"
-                    add_entry(f"In-date changed: {old_display} â†’ {new_display}", saved_at)
+                    add_entry(f"In-date changed: {old_display} → {new_display}", saved_at)
 
                 if prev_ecd_date is not None and current_ecd_date != prev_ecd_date:
                     old_display = prev_ecd_date.isoformat() if prev_ecd_date else "-"
                     new_display = current_ecd_date.isoformat() if current_ecd_date else "-"
-                    add_entry(f"ECD changed: {old_display} â†’ {new_display}", saved_at)
+                    add_entry(f"ECD changed: {old_display} → {new_display}", saved_at)
 
                 prev_total_hours = total_hours
                 prev_in_date = current_in_date
@@ -2007,7 +2007,8 @@ async def list_parts_ros(request: Request):
             SELECT DISTINCT ON (ro)
                    ro,
                    vehicle,
-                 estimator,
+                                     estimator,
+                                     written_by,
                    parts_repairs,
                    saved_at
             FROM saved_estimates
@@ -2110,27 +2111,47 @@ async def list_parts_ros(request: Request):
 
         cur.execute(
             """
-            SELECT ro, repair_type, tech_name
-            FROM ro_line_assignments
-                        WHERE (
-                                        shop_uuid = %s::uuid
-                                 OR (shop_uuid IS NULL AND shop_id = %s AND domain = %s)
-                                    )
-              AND ro IS NOT NULL
-              AND ro <> ''
-              AND tech_name IS NOT NULL
-              AND TRIM(tech_name) <> ''
-            ORDER BY ro, CASE WHEN repair_type = 'body' THEN 0 WHEN repair_type = 'paint' THEN 1 ELSE 2 END
+            SELECT
+                rla.ro,
+                rla.repair_type,
+                COALESCE(
+                    NULLIF(TRIM(rla.tech_name), ''),
+                    NULLIF(TRIM(CONCAT(COALESCE(t.first_name, ''), ' ', COALESCE(t.last_name, ''))), '')
+                ) AS tech_name
+            FROM ro_line_assignments rla
+            LEFT JOIN techs t
+              ON t.id = rla.tech_id
+             AND (
+                    t.shop_uuid = %s::uuid
+                 OR (t.shop_uuid IS NULL AND t.shop_id = %s AND (t.domain = %s OR t.domain IS NULL))
+                 )
+            WHERE (
+                    rla.shop_uuid = %s::uuid
+                 OR (rla.shop_uuid IS NULL AND rla.shop_id = %s AND rla.domain = %s)
+                  )
+              AND rla.ro IS NOT NULL
+              AND rla.ro <> ''
+            ORDER BY rla.ro, CASE WHEN rla.repair_type = 'body' THEN 0 WHEN rla.repair_type = 'paint' THEN 1 ELSE 2 END
             """,
-                        (current_shop_uuid, current_shop_id, domain),
+            (
+                current_shop_uuid,
+                current_shop_id,
+                domain,
+                current_shop_uuid,
+                current_shop_id,
+                domain,
+            ),
         )
         tech_rows = cur.fetchall() or []
         tech_by_ro = {}
         for tech_row in tech_rows:
-            ro_value = tech_row.get("ro")
-            if not ro_value or ro_value in tech_by_ro:
+            ro_key = str(tech_row.get("ro") or "").strip()
+            if not ro_key or ro_key in tech_by_ro:
                 continue
-            tech_by_ro[ro_value] = (tech_row.get("tech_name") or "").strip()
+            tech_name = (tech_row.get("tech_name") or "").strip()
+            if not tech_name:
+                continue
+            tech_by_ro[ro_key] = tech_name
 
         order_summary = {}
         on_order_warning_counts = {}
@@ -2173,6 +2194,7 @@ async def list_parts_ros(request: Request):
         ros = []
         for row in rows:
             ro = row["ro"]
+            ro_key = str(ro or "").strip()
             phase_value = phase_map.get(str(ro or "").strip(), "")
             if phase_value in closed_phase_keys:
                 continue
@@ -2192,6 +2214,8 @@ async def list_parts_ros(request: Request):
                 except (TypeError, ValueError):
                     parts_qty += 1
 
+            estimator_name = (row.get("estimator") or "").strip() or (row.get("written_by") or "").strip()
+
             summary = order_summary.get(ro, {})
             ordered_ids = summary.get("ordered_ids", set())
             returned_count = returned_map.get(ro, 0)
@@ -2200,8 +2224,8 @@ async def list_parts_ros(request: Request):
                 {
                     "ro": ro,
                     "vehicle": row.get("vehicle"),
-                    "estimator": (row.get("estimator") or "").strip() or "â€”",
-                    "tech": tech_by_ro.get(ro, "â€”"),
+                    "estimator": estimator_name or "—",
+                    "tech": tech_by_ro.get(ro_key, "—"),
                     "parts_qty": float(parts_qty or line_count or 0),
                     "on_order": on_order,
                     "on_order_warning_count": on_order_warning_counts.get(ro, 0),
