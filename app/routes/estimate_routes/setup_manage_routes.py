@@ -709,6 +709,71 @@ async def create_manage_user(request: Request):
 
 
 
+@router.post("/manage/users/reset-password")
+async def reset_manage_user_password(request: Request):
+    domain = get_user_domain(request)
+    if not domain:
+        return JSONResponse(status_code=401, content={"error": "Not authenticated"})
+    if not _request_is_architect(request):
+        return JSONResponse(status_code=403, content={"error": "Forbidden"})
+
+    data = await request.json()
+    selected_domain = str(data.get("shop_domain") or "").strip().lower()
+    user_ids_raw = data.get("user_ids") or []
+    new_password = str(data.get("new_password") or "")
+
+    if not selected_domain:
+        return JSONResponse(status_code=400, content={"error": "shop_domain is required"})
+    if not isinstance(user_ids_raw, list) or not user_ids_raw:
+        return JSONResponse(status_code=400, content={"error": "user_ids is required"})
+    if not new_password:
+        return JSONResponse(status_code=400, content={"error": "new_password is required"})
+
+    user_ids = []
+    for value in user_ids_raw:
+        try:
+            parsed = int(value)
+        except (TypeError, ValueError):
+            continue
+        if parsed not in user_ids:
+            user_ids.append(parsed)
+
+    if not user_ids:
+        return JSONResponse(status_code=400, content={"error": "No valid user ids provided"})
+
+    password_hash = hashlib.sha256(new_password.encode("utf-8")).hexdigest()
+
+    conn = get_conn()
+    cur = conn.cursor()
+    try:
+        cur.execute("SELECT id, shop_id, shop_id AS shop_uuid FROM shops WHERE domain = %s LIMIT 1", (selected_domain,))
+        shop_row = cur.fetchone() or {}
+        selected_shop_id = int(shop_row.get("id") or 0)
+        selected_shop_uuid = str(shop_row.get("shop_uuid") or "").strip() or None
+        if not selected_shop_id or not selected_shop_uuid:
+            return JSONResponse(status_code=400, content={"error": "Unable to resolve shop scope"})
+
+        cur.execute(
+            """
+            UPDATE shop_users
+            SET password_hash = %s
+            WHERE (
+                    shop_uuid = %s::uuid
+                 OR (shop_uuid IS NULL AND shop_id = %s AND domain = %s)
+                  )
+              AND active = TRUE
+              AND id = ANY(%s)
+            """,
+            (password_hash, selected_shop_uuid, selected_shop_id, selected_domain, user_ids),
+        )
+        updated_count = int(cur.rowcount or 0)
+        conn.commit()
+        return {"status": "ok", "updated": updated_count}
+    finally:
+        cur.close()
+
+
+
 @router.post("/manage/delete")
 async def delete_manage_entities(request: Request):
     domain = get_user_domain(request)

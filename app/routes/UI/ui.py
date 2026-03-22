@@ -1901,6 +1901,7 @@ async def manage_screen(request: Request):
             <div class="actions">
                 <button class="btn" onclick="onEdit()">Edit</button>
                 <button class="btn" onclick="onDelete()">Delete</button>
+                <button class="btn" onclick="onReset()">RESET</button>
                 <button id="manageAddBtn" class="btn" onclick="onAdd()">Add</button>
                 <button id="manageAddShopBtn" class="btn" onclick="onAddShopToggle()">+ Shop</button>
             </div>
@@ -2344,6 +2345,35 @@ async def manage_screen(request: Request):
                 if (state.expandedDomain) await ensureUsersLoaded(state.expandedDomain);
             } catch (error) {
                 alert(String(error.message || 'Unable to delete selection'));
+            }
+        }
+
+        async function onReset() {
+            if (!state.selectedUserIds.size) {
+                alert('Select user(s) first.');
+                return;
+            }
+            if (!state.expandedDomain) {
+                alert('Select a shop first.');
+                return;
+            }
+
+            const newPassword = window.prompt('Enter new password for selected user(s):');
+            if (!newPassword) return;
+
+            try {
+                await api('/api/manage/users/reset-password', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        shop_domain: state.expandedDomain,
+                        user_ids: Array.from(state.selectedUserIds),
+                        new_password: newPassword,
+                    }),
+                });
+                alert('Password reset complete.');
+            } catch (error) {
+                alert(String(error.message || 'Unable to reset password'));
             }
         }
 
