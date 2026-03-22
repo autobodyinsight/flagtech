@@ -1,19 +1,25 @@
 import json
+import logging
 import os
 import re
+import time
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 from sqlalchemy import create_engine
+from sqlalchemy.exc import TimeoutError as SQLAlchemyTimeoutError
 
 DATABASE_URL = os.getenv("DATABASE_URL")
+DB_CHECKOUT_WARN_MS = float(os.getenv("DB_CHECKOUT_WARN_MS", "1000"))
 
 engine = None
+logger = logging.getLogger("flagtech.db")
 
 
 class CursorAdapter:
     def __init__(self, connection):
         self._connection = connection
         self._result = None
+        self._closed = False
         self.rowcount = -1
 
     def execute(self, statement, params=None):
@@ -39,7 +45,22 @@ class CursorAdapter:
         return [dict(row) for row in self._result.mappings().all()]
 
     def close(self):
-        self._result = None
+        if self._closed:
+            return
+        self._closed = True
+
+        if self._result is not None:
+            try:
+                self._result.close()
+            except Exception:
+                pass
+            self._result = None
+
+        try:
+            if not self._connection.closed:
+                self._connection.close()
+        except Exception:
+            pass
 
 
 class ConnectionAdapter:
@@ -95,7 +116,18 @@ def get_conn():
             pool_recycle=1800,
             isolation_level="AUTOCOMMIT",
         )
-    return ConnectionAdapter(engine.connect())
+    start_time = time.perf_counter()
+    try:
+        connection = engine.connect()
+    except SQLAlchemyTimeoutError:
+        duration_ms = (time.perf_counter() - start_time) * 1000
+        logger.warning("db_checkout_timeout duration_ms=%.1f", duration_ms)
+        raise
+
+    duration_ms = (time.perf_counter() - start_time) * 1000
+    if duration_ms >= DB_CHECKOUT_WARN_MS:
+        logger.warning("db_checkout_slow duration_ms=%.1f", duration_ms)
+    return ConnectionAdapter(connection)
 
 
 def _parse_float(value) -> float:
