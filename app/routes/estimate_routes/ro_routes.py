@@ -2012,15 +2012,12 @@ async def list_parts_ros(request: Request):
                    parts_repairs,
                    saved_at
             FROM saved_estimates
-                        WHERE (
-                                        shop_uuid = %s::uuid
-                                 OR (shop_uuid IS NULL AND shop_id = %s AND domain = %s)
-                                    )
+            WHERE shop_uuid = %s::uuid
               AND ro IS NOT NULL
               AND ro <> ''
             ORDER BY ro, saved_at DESC, id DESC
             """,
-                        (current_shop_uuid, current_shop_id, domain),
+                        (current_shop_uuid,),
         )
         rows = cur.fetchall()
 
@@ -2028,12 +2025,9 @@ async def list_parts_ros(request: Request):
             """
             SELECT ro, phase
             FROM ro_phases
-            WHERE (
-                    shop_uuid = %s::uuid
-                 OR (shop_uuid IS NULL AND shop_id = %s AND domain = %s)
-                  )
+            WHERE shop_uuid = %s::uuid
             """,
-            (current_shop_uuid, current_shop_id, domain),
+            (current_shop_uuid,),
         )
         phase_rows = cur.fetchall() or []
         phase_map = {str(row.get("ro") or "").strip(): str(row.get("phase") or "").strip().lower() for row in phase_rows}
@@ -2043,13 +2037,10 @@ async def list_parts_ros(request: Request):
             """
             SELECT ro, arrival_date, ordered_lines, arrived_count, returned_count, created_at
             FROM parts_orders
-            WHERE (
-                    shop_uuid = %s::uuid
-                 OR (shop_uuid IS NULL AND shop_id = %s AND domain = %s)
-                  )
+            WHERE shop_uuid = %s::uuid
             ORDER BY created_at DESC
             """,
-            (current_shop_uuid, current_shop_id, domain),
+            (current_shop_uuid,),
         )
         orders = cur.fetchall()
 
@@ -2057,13 +2048,10 @@ async def list_parts_ros(request: Request):
             """
             SELECT ro, COUNT(*) as arrived
             FROM parts_received
-            WHERE (
-                    shop_uuid = %s::uuid
-                 OR (shop_uuid IS NULL AND shop_id = %s AND domain = %s)
-                  )
+            WHERE shop_uuid = %s::uuid
             GROUP BY ro
             """,
-            (current_shop_uuid, current_shop_id, domain),
+            (current_shop_uuid,),
         )
         received_rows = cur.fetchall()
         received_map = {row["ro"]: int(row.get("arrived") or 0) for row in received_rows}
@@ -2072,13 +2060,10 @@ async def list_parts_ros(request: Request):
             """
             SELECT ro, line_id
             FROM parts_received
-                        WHERE (
-                                        shop_uuid = %s::uuid
-                                 OR (shop_uuid IS NULL AND shop_id = %s AND domain = %s)
-                                    )
+            WHERE shop_uuid = %s::uuid
               AND COALESCE(returned, FALSE) = FALSE
             """,
-                        (current_shop_uuid, current_shop_id, domain),
+                        (current_shop_uuid,),
         )
         received_not_returned_rows = cur.fetchall() or []
         received_not_returned_by_ro = {}
@@ -2097,14 +2082,11 @@ async def list_parts_ros(request: Request):
             """
             SELECT ro, COUNT(*) as returned
             FROM parts_received
-                        WHERE (
-                                        shop_uuid = %s::uuid
-                                 OR (shop_uuid IS NULL AND shop_id = %s AND domain = %s)
-                                    )
+            WHERE shop_uuid = %s::uuid
               AND COALESCE(returned, FALSE) = TRUE
             GROUP BY ro
             """,
-                        (current_shop_uuid, current_shop_id, domain),
+                        (current_shop_uuid,),
         )
         returned_rows = cur.fetchall() or []
         returned_map = {row["ro"]: int(row.get("returned") or 0) for row in returned_rows}
@@ -2121,25 +2103,15 @@ async def list_parts_ros(request: Request):
             FROM ro_line_assignments rla
             LEFT JOIN techs t
               ON t.id = rla.tech_id
-             AND (
-                    t.shop_uuid = %s::uuid
-                 OR (t.shop_uuid IS NULL AND t.shop_id = %s AND (t.domain = %s OR t.domain IS NULL))
-                 )
-            WHERE (
-                    rla.shop_uuid = %s::uuid
-                 OR (rla.shop_uuid IS NULL AND rla.shop_id = %s AND rla.domain = %s)
-                  )
+              AND t.shop_uuid = %s::uuid
+            WHERE rla.shop_uuid = %s::uuid
               AND rla.ro IS NOT NULL
               AND rla.ro <> ''
             ORDER BY rla.ro, CASE WHEN rla.repair_type = 'body' THEN 0 WHEN rla.repair_type = 'paint' THEN 1 ELSE 2 END
             """,
             (
                 current_shop_uuid,
-                current_shop_id,
-                domain,
                 current_shop_uuid,
-                current_shop_id,
-                domain,
             ),
         )
         tech_rows = cur.fetchall() or []
@@ -2265,12 +2237,9 @@ async def list_parts_lines(request: Request, ro: str):
             """
             SELECT ordered_lines
             FROM parts_orders
-            WHERE (
-                    shop_uuid = %s::uuid
-                 OR (shop_uuid IS NULL AND shop_id = %s AND domain = %s)
-            ) AND ro = %s
+            WHERE shop_uuid = %s::uuid AND ro = %s
             """,
-            (current_shop_uuid, current_shop_id, domain, ro),
+            (current_shop_uuid, ro),
         )
         order_rows = cur.fetchall() or []
         ordered_ids = set()
@@ -2281,12 +2250,9 @@ async def list_parts_lines(request: Request, ro: str):
             """
             SELECT line_id
             FROM parts_received
-            WHERE (
-                    shop_uuid = %s::uuid
-                 OR (shop_uuid IS NULL AND shop_id = %s AND domain = %s)
-            ) AND ro = %s AND COALESCE(returned, FALSE) = FALSE
+            WHERE shop_uuid = %s::uuid AND ro = %s AND COALESCE(returned, FALSE) = FALSE
             """,
-            (current_shop_uuid, current_shop_id, domain, ro),
+            (current_shop_uuid, ro),
         )
         received_rows = cur.fetchall() or []
         received_not_returned_ids = {
@@ -2299,12 +2265,9 @@ async def list_parts_lines(request: Request, ro: str):
             """
             SELECT line_id
             FROM parts_received
-            WHERE (
-                    shop_uuid = %s::uuid
-                 OR (shop_uuid IS NULL AND shop_id = %s AND domain = %s)
-            ) AND ro = %s AND COALESCE(returned, FALSE) = TRUE
+            WHERE shop_uuid = %s::uuid AND ro = %s AND COALESCE(returned, FALSE) = TRUE
             """,
-            (current_shop_uuid, current_shop_id, domain, ro),
+            (current_shop_uuid, ro),
         )
         returned_rows = cur.fetchall() or []
         returned_ids = {
@@ -2319,14 +2282,11 @@ async def list_parts_lines(request: Request, ro: str):
             """
             SELECT parts_repairs
             FROM saved_estimates
-            WHERE (
-                    shop_uuid = %s::uuid
-                 OR (shop_uuid IS NULL AND shop_id = %s AND domain = %s)
-            ) AND ro = %s
+            WHERE shop_uuid = %s::uuid AND ro = %s
             ORDER BY saved_at DESC, id DESC
             LIMIT 1
             """,
-            (current_shop_uuid, current_shop_id, domain, ro),
+            (current_shop_uuid, ro),
         )
         row = cur.fetchone()
         parts_repairs = _parse_json_field(row.get("parts_repairs")) if row else []
@@ -2395,12 +2355,9 @@ async def save_parts_order(request: Request):
             """
             SELECT ordered_lines
             FROM parts_orders
-            WHERE (
-                    shop_uuid = %s::uuid
-                 OR (shop_uuid IS NULL AND shop_id = %s AND domain = %s)
-            ) AND ro = %s
+            WHERE shop_uuid = %s::uuid AND ro = %s
             """,
-            (current_shop_uuid, current_shop_id, domain, ro),
+            (current_shop_uuid, ro),
         )
         existing_orders = cur.fetchall() or []
         already_ordered = set()
@@ -2411,12 +2368,9 @@ async def save_parts_order(request: Request):
             """
             SELECT line_id
             FROM parts_received
-            WHERE (
-                    shop_uuid = %s::uuid
-                 OR (shop_uuid IS NULL AND shop_id = %s AND domain = %s)
-            ) AND ro = %s AND COALESCE(returned, FALSE) = FALSE
+            WHERE shop_uuid = %s::uuid AND ro = %s AND COALESCE(returned, FALSE) = FALSE
             """,
-            (current_shop_uuid, current_shop_id, domain, ro),
+            (current_shop_uuid, ro),
         )
         received_rows = cur.fetchall() or []
         received_not_returned_ids = {
@@ -2429,12 +2383,9 @@ async def save_parts_order(request: Request):
             """
             SELECT line_id
             FROM parts_received
-            WHERE (
-                    shop_uuid = %s::uuid
-                 OR (shop_uuid IS NULL AND shop_id = %s AND domain = %s)
-            ) AND ro = %s AND COALESCE(returned, FALSE) = TRUE
+            WHERE shop_uuid = %s::uuid AND ro = %s AND COALESCE(returned, FALSE) = TRUE
             """,
-            (current_shop_uuid, current_shop_id, domain, ro),
+            (current_shop_uuid, ro),
         )
         returned_rows = cur.fetchall() or []
         returned_ids = {
@@ -2513,14 +2464,10 @@ async def list_parts_received(request: Request, ro: str):
             SELECT line_id, vendor, part_number, list_price, cost, eta, invoice_number, invoice_total,
                    returned, received_business_date, received_at
             FROM parts_received
-                        WHERE ro = %s
-                            AND (
-                                        shop_uuid = %s::uuid
-                                 OR (shop_uuid IS NULL AND shop_id = %s AND domain = %s)
-                            )
+            WHERE shop_uuid = %s::uuid AND ro = %s
             ORDER BY COALESCE(received_business_date, received_at::date) DESC, received_at DESC
             """,
-                        (ro, current_shop_uuid, current_shop_id, domain),
+                        (current_shop_uuid, ro),
         )
         rows = cur.fetchall()
         items = [
@@ -2975,14 +2922,11 @@ async def get_parts_ro_full(request: Request, ro: str):
             """
             SELECT parts_repairs
             FROM saved_estimates
-            WHERE (
-                    shop_uuid = %s::uuid
-                 OR (shop_uuid IS NULL AND shop_id = %s AND domain = %s)
-            ) AND ro = %s
+            WHERE shop_uuid = %s::uuid AND ro = %s
             ORDER BY saved_at DESC, id DESC
             LIMIT 1
             """,
-            (current_shop_uuid, current_shop_id, domain, ro_value),
+            (current_shop_uuid, ro_value),
         )
         estimate_row = cur.fetchone()
         parts_repairs = _parse_json_field(estimate_row.get("parts_repairs")) if estimate_row else []
@@ -3017,13 +2961,10 @@ async def get_parts_ro_full(request: Request, ro: str):
             """
             SELECT id, vendor_name, arrival_date, ordered_lines
             FROM parts_orders
-            WHERE (
-                    shop_uuid = %s::uuid
-                 OR (shop_uuid IS NULL AND shop_id = %s AND domain = %s)
-            ) AND ro = %s
+            WHERE shop_uuid = %s::uuid AND ro = %s
             ORDER BY created_at DESC, id DESC
             """,
-            (current_shop_uuid, current_shop_id, domain, ro_value),
+            (current_shop_uuid, ro_value),
         )
         order_rows = cur.fetchall() or []
 
@@ -3032,13 +2973,10 @@ async def get_parts_ro_full(request: Request, ro: str):
             """
             SELECT line_id, vendor, description, part_number, list_price, cost, invoice_number, received_business_date, received_at, returned, returned_business_date, returned_at
             FROM parts_received
-            WHERE (
-                    shop_uuid = %s::uuid
-                 OR (shop_uuid IS NULL AND shop_id = %s AND domain = %s)
-            ) AND ro = %s
+            WHERE shop_uuid = %s::uuid AND ro = %s
             ORDER BY COALESCE(received_business_date, received_at::date) DESC, line_id
             """,
-            (current_shop_uuid, current_shop_id, domain, ro_value),
+            (current_shop_uuid, ro_value),
         )
         received_rows = cur.fetchall() or []
 
