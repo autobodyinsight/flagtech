@@ -191,7 +191,7 @@ async def save_setup_shop(request: Request):
         if not requester_is_architect and selected_domain != str(domain or "").strip().lower():
             return JSONResponse(status_code=403, content={"error": "Forbidden"})
 
-        cur.execute("SELECT id, shop_id, shop_uuid FROM shops WHERE domain = %s LIMIT 1", (selected_domain,))
+        cur.execute("SELECT id, shop_id, shop_id AS shop_uuid FROM shops WHERE domain = %s LIMIT 1", (selected_domain,))
         shop_row = cur.fetchone() or {}
         selected_shop_id = int(shop_row.get("id") or 0)
         selected_shop_uuid = str(shop_row.get("shop_uuid") or shop_row.get("shop_id") or "").strip() or None
@@ -209,7 +209,7 @@ async def save_setup_shop(request: Request):
                     state = COALESCE(EXCLUDED.state, shops.state),
                     zip = COALESCE(EXCLUDED.zip, shops.zip),
                     updated_at = CURRENT_TIMESTAMP
-                RETURNING id, shop_id, shop_uuid
+                RETURNING id, shop_id, shop_id AS shop_uuid
                 """,
                 (str(uuid.uuid4()), selected_domain, shop_name or None, address or None, city or None, state or None, zip_code or None),
             )
@@ -591,7 +591,7 @@ async def update_manage_user(request: Request):
     conn = get_conn()
     cur = conn.cursor()
     try:
-        cur.execute("SELECT id, shop_id, shop_uuid FROM shops WHERE domain = %s LIMIT 1", (selected_domain,))
+        cur.execute("SELECT id, shop_id, shop_id AS shop_uuid FROM shops WHERE domain = %s LIMIT 1", (selected_domain,))
         shop_row = cur.fetchone() or {}
         selected_shop_id = int(shop_row.get("id") or 0)
         selected_shop_uuid = str(shop_row.get("shop_uuid") or "").strip() or None
@@ -668,7 +668,7 @@ async def create_manage_user(request: Request):
     conn = get_conn()
     cur = conn.cursor()
     try:
-        cur.execute("SELECT id, shop_id, shop_uuid FROM shops WHERE domain = %s LIMIT 1", (selected_domain,))
+        cur.execute("SELECT id, shop_id, shop_id AS shop_uuid FROM shops WHERE domain = %s LIMIT 1", (selected_domain,))
         shop_row = cur.fetchone() or {}
         selected_shop_id = int(shop_row.get("id") or 0)
         selected_shop_uuid = str(shop_row.get("shop_uuid") or "").strip() or None
@@ -808,7 +808,7 @@ async def update_setup_user(request: Request):
         if not (requester_is_architect or _is_manager_or_hr_role(requester_role)):
             return JSONResponse(status_code=403, content={"error": "Forbidden"})
 
-        cur.execute("SELECT id, shop_id, shop_uuid FROM shops WHERE domain = %s LIMIT 1", (selected_domain,))
+        cur.execute("SELECT id, shop_id, shop_id AS shop_uuid FROM shops WHERE domain = %s LIMIT 1", (selected_domain,))
         shop_row = cur.fetchone() or {}
         selected_shop_id = int(shop_row.get("id") or 0)
         selected_shop_uuid = str(shop_row.get("shop_uuid") or "").strip() or None
@@ -899,7 +899,7 @@ async def reset_setup_user_password(request: Request):
         if not (requester_is_architect or _is_manager_or_hr_role(requester_role)):
             return JSONResponse(status_code=403, content={"error": "Forbidden"})
 
-        cur.execute("SELECT id, shop_id, shop_uuid FROM shops WHERE domain = %s LIMIT 1", (selected_domain,))
+        cur.execute("SELECT id, shop_id, shop_id AS shop_uuid FROM shops WHERE domain = %s LIMIT 1", (selected_domain,))
         shop_row = cur.fetchone() or {}
         selected_shop_id = int(shop_row.get("id") or 0)
         selected_shop_uuid = str(shop_row.get("shop_uuid") or "").strip() or None
@@ -1029,7 +1029,7 @@ async def create_setup_user(request: Request):
         if not (requester_is_architect or _is_manager_or_hr_role(requester_role)):
             return JSONResponse(status_code=403, content={"error": "Forbidden"})
 
-        cur.execute("SELECT id, shop_id, shop_uuid FROM shops WHERE domain = %s LIMIT 1", (selected_domain,))
+        cur.execute("SELECT id, shop_id, shop_id AS shop_uuid FROM shops WHERE domain = %s LIMIT 1", (selected_domain,))
         shop_row = cur.fetchone() or {}
         selected_shop_id = int(shop_row.get("id") or 0)
         selected_shop_uuid = str(shop_row.get("shop_uuid") or "").strip() or None
@@ -1111,7 +1111,7 @@ async def delete_setup_users(request: Request):
         if not (requester_is_architect or _is_manager_or_hr_role(requester_role)):
             return JSONResponse(status_code=403, content={"error": "Forbidden"})
 
-        cur.execute("SELECT id, shop_id, shop_uuid FROM shops WHERE domain = %s LIMIT 1", (selected_domain,))
+        cur.execute("SELECT id, shop_id, shop_id AS shop_uuid FROM shops WHERE domain = %s LIMIT 1", (selected_domain,))
         shop_row = cur.fetchone() or {}
         selected_shop_id = int(shop_row.get("id") or 0)
         selected_shop_uuid = str(shop_row.get("shop_uuid") or "").strip() or None
@@ -1177,7 +1177,7 @@ async def delete_setup_shop(request: Request):
     conn = get_conn()
     cur = conn.cursor()
     try:
-        cur.execute("SELECT id, shop_id, shop_uuid FROM shops WHERE domain = %s LIMIT 1", (selected_domain,))
+        cur.execute("SELECT id, shop_id, shop_id AS shop_uuid FROM shops WHERE domain = %s LIMIT 1", (selected_domain,))
         shop_row = cur.fetchone() or {}
         selected_shop_id = int(shop_row.get("id") or 0)
         selected_shop_uuid = str(shop_row.get("shop_uuid") or "").strip() or None
