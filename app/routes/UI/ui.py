@@ -2080,18 +2080,11 @@ async def manage_screen(request: Request):
                 const addRow = state.addingRowByDomain[domain] || null;
                 const tableRows = users.map((u) => renderUserRow(u, domain)).join('') + (addRow ? renderUserRow(addRow, domain, true) : '');
 
-                const address = String(shop.address || '').trim();
-                const city = String(shop.city || '').trim();
-                const state = String(shop.state || '').trim();
-                const zip = String(shop.zip_code || '').trim();
-                const addressLine = [address, city, state, zip].filter(v => v).join('   ');
-                const fullDisplay = addressLine ? `${esc(shop.shop_name || domain)}   ${esc(addressLine)}` : esc(shop.shop_name || domain);
-
                 return `
                     <div class="shop-row">
                         <div><input type="checkbox" data-shop-domain="${esc(domain)}" ${state.selectedShopDomains.has(domain) ? 'checked' : ''} onchange="toggleShopSelection('${esc(domain)}', this.checked)" /></div>
                         <label class="toggle"><input type="checkbox" ${shop.active ? 'checked' : ''} onchange="toggleShopActive('${esc(domain)}', this.checked)" /> ${shop.active ? 'ACTIVE' : 'INACTIVE'}</label>
-                        <button type="button" class="shop-name" onclick="toggleExpand('${esc(domain)}')">${fullDisplay}</button>
+                        <button type="button" class="shop-name" onclick="toggleExpand('${esc(domain)}')">${esc(shop.shop_name || domain)}</button>
                         <div class="muted">Users: ${Number(shop.user_count || 0)}</div>
                     </div>
                     <div class="slide ${open ? 'open' : ''}">

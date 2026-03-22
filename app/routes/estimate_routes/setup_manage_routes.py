@@ -28,6 +28,7 @@
     get_user_domain,
     get_user_shop_uuid,
     revoke_auth_session,
+    build_session_snapshot_payload,
     build_permission_snapshot,
     _quote_ident,
     _ensure_shops_table,
@@ -193,13 +194,13 @@ async def save_setup_shop(request: Request):
         cur.execute("SELECT id, shop_id, shop_uuid FROM shops WHERE domain = %s LIMIT 1", (selected_domain,))
         shop_row = cur.fetchone() or {}
         selected_shop_id = int(shop_row.get("id") or 0)
-        selected_shop_uuid = str(shop_row.get("shop_uuid") or "").strip() or None
+        selected_shop_uuid = str(shop_row.get("shop_uuid") or shop_row.get("shop_id") or "").strip() or None
 
         if not selected_shop_id and requester_is_architect:
             cur.execute(
                 """
-                INSERT INTO shops (domain, name, address, city, state, zip, updated_at)
-                VALUES (%s, %s, %s, %s, %s, %s, CURRENT_TIMESTAMP)
+                INSERT INTO shops (shop_id, domain, name, address, city, state, zip, updated_at)
+                VALUES (%s::uuid, %s, %s, %s, %s, %s, %s, CURRENT_TIMESTAMP)
                 ON CONFLICT (domain)
                 DO UPDATE SET
                     name = COALESCE(EXCLUDED.name, shops.name),
@@ -210,11 +211,11 @@ async def save_setup_shop(request: Request):
                     updated_at = CURRENT_TIMESTAMP
                 RETURNING id, shop_id, shop_uuid
                 """,
-                (selected_domain, shop_name or None, address or None, city or None, state or None, zip_code or None),
+                (str(uuid.uuid4()), selected_domain, shop_name or None, address or None, city or None, state or None, zip_code or None),
             )
             inserted_shop_row = cur.fetchone() or {}
             selected_shop_id = int(inserted_shop_row.get("id") or 0)
-            selected_shop_uuid = str(inserted_shop_row.get("shop_uuid") or "").strip() or None
+            selected_shop_uuid = str(inserted_shop_row.get("shop_uuid") or inserted_shop_row.get("shop_id") or "").strip() or None
 
         if not selected_shop_id or not selected_shop_uuid:
             return JSONResponse(status_code=400, content={"error": "Unable to resolve shop scope"})
@@ -262,7 +263,40 @@ async def save_setup_shop(request: Request):
             (shop_name or None, address or None, city or None, state or None, zip_code or None, selected_shop_id),
         )
         conn.commit()
-        return {"status": "ok"}
+        authenticated_user = get_authenticated_user(request) or {}
+        role_value = str((requester_row or {}).get("role") or authenticated_user.get("role") or "").strip()
+        user_uuid_value = str(authenticated_user.get("user_uuid") or "").strip() or None
+        permissions = build_permission_snapshot(
+            role=role_value,
+            domain=selected_domain,
+            shop_id=selected_shop_id,
+            shop_uuid=selected_shop_uuid,
+            user_uuid=user_uuid_value,
+            is_architect=requester_is_architect,
+        )
+        snapshot_user = {
+            "id": int(authenticated_user.get("id") or (requester_row or {}).get("id") or 0),
+            "email": str(authenticated_user.get("email") or (requester_row or {}).get("email") or "").strip().lower(),
+            "first_name": str(authenticated_user.get("first_name") or (requester_row or {}).get("first_name") or "").strip(),
+            "last_name": str(authenticated_user.get("last_name") or (requester_row or {}).get("last_name") or "").strip(),
+            "role": role_value,
+            "domain": selected_domain,
+            "shop_id": selected_shop_id,
+            "shop_uuid": selected_shop_uuid,
+            "user_uuid": user_uuid_value,
+            "shop_name": shop_name,
+            "address": address,
+            "access_level": str(permissions.get("access_level") or "").strip(),
+            "permissions": permissions,
+            "is_architect": requester_is_architect,
+        }
+        session_snapshot = build_session_snapshot_payload(
+            user=snapshot_user,
+            permission_snapshot=permissions,
+        )
+        request.state.session_snapshot = session_snapshot
+        request.state.permission_snapshot = permissions
+        return {"status": "ok", "shop_uuid": selected_shop_uuid, "session_snapshot": session_snapshot}
     finally:
         cur.close()
 
@@ -389,16 +423,12 @@ async def list_manage_shops(request: Request):
                     d.domain,
                     COALESCE(sh.active, TRUE) AS active,
                     COALESCE(ss.shop_name, sh.name, d.domain) AS shop_name,
-                    ss.address,
-                    ss.city,
-                    ss.state,
-                    ss.zip_code,
                     COUNT(DISTINCT su.id) FILTER (WHERE su.active = TRUE) AS user_count
                 FROM all_domains d
                 LEFT JOIN shops sh ON sh.domain = d.domain
                 LEFT JOIN shop_settings ss ON ss.domain = d.domain
                 LEFT JOIN shop_users su ON su.domain = d.domain
-                GROUP BY sh.id, d.domain, sh.active, ss.shop_name, sh.name, ss.address, ss.city, ss.state, ss.zip_code
+                GROUP BY sh.id, d.domain, sh.active, ss.shop_name, sh.name
                 ORDER BY LOWER(COALESCE(NULLIF(ss.shop_name, ''), NULLIF(sh.name, ''), d.domain)) ASC
                 """
             )
@@ -410,10 +440,6 @@ async def list_manage_shops(request: Request):
                         "id": int(row.get("shop_id") or 0) or None,
                         "domain": str(row.get("domain") or "").strip().lower(),
                         "shop_name": str(row.get("shop_name") or "").strip(),
-                        "address": str(row.get("address") or "").strip(),
-                        "city": str(row.get("city") or "").strip(),
-                        "state": str(row.get("state") or "").strip(),
-                        "zip_code": str(row.get("zip_code") or "").strip(),
                         "active": bool(row.get("active", True)),
                         "user_count": int(row.get("user_count") or 0),
                     }
