@@ -4,6 +4,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from contextlib import asynccontextmanager
 from pathlib import Path
+import logging
+import time
 from app.services.schema_bootstrap import initialize_application_schema
 from app.services.middleware import validate_request_session
 
@@ -14,6 +16,9 @@ from app.routes.UI.ui_with_processing import router as processing_router
 from app.routes.UI.upload_ui.routes import router as ui_routes_router
 from app.routes.UI.reports import router as reports_router
 from app.routes.payments import router as payments_router
+
+
+logger = logging.getLogger("flagtech.request_timing")
 
 
 
@@ -101,6 +106,33 @@ async def permission_guard_middleware(request, call_next):
     request.state.permission_snapshot = session_info.get("permission_snapshot") or {}
 
     return await call_next(request)
+
+
+@app.middleware("http")
+async def request_timing_middleware(request, call_next):
+    path = str(request.url.path or "")
+    if path.startswith("/static/"):
+        return await call_next(request)
+
+    method = request.method.upper()
+    start_time = time.perf_counter()
+    logger.info("req_start method=%s path=%s", method, path)
+    try:
+        response = await call_next(request)
+    except Exception:
+        duration_ms = (time.perf_counter() - start_time) * 1000
+        logger.exception("req_error method=%s path=%s duration_ms=%.1f", method, path, duration_ms)
+        raise
+
+    duration_ms = (time.perf_counter() - start_time) * 1000
+    logger.info(
+        "req_done method=%s path=%s status=%s duration_ms=%.1f",
+        method,
+        path,
+        response.status_code,
+        duration_ms,
+    )
+    return response
 
 # ---------------------------------------------------------
 # ROOT REDIRECT
