@@ -76,6 +76,11 @@ def get_setup_screen_html():
         </style>
 
         <div id="setupMainPane">
+            <div style="display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; margin:0 0 28px 0; padding:14px; background:rgba(0,0,0,0.02); border-radius:8px; border:1px solid rgba(0,0,0,0.06);">
+                <h3 style="margin:0 0 8px 0; color:#333; font-size:18px;">Shop Information</h3>
+                <div id="setupShopInfo" style="font-size:14px; color:#555; line-height:1.6;">Loading shop details...</div>
+            </div>
+
             <h3 style="margin:0 0 18px 0; color:#333;">Setup</h3>
 
             <div style="display:flex; align-items:center; justify-content:flex-end; margin-bottom:8px; gap:8px;">
@@ -169,12 +174,17 @@ def get_setup_screen_html():
 def get_setup_script():
     return """
         let setupUsersData = [];
+        let setupShopData = {};
         let setupEditMode = false;
         let setupPendingDeleteUserIds = [];
         let setupUsersLastLoadedAt = 0;
+        let setupShopLastLoadedAt = 0;
         let setupUsersInFlightPromise = null;
+        let setupShopInFlightPromise = null;
         let setupUsersRequestToken = 0;
+        let setupShopRequestToken = 0;
         const setupUsersTtlMs = 15000;
+        const setupShopTtlMs = 30000;
 
         function setupEscape(value) {
             return String(value || '')
@@ -192,7 +202,71 @@ def get_setup_script():
                 setupRenderUsers();
                 return;
             }
-            await setupLoadUsers({ force });
+            await Promise.all([setupLoadShop({ force }), setupLoadUsers({ force })]);
+        }
+
+        async function setupLoadShop(options = {}) {
+            const force = !!options.force;
+            const hasCachedShop = Object.keys(setupShopData).length > 0;
+            const isFresh = hasCachedShop && (Date.now() - setupShopLastLoadedAt) < setupShopTtlMs;
+            if (!force && isFresh) {
+                setupRenderShopInfo();
+                return;
+            }
+
+            if (setupShopInFlightPromise && !force) {
+                return setupShopInFlightPromise;
+            }
+
+            const loadPromise = (async () => {
+                const requestToken = ++setupShopRequestToken;
+                try {
+                    const resp = await fetch('/api/setup/shop', { credentials: 'include' });
+                    const data = await resp.json().catch(() => ({}));
+                    if (!resp.ok || data.error) {
+                        throw new Error(data.error || `Failed to load shop (${resp.status})`);
+                    }
+                    if (requestToken !== setupShopRequestToken) {
+                        return;
+                    }
+                    setupShopData = data.shop || {};
+                    setupShopLastLoadedAt = Date.now();
+                    setupRenderShopInfo();
+                } catch (error) {
+                    console.error('Error loading shop info:', error);
+                    const shopInfoEl = document.getElementById('setupShopInfo');
+                    if (shopInfoEl) {
+                        shopInfoEl.innerHTML = '<span style="color:#c00;">Unable to load shop information.</span>';
+                    }
+                }
+            })();
+
+            setupShopInFlightPromise = loadPromise;
+            try {
+                await loadPromise;
+            } finally {
+                if (setupShopInFlightPromise === loadPromise) {
+                    setupShopInFlightPromise = null;
+                }
+            }
+        }
+
+        function setupRenderShopInfo() {
+            const infoEl = document.getElementById('setupShopInfo');
+            if (!infoEl) return;
+            const shop = setupShopData || {};
+            const name = setupEscape(shop.shop_name || '');
+            const address = setupEscape(shop.address || '');
+            const city = setupEscape(shop.city || '');
+            const state = setupEscape(shop.state || '');
+            const zip = setupEscape(shop.zip_code || '');
+            
+            let html = `<strong>${name}</strong>`;
+            if (address) html += `<div>${address}</div>`;
+            const cityStateZip = [city, state].filter(v => v).join(', ') + (zip ? ` ${zip}` : '');
+            if (cityStateZip.trim()) html += `<div>${cityStateZip}</div>`;
+            
+            infoEl.innerHTML = html;
         }
 
         async function setupLoadUsers(options = {}) {
