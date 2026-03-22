@@ -2098,7 +2098,7 @@ async def manage_screen(request: Request):
                                         <th>Email</th>
                                         <th>Role</th>
                                         <th>Shop name</th>
-                                        <th style="width:90px;">Save</th>
+                                        <th style="width:170px;">Password</th>
                                     </tr>
                                 </thead>
                                 <tbody>${tableRows || '<tr><td colspan="7" class="muted">No users.</td></tr>'}</tbody>
@@ -2172,6 +2172,9 @@ async def manage_screen(request: Request):
             const shopCell = editable
                 ? `<select data-field="shop_domain" data-domain="${esc(domain)}" data-user-id="${userId}">${shopOptions(shopDomain)}</select>`
                 : esc(user.shop_name || domain);
+            const passwordCell = isNew
+                ? `<input type="password" data-field="password" data-domain="${esc(domain)}" data-user-id="${userId}" value="" placeholder="Temporary password" />`
+                : '<span class="muted">—</span>';
 
             return `
                 <tr>
@@ -2181,9 +2184,48 @@ async def manage_screen(request: Request):
                     <td>${emailCell}</td>
                     <td>${roleCell}</td>
                     <td>${shopCell}</td>
-                    <td>${editable && !isNew ? `<button class="btn" style="padding:6px 10px;" onclick="saveUserRow('${esc(domain)}', ${userId}, false)">Save</button>` : ''}</td>
+                    <td>${passwordCell}</td>
                 </tr>
             `;
+        }
+
+        function collectChangedUserEdits(domain) {
+            const normalizedDomain = String(domain || '').trim().toLowerCase();
+            const users = Array.isArray(state.usersByDomain[normalizedDomain]) ? state.usersByDomain[normalizedDomain] : [];
+            const changes = [];
+
+            users.forEach((user) => {
+                const userId = Number(user.id || 0);
+                if (!userId || !state.selectedUserIds.has(userId)) return;
+                const next = readEditableRow(normalizedDomain, userId);
+                const changed =
+                    next.first_name !== String(user.first_name || '').trim() ||
+                    next.last_name !== String(user.last_name || '').trim() ||
+                    next.email !== String(user.email || '').trim().toLowerCase() ||
+                    next.role !== String(user.role || '').trim() ||
+                    next.shop_domain !== String(user.shop_domain || normalizedDomain).trim().toLowerCase();
+
+                if (changed) {
+                    changes.push({ id: userId, ...next });
+                }
+            });
+
+            return changes;
+        }
+
+        async function saveChangedUserEdits(domain) {
+            const changes = collectChangedUserEdits(domain);
+            if (!changes.length) return false;
+
+            for (const payload of changes) {
+                await api('/api/manage/users/update', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload),
+                });
+            }
+
+            return true;
         }
 
         function toggleShopSelection(domain, checked) {
@@ -2325,7 +2367,20 @@ async def manage_screen(request: Request):
                 render();
                 return;
             }
-            void commitDraftUser(domain);
+            void (async () => {
+                try {
+                    const hadUserUpdates = await saveChangedUserEdits(domain);
+                    await commitDraftUser(domain);
+                    if (hadUserUpdates) {
+                        state.editMode = false;
+                        await loadShops({ force: true });
+                        await ensureUsersLoaded(domain, { force: true });
+                        render();
+                    }
+                } catch (error) {
+                    alert(String(error.message || 'Unable to save changes'));
+                }
+            })();
         }
 
         function readShopDraft() {
@@ -2407,6 +2462,7 @@ async def manage_screen(request: Request):
 
         async function commitDraftUser(domain) {
             const payload = readEditableRow(domain, -1);
+            const password = String(document.querySelector(`[data-field="password"][data-domain="${domain}"][data-user-id="-1"]`)?.value || '').trim();
             const hasChanges = Object.values(payload).some((value) => String(value || '').trim().length > 0);
             if (!hasChanges) {
                 delete state.addingRowByDomain[domain];
@@ -2417,8 +2473,10 @@ async def manage_screen(request: Request):
                 alert('All user fields are required before saving.');
                 return;
             }
-            const password = window.prompt('Enter temporary password for new user:');
-            if (!password) return;
+            if (!password) {
+                alert('Password is required for new user.');
+                return;
+            }
             try {
                 await api('/api/manage/users', {
                     method: 'POST',
