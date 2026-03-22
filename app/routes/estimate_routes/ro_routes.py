@@ -2243,6 +2243,11 @@ async def list_parts_ros(request: Request):
 
 @router.get("/parts/ro-lines")
 async def list_parts_lines(request: Request, ro: str):
+    """
+    ⚠️ DEPRECATED: Use GET /parts/ro/{ro}/full instead.
+    This endpoint returns only the parts lines. The new endpoint consolidates
+    all parts data (lines, on-order, arrived, returned) in a single request.
+    """
     domain = get_user_domain(request)
     if not domain:
         return JSONResponse(status_code=401, content={"error": "Not authenticated", "lines": []})
@@ -2546,6 +2551,11 @@ async def list_parts_received(request: Request, ro: str):
 
 @router.get("/parts/arrived-lines")
 async def list_arrived_lines(request: Request, ro: str):
+    """
+    ⚠️ DEPRECATED: Use GET /parts/ro/{ro}/full instead.
+    This endpoint returns only arrived parts. The new endpoint consolidates
+    all parts data (lines, on-order, arrived, returned) in a single request.
+    """
     domain = get_user_domain(request)
     if not domain:
         return JSONResponse(status_code=401, content={"error": "Not authenticated", "items": []})
@@ -2722,6 +2732,11 @@ async def return_arrived_lines(request: Request):
 
 @router.get("/parts/returned-lines")
 async def list_returned_lines(request: Request, ro: str):
+    """
+    ⚠️ DEPRECATED: Use GET /parts/ro/{ro}/full instead.
+    This endpoint returns only returned parts. The new endpoint consolidates
+    all parts data (lines, on-order, arrived, returned) in a single request.
+    """
     domain = get_user_domain(request)
     if not domain:
         return JSONResponse(status_code=401, content={"error": "Not authenticated", "items": []})
@@ -2814,6 +2829,11 @@ async def list_returned_lines(request: Request, ro: str):
 
 @router.get("/parts/on-order-lines")
 async def list_on_order_lines(request: Request, ro: str):
+    """
+    ⚠️ DEPRECATED: Use GET /parts/ro/{ro}/full instead.
+    This endpoint returns only on-order parts. The new endpoint consolidates
+    all parts data (lines, on-order, arrived, returned) in a single request.
+    """
     domain = get_user_domain(request)
     if not domain:
         return JSONResponse(status_code=401, content={"error": "Not authenticated", "items": []})
@@ -2925,6 +2945,243 @@ async def list_on_order_lines(request: Request, ro: str):
     finally:
         cur.close()
 
+
+
+@router.get("/parts/ro/{ro}/full")
+async def get_parts_ro_full(request: Request, ro: str):
+    """
+    Consolidated parts data endpoint for a single RO.
+    Groups all parts data server-side into vendors, on_order, arrived, and returned categories.
+    """
+    domain = get_user_domain(request)
+    if not domain:
+        return JSONResponse(status_code=401, content={"error": "Not authenticated"})
+
+    ro_value = (ro or "").strip()
+    if not ro_value:
+        return JSONResponse(status_code=400, content={"error": "RO is required"})
+
+    conn = get_conn()
+    cur = conn.cursor()
+    try:
+        _scope = resolve_request_scope(request, cur, domain=domain)
+        current_shop_id = _scope["shop_id"]
+        current_shop_uuid = _scope["shop_uuid"]
+        if not current_shop_id or not current_shop_uuid:
+            return JSONResponse(status_code=403, content={"error": "Shop scope not resolved"})
+
+        # Fetch base parts from estimate
+        cur.execute(
+            """
+            SELECT parts_repairs
+            FROM saved_estimates
+            WHERE (
+                    shop_uuid = %s::uuid
+                 OR (shop_uuid IS NULL AND shop_id = %s AND domain = %s)
+            ) AND ro = %s
+            ORDER BY saved_at DESC, id DESC
+            LIMIT 1
+            """,
+            (current_shop_uuid, current_shop_id, domain, ro_value),
+        )
+        estimate_row = cur.fetchone()
+        parts_repairs = _parse_json_field(estimate_row.get("parts_repairs")) if estimate_row else []
+        if not isinstance(parts_repairs, list):
+            parts_repairs = []
+
+        # Build line metadata from estimate
+        line_metadata = {}
+        for idx, item in enumerate(parts_repairs, start=1):
+            if not isinstance(item, dict):
+                continue
+            parsed_description, parsed_part_number = _parse_part_description_and_number(item)
+            explicit_part_number = (
+                item.get("part_number")
+                or item.get("part_no")
+                or item.get("part#")
+                or item.get("pn")
+                or ""
+            )
+            part_number = str(parsed_part_number or explicit_part_number or "").strip()
+            line_metadata[idx] = {
+                "line": item.get("line") or idx,
+                "description": parsed_description,
+                "part_number": part_number,
+                "part_type": item.get("part_type"),
+                "price": float(item.get("price") or 0),
+                "qty": float(item.get("qty") or 0),
+            }
+
+        # Fetch parts orders
+        cur.execute(
+            """
+            SELECT id, vendor_name, arrival_date, ordered_lines
+            FROM parts_orders
+            WHERE (
+                    shop_uuid = %s::uuid
+                 OR (shop_uuid IS NULL AND shop_id = %s AND domain = %s)
+            ) AND ro = %s
+            ORDER BY created_at DESC, id DESC
+            """,
+            (current_shop_uuid, current_shop_id, domain, ro_value),
+        )
+        order_rows = cur.fetchall() or []
+
+        # Fetch received parts
+        cur.execute(
+            """
+            SELECT line_id, vendor, description, part_number, list_price, cost, invoice_number, received_business_date, received_at, returned, returned_business_date, returned_at
+            FROM parts_received
+            WHERE (
+                    shop_uuid = %s::uuid
+                 OR (shop_uuid IS NULL AND shop_id = %s AND domain = %s)
+            ) AND ro = %s
+            ORDER BY COALESCE(received_business_date, received_at::date) DESC, line_id
+            """,
+            (current_shop_uuid, current_shop_id, domain, ro_value),
+        )
+        received_rows = cur.fetchall() or []
+
+        # Build received maps
+        received_by_line = {}
+        received_not_returned_ids = set()
+        returned_ids = set()
+
+        for row in received_rows:
+            line_id = int(row.get("line_id") or 0)
+            is_returned = row.get("returned") or False
+
+            received_by_line[line_id] = row
+
+            if is_returned:
+                returned_ids.add(line_id)
+            else:
+                received_not_returned_ids.add(line_id)
+
+        # Build ordered and included line IDs
+        ordered_ids = set()
+        included_line_ids = set()
+        for order_row in order_rows:
+            ordered_ids.update(_normalize_line_ids(order_row.get("ordered_lines") or []))
+
+        # Prepare grouped data
+        all_lines = []
+        vendors_dict = {}
+        on_order_items = []
+        arrived_items = []
+        returned_items = []
+
+        # Process all lines with status
+        for line_id in sorted(line_metadata.keys()):
+            metadata = line_metadata[line_id]
+            received_row = received_by_line.get(line_id)
+
+            line_obj = {
+                "id": line_id,
+                "line": metadata.get("line"),
+                "description": metadata.get("description"),
+                "part_number": metadata.get("part_number"),
+                "part_type": metadata.get("part_type"),
+                "price": metadata.get("price"),
+                "qty": metadata.get("qty"),
+                "status": "available",  # default
+            }
+
+            # Determine status
+            if line_id in returned_ids:
+                line_obj["status"] = "returned"
+            elif line_id in received_not_returned_ids:
+                line_obj["status"] = "arrived"
+            elif line_id in ordered_ids:
+                line_obj["status"] = "on_order"
+
+            all_lines.append(line_obj)
+
+        # Process on-order items
+        for order_row in order_rows:
+            order_id = order_row.get("id")
+            vendor_name = order_row.get("vendor_name") or ""
+            arrival_date = order_row.get("arrival_date")
+            ordered_line_ids = _normalize_line_ids(order_row.get("ordered_lines") or [])
+
+            for line_id in sorted(ordered_line_ids):
+                if line_id in received_not_returned_ids or line_id in included_line_ids:
+                    continue
+                metadata = line_metadata.get(line_id, {})
+                on_order_items.append(
+                    {
+                        "order_id": order_id,
+                        "line_id": line_id,
+                        "line": metadata.get("line") or line_id,
+                        "description": metadata.get("description") or "",
+                        "part_number": metadata.get("part_number") or "",
+                        "qty": metadata.get("qty") or 0,
+                        "list": metadata.get("price") or 0,
+                        "vendor": vendor_name,
+                        "eta": arrival_date.isoformat() if arrival_date else None,
+                    }
+                )
+                included_line_ids.add(line_id)
+                # Track vendor
+                if vendor_name not in vendors_dict:
+                    vendors_dict[vendor_name] = {"name": vendor_name, "count": 0}
+                vendors_dict[vendor_name]["count"] += 1
+
+        # Process arrived items
+        for line_id in sorted(received_not_returned_ids):
+            row = received_by_line.get(line_id, {})
+            metadata = line_metadata.get(line_id, {})
+            arrived_items.append(
+                {
+                    "line_id": line_id,
+                    "line": metadata.get("line") or line_id,
+                    "description": row.get("description") or metadata.get("description") or "",
+                    "part_number": row.get("part_number") or metadata.get("part_number") or "",
+                    "list": float(row.get("list_price") or metadata.get("price") or 0),
+                    "vendor": row.get("vendor") or "",
+                    "cost": float(row.get("cost") or 0),
+                    "invoice_number": row.get("invoice_number") or "",
+                    "arrived_date": (
+                        row.get("received_business_date").isoformat() if row.get("received_business_date")
+                        else (row.get("received_at").date().isoformat() if row.get("received_at") else None)
+                    ),
+                }
+            )
+            if row.get("vendor"):
+                if row.get("vendor") not in vendors_dict:
+                    vendors_dict[row.get("vendor")] = {"name": row.get("vendor"), "count": 0}
+                vendors_dict[row.get("vendor")]["count"] += 1
+
+        # Process returned items
+        for line_id in sorted(returned_ids):
+            row = received_by_line.get(line_id, {})
+            metadata = line_metadata.get(line_id, {})
+            return_date_value = (
+                row.get("returned_business_date")
+                or (row.get("returned_at").date() if row.get("returned_at") else None)
+            )
+            returned_items.append(
+                {
+                    "line_id": line_id,
+                    "line": metadata.get("line") or line_id,
+                    "description": row.get("description") or metadata.get("description") or "",
+                    "part_number": row.get("part_number") or metadata.get("part_number") or "",
+                    "vendor": row.get("vendor") or "",
+                    "cost": float(row.get("cost") or 0),
+                    "return_date": return_date_value.isoformat() if return_date_value else None,
+                }
+            )
+
+        return {
+            "ro": ro_value,
+            "all_lines": all_lines,
+            "vendors": list(vendors_dict.values()),
+            "on_order": on_order_items,
+            "arrived": arrived_items,
+            "returned": returned_items,
+        }
+    finally:
+        cur.close()
 
 
 @router.post("/parts/on-order-receive")

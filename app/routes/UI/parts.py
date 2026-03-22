@@ -352,6 +352,7 @@ def get_parts_script():
         let partsOrderSortField = 'line';
         let partsOrderSortDirection = 'asc';
         let partsVendorsCache = [];
+        let partsDataCache = {};  // Cache for consolidated RO parts data
         let partsOnOrderRo = null;
         let partsOnOrderLines = [];
         let partsOnOrderManualLines = [];
@@ -810,6 +811,26 @@ def get_parts_script():
                 });
         }
 
+        function partsLoadRoFullData(ro) {
+            /**
+             * Load consolidated parts data for an RO from the unified endpoint.
+             * Stores result in cache for all modal operations to use.
+             */
+            return fetch(`/api/parts/ro/${encodeURIComponent(ro)}/full`, { credentials: 'include' })
+                .then(r => r.json())
+                .then(res => {
+                    if (res.error) {
+                        throw new Error(res.error);
+                    }
+                    partsDataCache[ro] = res;
+                    return res;
+                })
+                .catch(err => {
+                    console.error(`Error loading full parts data for RO ${ro}:`, err);
+                    throw err;
+                });
+        }
+
         function partsLoadVendorOptions() {
             const select = document.getElementById('partsOrderVendor');
             if (!select) return;
@@ -962,16 +983,22 @@ def get_parts_script():
             if (!body || !partsArrivedRo) return;
 
             body.innerHTML = '<tr><td colspan="8" style="padding:12px; text-align:center; color:#777;">Loading...</td></tr>';
-            fetch(`/api/parts/arrived-lines?ro=${encodeURIComponent(partsArrivedRo)}`, { credentials: 'include' })
-                .then(r => r.json())
-                .then(res => {
-                    partsArrivedItems = res.items || [];
-                    partsRenderArrivedLines();
-                })
-                .catch(err => {
-                    console.error('Error loading arrived parts:', err);
-                    body.innerHTML = '<tr><td colspan="8" style="padding:12px; text-align:center; color:red;">Error loading arrived parts.</td></tr>';
-                });
+            
+            const fromCache = partsDataCache[partsArrivedRo];
+            if (fromCache && fromCache.arrived) {
+                partsArrivedItems = fromCache.arrived || [];
+                partsRenderArrivedLines();
+            } else {
+                partsLoadRoFullData(partsArrivedRo)
+                    .then(data => {
+                        partsArrivedItems = data.arrived || [];
+                        partsRenderArrivedLines();
+                    })
+                    .catch(err => {
+                        console.error('Error loading arrived parts:', err);
+                        body.innerHTML = '<tr><td colspan="8" style="padding:12px; text-align:center; color:red;">Error loading arrived parts.</td></tr>';
+                    });
+            }
         }
 
         function partsRenderArrivedLines() {
@@ -1034,6 +1061,8 @@ def get_parts_script():
                 if (res.error) {
                     throw new Error(res.error);
                 }
+                // Clear cache for this RO so it reloads fresh
+                delete partsDataCache[partsArrivedRo];
                 partsLoadRos();
                 partsLoadArrivedLines();
             })
@@ -1063,16 +1092,22 @@ def get_parts_script():
             if (!body || !partsReturnedRo) return;
 
             body.innerHTML = '<tr><td colspan="6" style="padding:12px; text-align:center; color:#777;">Loading...</td></tr>';
-            fetch(`/api/parts/returned-lines?ro=${encodeURIComponent(partsReturnedRo)}`, { credentials: 'include' })
-                .then(r => r.json())
-                .then(res => {
-                    partsReturnedItems = res.items || [];
-                    partsRenderReturnedLines();
-                })
-                .catch(err => {
-                    console.error('Error loading returned parts:', err);
-                    body.innerHTML = '<tr><td colspan="6" style="padding:12px; text-align:center; color:red;">Error loading returned parts.</td></tr>';
-                });
+            
+            const fromCache = partsDataCache[partsReturnedRo];
+            if (fromCache && fromCache.returned) {
+                partsReturnedItems = fromCache.returned || [];
+                partsRenderReturnedLines();
+            } else {
+                partsLoadRoFullData(partsReturnedRo)
+                    .then(data => {
+                        partsReturnedItems = data.returned || [];
+                        partsRenderReturnedLines();
+                    })
+                    .catch(err => {
+                        console.error('Error loading returned parts:', err);
+                        body.innerHTML = '<tr><td colspan="6" style="padding:12px; text-align:center; color:red;">Error loading returned parts.</td></tr>';
+                    });
+            }
         }
 
         function partsRenderReturnedLines() {
@@ -1204,16 +1239,22 @@ def get_parts_script():
             if (!body || !partsOnOrderRo) return;
 
             body.innerHTML = '<tr><td colspan="9" style="padding:12px; text-align:center; color:#777;">Loading...</td></tr>';
-            fetch(`/api/parts/on-order-lines?ro=${encodeURIComponent(partsOnOrderRo)}`, { credentials: 'include' })
-                .then(r => r.json())
-                .then(res => {
-                    partsOnOrderLines = res.items || [];
-                    partsRenderOnOrderLines();
-                })
-                .catch(err => {
-                    console.error('Error loading on-order lines:', err);
-                    body.innerHTML = '<tr><td colspan="9" style="padding:12px; text-align:center; color:red;">Error loading on-order parts.</td></tr>';
-                });
+            
+            const fromCache = partsDataCache[partsOnOrderRo];
+            if (fromCache && fromCache.on_order) {
+                partsOnOrderLines = fromCache.on_order || [];
+                partsRenderOnOrderLines();
+            } else {
+                partsLoadRoFullData(partsOnOrderRo)
+                    .then(data => {
+                        partsOnOrderLines = data.on_order || [];
+                        partsRenderOnOrderLines();
+                    })
+                    .catch(err => {
+                        console.error('Error loading on-order lines:', err);
+                        body.innerHTML = '<tr><td colspan="9" style="padding:12px; text-align:center; color:red;">Error loading on-order parts.</td></tr>';
+                    });
+            }
         }
 
         function partsRenderOnOrderLines() {
@@ -1509,6 +1550,8 @@ def get_parts_script():
                 partsOnOrderManualLines = [];
                 partsRenderOnOrderValidation([]);
 
+                // Clear cache for this RO so it reloads fresh
+                delete partsDataCache[partsOnOrderRo];
                 partsLoadRos();
                 partsLoadOnOrderLines();
             })
@@ -1692,16 +1735,22 @@ def get_parts_script():
             linesContainer.innerHTML = '<div style="padding:12px; color:#777;">Loading...</div>';
             partsLoadVendorOptions();
 
-            fetch(`/api/parts/ro-lines?ro=${encodeURIComponent(ro)}`, { credentials: 'include' })
-                .then(r => r.json())
-                .then(res => {
-                    partsCurrentLines = res.lines || [];
-                    partsRenderOrderLines();
-                })
-                .catch(err => {
-                    console.error('Error loading parts lines:', err);
-                    linesContainer.innerHTML = '<div style="padding:12px; color:red;">Error loading parts.</div>';
-                });
+            // Use consolidated endpoint
+            const fromCache = partsDataCache[ro];
+            if (fromCache && fromCache.all_lines) {
+                partsCurrentLines = fromCache.all_lines;
+                partsRenderOrderLines();
+            } else {
+                partsLoadRoFullData(ro)
+                    .then(data => {
+                        partsCurrentLines = data.all_lines || [];
+                        partsRenderOrderLines();
+                    })
+                    .catch(err => {
+                        console.error('Error loading parts lines:', err);
+                        linesContainer.innerHTML = '<div style="padding:12px; color:red;">Error loading parts.</div>';
+                    });
+            }
 
             modal.style.display = 'block';
         }
@@ -2007,6 +2056,8 @@ def get_parts_script():
                     throw new Error(res.error);
                 }
                 closePartsOrderModal();
+                // Clear cache for this RO so it reloads fresh
+                delete partsDataCache[partsCurrentRo];
                 partsLoadRos();
                 try {
                     partsOpenPrintOrderView({
