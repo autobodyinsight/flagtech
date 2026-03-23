@@ -2376,6 +2376,14 @@ async def manage_screen(request: Request):
                 alert('Select user(s) or shop(s) first.');
                 return;
             }
+
+            const deletedUserIds = new Set(Array.from(state.selectedUserIds).map((value) => Number(value || 0)).filter((value) => value > 0));
+            const deletedShopDomains = new Set(
+                Array.from(state.selectedShopDomains)
+                    .map((value) => String(value || '').trim().toLowerCase())
+                    .filter((value) => value)
+            );
+
             try {
                 await api('/api/manage/delete', {
                     method: 'POST',
@@ -2385,11 +2393,41 @@ async def manage_screen(request: Request):
                         shop_domains: Array.from(state.selectedShopDomains),
                     })
                 });
+
+                if (deletedShopDomains.size) {
+                    state.shops = (state.shops || []).filter((shop) => !deletedShopDomains.has(String(shop?.domain || '').trim().toLowerCase()));
+                    for (const domain of deletedShopDomains) {
+                        delete state.usersByDomain[domain];
+                        delete state.usersLoadedAtByDomain[domain];
+                        delete state.usersRequestTokenByDomain[domain];
+                        delete state.usersInFlightByDomain[domain];
+                    }
+                }
+
+                if (deletedUserIds.size) {
+                    Object.keys(state.usersByDomain || {}).forEach((domain) => {
+                        const users = Array.isArray(state.usersByDomain[domain]) ? state.usersByDomain[domain] : [];
+                        const nextUsers = users.filter((user) => !deletedUserIds.has(Number(user?.id || 0)));
+                        state.usersByDomain[domain] = nextUsers;
+
+                        const shop = (state.shops || []).find((candidate) => String(candidate?.domain || '').trim().toLowerCase() === domain);
+                        if (shop) {
+                            shop.user_count = nextUsers.length;
+                        }
+                    });
+                }
+
                 state.selectedUserIds.clear();
                 state.selectedShopDomains.clear();
                 state.editMode = false;
-                await loadShops();
-                if (state.expandedDomain) await ensureUsersLoaded(state.expandedDomain);
+
+                if (deletedShopDomains.has(String(state.expandedDomain || '').trim().toLowerCase())) {
+                    state.expandedDomain = state.shops.length ? String(state.shops[0]?.domain || '').trim().toLowerCase() : '';
+                }
+
+                state.shopsLastLoadedAt = 0;
+                render();
+                await loadShops({ force: true });
             } catch (error) {
                 alert(String(error.message || 'Unable to delete selection'));
             }
