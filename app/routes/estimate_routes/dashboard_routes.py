@@ -97,14 +97,6 @@
 
 router = APIRouter()
 
-@router.post("/flash")
-async def flash_data(request: Request):
-    if not get_user_domain(request):
-        return JSONResponse(status_code=401, content={"error": "Not authenticated"})
-    return JSONResponse(status_code=403, content={"error": "Endpoint disabled for tenant safety"})
-
-
-
 @router.get("/dashboard-data")
 async def get_dashboard_data(request: Request):
     domain = get_user_domain(request)
@@ -114,6 +106,13 @@ async def get_dashboard_data(request: Request):
     conn = get_conn()
     cur = conn.cursor()
     try:
+        _ensure_saved_estimates_table(cur)
+        _ensure_ro_phases_table(cur)
+        _ensure_ro_line_assignments_table(cur)
+        _ensure_ro_assignments_table(cur)
+        _ensure_ro_line_assignments_table(cur)
+        _ensure_techs_table(cur)
+        _ensure_shop_isolation_infrastructure(cur)
         _scope = resolve_request_scope(request, cur, domain=domain)
         current_shop_id = _scope["shop_id"]
         current_shop_uuid = _scope["shop_uuid"]

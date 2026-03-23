@@ -7,7 +7,6 @@ def get_dashboard_screen_html():
         <div id="dashboard" class="screen active" style="padding:20px;">
             <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:30px; gap:20px;">
                 <h1 style="text-align:center; margin:0; flex:1;">DASHBOARD</h1>
-                <button onclick="flashAllData()" style="padding:10px 16px; background:var(--brand-red, #d32f2f); color:#fff; border:none; border-radius:4px; font-weight:bold; cursor:pointer;">FLASH</button>
             </div>
             
             <div style="--dash-chart-h: 520px;">
@@ -2926,24 +2925,6 @@ def get_dashboard_screen_html():
                 };
                 dashboardData = fallback;
                 updateDashboard(fallback);
-            }
-
-            async function flashAllData() {
-                const confirmed = confirm('This will delete all uploaded estimate data. Continue?');
-                if (!confirmed) return;
-
-                try {
-                    const response = await fetch('/api/flash', { method: 'POST', credentials: 'include' });
-                    const result = await response.json();
-                    if (result.status === 'success') {
-                        await loadDashboardData();
-                        alert('All uploaded estimate data cleared.');
-                    } else {
-                        alert('Flash failed: ' + (result.message || 'Unknown error'));
-                    }
-                } catch (error) {
-                    alert('Flash failed: ' + error.message);
-                }
             }
 
             function isOpenDashboardRo(ro) {
