@@ -798,10 +798,16 @@ async def delete_manage_entities(request: Request):
     user_ids = []
     for value in data.get("user_ids") or []:
         try:
-            user_ids.append(int(value))
+            parsed = int(value)
+            if parsed not in user_ids:
+                user_ids.append(parsed)
         except (TypeError, ValueError):
             continue
-    shop_domains = [str(value or "").strip().lower() for value in (data.get("shop_domains") or []) if str(value or "").strip()]
+    shop_domains = []
+    for value in (data.get("shop_domains") or []):
+        normalized = str(value or "").strip().lower()
+        if normalized and normalized not in shop_domains:
+            shop_domains.append(normalized)
 
     if not user_ids and not shop_domains:
         return JSONResponse(status_code=400, content={"error": "No users or shops selected"})
@@ -811,31 +817,55 @@ async def delete_manage_entities(request: Request):
     try:
         deleted_users = 0
         deleted_shops = 0
-
-        if user_ids:
-            cur.execute(
-                """
-                UPDATE shop_users
-                SET active = FALSE
-                WHERE id = ANY(%s)
-                  AND active = TRUE
-                """,
-                (user_ids,),
-            )
-            deleted_users += int(cur.rowcount or 0)
+        all_user_ids = set(user_ids)
 
         if shop_domains:
             cur.execute(
                 """
-                UPDATE shop_users
-                SET active = FALSE
+                SELECT id
+                FROM shop_users
                 WHERE domain = ANY(%s)
-                  AND active = TRUE
                 """,
                 (shop_domains,),
             )
-            deleted_users += int(cur.rowcount or 0)
+            for row in (cur.fetchall() or []):
+                user_id = int((row or {}).get("id") or 0)
+                if user_id > 0:
+                    all_user_ids.add(user_id)
 
+        resolved_user_ids = [value for value in all_user_ids if value > 0]
+
+        if resolved_user_ids:
+            cur.execute("DELETE FROM auth_sessions WHERE user_id = ANY(%s)", (resolved_user_ids,))
+
+            cur.execute(
+                """
+                DELETE FROM chat_messages
+                WHERE sender_user_id = ANY(%s)
+                   OR recipient_user_id = ANY(%s)
+                """,
+                (resolved_user_ids, resolved_user_ids),
+            )
+
+            cur.execute("DELETE FROM shop_users WHERE id = ANY(%s)", (resolved_user_ids,))
+            deleted_users = int(cur.rowcount or 0)
+
+        if shop_domains:
+            cur.execute("DELETE FROM parts_vendors WHERE domain = ANY(%s)", (shop_domains,))
+            cur.execute("DELETE FROM saved_estimates WHERE domain = ANY(%s)", (shop_domains,))
+            cur.execute("DELETE FROM ro_payment_entries WHERE domain = ANY(%s)", (shop_domains,))
+            cur.execute("DELETE FROM ro_payment_totals WHERE domain = ANY(%s)", (shop_domains,))
+            cur.execute("DELETE FROM parts_orders WHERE domain = ANY(%s)", (shop_domains,))
+            cur.execute("DELETE FROM parts_received WHERE domain = ANY(%s)", (shop_domains,))
+            cur.execute("DELETE FROM ro_phases WHERE domain = ANY(%s)", (shop_domains,))
+            cur.execute("DELETE FROM ro_notes WHERE domain = ANY(%s)", (shop_domains,))
+            cur.execute("DELETE FROM ro_activity_log WHERE domain = ANY(%s)", (shop_domains,))
+            cur.execute("DELETE FROM ro_assignments WHERE domain = ANY(%s)", (shop_domains,))
+            cur.execute("DELETE FROM ro_line_assignments WHERE domain = ANY(%s)", (shop_domains,))
+            cur.execute("DELETE FROM ro_flagout_lines WHERE domain = ANY(%s)", (shop_domains,))
+            cur.execute("DELETE FROM techs WHERE domain = ANY(%s)", (shop_domains,))
+            cur.execute("DELETE FROM archived_techs WHERE domain = ANY(%s)", (shop_domains,))
+            cur.execute("DELETE FROM chat_messages WHERE domain = ANY(%s)", (shop_domains,))
             cur.execute("DELETE FROM shop_settings WHERE domain = ANY(%s)", (shop_domains,))
             cur.execute("DELETE FROM shops WHERE domain = ANY(%s)", (shop_domains,))
             deleted_shops = int(cur.rowcount or 0)
