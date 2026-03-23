@@ -167,6 +167,23 @@ def get_setup_screen_html():
             </div>
         </div>
 
+        <div id="setupResetPasswordModal" class="modal" style="display:none;">
+            <div class="modal-content" style="max-width:520px; padding:24px;">
+                <div style="font-size:20px; font-weight:800; color:#111; margin-bottom:12px;">RESET USER PASSWORD</div>
+                <div style="font-size:14px; line-height:1.5; color:#333; margin-bottom:12px;">
+                    Enter a new password for the selected user(s).
+                </div>
+                <div style="margin-bottom:18px;">
+                    <label for="setupResetPasswordInput" style="display:block; font-weight:700; color:#333; margin-bottom:6px;">New Password</label>
+                    <input id="setupResetPasswordInput" type="password" style="width:100%; padding:10px; border:1px solid #ccc; border-radius:4px;" />
+                </div>
+                <div style="display:flex; justify-content:flex-end; gap:10px;">
+                    <button type="button" onclick="closeSetupResetPasswordModal()" style="padding:10px 14px; background:#505050; color:#fff; border:none; border-radius:4px; cursor:pointer;">Cancel</button>
+                    <button id="setupResetPasswordSaveBtn" type="button" onclick="setupSaveResetPassword()" style="padding:10px 16px; background:#b22222; color:#fff; border:none; border-radius:4px; cursor:pointer; font-weight:bold;">Save</button>
+                </div>
+            </div>
+        </div>
+
     </div>
     """
 
@@ -177,6 +194,7 @@ def get_setup_script():
         let setupShopData = {};
         let setupEditMode = false;
         let setupPendingDeleteUserIds = [];
+        let setupPendingResetUserIds = [];
         let setupUsersLastLoadedAt = 0;
         let setupShopLastLoadedAt = 0;
         let setupUsersInFlightPromise = null;
@@ -479,22 +497,61 @@ def get_setup_script():
                 return;
             }
 
-            const newPassword = window.prompt('Enter new password for selected user(s):');
-            if (!newPassword) return;
+            setupPendingResetUserIds = selected;
+            openSetupResetPasswordModal();
+        }
+
+        function openSetupResetPasswordModal() {
+            const modal = document.getElementById('setupResetPasswordModal');
+            const input = document.getElementById('setupResetPasswordInput');
+            if (!modal) return;
+            modal.style.display = 'block';
+            if (input) {
+                input.value = '';
+                input.focus();
+            }
+        }
+
+        function closeSetupResetPasswordModal() {
+            const modal = document.getElementById('setupResetPasswordModal');
+            const input = document.getElementById('setupResetPasswordInput');
+            if (modal) modal.style.display = 'none';
+            if (input) input.value = '';
+            setupPendingResetUserIds = [];
+        }
+
+        async function setupSaveResetPassword() {
+            if (!setupPendingResetUserIds.length) {
+                closeSetupResetPasswordModal();
+                return;
+            }
+
+            const input = document.getElementById('setupResetPasswordInput');
+            const saveBtn = document.getElementById('setupResetPasswordSaveBtn');
+            const newPassword = String(input?.value || '').trim();
+            if (!newPassword) {
+                alert('Enter a new password.');
+                return;
+            }
+
+            if (saveBtn) saveBtn.disabled = true;
 
             try {
                 const resp = await fetch('/api/setup/users/reset-password', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     credentials: 'include',
-                    body: JSON.stringify({ user_ids: selected, new_password: newPassword }),
+                    body: JSON.stringify({ user_ids: setupPendingResetUserIds, new_password: newPassword }),
                 });
                 const data = await setupReadJsonResponse(resp);
                 if (!resp.ok || data.error) throw new Error(data.error || 'Unable to reset password');
+                closeSetupResetPasswordModal();
                 alert('Password reset complete.');
             } catch (error) {
                 console.error('Error resetting passwords:', error);
                 alert(String(error.message || 'Error resetting password.'));
+            } finally {
+                if (saveBtn) saveBtn.disabled = false;
             }
         }
 
@@ -617,6 +674,29 @@ def get_setup_script():
             const deleteModal = document.getElementById('setupDeleteConfirmModal');
             if (deleteModal && deleteModal.style.display === 'block' && event.target === deleteModal) {
                 closeSetupDeleteConfirmModal();
+            }
+
+            const resetModal = document.getElementById('setupResetPasswordModal');
+            if (resetModal && resetModal.style.display === 'block' && event.target === resetModal) {
+                closeSetupResetPasswordModal();
+            }
+        });
+
+        document.addEventListener('keydown', (event) => {
+            const resetModal = document.getElementById('setupResetPasswordModal');
+            const input = document.getElementById('setupResetPasswordInput');
+            if (!resetModal || resetModal.style.display !== 'block') {
+                return;
+            }
+
+            if (event.key === 'Escape') {
+                closeSetupResetPasswordModal();
+                return;
+            }
+
+            if (event.key === 'Enter' && document.activeElement === input) {
+                event.preventDefault();
+                setupSaveResetPassword();
             }
         });
     """
