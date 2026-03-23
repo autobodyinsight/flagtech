@@ -972,7 +972,7 @@ async def reset_setup_user_password(request: Request):
         requester_row = _resolve_current_user_row(request, cur, domain)
         if not requester_row and not requester_is_architect:
             return JSONResponse(status_code=401, content={"error": "Not authenticated"})
-        requester_role = str(requester_row.get("role") or "").strip()
+        requester_role = str((requester_row or {}).get("role") or "").strip()
         if not (requester_is_architect or _is_manager_or_hr_role(requester_role)):
             return JSONResponse(status_code=403, content={"error": "Forbidden"})
 
@@ -1197,7 +1197,7 @@ async def delete_setup_users(request: Request):
 
         cur.execute(
             """
-            SELECT id
+            SELECT id, email
             FROM shop_users
                         WHERE (
                                         shop_uuid = %s::uuid
@@ -1205,11 +1205,14 @@ async def delete_setup_users(request: Request):
                                     )
               AND id = ANY(%s)
               AND active = TRUE
-              AND LOWER(email) <> %s
             """,
-                                                (selected_shop_uuid, selected_shop_id, selected_domain, user_ids, _ARCHITECT_EMAIL),
+                                                (selected_shop_uuid, selected_shop_id, selected_domain, user_ids),
         )
-        deletable_ids = [int((row or {}).get("id") or 0) for row in (cur.fetchall() or [])]
+        deletable_ids = [
+            int((row or {}).get("id") or 0)
+            for row in (cur.fetchall() or [])
+            if not _is_architect_email(str((row or {}).get("email") or "").strip().lower())
+        ]
         deletable_ids = [value for value in deletable_ids if value > 0]
         if not deletable_ids:
             return JSONResponse(status_code=404, content={"error": "No deletable users found"})

@@ -195,6 +195,16 @@ def get_setup_script():
                 .replace(/'/g, '&#39;');
         }
 
+        async function setupReadJsonResponse(resp) {
+            const raw = await resp.text();
+            if (!raw) return {};
+            try {
+                return JSON.parse(raw);
+            } catch (_error) {
+                return { error: raw };
+            }
+        }
+
         async function setupLoadData(force = false) {
             const hasCachedUsers = Array.isArray(setupUsersData) && setupUsersData.length > 0;
             const isFresh = hasCachedUsers && (Date.now() - setupUsersLastLoadedAt) < setupUsersTtlMs;
@@ -479,12 +489,12 @@ def get_setup_script():
                     credentials: 'include',
                     body: JSON.stringify({ user_ids: selected, new_password: newPassword }),
                 });
-                const data = await resp.json();
-                if (data.error) throw new Error(data.error);
+                const data = await setupReadJsonResponse(resp);
+                if (!resp.ok || data.error) throw new Error(data.error || 'Unable to reset password');
                 alert('Password reset complete.');
             } catch (error) {
                 console.error('Error resetting passwords:', error);
-                alert('Error resetting password.');
+                alert(String(error.message || 'Error resetting password.'));
             }
         }
 
@@ -534,7 +544,7 @@ def get_setup_script():
                     credentials: 'include',
                     body: JSON.stringify({ user_ids: setupPendingDeleteUserIds }),
                 });
-                const data = await resp.json();
+                const data = await setupReadJsonResponse(resp);
                 if (!resp.ok || data.error) throw new Error(data.error || 'Unable to delete user');
                 closeSetupDeleteConfirmModal();
                 await setupLoadUsers();
