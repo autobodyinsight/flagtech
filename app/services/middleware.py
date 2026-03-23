@@ -14,7 +14,6 @@ from app.services.permissions import build_permission_snapshot
 
 
 DEFAULT_SCOPE_DOMAIN = "autobodyinsight.com"
-ARCHITECT_EMAIL = "jorge@autobodyinsight.com"
 SESSION_COOKIE_NAME = "session_id"
 SESSION_DURATION_HOURS = 12
 
@@ -58,6 +57,31 @@ def _ensure_auth_sessions_table(cur) -> None:
     cur.execute("CREATE INDEX IF NOT EXISTS idx_auth_sessions_user_uuid ON auth_sessions(user_uuid)")
     cur.execute("CREATE INDEX IF NOT EXISTS idx_auth_sessions_shop_uuid ON auth_sessions(shop_uuid)")
     cur.execute("CREATE INDEX IF NOT EXISTS idx_auth_sessions_expires_at ON auth_sessions(expires_at)")
+
+
+def _ensure_system_settings_table(cur) -> None:
+    cur.execute(
+        """
+        CREATE TABLE IF NOT EXISTS system_settings (
+            key VARCHAR(120) PRIMARY KEY,
+            value TEXT,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+        """
+    )
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_system_settings_updated_at ON system_settings(updated_at)")
+
+
+def get_architect_email_setting() -> str:
+    conn = get_conn()
+    cur = conn.cursor()
+    try:
+        _ensure_system_settings_table(cur)
+        cur.execute("SELECT value FROM system_settings WHERE key = %s LIMIT 1", ("architect_email",))
+        row = cur.fetchone() or {}
+        return str(row.get("value") or "").strip().lower()
+    finally:
+        cur.close()
 
 
 def _normalize_permission_snapshot(raw_snapshot) -> dict | None:
@@ -257,7 +281,9 @@ def get_authenticated_user(request: Request) -> dict | None:
         if not row:
             return None
 
-        is_architect = str(row.get("email") or "").strip().lower() == ARCHITECT_EMAIL
+        architect_email = get_architect_email_setting()
+        normalized_email = str(row.get("email") or "").strip().lower()
+        is_architect = bool(architect_email) and normalized_email == architect_email
         normalized_domain = _build_scope_key(str(row.get("domain") or "").strip().lower())
         normalized_shop_id = int(row.get("shop_id") or 0) or None
         normalized_shop_uuid = str(row.get("shop_uuid") or "").strip() or None

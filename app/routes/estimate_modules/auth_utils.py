@@ -1,7 +1,5 @@
 from fastapi import Request
-from app.services.middleware import get_authenticated_user, get_authenticated_user_email
-
-_ARCHITECT_EMAIL = "jorge@autobodyinsight.com"
+from app.services.middleware import get_authenticated_user, get_authenticated_user_email, get_architect_email_setting
 
 
 def _resolve_request_user_email(request: Request) -> str:
@@ -10,7 +8,8 @@ def _resolve_request_user_email(request: Request) -> str:
 
 def _is_architect_email(email: str) -> bool:
     normalized = str(email or "").strip().lower()
-    return bool(normalized) and normalized == _ARCHITECT_EMAIL
+    architect_email = get_architect_email_setting()
+    return bool(normalized) and bool(architect_email) and normalized == architect_email
 
 
 def _build_cookie_secure_flag(request: Request) -> bool:
