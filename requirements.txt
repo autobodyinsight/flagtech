@@ -10,3 +10,4 @@ pytesseract
 python-multipart
 
 pydantic
+bcrypt

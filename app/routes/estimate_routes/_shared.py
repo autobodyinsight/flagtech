@@ -5,6 +5,7 @@ import math
 import re
 import hashlib
 import uuid
+import bcrypt
 from decimal import Decimal
 from datetime import date, datetime, timedelta, timezone
 
@@ -102,3 +103,30 @@ from app.routes.estimate_modules.parsing_utils import (
     _line_key,
     _normalize_repair_type,
 )
+
+
+def hash_password(password: str) -> str:
+    password_bytes = str(password or "").encode("utf-8")
+    return bcrypt.hashpw(password_bytes, bcrypt.gensalt()).decode("utf-8")
+
+
+def verify_password(password: str, stored_hash: str | None) -> tuple[bool, bool]:
+    password_value = str(password or "")
+    stored_value = str(stored_hash or "").strip()
+    if not password_value or not stored_value:
+        return False, False
+
+    stored_bytes = stored_value.encode("utf-8")
+    password_bytes = password_value.encode("utf-8")
+
+    if stored_value.startswith(("$2a$", "$2b$", "$2y$")):
+        try:
+            return bcrypt.checkpw(password_bytes, stored_bytes), False
+        except ValueError:
+            return False, False
+
+    legacy_hash = hashlib.sha256(password_bytes).hexdigest()
+    if legacy_hash == stored_value:
+        return True, True
+
+    return False, False

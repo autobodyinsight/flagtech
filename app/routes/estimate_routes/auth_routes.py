@@ -4,7 +4,6 @@
     json,
     math,
     re,
-    hashlib,
     uuid,
     Decimal,
     date,
@@ -29,6 +28,8 @@
     get_user_domain,
     get_user_shop_uuid,
     revoke_auth_session,
+    hash_password,
+    verify_password,
     build_permission_snapshot,
     _quote_ident,
     _ensure_shops_table,
@@ -105,8 +106,6 @@ async def auth_login(request: Request):
     if not email or not password:
         return JSONResponse(status_code=400, content={"error": "email and password are required"})
 
-    password_hash = hashlib.sha256(password.encode("utf-8")).hexdigest()
-
     conn = get_conn()
     cur = conn.cursor()
     try:
@@ -119,6 +118,7 @@ async def auth_login(request: Request):
                                 su.last_name,
                                 su.email,
                                 su.role,
+                            su.password_hash,
                                 su.domain,
                                 su.shop_id,
                                 su.shop_uuid,
@@ -127,16 +127,26 @@ async def auth_login(request: Request):
                         LEFT JOIN shops sh
                             ON sh.id = su.shop_id
                         WHERE LOWER(su.email) = %s
-                            AND su.password_hash = %s
                             AND su.active = TRUE
                         ORDER BY su.created_at DESC, su.id DESC
             LIMIT 1
             """,
-            (email, password_hash),
+            (email,),
         )
         row = cur.fetchone() or {}
         if not row:
             return JSONResponse(status_code=401, content={"error": "Invalid credentials"})
+
+        password_valid, should_upgrade_hash = verify_password(password, row.get("password_hash"))
+        if not password_valid:
+            return JSONResponse(status_code=401, content={"error": "Invalid credentials"})
+
+        if should_upgrade_hash:
+            cur.execute(
+                "UPDATE shop_users SET password_hash = %s WHERE id = %s",
+                (hash_password(password), int(row.get("id") or 0)),
+            )
+            conn.commit()
 
         if not bool(row.get("shop_active", True)):
             return JSONResponse(status_code=403, content={"error": "LOG IN NOT AUTHORIZED, CONTACT SUPPORT"})

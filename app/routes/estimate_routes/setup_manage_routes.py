@@ -4,7 +4,6 @@
     json,
     math,
     re,
-    hashlib,
     uuid,
     Decimal,
     date,
@@ -30,6 +29,7 @@
     revoke_auth_session,
     build_session_snapshot_payload,
     build_permission_snapshot,
+    hash_password,
     _quote_ident,
     _ensure_shops_table,
     _sync_shop_id_bindings,
@@ -675,7 +675,7 @@ async def create_manage_user(request: Request):
     if _is_architect_email(email):
         return JSONResponse(status_code=400, content={"error": "This email cannot be assigned from Manage"})
 
-    password_hash = hashlib.sha256(password.encode("utf-8")).hexdigest()
+    password_hash = hash_password(password)
 
     conn = get_conn()
     cur = conn.cursor()
@@ -753,7 +753,7 @@ async def reset_manage_user_password(request: Request):
     if not user_ids:
         return JSONResponse(status_code=400, content={"error": "No valid user ids provided"})
 
-    password_hash = hashlib.sha256(new_password.encode("utf-8")).hexdigest()
+    password_hash = hash_password(new_password)
 
     conn = get_conn()
     cur = conn.cursor()
@@ -963,7 +963,7 @@ async def reset_setup_user_password(request: Request):
     if not user_ids:
         return JSONResponse(status_code=400, content={"error": "No valid user ids provided"})
 
-    password_hash = hashlib.sha256(new_password.encode("utf-8")).hexdigest()
+    password_hash = hash_password(new_password)
 
     conn = get_conn()
     cur = conn.cursor()
@@ -1093,7 +1093,7 @@ async def create_setup_user(request: Request):
     if _is_architect_email(email):
         return JSONResponse(status_code=400, content={"error": "This email cannot be created from Setup"})
 
-    password_hash = hashlib.sha256(password.encode("utf-8")).hexdigest()
+    password_hash = hash_password(password)
 
     conn = get_conn()
     cur = conn.cursor()
