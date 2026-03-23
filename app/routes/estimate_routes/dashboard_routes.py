@@ -97,6 +97,73 @@
 
 router = APIRouter()
 
+_RO_DELETE_TABLES = [
+    "ro_flagout_lines",
+    "ro_line_assignments",
+    "ro_assignments",
+    "ro_activity_log",
+    "ro_notes",
+    "ro_phases",
+    "parts_received",
+    "parts_orders",
+    "ro_payment_entries",
+    "ro_payment_totals",
+    "estimate_uploads",
+    "saved_estimates",
+]
+
+
+@router.post("/delete-ro")
+async def delete_ro(request: Request):
+    domain = get_user_domain(request)
+    if not domain:
+        return JSONResponse(status_code=401, content={"error": "Not authenticated"})
+
+    data = await request.json()
+    ro = str((data or {}).get("ro") or "").strip()
+    if not ro:
+        return JSONResponse(status_code=400, content={"error": "RO is required"})
+
+    conn = get_conn()
+    cur = conn.cursor()
+    try:
+        _scope = resolve_request_scope(request, cur, domain=domain)
+        current_shop_id = _scope["shop_id"]
+        current_shop_uuid = _scope["shop_uuid"]
+        if not current_shop_id or not current_shop_uuid:
+            return JSONResponse(status_code=403, content={"error": "Shop scope not resolved"})
+
+        for table in _RO_DELETE_TABLES:
+            cur.execute(
+                f"""
+                DELETE FROM {table}
+                WHERE ro = %s
+                  AND (
+                        shop_uuid = %s::uuid
+                     OR (shop_uuid IS NULL AND shop_id = %s AND domain = %s)
+                  )
+                """,
+                (ro, current_shop_uuid, current_shop_id, domain),
+            )
+
+        conn.commit()
+        return JSONResponse(content={"status": "success", "ro": ro})
+    except Exception:
+        try:
+            conn.rollback()
+        except Exception:
+            pass
+        return JSONResponse(status_code=500, content={"status": "error", "message": "Delete failed"})
+    finally:
+        try:
+            cur.close()
+        except Exception:
+            pass
+        try:
+            conn.close()
+        except Exception:
+            pass
+
 @router.get("/dashboard-data")
 async def get_dashboard_data(request: Request):
     domain = get_user_domain(request)

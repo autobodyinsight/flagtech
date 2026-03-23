@@ -2927,6 +2927,32 @@ def get_dashboard_screen_html():
                 updateDashboard(fallback);
             }
 
+            async function deleteRoFromDashboard(event, roNumber) {
+                if (event) event.stopPropagation();
+                const ro = String(roNumber || '').trim();
+                if (!ro) return;
+
+                const confirmed = confirm(`Delete RO ${ro} and all associated data? This cannot be undone.`);
+                if (!confirmed) return;
+
+                try {
+                    const response = await fetch('/api/delete-ro', {
+                        method: 'POST',
+                        credentials: 'include',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ ro })
+                    });
+                    const result = await response.json();
+                    if (result && result.status === 'success') {
+                        await loadDashboardData();
+                        return;
+                    }
+                    alert('Delete failed: ' + ((result && (result.error || result.message)) || 'Unknown error'));
+                } catch (error) {
+                    alert('Delete failed: ' + error.message);
+                }
+            }
+
             function isOpenDashboardRo(ro) {
                 const phase = String(ro?.phase || '').trim().toLowerCase();
                 return phase !== 'complete' && phase !== 'complete/finish';
@@ -4626,6 +4652,7 @@ def get_dashboard_screen_html():
                         <tr class="dashboard-ro-main-row" style="background:${rowBg};">
                             <td style="padding:12px; border-bottom:1px solid #eee; position:relative;">
                                 <div style="display:inline-flex; align-items:center; gap:6px;">
+                                    <button type="button" onclick="deleteRoFromDashboard(event, '${ro.ro}')" style="width:18px; height:18px; border:1px solid #b22222; background:#fff; color:#b22222; border-radius:3px; cursor:pointer; font-size:13px; line-height:1; padding:0; display:inline-flex; align-items:center; justify-content:center;" title="Delete RO">-</button>
                                     <button type="button" onclick="openRoWindowFromDashboard(event, '${ro.ro}')" style="background:none; border:none; color:#0066cc; text-decoration:underline; cursor:pointer; padding:0; font:inherit;">
                                         ${ro.ro}
                                     </button>
