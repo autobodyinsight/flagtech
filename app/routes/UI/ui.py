@@ -2128,6 +2128,11 @@ async def manage_screen(request: Request):
         }
 
         function updateActionButtons() {
+            const editBtn = document.querySelector('.actions .btn[onclick="onEdit()"]');
+            if (editBtn) {
+                editBtn.textContent = state.editMode ? 'Edit (On)' : 'Edit';
+            }
+
             const addBtn = document.getElementById('manageAddBtn');
             if (addBtn) {
                 const active = !!(state.expandedDomain && state.addingRowByDomain[state.expandedDomain]);
@@ -2332,13 +2337,38 @@ async def manage_screen(request: Request):
             }
         }
 
-        function onEdit() {
-            if (!state.selectedUserIds.size) {
-                alert('Select user rows first.');
+        async function onEdit() {
+            if (!state.editMode) {
+                if (!state.selectedUserIds.size) {
+                    alert('Select user rows first.');
+                    return;
+                }
+                state.editMode = true;
+                render();
                 return;
             }
-            state.editMode = true;
-            render();
+
+            const domain = String(state.expandedDomain || '').trim().toLowerCase();
+            if (!domain) {
+                state.editMode = false;
+                render();
+                return;
+            }
+
+            try {
+                const hadUserUpdates = await saveChangedUserEdits(domain);
+                state.editMode = false;
+
+                if (hadUserUpdates) {
+                    await loadShops({ force: true });
+                    if (state.expandedDomain) {
+                        await ensureUsersLoaded(state.expandedDomain, { force: true });
+                    }
+                }
+                render();
+            } catch (error) {
+                alert(String(error.message || 'Unable to save user changes'));
+            }
         }
 
         async function onDelete() {
