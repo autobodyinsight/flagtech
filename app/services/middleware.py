@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 import secrets
 from datetime import datetime, timedelta, timezone
 from typing import Optional
@@ -73,30 +74,37 @@ def _ensure_system_settings_table(cur) -> None:
 
 
 def get_architect_email_setting() -> str:
+    env_fallback = str(os.getenv("ARCHITECT_EMAIL") or "").strip().lower()
     conn = get_conn()
     cur = conn.cursor()
     try:
-        _ensure_system_settings_table(cur)
-        cur.execute("SELECT value FROM system_settings WHERE key = %s LIMIT 1", ("architect_email",))
-        row = cur.fetchone() or {}
-        configured = str(row.get("value") or "").strip().lower()
-        if configured:
-            return configured
+        try:
+            _ensure_system_settings_table(cur)
+            cur.execute("SELECT value FROM system_settings WHERE key = %s LIMIT 1", ("architect_email",))
+            row = cur.fetchone() or {}
+            configured = str(row.get("value") or "").strip().lower()
+            if configured:
+                return configured
+        except Exception:
+            conn.rollback()
 
-        env_fallback = str(os.getenv("ARCHITECT_EMAIL") or "").strip().lower()
         if env_fallback:
-            cur.execute(
-                """
-                INSERT INTO system_settings (key, value, updated_at)
-                VALUES (%s, %s, CURRENT_TIMESTAMP)
-                ON CONFLICT (key)
-                DO UPDATE SET
-                    value = EXCLUDED.value,
-                    updated_at = CURRENT_TIMESTAMP
-                """,
-                ("architect_email", env_fallback),
-            )
-            conn.commit()
+            try:
+                _ensure_system_settings_table(cur)
+                cur.execute(
+                    """
+                    INSERT INTO system_settings (key, value, updated_at)
+                    VALUES (%s, %s, CURRENT_TIMESTAMP)
+                    ON CONFLICT (key)
+                    DO UPDATE SET
+                        value = EXCLUDED.value,
+                        updated_at = CURRENT_TIMESTAMP
+                    """,
+                    ("architect_email", env_fallback),
+                )
+                conn.commit()
+            except Exception:
+                conn.rollback()
             return env_fallback
 
         return ""
