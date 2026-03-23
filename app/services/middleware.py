@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import os
 import secrets
+import time
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
@@ -73,43 +74,50 @@ def _ensure_system_settings_table(cur) -> None:
     cur.execute("CREATE INDEX IF NOT EXISTS idx_system_settings_updated_at ON system_settings(updated_at)")
 
 
+# Read env var once at module load — no DB needed, zero per-request cost.
+_ARCHITECT_EMAIL_ENV: str = str(os.getenv("ARCHITECT_EMAIL") or "").strip().lower()
+
+# Short-lived in-memory cache for the DB override (avoids per-request DB hits).
+_architect_email_db_cache: tuple[float, str] | None = None
+_ARCHITECT_EMAIL_CACHE_TTL: float = 60.0  # seconds
+
+
 def get_architect_email_setting() -> str:
-    env_fallback = str(os.getenv("ARCHITECT_EMAIL") or "").strip().lower()
-    conn = get_conn()
-    cur = conn.cursor()
+    """Return the architect email: env var wins, DB override is read at most once per minute."""
+    global _architect_email_db_cache
+
+    # Env var is the primary source — set ARCHITECT_EMAIL in Render env vars.
+    if _ARCHITECT_EMAIL_ENV:
+        return _ARCHITECT_EMAIL_ENV
+
+    # Check in-memory DB cache before hitting the database.
+    now = time.monotonic()
+    if _architect_email_db_cache is not None:
+        cached_at, cached_value = _architect_email_db_cache
+        if now - cached_at < _ARCHITECT_EMAIL_CACHE_TTL:
+            return cached_value
+
+    # Read from DB (only when env var is absent).
     try:
+        conn = get_conn()
+        cur = conn.cursor()
         try:
             _ensure_system_settings_table(cur)
-            cur.execute("SELECT value FROM system_settings WHERE key = %s LIMIT 1", ("architect_email",))
+            cur.execute(
+                "SELECT value FROM system_settings WHERE key = %s LIMIT 1",
+                ("architect_email",),
+            )
             row = cur.fetchone() or {}
-            configured = str(row.get("value") or "").strip().lower()
-            if configured:
-                return configured
-        except Exception:
-            conn.rollback()
-
-        if env_fallback:
-            try:
-                _ensure_system_settings_table(cur)
-                cur.execute(
-                    """
-                    INSERT INTO system_settings (key, value, updated_at)
-                    VALUES (%s, %s, CURRENT_TIMESTAMP)
-                    ON CONFLICT (key)
-                    DO UPDATE SET
-                        value = EXCLUDED.value,
-                        updated_at = CURRENT_TIMESTAMP
-                    """,
-                    ("architect_email", env_fallback),
-                )
-                conn.commit()
-            except Exception:
-                conn.rollback()
-            return env_fallback
-
+            db_value = str(row.get("value") or "").strip().lower()
+        finally:
+            cur.close()
+        _architect_email_db_cache = (now, db_value)
+        return db_value
+    except Exception:
+        # On DB error, return last known cached value (or empty) — never crash auth.
+        if _architect_email_db_cache is not None:
+            return _architect_email_db_cache[1]
         return ""
-    finally:
-        cur.close()
 
 
 def _normalize_permission_snapshot(raw_snapshot) -> dict | None:
