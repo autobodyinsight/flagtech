@@ -79,7 +79,27 @@ def get_architect_email_setting() -> str:
         _ensure_system_settings_table(cur)
         cur.execute("SELECT value FROM system_settings WHERE key = %s LIMIT 1", ("architect_email",))
         row = cur.fetchone() or {}
-        return str(row.get("value") or "").strip().lower()
+        configured = str(row.get("value") or "").strip().lower()
+        if configured:
+            return configured
+
+        env_fallback = str(os.getenv("ARCHITECT_EMAIL") or "").strip().lower()
+        if env_fallback:
+            cur.execute(
+                """
+                INSERT INTO system_settings (key, value, updated_at)
+                VALUES (%s, %s, CURRENT_TIMESTAMP)
+                ON CONFLICT (key)
+                DO UPDATE SET
+                    value = EXCLUDED.value,
+                    updated_at = CURRENT_TIMESTAMP
+                """,
+                ("architect_email", env_fallback),
+            )
+            conn.commit()
+            return env_fallback
+
+        return ""
     finally:
         cur.close()
 
