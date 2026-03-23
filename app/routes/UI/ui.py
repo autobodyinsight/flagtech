@@ -236,6 +236,13 @@ async def login_screen(request: Request):
 async def home_screen(request: Request):
     """Main UI screen with sidebar navigation."""
 
+    is_architect = _is_architect(request)
+    manage_button_html = (
+        "<button id=\"sideManageBtn\" type=\"button\" class=\"side-menu-item\" data-screen=\"manage\" aria-label=\"Manage\"><span class=\"nav-icon\"><svg viewBox=\"0 0 24 24\" fill=\"none\" xmlns=\"http://www.w3.org/2000/svg\"><path d=\"M4 6h16\" stroke=\"currentColor\" stroke-width=\"1.8\" stroke-linecap=\"round\"/><path d=\"M4 12h16\" stroke=\"currentColor\" stroke-width=\"1.8\" stroke-linecap=\"round\"/><path d=\"M4 18h16\" stroke=\"currentColor\" stroke-width=\"1.8\" stroke-linecap=\"round\"/></svg></span><span class=\"nav-label\">Manage</span></button>"
+        if is_architect
+        else ""
+    )
+
     return f"""
 <!DOCTYPE html>
 <html>
@@ -928,7 +935,7 @@ async def home_screen(request: Request):
             <button type="button" class="side-menu-item" data-screen="flagtech" aria-label="Flagout"><span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M6 3v18" stroke="currentColor" stroke-width="1.8"/><path d="M6 4h11l-2.2 3L17 10H6" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg></span><span class="nav-label">Flagout</span></button>
             <button type="button" class="side-menu-item" data-screen="reports" aria-label="Reports"><span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M5 5h14v14H5z" stroke="currentColor" stroke-width="1.8"/><path d="M8 9h8M8 13h8M8 17h5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></span><span class="nav-label">Reports</span></button>
             <button id="sideSetupBtn" type="button" class="side-menu-item" data-screen="setup" aria-label="Setup"><span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M5 19l6-6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M10.2 7.8a2.8 2.8 0 0 1-3.9 3.9L3.8 14.2a1.4 1.4 0 0 0 2 2l2.5-2.5a2.8 2.8 0 0 1 3.9-3.9" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M19 5l-6 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M13.8 16.2a2.8 2.8 0 0 1 3.9-3.9l2.5-2.5a1.4 1.4 0 1 0-2-2l-2.5 2.5a2.8 2.8 0 0 1-3.9 3.9" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span class="nav-label">Setup</span></button>
-            <button id="sideManageBtn" type="button" class="side-menu-item" data-screen="manage" aria-label="Manage"><span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M4 6h16" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M4 12h16" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M4 18h16" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></span><span class="nav-label">Manage</span></button>
+            {manage_button_html}
             <button type="button" class="side-menu-item" data-action="chat" aria-label="Chat"><span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M4 5h16v10H8l-4 4V5z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg></span><span class="nav-label">Chat</span></button>
         </div>
         <div class="side-user-wrap">
@@ -1084,6 +1091,7 @@ async def home_screen(request: Request):
         }}
 
         normalizeFormAccessibility();
+    const canAccessManage = {str(is_architect).lower()};
         const a11yObserver = new MutationObserver(() => normalizeFormAccessibility());
         a11yObserver.observe(document.body, {{ childList: true, subtree: true }});
 
@@ -1653,7 +1661,7 @@ async def home_screen(request: Request):
                 const userLabelEl = document.getElementById('sideUserLabel');
                 if (userLabelEl && (firstName || lastName)) userLabelEl.textContent = (firstName + ' ' + lastName).trim();
                 const sideManageBtn = document.getElementById('sideManageBtn');
-                if (sideManageBtn) sideManageBtn.style.display = 'flex';
+                if (sideManageBtn) sideManageBtn.style.display = canAccessManage ? 'flex' : 'none';
                 const sideSetupBtn = document.getElementById('sideSetupBtn');
                 if (sideSetupBtn) sideSetupBtn.style.display = 'flex';
                 const resetPasswordBtn = document.getElementById('profileResetPasswordBtn');
@@ -1739,6 +1747,10 @@ async def home_screen(request: Request):
         }}
 
         function switchScreen(screenName, sourceEl = null) {{
+            if (screenName === 'manage' && !canAccessManage) {{
+                screenName = 'dashboard';
+            }}
+
             const screens = document.querySelectorAll('.screen');
             screens.forEach(screen => screen.classList.remove('active'));
 
