@@ -347,6 +347,42 @@ def _normalize_parts_part_type(part_type: str) -> str:
     return str(part_type or "").strip().upper()
 
 
+def _infer_parts_part_type(
+    explicit_part_type: str,
+    row_text: str,
+    description: str,
+    operation_type: str,
+    part_number: str,
+) -> str:
+    normalized_explicit = _normalize_parts_part_type(explicit_part_type)
+    if normalized_explicit in {"OEM", "LKQ", "A/M", "SUBLET"}:
+        return normalized_explicit
+
+    combined = " ".join(
+        [
+            str(explicit_part_type or ""),
+            str(row_text or ""),
+            str(description or ""),
+            str(operation_type or ""),
+            str(part_number or ""),
+        ]
+    ).lower()
+
+    if "qual recycled" in combined or "lkq" in combined:
+        return "LKQ"
+    if "aftermarket" in combined or "a/m" in combined or "a m" in combined:
+        return "A/M"
+    if re.search(r"\bnew\b", combined) or " oem" in f" {combined}":
+        return "OEM"
+    if "sublet" in combined or re.search(r"\bsubl\b", combined):
+        return "SUBLET"
+    return normalized_explicit
+
+
+def _is_parts_replacement_from_normalized_type(normalized_part_type: str) -> bool:
+    return normalized_part_type in {"OEM", "LKQ", "A/M", "SUBLET"}
+
+
 def _build_parts_row_text(
     line_number: str,
     description: str,
@@ -413,6 +449,7 @@ def _extract_mitchell_repair_lines(pages: List[Dict[str, Any]]) -> tuple[List[Di
                     cursor += 1
                     continue
 
+                candidate_row_text = _row_text(candidate)
                 description = _extract_description(_extract_row_field(candidate, ranges, "description"))
                 operation_type = _extract_row_field(candidate, ranges, "operation_type")
                 total_units_raw = _extract_row_field(candidate, ranges, "total_units")
@@ -439,10 +476,16 @@ def _extract_mitchell_repair_lines(pages: List[Dict[str, Any]]) -> tuple[List[Di
                 seen_rows.add(row_key)
 
                 is_refinish = _is_refinish_operation(operation_type)
-                is_parts_replacement = _is_parts_replacement(part_type)
-                is_duplicate_parts_replacement = _is_duplicate_parts_replacement(part_type)
                 is_non_labor_charge = _is_non_labor_charge(description)
-                normalized_part_type = _normalize_parts_part_type(part_type)
+                normalized_part_type = _infer_parts_part_type(
+                    part_type,
+                    candidate_row_text,
+                    description,
+                    operation_type,
+                    part_number,
+                )
+                is_parts_replacement = _is_parts_replacement_from_normalized_type(normalized_part_type)
+                is_duplicate_parts_replacement = _is_duplicate_parts_replacement(part_type)
                 parts_row_text = _build_parts_row_text(
                     line_number,
                     description,
