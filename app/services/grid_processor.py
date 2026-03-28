@@ -189,6 +189,7 @@ def detect_anchors_and_vehicle_info(
             if re.search(r"\b(owner|customer)\s*:", row_text, re.IGNORECASE):
                 name = ""
                 phone = ""
+                is_owner_label_row = bool(re.search(r"\bowner\s*:", row_text, re.IGNORECASE))
 
                 header_groups = _group_row_words_by_x(r["words"])
                 owner_group = None
@@ -219,9 +220,47 @@ def detect_anchors_and_vehicle_info(
                         w.get("text", "") for w in sorted(filtered_words, key=lambda w: w.get("x0", 0))
                     ).strip()
 
+                def _same_line_value_text(row: Dict) -> str:
+                    words = row.get("words", [])
+                    if owner_group is None:
+                        return ""
+                    filtered_words = [
+                        w for w in words
+                        if w.get("xmid", 0) > owner_group["max_x"]
+                        and (right_bound is None or w.get("xmid", 0) < right_bound)
+                    ]
+                    return " ".join(
+                        w.get("text", "") for w in sorted(filtered_words, key=lambda w: w.get("x0", 0))
+                    ).strip()
+
+                search_start = idx + 1
+                same_line_value = _same_line_value_text(r)
+                if same_line_value:
+                    name_match = re.match(r"^([A-Za-z][A-Za-z\-\s']*,\s*[A-Za-z][A-Za-z\-\s']*)", same_line_value)
+                    if name_match:
+                        name = name_match.group(1)
+                    phone_match = re.search(
+                        r"(\(\d{3}\)\s*\d{3}-\d{4})\s*(cell|work|home|mobile)?",
+                        same_line_value,
+                        re.IGNORECASE,
+                    )
+                    if phone_match:
+                        phone = phone_match.group(1).strip()
+                        if phone_match.group(2):
+                            phone += " " + phone_match.group(2).strip()
+
+                if is_owner_label_row and not same_line_value:
+                    while search_start < len(rows):
+                        candidate_text = _row_text_in_bounds(rows[search_start])
+                        if candidate_text and not re.search(r"\b(owner|customer)\s*:", candidate_text, re.IGNORECASE):
+                            break
+                        search_start += 1
+
                 # Scan the next rows for name and phone within the same x column.
                 scan_end = min(len(rows), idx + 10)
-                for j in range(idx + 1, scan_end):
+                for j in range(search_start, scan_end):
+                    if name:
+                        break
                     full_line = _row_text_in_bounds(rows[j])
                     if not full_line:
                         continue
@@ -230,7 +269,9 @@ def detect_anchors_and_vehicle_info(
                         name = name_match.group(1)
                         break
 
-                for j in range(idx + 1, scan_end):
+                for j in range(search_start, scan_end):
+                    if phone:
+                        break
                     full_line = _row_text_in_bounds(rows[j])
                     if not full_line:
                         continue
