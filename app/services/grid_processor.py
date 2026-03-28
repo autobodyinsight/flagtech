@@ -114,8 +114,8 @@ def detect_anchors_and_vehicle_info(
     ro_anchor_ymid = None
     customer_anchor_page = None
     customer_anchor_ymid = None
-    owner_anchor_page = None
-    owner_anchor_ymid = None
+    owner_value_anchor_page = None
+    owner_value_anchor_ymid = None
 
     def _is_ro_number_row(text: str) -> bool:
         return bool(
@@ -123,11 +123,19 @@ def detect_anchors_and_vehicle_info(
             or re.search(r"\bRO\s*#", text, re.IGNORECASE)
         )
 
-    def _is_customer_row(text: str) -> bool:
+    def _is_customer_anchor_row(text: str) -> bool:
         return bool(re.search(r"\bCUSTOMER\s*:", text, re.IGNORECASE))
 
-    def _is_owner_row(text: str) -> bool:
-        return bool(re.search(r"\bOWNER\s*:", text, re.IGNORECASE))
+    def _is_owner_value_row(text: str) -> bool:
+        cleaned = str(text or "").strip()
+        if not cleaned:
+            return False
+        # Owner fallback must target the owner value row, not the label row.
+        if re.search(r"\bOWNER\s*:", cleaned, re.IGNORECASE):
+            return False
+        if re.search(r"\bCUSTOMER\s*:", cleaned, re.IGNORECASE):
+            return False
+        return bool(re.match(r"^[A-Za-z][A-Za-z\-\s']*,\s*[A-Za-z][A-Za-z\-\s']*(?:\s|$)", cleaned))
 
     def _is_vin_or_vehicle_row(text: str) -> bool:
         return bool(re.search(r"\b(VIN|VEHICLE)\b", text, re.IGNORECASE))
@@ -168,7 +176,7 @@ def detect_anchors_and_vehicle_info(
                 if re.search(r"\bCLAIM\b", row_text, re.IGNORECASE):
                     claim_number = _extract_claim_number_from_text(row_text)
 
-            # Anchor priority: RO Number -> Customer: -> Owner
+            # Primary anchor: RO Number row
             if _is_ro_number_row(row_text):
                 ro_count += 1
                 if ro_count == 1 and not first_ro_line:
@@ -177,13 +185,19 @@ def detect_anchors_and_vehicle_info(
                     ro_anchor_page = pi
                     ro_anchor_ymid = r["ymid"]
 
-            if customer_anchor_page is None and _is_customer_row(row_text):
+            # Fallback anchor #1: Customer label row
+            if customer_anchor_page is None and _is_customer_anchor_row(row_text):
                 customer_anchor_page = pi
                 customer_anchor_ymid = r["ymid"]
 
-            if owner_anchor_page is None and _is_owner_row(row_text):
-                owner_anchor_page = pi
-                owner_anchor_ymid = r["ymid"]
+            # Fallback anchor #2: Owner value row (never the literal "Owner:" label row)
+            if owner_value_anchor_page is None and _is_owner_value_row(row_text):
+                prev_row_text = ""
+                if idx > 0:
+                    prev_row_text = " ".join(w.get("text", "") for w in rows[idx - 1]["words"]).strip()
+                if re.search(r"\b(owner|customer)\s*:", prev_row_text, re.IGNORECASE):
+                    owner_value_anchor_page = pi
+                    owner_value_anchor_ymid = r["ymid"]
 
             # Extract owner info (look for "owner:" or "customer:" and extract name/phone in the same x column)
             if re.search(r"\b(owner|customer)\s*:", row_text, re.IGNORECASE):
@@ -334,9 +348,9 @@ def detect_anchors_and_vehicle_info(
     elif customer_anchor_page is not None:
         anchor_page = customer_anchor_page
         anchor_ymid = customer_anchor_ymid
-    elif owner_anchor_page is not None:
-        anchor_page = owner_anchor_page
-        anchor_ymid = owner_anchor_ymid
+    elif owner_value_anchor_page is not None:
+        anchor_page = owner_value_anchor_page
+        anchor_ymid = owner_value_anchor_ymid
 
     return anchor_page, anchor_ymid, subtotals_page, subtotals_ymid, first_ro_line, vehicle_info_line, owner_info, insurance_company, vin, claim_number
 
