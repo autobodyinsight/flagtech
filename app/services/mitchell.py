@@ -118,6 +118,21 @@ def _extract_value_below_label(pages: List[Dict[str, Any]], label: str) -> str:
 
 
 def _extract_vehicle_header_line(pages: List[Dict[str, Any]]) -> str:
+    """Find the vehicle year/make/model line that appears just above 'Exterior Color'."""
+    exterior_color_pattern = re.compile(r"exterior\s+color", re.IGNORECASE)
+
+    for page in pages:
+        rows = _group_rows(page.get("words", []), y_thresh=6.0)
+        for idx, row in enumerate(rows):
+            if exterior_color_pattern.search(_row_text(row)):
+                # Search upward from the Exterior Color label for a 4-digit year
+                for prev_idx in range(idx - 1, max(-1, idx - 6), -1):
+                    candidate = _row_text(rows[prev_idx])
+                    if re.match(r"^\d{4}\b", candidate):
+                        return candidate
+                break  # Found the label on this page; no need to keep searching
+
+    # Fallback: first row starting with a 4-digit year anywhere
     for page in pages:
         rows = _group_rows(page.get("words", []), y_thresh=6.0)
         for row in rows:
