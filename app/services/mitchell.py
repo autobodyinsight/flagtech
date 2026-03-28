@@ -336,6 +336,40 @@ def _is_non_labor_charge(description: str) -> bool:
     return any(keyword in description_lower for keyword in _NON_LABOR_DESCRIPTION_KEYWORDS)
 
 
+def _normalize_parts_part_type(part_type: str) -> str:
+    normalized = str(part_type or "").strip().lower()
+    if "qual recycled" in normalized:
+        return "LKQ"
+    if "aftermarket" in normalized:
+        return "AFTERMARKET"
+    if normalized == "new":
+        return "OEM"
+    return str(part_type or "").strip().upper()
+
+
+def _build_parts_row_text(
+    line_number: str,
+    description: str,
+    operation_type: str,
+    total_units: Optional[float],
+    part_type: str,
+    part_number: str,
+    qty: Optional[float],
+    total_price: Optional[float],
+) -> str:
+    parts = [
+        str(line_number or "").strip(),
+        str(description or "").strip(),
+        str(operation_type or "").strip(),
+        "" if total_units is None else f"{total_units:g}",
+        str(part_type or "").strip(),
+        str(part_number or "").strip(),
+        "" if qty is None else f"{qty:g}",
+        "" if total_price is None else f"${total_price:,.2f}",
+    ]
+    return " ".join(part for part in parts if part)
+
+
 def _is_repair_table_stop_row(row_text: str) -> bool:
     lowered = str(row_text or "").strip().lower()
     if not lowered:
@@ -408,6 +442,17 @@ def _extract_mitchell_repair_lines(pages: List[Dict[str, Any]]) -> tuple[List[Di
                 is_parts_replacement = _is_parts_replacement(part_type)
                 is_duplicate_parts_replacement = _is_duplicate_parts_replacement(part_type)
                 is_non_labor_charge = _is_non_labor_charge(description)
+                normalized_part_type = _normalize_parts_part_type(part_type)
+                parts_row_text = _build_parts_row_text(
+                    line_number,
+                    description,
+                    operation_type,
+                    total_units,
+                    normalized_part_type,
+                    part_number,
+                    qty,
+                    total_price,
+                )
 
                 if is_refinish:
                     paint_items.append(
@@ -430,13 +475,14 @@ def _extract_mitchell_repair_lines(pages: List[Dict[str, Any]]) -> tuple[List[Di
                         {
                             "line": line_number,
                             "description": description,
-                            "part_type": part_type,
+                            "part_type": normalized_part_type,
                             "price": total_price if total_price is not None else 0.0,
                             "qty": qty if qty is not None else 0.0,
                             "operation_type": operation_type,
                             "total_units": total_units if total_units is not None else 0.0,
                             "number": part_number,
                             "tax": tax,
+                            "row_text": parts_row_text,
                         }
                     )
 
