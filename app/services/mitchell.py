@@ -117,6 +117,28 @@ def _extract_value_below_label(pages: List[Dict[str, Any]], label: str) -> str:
     return ""
 
 
+def _extract_vehicle_header_line(pages: List[Dict[str, Any]]) -> str:
+    for page in pages:
+        rows = _group_rows(page.get("words", []), y_thresh=6.0)
+        for row in rows:
+            row_text = _row_text(row)
+            if re.match(r"^\d{4}\b", row_text):
+                return row_text
+    return ""
+
+
+def _parse_vehicle_header_fields(vehicle_line: str) -> tuple[str, str, str]:
+    cleaned = str(vehicle_line or "").strip()
+    if not cleaned:
+        return "", "", ""
+
+    match = re.match(r"^(\d{4})\b\s+(\S+)\s+(\S+)", cleaned)
+    if not match:
+        return "", "", ""
+
+    return match.group(1), match.group(2), match.group(3)
+
+
 def parse_mitchell(words: List[Dict[str, Any]]) -> Dict[str, Any]:
     pages = words
     for page_index, page in enumerate(pages, start=1):
@@ -129,6 +151,8 @@ def parse_mitchell(words: List[Dict[str, Any]]) -> Dict[str, Any]:
     estimator = _extract_value_below_label(pages, "appraiser")
     insurance_company = _extract_value_below_label(pages, "insurance company")
     claim_number = _extract_value_below_label(pages, "claim number")
+    vehicle_info_line = _extract_vehicle_header_line(pages)
+    year, make, model = _parse_vehicle_header_fields(vehicle_info_line)
 
     return {
         "labor_items": [],
@@ -138,13 +162,18 @@ def parse_mitchell(words: List[Dict[str, Any]]) -> Dict[str, Any]:
         "total_paint": 0,
         "first_ro_line": "",
         "second_ro_line": "",
-        "vehicle_info_line": "",
+        "vehicle_info_line": vehicle_info_line,
+        "owner": owner_info,
         "owner_info": owner_info,
         "insurance_company": insurance_company,
         "written_by": "",
         "estimator": estimator,
         "vin": "",
+        "claim": claim_number,
         "claim_number": claim_number,
+        "year": year,
+        "make": make,
+        "model": model,
         "anchor_page": None,
         "anchor_ymid": None,
         "subtotals_page": None,
