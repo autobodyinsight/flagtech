@@ -311,7 +311,7 @@ function resolvePartType(item) {{
 function formatPartPrice(value) {{
   if (value === null || value === undefined || value === '') return '-';
   const parsed = parseFloat(value);
-  if (!Number.isFinite(parsed)) return value;
+  if (!Number.isFinite(parsed)) return '-';
   const fixed = parsed.toFixed(2);
   return fixed.endsWith('.00') ? String(parseInt(fixed, 10)) : fixed;
 }}
@@ -327,17 +327,16 @@ function formatEstimateValue(value) {{
 
 function shouldDisplayPartReplacement(item) {{
   if (!item || typeof item !== 'object') return false;
-  const priceVal = parseFloat(item.price);
-  if (!Number.isFinite(priceVal) || priceVal <= 0) {{
-    return false;
-  }}
-
   const explicitPartType = String(item.part_type || '').trim().toUpperCase();
   if (explicitPartType === 'OEM' || explicitPartType === 'LKQ' || explicitPartType === 'A/M') {{
     return true;
   }}
+  if (explicitPartType === 'SUBLET') {{
+    return true;
+  }}
 
   const qtyVal = parseFloat(item.qty);
+  const priceVal = parseFloat(item.price);
   const rowText = String(item.row_text || '').trim().toLowerCase();
   const descText = String(item.description || '').trim().toLowerCase();
   const sourceText = rowText || descText;
@@ -345,7 +344,11 @@ function shouldDisplayPartReplacement(item) {{
     return true;
   }}
 
-  return Number.isFinite(qtyVal) && qtyVal > 0 && !!explicitPartType;
+  if (Number.isFinite(qtyVal) && qtyVal > 0 && !!explicitPartType) {{
+    return true;
+  }}
+
+  return Number.isFinite(priceVal) && priceVal > 0 && !!explicitPartType;
 }}
 
 function extractPartsReplacements() {{
@@ -552,12 +555,14 @@ function openSaveEstimateModal(estimateTotals) {{
       const lineText = item.line ? ('Line ' + item.line + ' - ') : '';
       const rawDesc = rowText || descText || 'Part';
       const cleanedDesc = rawDesc.replace(/^\\s*\\d+\\s+/, '').trim();
-      const priceText = '$' + formatPartPrice(priceVal);
+      const priceText = Number.isFinite(priceVal) && priceVal > 0 ? ('$' + formatPartPrice(priceVal)) : '-';
       partsHtml += '<div class="repair-item" id="part-item-' + partsCount + '">';
       partsHtml += '<div class="repair-item-label"><strong>' + lineText + '</strong>' + cleanedDesc + ' - ' + partType + '</div>';
       partsHtml += '<div class="repair-item-value">' + priceText + '</div>';
       partsHtml += '</div>';
-      partsTotal += priceVal;
+      if (Number.isFinite(priceVal) && priceVal > 0) {{
+        partsTotal += priceVal;
+      }}
       partsCount += 1;
     }});
   }}

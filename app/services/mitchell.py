@@ -305,6 +305,24 @@ def _to_float(value: str) -> Optional[float]:
         return None
 
 
+def _parse_last_money_value(text: str) -> Optional[float]:
+    source = str(text or "")
+    if not source:
+        return None
+
+    # Prefer currency-like values with cents to avoid capturing part numbers.
+    money_with_cents = re.findall(r"\$?\d{1,3}(?:,\d{3})*(?:\.\d{2})", source)
+    if money_with_cents:
+        return _to_float(money_with_cents[-1])
+
+    # Fallback: last dollar-prefixed value (may not include cents).
+    dollar_values = re.findall(r"\$\s*\d+(?:,\d{3})*(?:\.\d{1,2})?", source)
+    if dollar_values:
+        return _to_float(dollar_values[-1])
+
+    return None
+
+
 def _extract_line_number(value: str) -> str:
     match = re.search(r"\b(\d{1,4})\b", str(value or ""))
     return match.group(1) if match else ""
@@ -464,6 +482,10 @@ def _extract_mitchell_repair_lines(pages: List[Dict[str, Any]]) -> tuple[List[Di
                 part_number = _extract_part_number(_extract_row_field(candidate, ranges, "number"))
                 qty = _to_float(_extract_row_field(candidate, ranges, "qty"))
                 extended_price = _to_float(_extract_row_field(candidate, ranges, "ext_price"))
+                if extended_price is None or extended_price <= 0:
+                    fallback_price = _parse_last_money_value(candidate_row_text)
+                    if fallback_price is not None and fallback_price > 0:
+                        extended_price = fallback_price
                 tax_text = _extract_row_field(candidate, ranges, "tax")
                 tax = str(tax_text or "").strip().lower() in {"yes", "y", "true", "tax"}
 
