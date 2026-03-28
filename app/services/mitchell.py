@@ -237,8 +237,14 @@ def _header_group_key(text: str) -> Optional[str]:
         return "number"
     if normalized in {"qty", "quantity"} or "qty" in normalized:
         return "qty"
-    if "total price" in normalized or normalized == "price" or "price" in normalized:
-        return "total_price"
+    if (
+        "extended price" in normalized
+        or "ext price" in normalized
+        or "total price" in normalized
+        or normalized == "price"
+        or "price" in normalized
+    ):
+        return "ext_price"
     if "tax" in normalized:
         return "tax"
     return None
@@ -391,7 +397,7 @@ def _build_parts_row_text(
     part_type: str,
     part_number: str,
     qty: Optional[float],
-    total_price: Optional[float],
+    extended_price: Optional[float],
 ) -> str:
     parts = [
         str(line_number or "").strip(),
@@ -401,7 +407,7 @@ def _build_parts_row_text(
         str(part_type or "").strip(),
         str(part_number or "").strip(),
         "" if qty is None else f"{qty:g}",
-        "" if total_price is None else f"${total_price:,.2f}",
+        "" if extended_price is None else f"${extended_price:,.2f}",
     ]
     return " ".join(part for part in parts if part)
 
@@ -457,7 +463,7 @@ def _extract_mitchell_repair_lines(pages: List[Dict[str, Any]]) -> tuple[List[Di
                 part_type = _extract_row_field(candidate, ranges, "type")
                 part_number = _extract_part_number(_extract_row_field(candidate, ranges, "number"))
                 qty = _to_float(_extract_row_field(candidate, ranges, "qty"))
-                total_price = _to_float(_extract_row_field(candidate, ranges, "total_price"))
+                extended_price = _to_float(_extract_row_field(candidate, ranges, "ext_price"))
                 tax_text = _extract_row_field(candidate, ranges, "tax")
                 tax = str(tax_text or "").strip().lower() in {"yes", "y", "true", "tax"}
 
@@ -468,7 +474,7 @@ def _extract_mitchell_repair_lines(pages: List[Dict[str, Any]]) -> tuple[List[Di
                     part_type,
                     part_number,
                     str(qty if qty is not None else ""),
-                    str(total_price if total_price is not None else ""),
+                    str(extended_price if extended_price is not None else ""),
                 )
                 if row_key in seen_rows:
                     cursor += 1
@@ -494,7 +500,7 @@ def _extract_mitchell_repair_lines(pages: List[Dict[str, Any]]) -> tuple[List[Di
                     normalized_part_type,
                     part_number,
                     qty,
-                    total_price,
+                    extended_price,
                 )
 
                 if is_refinish:
@@ -508,7 +514,8 @@ def _extract_mitchell_repair_lines(pages: List[Dict[str, Any]]) -> tuple[List[Di
                             "type": part_type,
                             "number": part_number,
                             "qty": qty if qty is not None else 0.0,
-                            "total_price": total_price if total_price is not None else 0.0,
+                            "extended_price": extended_price if extended_price is not None else 0.0,
+                            "total_price": extended_price if extended_price is not None else 0.0,
                             "tax": tax,
                         }
                     )
@@ -519,7 +526,8 @@ def _extract_mitchell_repair_lines(pages: List[Dict[str, Any]]) -> tuple[List[Di
                             "line": line_number,
                             "description": description,
                             "part_type": normalized_part_type,
-                            "price": total_price if total_price is not None else 0.0,
+                            "price": extended_price if extended_price is not None else 0.0,
+                            "extended_price": extended_price if extended_price is not None else 0.0,
                             "qty": qty if qty is not None else 0.0,
                             "operation_type": operation_type,
                             "total_units": total_units if total_units is not None else 0.0,
@@ -542,7 +550,8 @@ def _extract_mitchell_repair_lines(pages: List[Dict[str, Any]]) -> tuple[List[Di
                             "type": part_type,
                             "number": part_number,
                             "qty": qty if qty is not None else 0.0,
-                            "total_price": total_price if total_price is not None else 0.0,
+                            "extended_price": extended_price if extended_price is not None else 0.0,
+                            "total_price": extended_price if extended_price is not None else 0.0,
                             "tax": tax,
                         }
                     )
