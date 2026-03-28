@@ -22,6 +22,18 @@ _PART_TYPE_KEYWORDS = (
     "sublet",
 )
 
+_DUPLICATE_PARTS_TYPE_KEYWORDS = (
+    "new",
+    "qual recycled",
+    "aftermarket",
+)
+
+_NON_LABOR_DESCRIPTION_KEYWORDS = (
+    "paint/materials",
+    "paint materials",
+    "hazardous waste",
+)
+
 _REPAIR_TABLE_STOP_MARKERS = (
     "subtotal",
     "totals",
@@ -314,6 +326,16 @@ def _is_parts_replacement(part_type: str) -> bool:
     return any(keyword in part_type_lower for keyword in _PART_TYPE_KEYWORDS)
 
 
+def _is_duplicate_parts_replacement(part_type: str) -> bool:
+    part_type_lower = str(part_type or "").lower()
+    return any(keyword in part_type_lower for keyword in _DUPLICATE_PARTS_TYPE_KEYWORDS)
+
+
+def _is_non_labor_charge(description: str) -> bool:
+    description_lower = str(description or "").lower()
+    return any(keyword in description_lower for keyword in _NON_LABOR_DESCRIPTION_KEYWORDS)
+
+
 def _is_repair_table_stop_row(row_text: str) -> bool:
     lowered = str(row_text or "").strip().lower()
     if not lowered:
@@ -384,6 +406,8 @@ def _extract_mitchell_repair_lines(pages: List[Dict[str, Any]]) -> tuple[List[Di
 
                 is_refinish = _is_refinish_operation(operation_type)
                 is_parts_replacement = _is_parts_replacement(part_type)
+                is_duplicate_parts_replacement = _is_duplicate_parts_replacement(part_type)
+                is_non_labor_charge = _is_non_labor_charge(description)
 
                 if is_refinish:
                     paint_items.append(
@@ -401,7 +425,7 @@ def _extract_mitchell_repair_lines(pages: List[Dict[str, Any]]) -> tuple[List[Di
                         }
                     )
 
-                if is_parts_replacement:
+                if is_parts_replacement or is_duplicate_parts_replacement:
                     parts_items.append(
                         {
                             "line": line_number,
@@ -418,7 +442,7 @@ def _extract_mitchell_repair_lines(pages: List[Dict[str, Any]]) -> tuple[List[Di
 
                 # Mitchell lines with replacement part types still carry body labor hours,
                 # so keep them in labor unless they are explicitly refinish/blend operations.
-                if not is_refinish:
+                if not is_refinish and not is_non_labor_charge:
                     labor_items.append(
                         {
                             "line": line_number,
