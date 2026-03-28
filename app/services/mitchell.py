@@ -382,7 +382,10 @@ def _extract_mitchell_repair_lines(pages: List[Dict[str, Any]]) -> tuple[List[Di
                     continue
                 seen_rows.add(row_key)
 
-                if _is_refinish_operation(operation_type):
+                is_refinish = _is_refinish_operation(operation_type)
+                is_parts_replacement = _is_parts_replacement(part_type)
+
+                if is_refinish:
                     paint_items.append(
                         {
                             "line": line_number,
@@ -397,7 +400,8 @@ def _extract_mitchell_repair_lines(pages: List[Dict[str, Any]]) -> tuple[List[Di
                             "tax": tax,
                         }
                     )
-                elif _is_parts_replacement(part_type):
+
+                if is_parts_replacement:
                     parts_items.append(
                         {
                             "line": line_number,
@@ -411,7 +415,10 @@ def _extract_mitchell_repair_lines(pages: List[Dict[str, Any]]) -> tuple[List[Di
                             "tax": tax,
                         }
                     )
-                else:
+
+                # Mitchell lines with replacement part types still carry body labor hours,
+                # so keep them in labor unless they are explicitly refinish/blend operations.
+                if not is_refinish:
                     labor_items.append(
                         {
                             "line": line_number,
