@@ -142,6 +142,19 @@ def _extract_vehicle_header_line(pages: List[Dict[str, Any]]) -> str:
     return ""
 
 
+_VIN_RE = re.compile(r"[A-HJ-NPR-Z0-9]{17}", re.IGNORECASE)
+
+
+def _extract_vin(pages: List[Dict[str, Any]]) -> str:
+    """Extract the 17-character VIN that appears below the 'VIN' column header."""
+    raw = _extract_value_below_label(pages, "VIN")
+    if raw:
+        match = _VIN_RE.search(raw)
+        if match:
+            return match.group(0).upper()
+    return ""
+
+
 def _parse_vehicle_header_fields(vehicle_line: str) -> tuple[str, str, str]:
     cleaned = str(vehicle_line or "").strip()
     if not cleaned:
@@ -168,6 +181,7 @@ def parse_mitchell(words: List[Dict[str, Any]]) -> Dict[str, Any]:
     claim_number = _extract_value_below_label(pages, "claim number")
     vehicle_info_line = _extract_vehicle_header_line(pages)
     year, make, model = _parse_vehicle_header_fields(vehicle_info_line)
+    vin = _extract_vin(pages)
 
     return {
         "labor_items": [],
@@ -183,7 +197,7 @@ def parse_mitchell(words: List[Dict[str, Any]]) -> Dict[str, Any]:
         "insurance_company": insurance_company,
         "written_by": "",
         "estimator": estimator,
-        "vin": "",
+        "vin": vin,
         "claim": claim_number,
         "claim_number": claim_number,
         "year": year,
