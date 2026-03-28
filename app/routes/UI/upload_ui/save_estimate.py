@@ -325,6 +325,29 @@ function formatEstimateValue(value) {{
   return normalized;
 }}
 
+function shouldDisplayPartReplacement(item) {{
+  if (!item || typeof item !== 'object') return false;
+  const priceVal = parseFloat(item.price);
+  if (!Number.isFinite(priceVal) || priceVal <= 0) {{
+    return false;
+  }}
+
+  const explicitPartType = String(item.part_type || '').trim().toUpperCase();
+  if (explicitPartType === 'OEM' || explicitPartType === 'LKQ' || explicitPartType === 'A/M') {{
+    return true;
+  }}
+
+  const qtyVal = parseFloat(item.qty);
+  const rowText = String(item.row_text || '').trim().toLowerCase();
+  const descText = String(item.description || '').trim().toLowerCase();
+  const sourceText = rowText || descText;
+  if (sourceText.includes('repl') || sourceText.includes('replace') || sourceText.includes('sublet') || sourceText.includes('subl')) {{
+    return true;
+  }}
+
+  return Number.isFinite(qtyVal) && qtyVal > 0 && !!explicitPartType;
+}}
+
 function extractPartsReplacements() {{
   const replacements = [];
   let partsTotal = 0;
@@ -334,16 +357,12 @@ function extractPartsReplacements() {{
   }}
 
   savePartsItems.forEach((item) => {{
-    const priceVal = parseFloat(item.price);
-    if (!Number.isFinite(priceVal) || priceVal <= 0) {{
+    if (!shouldDisplayPartReplacement(item)) {{
       return;
     }}
+    const priceVal = parseFloat(item.price);
     const descText = String(item.description || '').trim();
     const rowText = String(item.row_text || '').trim();
-    const sourceText = (rowText || descText).toLowerCase();
-    if (!sourceText.includes('repl') && !sourceText.includes('sublet') && !sourceText.includes('subl')) {{
-      return;
-    }}
     const partType = resolvePartType(item);
     const cleanedDesc = (rowText || descText || 'Part').replace(/^\\s*\\d+\\s+/, '').trim();
     replacements.push({{
@@ -523,16 +542,12 @@ function openSaveEstimateModal(estimateTotals) {{
   let partsTotal = 0;
   if (savePartsItems && savePartsItems.length > 0) {{
     savePartsItems.forEach((item) => {{
-      const priceVal = parseFloat(item.price);
-      if (!Number.isFinite(priceVal) || priceVal <= 0) {{
+      if (!shouldDisplayPartReplacement(item)) {{
         return;
       }}
+      const priceVal = parseFloat(item.price);
       const descText = String(item.description || '').trim();
       const rowText = String(item.row_text || '').trim();
-      const sourceText = (rowText || descText).toLowerCase();
-      if (!sourceText.includes('repl') && !sourceText.includes('sublet') && !sourceText.includes('subl')) {{
-        return;
-      }}
       const partType = resolvePartType(item);
       const lineText = item.line ? ('Line ' + item.line + ' - ') : '';
       const rawDesc = rowText || descText || 'Part';

@@ -341,7 +341,7 @@ def _normalize_parts_part_type(part_type: str) -> str:
     if "qual recycled" in normalized:
         return "LKQ"
     if "aftermarket" in normalized:
-        return "AFTERMARKET"
+        return "A/M"
     if normalized == "new":
         return "OEM"
     return str(part_type or "").strip().upper()
