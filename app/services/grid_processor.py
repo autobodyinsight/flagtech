@@ -1,6 +1,15 @@
 import re
 from typing import List, Dict, Any, Tuple, Optional
 
+from app.services.mitchell import parse_mitchell
+
+
+_MITCHELL_FORMAT_MARKERS = (
+    "mitchell estimating",
+    "mitchell international",
+    "mitchell cloud estimating",
+)
+
 
 def kmeans_1d(values: List[float], k: int, iters: int = 40) -> List[float]:
     """
@@ -650,6 +659,15 @@ def process_pdf_grid(pages: List[Dict]) -> Dict[str, Any]:
             w["page_index"] = pi
             w["xmid"] = (w["x0"] + w["x1"]) / 2.0
             w["ymid"] = (w["y0"] + w["y1"]) / 2.0
+
+    extracted_text = " ".join(
+        str(word.get("text", ""))
+        for page in pages
+        for word in page.get("words", [])
+        if str(word.get("text", "")).strip()
+    ).lower()
+    if any(marker in extracted_text for marker in _MITCHELL_FORMAT_MARKERS):
+        return parse_mitchell(pages)
 
     anchor_page, anchor_ymid, subtotals_page, subtotals_ymid, first_ro_line, vehicle_info_line, owner_info, insurance_company, vin, claim_number = \
         detect_anchors_and_vehicle_info(pages)
