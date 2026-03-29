@@ -41,6 +41,31 @@ _REPAIR_TABLE_STOP_MARKERS = (
     "summary",
 )
 
+_MITCHELL_TOTALS_HEADER = (
+    "labor",
+    "units",
+    "rate",
+    "sublet",
+    "addl amount",
+    "totals",
+)
+
+_MITCHELL_LABOR_TOTAL_LABELS = {
+    "body labor": "body_labor",
+    "refinish labor": "paint_labor",
+    "mechanical labor": "mechanical_labor",
+    "frame labor": "frame_labor",
+    "glass labor": "glass_labor",
+}
+
+_MITCHELL_SUMMARY_TOTAL_LABELS = {
+    "taxable parts": "parts_total",
+    "gross total": "grand_total",
+    "deductible": "deductible",
+    "total customer": "customer_pay",
+    "net estimate total": "insurance_pay",
+}
+
 
 def _group_rows(words: List[Dict[str, Any]], y_thresh: float = 6.0) -> List[Dict[str, Any]]:
     rows: List[Dict[str, Any]] = []
@@ -323,6 +348,138 @@ def _parse_last_money_value(text: str) -> Optional[float]:
     return None
 
 
+def _normalize_cell_text(text: str) -> str:
+    cleaned = re.sub(r"[^a-z0-9]+", " ", str(text or "").lower())
+    collapsed = re.sub(r"\s+", " ", cleaned).strip()
+    return collapsed.replace("add l", "addl")
+
+
+def _row_money_values(row: Dict[str, Any]) -> List[float]:
+    values: List[float] = []
+    for word in sorted(row.get("words", []), key=lambda item: item.get("x0", 0)):
+        parsed = _to_float(str(word.get("text", "")))
+        if parsed is not None:
+            values.append(parsed)
+    return values
+
+
+def _find_mitchell_totals_header_row(rows: List[Dict[str, Any]]) -> Optional[int]:
+    for idx, row in enumerate(rows):
+        groups = _group_row_words_by_x(row.get("words", []), gap=15.0)
+        normalized_groups = [_normalize_cell_text(group.get("text", "")) for group in groups]
+        if normalized_groups == list(_MITCHELL_TOTALS_HEADER):
+            return idx
+    return None
+
+
+def _extract_totals_table_values(rows: List[Dict[str, Any]], header_index: int) -> Dict[str, Optional[float]]:
+    result: Dict[str, Optional[float]] = {
+        "body_labor": None,
+        "paint_labor": None,
+        "mechanical_labor": None,
+        "frame_labor": None,
+        "glass_labor": None,
+    }
+
+    header_groups = _group_row_words_by_x(rows[header_index].get("words", []), gap=15.0)
+    if len(header_groups) != len(_MITCHELL_TOTALS_HEADER):
+        return result
+
+    ranges: List[tuple[float, Optional[float]]] = []
+    for i, group in enumerate(header_groups):
+        left = float(group.get("min_x", 0.0)) - 2.0
+        if i + 1 < len(header_groups):
+            right = float(header_groups[i + 1].get("min_x", 0.0)) - 2.0
+        else:
+            right = None
+        ranges.append((left, right))
+
+    for row in rows[header_index + 1 :]:
+        label_text = _normalize_cell_text(_text_in_bounds(row, ranges[0][0], ranges[0][1]))
+        if not label_text:
+            break
+
+        if label_text in _MITCHELL_SUMMARY_TOTAL_LABELS:
+            break
+
+        totals_text = _text_in_bounds(row, ranges[-1][0], ranges[-1][1])
+        totals_value = _to_float(totals_text)
+        if totals_value is None:
+            monies = _row_money_values(row)
+            totals_value = monies[-1] if monies else None
+
+        schema_key = _MITCHELL_LABOR_TOTAL_LABELS.get(label_text)
+        if schema_key:
+            result[schema_key] = totals_value
+
+        # Stop once table rows no longer look like the six-column totals structure.
+        row_groups = _group_row_words_by_x(row.get("words", []), gap=15.0)
+        if len(row_groups) < len(header_groups) - 1:
+            break
+
+    return result
+
+
+def _extract_summary_totals(rows: List[Dict[str, Any]]) -> Dict[str, Optional[float]]:
+    result: Dict[str, Optional[float]] = {
+        "parts_total": None,
+        "grand_total": None,
+        "deductible": None,
+        "customer_pay": None,
+        "insurance_pay": None,
+    }
+
+    for row in rows:
+        row_text = _normalize_cell_text(_row_text(row))
+        if not row_text:
+            continue
+
+        for label, schema_key in _MITCHELL_SUMMARY_TOTAL_LABELS.items():
+            if result[schema_key] is not None:
+                continue
+            if label not in row_text:
+                continue
+
+            value = _parse_last_money_value(_row_text(row))
+            if value is None:
+                monies = _row_money_values(row)
+                value = monies[-1] if monies else None
+            result[schema_key] = value
+
+    return result
+
+
+def _extract_mitchell_estimate_totals(pages: List[Dict[str, Any]]) -> Dict[str, Optional[float]]:
+    totals: Dict[str, Optional[float]] = {
+        "parts_total": None,
+        "grand_total": None,
+        "deductible": None,
+        "customer_pay": None,
+        "insurance_pay": None,
+        "body_labor": None,
+        "paint_labor": None,
+        "frame_labor": None,
+        "mechanical_labor": None,
+        "glass_labor": None,
+    }
+
+    for page in pages:
+        rows = _group_rows(page.get("words", []), y_thresh=6.0)
+        header_index = _find_mitchell_totals_header_row(rows)
+        if header_index is not None:
+            table_totals = _extract_totals_table_values(rows, header_index)
+            for key, value in table_totals.items():
+                if value is not None:
+                    totals[key] = value
+
+        summary_totals = _extract_summary_totals(rows)
+        for key, value in summary_totals.items():
+            if value is not None:
+                totals[key] = value
+
+    return totals
+
+
 def _extract_line_number(value: str) -> str:
     match = re.search(r"\b(\d{1,4})\b", str(value or ""))
     return match.group(1) if match else ""
@@ -601,9 +758,13 @@ def parse_mitchell(words: List[Dict[str, Any]]) -> Dict[str, Any]:
     year, make, model = _parse_vehicle_header_fields(vehicle_info_line)
     vin = _extract_vin(pages)
     labor_items, paint_items, parts_items = _extract_mitchell_repair_lines(pages)
+    extracted_totals = _extract_mitchell_estimate_totals(pages)
     total_labor = sum(float(item.get("value", 0.0) or 0.0) for item in labor_items)
     total_paint = sum(float(item.get("value", 0.0) or 0.0) for item in paint_items)
-    parts_total = sum(float(item.get("price", 0.0) or 0.0) for item in parts_items) if parts_items else None
+    computed_parts_total = sum(float(item.get("price", 0.0) or 0.0) for item in parts_items) if parts_items else None
+    parts_total = extracted_totals.get("parts_total")
+    if parts_total is None:
+        parts_total = computed_parts_total
 
     return {
         "labor_items": labor_items,
@@ -630,13 +791,13 @@ def parse_mitchell(words: List[Dict[str, Any]]) -> Dict[str, Any]:
         "subtotals_page": None,
         "subtotals_ymid": None,
         "parts_total": parts_total,
-        "grand_total": None,
-        "deductible": None,
-        "customer_pay": None,
-        "insurance_pay": None,
-        "body_labor": None,
-        "paint_labor": None,
-        "frame_labor": None,
-        "mechanical_labor": None,
-        "glass_labor": None,
+        "grand_total": extracted_totals.get("grand_total"),
+        "deductible": extracted_totals.get("deductible"),
+        "customer_pay": extracted_totals.get("customer_pay"),
+        "insurance_pay": extracted_totals.get("insurance_pay"),
+        "body_labor": extracted_totals.get("body_labor"),
+        "paint_labor": extracted_totals.get("paint_labor"),
+        "frame_labor": extracted_totals.get("frame_labor"),
+        "mechanical_labor": extracted_totals.get("mechanical_labor"),
+        "glass_labor": extracted_totals.get("glass_labor"),
     }
