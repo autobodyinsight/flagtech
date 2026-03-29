@@ -212,3 +212,32 @@ def test_header_tolerance_when_desc_abbreviated_and_qty_missing():
             "value": 2.0,
         }
     ]
+
+
+def test_continuation_text_does_not_corrupt_line_number():
+    page = _make_repair_page(
+        [
+            {
+                "line_num": "7",
+                "description": "Upper Grille",
+                "operation": "Repair",
+                "type": "Body",
+                "total_units": "1.0",
+            },
+            {
+                # Simulate OCR bleed where continuation text lands in the line-number bounds.
+                "line_num": "Grille",
+                "description": "Molding",
+            },
+        ]
+    )
+
+    parsed = parse_mitchell([page])
+
+    assert parsed["labor_items"] == [
+        {
+            "line": "7",
+            "description": "[Repair|Body] Upper Grille Molding",
+            "value": 1.0,
+        }
+    ]

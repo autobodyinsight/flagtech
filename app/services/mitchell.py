@@ -350,7 +350,11 @@ def _extract_mitchell_repair_lines(pages: List[Dict[str, Any]]) -> tuple[List[Di
                 if not current_row:
                     return
 
-                line_num = int(current_row["line_num"])
+                line_num_text = str(current_row.get("line_num", ""))
+                line_num_match = re.search(r"\b(\d{1,4})\b", line_num_text)
+                if not line_num_match:
+                    return
+                line_num = int(line_num_match.group(1))
                 description = _clean_mitchell_description(current_row.get("description", ""))
                 operation_text = str(current_row.get("operation", "")).strip()
                 labor_type_text = str(current_row.get("type", "")).strip()
@@ -421,6 +425,8 @@ def _extract_mitchell_repair_lines(pages: List[Dict[str, Any]]) -> tuple[List[Di
                     current_row = row_fields
                 elif current_row and has_any_column_text:
                     for key in ordered_keys:
+                        if key == "line_num":
+                            continue
                         current_row[key] = _append_text(current_row.get(key, ""), row_fields.get(key, ""))
                     current_row["row_text"] = _append_text(current_row.get("row_text", ""), row_fields.get("row_text", ""))
 
