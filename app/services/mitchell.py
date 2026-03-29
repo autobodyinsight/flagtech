@@ -273,10 +273,85 @@ def _parse_total_units(value: str) -> Optional[float]:
     return _to_float(cleaned)
 
 
+def _parse_mitchell_row_from_text(row_text: str) -> Optional[Dict[str, Any]]:
+    text = str(row_text or "").strip()
+    if not text:
+        return None
+
+    line_match = re.match(r"^(\d{1,4})\b", text)
+    if not line_match:
+        return None
+
+    line_num = int(line_match.group(1))
+    lowered = text.lower()
+
+    if "refinish" in lowered:
+        type_text = "Refinish"
+    elif "blend" in lowered:
+        type_text = "Blend"
+    elif re.search(r"\bbody\b", lowered):
+        type_text = "Body"
+    else:
+        type_text = ""
+
+    if "remove" in lowered and "replace" in lowered:
+        operation_text = "Remove / Replace"
+    elif re.search(r"\brepair\b", lowered):
+        operation_text = "Repair"
+    elif "refinish" in lowered:
+        operation_text = "Refinish"
+    elif "blend" in lowered:
+        operation_text = "Blend"
+    else:
+        operation_text = ""
+
+    units_match = re.search(r"\b(\d+\.\d+)\s*\*?#?\s*C?\b", text, re.IGNORECASE)
+    total_units = _to_float(units_match.group(1)) if units_match else None
+
+    total_price = _parse_last_money_value(text)
+    qty_value = None
+    if total_price is not None:
+        prefix = text.split("$", 1)[0]
+        qty_candidates = re.findall(r"\b\d+\b", prefix)
+        if qty_candidates:
+            try:
+                qty_value = float(qty_candidates[-1])
+            except Exception:
+                qty_value = None
+
+    tokens = text.split()
+    qty_index = -1
+    if qty_value is not None:
+        qty_token = str(int(qty_value)) if float(qty_value).is_integer() else str(qty_value)
+        for idx in range(len(tokens) - 1, -1, -1):
+            if tokens[idx].strip("*$#") == qty_token:
+                qty_index = idx
+                break
+    if qty_index < 0:
+        qty_index = len(tokens) - 1
+
+    description_parts = tokens[: qty_index + 1]
+    desc_text = " ".join(description_parts).strip()
+
+    return {
+        "line_num": line_num,
+        "desc_text": desc_text,
+        "operation": operation_text,
+        "type": type_text,
+        "total_units": total_units if total_units is not None else 0.0,
+        "qty": qty_value if qty_value is not None else 0.0,
+        "total_price": total_price if total_price is not None else 0.0,
+        "line": line_num,
+        "description": desc_text,
+        "value": total_units if total_units is not None else 0.0,
+    }
+
+
 def _extract_mitchell_repair_lines(pages: List[Dict[str, Any]]) -> tuple[List[Dict[str, Any]], List[Dict[str, Any]], List[Dict[str, Any]]]:
     labor_items: List[Dict[str, Any]] = []
     paint_items: List[Dict[str, Any]] = []
     parts_items: List[Dict[str, Any]] = []
+    seen_lines: set[int] = set()
 
     for page in pages:
         rows = _group_rows(page.get("words", []), y_thresh=6.0)
@@ -334,6 +409,11 @@ def _extract_mitchell_repair_lines(pages: List[Dict[str, Any]]) -> tuple[List[Di
                     "value": total_units if total_units is not None else 0.0,
                 }
 
+                if parsed_row["line_num"] in seen_lines:
+                    cursor += 1
+                    continue
+                seen_lines.add(parsed_row["line_num"])
+
                 operation_or_type = f"{operation_text} {type_text}".lower()
                 if "refinish" in operation_or_type or "blend" in operation_or_type:
                     paint_items.append(parsed_row)
@@ -343,6 +423,24 @@ def _extract_mitchell_repair_lines(pages: List[Dict[str, Any]]) -> tuple[List[Di
                 cursor += 1
 
             row_index = cursor
+
+    # Fallback for Mitchell layouts where header columns are not reliably detected.
+    if not labor_items and not paint_items:
+        for page in pages:
+            rows = _group_rows(page.get("words", []), y_thresh=6.0)
+            for row in rows:
+                parsed_row = _parse_mitchell_row_from_text(_row_text(row))
+                if not parsed_row:
+                    continue
+                if parsed_row["line_num"] in seen_lines:
+                    continue
+                seen_lines.add(parsed_row["line_num"])
+
+                operation_or_type = f"{parsed_row['operation']} {parsed_row['type']}".lower()
+                if "refinish" in operation_or_type or "blend" in operation_or_type:
+                    paint_items.append(parsed_row)
+                else:
+                    labor_items.append(parsed_row)
 
     return labor_items, paint_items, parts_items
 
