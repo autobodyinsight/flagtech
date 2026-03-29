@@ -229,6 +229,8 @@ def _repair_header_key(text: str) -> Optional[str]:
         return "description"
     if normalized == "type":
         return "type"
+    if "number" in normalized:
+        return "part_number"
     if normalized in {"qty", "quantity"}:
         return "qty"
     if "total units" in normalized or normalized == "units":
@@ -246,13 +248,22 @@ def _repair_header_key(text: str) -> Optional[str]:
 def _detect_repair_columns(row: Dict[str, Any]) -> Dict[str, tuple[float, Optional[float]]]:
     groups = _group_row_words_by_x(row.get("words", []), gap=14.0)
     selected: Dict[str, Dict[str, float]] = {}
+    type_seen = 0
     for group in groups:
-        key = _repair_header_key(group.get("text", ""))
-        if not key or key in selected:
+        raw_text = group.get("text", "")
+        normalized = _normalize_header_text(raw_text)
+        key = _repair_header_key(raw_text)
+        if normalized == "type":
+            type_seen += 1
+            key = "type" if type_seen == 1 else "part_type"
+
+        if not key:
+            continue
+        if key in selected:
             continue
         selected[key] = {"min_x": float(group.get("min_x", 0.0))}
 
-    required = {"line_num", "qty", "operation", "type"}
+    required = {"line_num", "description", "operation", "type", "qty"}
     if not required.issubset(selected.keys()):
         return {}
 
@@ -269,8 +280,44 @@ def _detect_repair_columns(row: Dict[str, Any]) -> Dict[str, tuple[float, Option
 
 
 def _parse_total_units(value: str) -> Optional[float]:
-    cleaned = re.sub(r"[#C\s]", "", str(value or ""), flags=re.IGNORECASE)
-    return _to_float(cleaned)
+    text = str(value or "").strip()
+    if not text:
+        return None
+    if "INC" in text.upper():
+        return None
+
+    number_match = re.search(r"-?\d+(?:\.\d+)?", text)
+    if not number_match:
+        return None
+    return _to_float(number_match.group(0))
+
+
+def _append_text(base: str, extra: str) -> str:
+    base_clean = str(base or "").strip()
+    extra_clean = str(extra or "").strip()
+    if not extra_clean:
+        return base_clean
+    if not base_clean:
+        return extra_clean
+    return f"{base_clean} {extra_clean}"
+
+
+def _clean_mitchell_description(text: str) -> str:
+    cleaned = re.sub(r"\s+", " ", str(text or "")).strip()
+
+    # Noise token 1: leading 5-8 digit code.
+    cleaned = re.sub(r"^\d{5,8}\b\s*", "", cleaned)
+    # Noise token 2: leading standalone AUTO.
+    cleaned = re.sub(r"^AUTO\b\s*", "", cleaned, flags=re.IGNORECASE)
+
+    cleaned = cleaned.strip(" -")
+    return re.sub(r"\s+", " ", cleaned).strip()
+
+
+def _is_paint_line(operation_text: str, labor_type_text: str) -> bool:
+    haystack = f"{operation_text} {labor_type_text}".lower()
+    paint_tokens = ("refinish", "blend", "clear coat", "clearcoat")
+    return any(token in haystack for token in paint_tokens)
 
 
 def _extract_mitchell_repair_lines(pages: List[Dict[str, Any]]) -> tuple[List[Dict[str, Any]], List[Dict[str, Any]], List[Dict[str, Any]]]:
@@ -289,7 +336,58 @@ def _extract_mitchell_repair_lines(pages: List[Dict[str, Any]]) -> tuple[List[Di
 
             ordered_columns = sorted(header_ranges.items(), key=lambda item: item[1][0])
             ordered_keys = [key for key, _ in ordered_columns]
-            qty_index = ordered_keys.index("qty") if "qty" in ordered_keys else -1
+            current_row: Optional[Dict[str, Any]] = None
+
+            def _flush_current_row() -> None:
+                if not current_row:
+                    return
+
+                line_num = int(current_row["line_num"])
+                description = _clean_mitchell_description(current_row.get("description", ""))
+                operation_text = str(current_row.get("operation", "")).strip()
+                labor_type_text = str(current_row.get("type", "")).strip()
+                part_type_text = str(current_row.get("part_type", "")).strip()
+                part_number_text = str(current_row.get("part_number", "")).strip()
+
+                total_units = _parse_total_units(current_row.get("total_units", ""))
+                qty_value = _to_float(current_row.get("qty", ""))
+                total_price = _to_float(current_row.get("total_price", ""))
+                if total_price is None:
+                    total_price = _parse_last_money_value(current_row.get("row_text", ""))
+
+                if qty_value is not None and qty_value >= 1 and total_price is not None and total_price > 0 and (
+                    part_number_text or part_type_text
+                ):
+                    parts_items.append(
+                        {
+                            "line": line_num,
+                            "description": description,
+                            "part_type": part_type_text,
+                            "price": float(total_price),
+                            "qty": float(qty_value),
+                        }
+                    )
+
+                if total_units is None or total_units <= 0:
+                    return
+
+                op_type_prefix = f"[{operation_text}|{labor_type_text}]"
+                item = {
+                    "line": str(line_num),
+                    "description": f"{op_type_prefix} {description}".strip(),
+                    "value": float(total_units),
+                }
+
+                description_lower = description.lower()
+                paint_line = _is_paint_line(operation_text, labor_type_text)
+                if paint_line:
+                    paint_items.append(item)
+                    return
+
+                if "add for clear coat" in description_lower:
+                    return
+
+                labor_items.append(item)
 
             cursor = row_index + 1
             while cursor < len(rows):
@@ -299,48 +397,26 @@ def _extract_mitchell_repair_lines(pages: List[Dict[str, Any]]) -> tuple[List[Di
 
                 line_text = _text_in_bounds(row, *header_ranges["line_num"])
                 line_match = re.search(r"\b(\d{1,4})\b", line_text)
-                if not line_match:
-                    cursor += 1
-                    continue
-
-                description_parts: List[str] = []
-                if qty_index >= 0:
-                    for key in ordered_keys[: qty_index + 1]:
-                        part_text = _text_in_bounds(row, *header_ranges[key])
-                        if part_text:
-                            description_parts.append(part_text)
-                desc_text = " ".join(description_parts).strip()
-
-                operation_text = _text_in_bounds(row, *header_ranges["operation"])
-                type_text = _text_in_bounds(row, *header_ranges["type"])
-                total_units = _parse_total_units(_text_in_bounds(row, *header_ranges.get("total_units", (0.0, None))))
-                qty_value = _to_float(_text_in_bounds(row, *header_ranges["qty"]))
-                total_price = None
-                if "total_price" in header_ranges:
-                    total_price = _to_float(_text_in_bounds(row, *header_ranges["total_price"]))
-                if total_price is None:
-                    total_price = _parse_last_money_value(_row_text(row))
-
-                parsed_row = {
-                    "line_num": int(line_match.group(1)),
-                    "desc_text": desc_text,
-                    "operation": operation_text,
-                    "type": type_text,
-                    "total_units": total_units if total_units is not None else 0.0,
-                    "qty": qty_value if qty_value is not None else 0.0,
-                    "total_price": total_price if total_price is not None else 0.0,
-                    "line": int(line_match.group(1)),
-                    "description": desc_text,
-                    "value": total_units if total_units is not None else 0.0,
+                row_fields = {
+                    key: _text_in_bounds(row, *bounds)
+                    for key, bounds in header_ranges.items()
                 }
+                row_fields["row_text"] = _row_text(row)
 
-                operation_or_type = f"{operation_text} {type_text}".lower()
-                if "refinish" in operation_or_type or "blend" in operation_or_type:
-                    paint_items.append(parsed_row)
-                else:
-                    labor_items.append(parsed_row)
+                has_any_column_text = any(str(value or "").strip() for value in row_fields.values())
+
+                if line_match:
+                    _flush_current_row()
+                    row_fields["line_num"] = line_match.group(1)
+                    current_row = row_fields
+                elif current_row and has_any_column_text:
+                    for key in ordered_keys:
+                        current_row[key] = _append_text(current_row.get(key, ""), row_fields.get(key, ""))
+                    current_row["row_text"] = _append_text(current_row.get("row_text", ""), row_fields.get("row_text", ""))
 
                 cursor += 1
+
+            _flush_current_row()
 
             row_index = cursor
 
