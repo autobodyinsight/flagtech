@@ -329,6 +329,9 @@ def _extract_mitchell_repair_lines(pages: List[Dict[str, Any]]) -> tuple[List[Di
                     "total_units": total_units if total_units is not None else 0.0,
                     "qty": qty_value if qty_value is not None else 0.0,
                     "total_price": total_price if total_price is not None else 0.0,
+                    "line": int(line_match.group(1)),
+                    "description": desc_text,
+                    "value": total_units if total_units is not None else 0.0,
                 }
 
                 operation_or_type = f"{operation_text} {type_text}".lower()
@@ -401,8 +404,8 @@ def parse_mitchell(pages: List[Dict[str, Any]]) -> Dict[str, Any]:
         "labor_items": labor_items,
         "paint_items": paint_items,
         "parts_items": parts_items,
-        "total_labor": sum(float(item.get("total_units", 0.0) or 0.0) for item in labor_items),
-        "total_paint": sum(float(item.get("total_units", 0.0) or 0.0) for item in paint_items),
+        "total_labor": sum(float(item.get("value", 0.0) or 0.0) for item in labor_items),
+        "total_paint": sum(float(item.get("value", 0.0) or 0.0) for item in paint_items),
         "first_ro_line": "",
         "second_ro_line": "",
         "vehicle_info_line": vehicle_info_line,
