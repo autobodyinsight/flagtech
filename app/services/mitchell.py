@@ -605,21 +605,12 @@ def _extract_repair_line_sequence_number(row_text: str) -> Optional[int]:
     if not match:
         return None
     try:
-        value = int(match.group(1))
+        numeric = int(match.group(1))
     except Exception:
         return None
-    if value <= 0 or value >= 150:
-        return None
-    return value
-
-
-def _is_repair_grid_description(description: str) -> bool:
-    normalized = re.sub(r"\s+", " ", str(description or "")).strip()
-    if not normalized:
-        return False
-    if re.search(r"\bestimating\b", normalized, re.IGNORECASE):
-        return False
-    return True
+    if 0 < numeric < 150:
+        return numeric
+    return None
 
 
 def _extract_mitchell_repair_lines(pages: List[Dict[str, Any]]) -> tuple[List[Dict[str, Any]], List[Dict[str, Any]], List[Dict[str, Any]]]:
@@ -627,10 +618,10 @@ def _extract_mitchell_repair_lines(pages: List[Dict[str, Any]]) -> tuple[List[Di
     paint_items: List[Dict[str, Any]] = []
     parts_items: List[Dict[str, Any]] = []
     seen_line_numbers: set[int] = set()
-    ranges: Dict[str, tuple[float, Optional[float]]] = {}
     started = False
     stopped = False
     expected_line_number: Optional[int] = None
+    ranges: Dict[str, tuple[float, Optional[float]]] = {}
 
     for page in pages:
         if stopped:
@@ -673,18 +664,15 @@ def _extract_mitchell_repair_lines(pages: List[Dict[str, Any]]) -> tuple[List[Di
             if line_number_value != expected_line_number:
                 stopped = True
                 break
-
             expected_line_number += 1
 
+            # Keep only first occurrence per line number.
             if line_number_value in seen_line_numbers:
                 continue
             seen_line_numbers.add(line_number_value)
 
             line_number = str(line_number_value)
             description = _extract_description(_extract_row_field(row, ranges, "description"))
-            if not _is_repair_grid_description(description):
-                continue
-
             operation_type = _extract_row_field(row, ranges, "operation_type")
             total_units_raw = _extract_row_field(row, ranges, "total_units")
             total_units = _to_float(total_units_raw)
