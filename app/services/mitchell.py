@@ -481,8 +481,14 @@ def _extract_mitchell_estimate_totals(pages: List[Dict[str, Any]]) -> Dict[str, 
 
 
 def _extract_line_number(value: str) -> str:
-    match = re.search(r"\b(\d{1,4})\b", str(value or ""))
-    return match.group(1) if match else ""
+    for token in re.findall(r"\b\d{1,4}\b", str(value or "")):
+        try:
+            numeric = int(token)
+        except Exception:
+            continue
+        if 0 < numeric < 150:
+            return str(numeric)
+    return ""
 
 
 def _extract_part_number(value: str) -> str:
