@@ -600,150 +600,179 @@ def _is_repair_table_stop_row(row_text: str) -> bool:
     return any(marker in lowered for marker in _REPAIR_TABLE_STOP_MARKERS)
 
 
+def _extract_repair_line_sequence_number(row_text: str) -> Optional[int]:
+    match = re.match(r"^\s*line\s*#\s*(\d{1,3})\s*-", str(row_text or ""), re.IGNORECASE)
+    if not match:
+        return None
+    try:
+        value = int(match.group(1))
+    except Exception:
+        return None
+    if value <= 0 or value >= 150:
+        return None
+    return value
+
+
+def _is_repair_grid_description(description: str) -> bool:
+    normalized = re.sub(r"\s+", " ", str(description or "")).strip()
+    if not normalized:
+        return False
+    if re.search(r"\bestimating\b", normalized, re.IGNORECASE):
+        return False
+    return True
+
+
 def _extract_mitchell_repair_lines(pages: List[Dict[str, Any]]) -> tuple[List[Dict[str, Any]], List[Dict[str, Any]], List[Dict[str, Any]]]:
     labor_items: List[Dict[str, Any]] = []
     paint_items: List[Dict[str, Any]] = []
     parts_items: List[Dict[str, Any]] = []
-    seen_rows: set[tuple[str, str, str, str, str, str, str]] = set()
+    seen_line_numbers: set[int] = set()
+    ranges: Dict[str, tuple[float, Optional[float]]] = {}
+    started = False
+    stopped = False
+    expected_line_number: Optional[int] = None
 
     for page in pages:
+        if stopped:
+            break
+
         rows = _group_rows(page.get("words", []), y_thresh=6.0)
-        row_index = 0
-        while row_index < len(rows):
-            row = rows[row_index]
-            if not _is_repair_header_row(row):
-                row_index += 1
+        for row in rows:
+            if stopped:
+                break
+
+            row_text = _row_text(row)
+
+            if not started:
+                if not _is_repair_header_row(row):
+                    continue
+                columns = _detect_repair_header_columns(row)
+                if not columns:
+                    continue
+                ranges = _build_column_ranges(columns)
+                started = True
                 continue
 
-            columns = _detect_repair_header_columns(row)
-            if not columns:
-                row_index += 1
+            if _is_repair_header_row(row):
+                columns = _detect_repair_header_columns(row)
+                if columns:
+                    ranges = _build_column_ranges(columns)
                 continue
 
-            ranges = _build_column_ranges(columns)
-            cursor = row_index + 1
-            while cursor < len(rows):
-                candidate = rows[cursor]
-                candidate_text = _row_text(candidate)
+            if _is_repair_table_stop_row(row_text):
+                stopped = True
+                break
 
-                if _is_repair_header_row(candidate):
-                    break
-                if _is_repair_table_stop_row(candidate_text):
-                    break
+            line_number_value = _extract_repair_line_sequence_number(row_text)
+            if line_number_value is None:
+                continue
 
-                line_number = _extract_line_number(_extract_row_field(candidate, ranges, "line"))
-                if not line_number:
-                    cursor += 1
-                    continue
+            if expected_line_number is None:
+                expected_line_number = line_number_value
 
-                candidate_row_text = _row_text(candidate)
-                description = _extract_description(_extract_row_field(candidate, ranges, "description"))
-                operation_type = _extract_row_field(candidate, ranges, "operation_type")
-                total_units_raw = _extract_row_field(candidate, ranges, "total_units")
-                total_units = _to_float(total_units_raw)
-                part_type = _extract_row_field(candidate, ranges, "type")
-                part_number = _extract_part_number(_extract_row_field(candidate, ranges, "number"))
-                qty = _to_float(_extract_row_field(candidate, ranges, "qty"))
-                extended_price = _to_float(_extract_row_field(candidate, ranges, "ext_price"))
-                if extended_price is None or extended_price <= 0:
-                    fallback_price = _parse_last_money_value(candidate_row_text)
-                    if fallback_price is not None and fallback_price > 0:
-                        extended_price = fallback_price
-                tax_text = _extract_row_field(candidate, ranges, "tax")
-                tax = str(tax_text or "").strip().lower() in {"yes", "y", "true", "tax"}
+            if line_number_value != expected_line_number:
+                stopped = True
+                break
 
-                row_key = (
-                    line_number,
-                    description,
-                    operation_type,
-                    part_type,
-                    part_number,
-                    str(qty if qty is not None else ""),
-                    str(extended_price if extended_price is not None else ""),
+            expected_line_number += 1
+
+            if line_number_value in seen_line_numbers:
+                continue
+            seen_line_numbers.add(line_number_value)
+
+            line_number = str(line_number_value)
+            description = _extract_description(_extract_row_field(row, ranges, "description"))
+            if not _is_repair_grid_description(description):
+                continue
+
+            operation_type = _extract_row_field(row, ranges, "operation_type")
+            total_units_raw = _extract_row_field(row, ranges, "total_units")
+            total_units = _to_float(total_units_raw)
+            part_type = _extract_row_field(row, ranges, "type")
+            part_number = _extract_part_number(_extract_row_field(row, ranges, "number"))
+            qty = _to_float(_extract_row_field(row, ranges, "qty"))
+            extended_price = _to_float(_extract_row_field(row, ranges, "ext_price"))
+            if extended_price is None or extended_price <= 0:
+                fallback_price = _parse_last_money_value(row_text)
+                if fallback_price is not None and fallback_price > 0:
+                    extended_price = fallback_price
+            tax_text = _extract_row_field(row, ranges, "tax")
+            tax = str(tax_text or "").strip().lower() in {"yes", "y", "true", "tax"}
+
+            is_refinish = _is_refinish_operation(operation_type)
+            is_non_labor_charge = _is_non_labor_charge(description)
+            normalized_part_type = _infer_parts_part_type(
+                part_type,
+                row_text,
+                description,
+                operation_type,
+                part_number,
+            )
+            is_parts_replacement = _is_parts_replacement_from_normalized_type(normalized_part_type)
+            is_duplicate_parts_replacement = _is_duplicate_parts_replacement(part_type)
+            parts_row_text = _build_parts_row_text(
+                line_number,
+                description,
+                operation_type,
+                total_units,
+                normalized_part_type,
+                part_number,
+                qty,
+                extended_price,
+            )
+
+            if is_refinish:
+                paint_items.append(
+                    {
+                        "line": line_number,
+                        "description": description,
+                        "value": total_units if total_units is not None else 0.0,
+                        "operation_type": operation_type,
+                        "total_units": total_units if total_units is not None else 0.0,
+                        "type": part_type,
+                        "number": part_number,
+                        "qty": qty if qty is not None else 0.0,
+                        "extended_price": extended_price if extended_price is not None else 0.0,
+                        "total_price": extended_price if extended_price is not None else 0.0,
+                        "tax": tax,
+                    }
                 )
-                if row_key in seen_rows:
-                    cursor += 1
-                    continue
-                seen_rows.add(row_key)
 
-                is_refinish = _is_refinish_operation(operation_type)
-                is_non_labor_charge = _is_non_labor_charge(description)
-                normalized_part_type = _infer_parts_part_type(
-                    part_type,
-                    candidate_row_text,
-                    description,
-                    operation_type,
-                    part_number,
-                )
-                is_parts_replacement = _is_parts_replacement_from_normalized_type(normalized_part_type)
-                is_duplicate_parts_replacement = _is_duplicate_parts_replacement(part_type)
-                parts_row_text = _build_parts_row_text(
-                    line_number,
-                    description,
-                    operation_type,
-                    total_units,
-                    normalized_part_type,
-                    part_number,
-                    qty,
-                    extended_price,
+            if is_parts_replacement or is_duplicate_parts_replacement:
+                parts_items.append(
+                    {
+                        "line": line_number,
+                        "description": description,
+                        "part_type": normalized_part_type,
+                        "price": extended_price if extended_price is not None else 0.0,
+                        "extended_price": extended_price if extended_price is not None else 0.0,
+                        "qty": qty if qty is not None else 0.0,
+                        "operation_type": operation_type,
+                        "total_units": total_units if total_units is not None else 0.0,
+                        "number": part_number,
+                        "tax": tax,
+                        "row_text": parts_row_text,
+                    }
                 )
 
-                if is_refinish:
-                    paint_items.append(
-                        {
-                            "line": line_number,
-                            "description": description,
-                            "value": total_units if total_units is not None else 0.0,
-                            "operation_type": operation_type,
-                            "total_units": total_units if total_units is not None else 0.0,
-                            "type": part_type,
-                            "number": part_number,
-                            "qty": qty if qty is not None else 0.0,
-                            "extended_price": extended_price if extended_price is not None else 0.0,
-                            "total_price": extended_price if extended_price is not None else 0.0,
-                            "tax": tax,
-                        }
-                    )
-
-                if is_parts_replacement or is_duplicate_parts_replacement:
-                    parts_items.append(
-                        {
-                            "line": line_number,
-                            "description": description,
-                            "part_type": normalized_part_type,
-                            "price": extended_price if extended_price is not None else 0.0,
-                            "extended_price": extended_price if extended_price is not None else 0.0,
-                            "qty": qty if qty is not None else 0.0,
-                            "operation_type": operation_type,
-                            "total_units": total_units if total_units is not None else 0.0,
-                            "number": part_number,
-                            "tax": tax,
-                            "row_text": parts_row_text,
-                        }
-                    )
-
-                # Mitchell lines with replacement part types still carry body labor hours,
-                # so keep them in labor unless they are explicitly refinish/blend operations.
-                if not is_refinish and not is_non_labor_charge:
-                    labor_items.append(
-                        {
-                            "line": line_number,
-                            "description": description,
-                            "value": total_units if total_units is not None else 0.0,
-                            "operation_type": operation_type,
-                            "total_units": total_units if total_units is not None else 0.0,
-                            "type": part_type,
-                            "number": part_number,
-                            "qty": qty if qty is not None else 0.0,
-                            "extended_price": extended_price if extended_price is not None else 0.0,
-                            "total_price": extended_price if extended_price is not None else 0.0,
-                            "tax": tax,
-                        }
-                    )
-
-                cursor += 1
-
-            row_index = cursor
+            # Mitchell lines with replacement part types still carry body labor hours,
+            # so keep them in labor unless they are explicitly refinish/blend operations.
+            if not is_refinish and not is_non_labor_charge:
+                labor_items.append(
+                    {
+                        "line": line_number,
+                        "description": description,
+                        "value": total_units if total_units is not None else 0.0,
+                        "operation_type": operation_type,
+                        "total_units": total_units if total_units is not None else 0.0,
+                        "type": part_type,
+                        "number": part_number,
+                        "qty": qty if qty is not None else 0.0,
+                        "extended_price": extended_price if extended_price is not None else 0.0,
+                        "total_price": extended_price if extended_price is not None else 0.0,
+                        "tax": tax,
+                    }
+                )
 
     return labor_items, paint_items, parts_items
 
