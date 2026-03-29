@@ -170,3 +170,45 @@ def test_refinish_row_with_wrapped_part_type_and_clear_coat_labor_exclusion():
         "value": 1.5,
     } in parsed["paint_items"]
     assert all(item["line"] != "50" for item in parsed["labor_items"])
+
+
+def test_header_tolerance_when_desc_abbreviated_and_qty_missing():
+    words = []
+    y = 100.0
+
+    header = {
+        "line_num": "Line #",
+        "description": "DESC",
+        "operation": "Operation",
+        "type": "Type",
+        "total_units": "Total Units",
+        "part_type": "Type",
+        "part_number": "Number",
+        "total_price": "Total Price",
+    }
+
+    for key, value in header.items():
+        words.extend(_make_cell_words(value, HEADER_COLUMNS[key], y))
+
+    y += 14.0
+    row = {
+        "line_num": "12",
+        "description": "AUTO Fender Repair",
+        "operation": "Repair",
+        "type": "Body",
+        "total_units": "2.0",
+        "total_price": "$0.00",
+    }
+    for key, value in row.items():
+        words.extend(_make_cell_words(value, HEADER_COLUMNS[key], y))
+
+    page = {"width": 1600, "height": 1200, "words": words}
+    parsed = parse_mitchell([page])
+
+    assert parsed["labor_items"] == [
+        {
+            "line": "12",
+            "description": "[Repair|Body] Fender Repair",
+            "value": 2.0,
+        }
+    ]

@@ -223,9 +223,9 @@ def _repair_header_key(text: str) -> Optional[str]:
         return None
     if "line" in normalized:
         return "line_num"
-    if "operation" in normalized or normalized == "oper":
+    if "operation" in normalized or normalized in {"oper", "op"}:
         return "operation"
-    if "description" in normalized:
+    if "description" in normalized or normalized.startswith("desc"):
         return "description"
     if normalized == "type":
         return "type"
@@ -263,7 +263,8 @@ def _detect_repair_columns(row: Dict[str, Any]) -> Dict[str, tuple[float, Option
             continue
         selected[key] = {"min_x": float(group.get("min_x", 0.0))}
 
-    required = {"line_num", "description", "operation", "type", "qty"}
+    # Mitchell OCR is noisy; keep only core required headers and treat others as optional.
+    required = {"line_num", "operation", "type"}
     if not required.issubset(selected.keys()):
         return {}
 
@@ -338,6 +339,13 @@ def _extract_mitchell_repair_lines(pages: List[Dict[str, Any]]) -> tuple[List[Di
             ordered_keys = [key for key, _ in ordered_columns]
             current_row: Optional[Dict[str, Any]] = None
 
+            description_fallback_bounds: Optional[tuple[float, Optional[float]]] = None
+            if "description" not in header_ranges and "line_num" in header_ranges and "operation" in header_ranges:
+                description_fallback_bounds = (
+                    header_ranges["line_num"][0],
+                    header_ranges["operation"][0],
+                )
+
             def _flush_current_row() -> None:
                 if not current_row:
                     return
@@ -401,6 +409,8 @@ def _extract_mitchell_repair_lines(pages: List[Dict[str, Any]]) -> tuple[List[Di
                     key: _text_in_bounds(row, *bounds)
                     for key, bounds in header_ranges.items()
                 }
+                if "description" not in row_fields and description_fallback_bounds:
+                    row_fields["description"] = _text_in_bounds(row, *description_fallback_bounds)
                 row_fields["row_text"] = _row_text(row)
 
                 has_any_column_text = any(str(value or "").strip() for value in row_fields.values())
