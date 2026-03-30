@@ -362,7 +362,7 @@ function parsePartQtyPrice(item) {{
     qty: Number.isFinite(qtyVal) ? qtyVal : null,
     price: Number.isFinite(priceVal) ? priceVal : null,
   }};
-}
+}}
 
 function shouldDisplayPartReplacement(item) {{
   if (!item || typeof item !== 'object') return false;
