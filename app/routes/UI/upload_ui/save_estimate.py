@@ -333,28 +333,35 @@ function parsePartQtyPrice(item) {{
   let qtyVal = parseFloat(qtyRaw);
   let priceVal = parseFloat(priceRaw);
 
-  // Handle merged values like "1 $186.85" inside either qty or price field.
-  const combined = `${{qtyRaw}} ${{priceRaw}}`.trim();
-  const mergedMatch = combined.match(/(\d+(?:\.\d+)?)\s+\$?\s*(\d{1,3}(?:,\d{3})*(?:\.\d+)?)/);
-  if (mergedMatch) {{
-    if (!Number.isFinite(qtyVal)) {{
-      qtyVal = parseFloat(mergedMatch[1]);
-    }}
-    const mergedPrice = parseFloat(String(mergedMatch[2]).replace(/,/g, ''));
-    if (Number.isFinite(mergedPrice)) {{
-      priceVal = mergedPrice;
+  // Support merged qty+price text like: "1 $186.85", "1$186.85", "1   $186.85", "1 186.85".
+  const source = `${{qtyRaw}} ${{priceRaw}} ${{rowRaw}}`.trim();
+  const numericMatches = source.match(/\d+(?:\.\d+)?/g) || [];
+  const moneyMatches = source.match(/\$?\s*\d[\d,]*(?:\.\d+)?/g) || [];
+
+  // Qty is always the first numeric value.
+  if (!Number.isFinite(qtyVal) && numericMatches.length > 0) {{
+    qtyVal = parseFloat(numericMatches[0]);
+  }}
+
+  // Price is always the last money-like value.
+  if (!Number.isFinite(priceVal) && moneyMatches.length > 0) {{
+    const lastMoney = parseFloat(String(moneyMatches[moneyMatches.length - 1]).replace(/[^0-9.]/g, ''));
+    if (Number.isFinite(lastMoney)) {{
+      priceVal = lastMoney;
     }}
   }}
 
-  // If price still looks like a qty, try extracting the last money-like number from source text.
-  if (!Number.isFinite(priceVal) || (Number.isFinite(qtyVal) && priceVal === qtyVal)) {{
-    const source = `${{priceRaw}} ${{rowRaw}}`;
-    const moneyMatches = source.match(/\$?\d{1,3}(?:,\d{3})*(?:\.\d{1,2})/g);
-    if (moneyMatches && moneyMatches.length) {{
-      const lastMoney = parseFloat(String(moneyMatches[moneyMatches.length - 1]).replace(/[^0-9.]/g, ''));
-      if (Number.isFinite(lastMoney)) {{
-        priceVal = lastMoney;
+  // Never treat qty as price; if equal, use the last numeric token as fallback price.
+  if (Number.isFinite(qtyVal) && Number.isFinite(priceVal) && qtyVal === priceVal) {{
+    if (numericMatches.length > 1) {{
+      const lastNumeric = parseFloat(numericMatches[numericMatches.length - 1]);
+      if (Number.isFinite(lastNumeric) && lastNumeric !== qtyVal) {{
+        priceVal = lastNumeric;
+      }} else {{
+        priceVal = null;
       }}
+    }} else {{
+      priceVal = null;
     }}
   }}
 
