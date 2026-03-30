@@ -82,13 +82,13 @@ def get_save_estimate_modal_html(
       <div style="margin-bottom: 15px;">
         <h3>Labor Repairs</h3>
         <div id="saveEstimateLaborList" class="repair-list"></div>
-        <div class="repair-total">Total Labor: <span id="saveEstimateTotalLabor">{total_labor}</span> hrs</div>
+        <div class="repair-total">Total Labor: <span id="saveEstimateTotalLabor">{round(float(total_labor or 0), 1)}</span> hrs</div>
       </div>
 
       <div style="margin-bottom: 15px;">
         <h3>Refinish Repairs</h3>
         <div id="saveEstimatePaintList" class="repair-list"></div>
-        <div class="repair-total">Total Refinish: <span id="saveEstimateTotalPaint">{total_paint}</span> hrs</div>
+        <div class="repair-total">Total Refinish: <span id="saveEstimateTotalPaint">{round(float(total_paint or 0), 1)}</span> hrs</div>
       </div>
 
       <div style="margin-bottom: 15px;">
