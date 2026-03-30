@@ -439,6 +439,17 @@ def _extract_mitchell_repair_lines(pages: List[Dict[str, Any]]) -> tuple[List[Di
         probe_lower = probe.lower()
         return any(probe_lower.startswith(prefix) for prefix in continuation_break_prefixes)
 
+    def _peek_next_line_num(rows: List[Dict[str, Any]], from_cursor: int, line_num_bounds: tuple) -> Optional[int]:
+        """Return the line number of the next explicitly-numbered repair row after from_cursor, or None."""
+        for i in range(from_cursor, len(rows)):
+            if _detect_repair_columns(rows[i]):
+                break
+            lt = _text_in_bounds(rows[i], *line_num_bounds)
+            m = re.search(r"\b(\d{1,4})\b", lt)
+            if m:
+                return int(m.group(1))
+        return None
+
     for page in pages:
         rows = _group_rows(page.get("words", []), y_thresh=6.0)
         row_index = 0
@@ -578,6 +589,16 @@ def _extract_mitchell_repair_lines(pages: List[Dict[str, Any]]) -> tuple[List[Di
                     row_fields["line_num"] = line_match.group(1)
                     current_row = row_fields
                 elif current_row and has_any_column_text:
+                    # Only accumulate if the next numbered row continues the sequence by exactly +1.
+                    cur_num_match = re.search(r"\b(\d{1,4})\b", str(current_row.get("line_num", "")))
+                    if cur_num_match:
+                        expected_next = int(cur_num_match.group(1)) + 1
+                        peeked = _peek_next_line_num(rows, cursor + 1, header_ranges["line_num"])
+                        if peeked is None or peeked != expected_next:
+                            _flush_current_row()
+                            current_row = None
+                            cursor += 1
+                            continue
                     if _is_continuation_break_row(row_fields):
                         _flush_current_row()
                         current_row = None

@@ -85,7 +85,10 @@ def test_parts_item_from_row_with_inc_units_and_wrapped_continuation():
     assert part["price"] == 464.0
     assert part["qty"] == 1.0
     assert "row_text" in part
-    assert all(item["line"] != "2" for item in parsed["labor_items"])
+    # INC# maps to 0.0 hrs - line 2 still appears as a labor line.
+    labor_line_2 = [item for item in parsed["labor_items"] if item["line"] == "2"]
+    assert len(labor_line_2) == 1
+    assert labor_line_2[0]["value"] == 0.0
     assert all(item["line"] != "2" for item in parsed["paint_items"])
 
 
@@ -234,10 +237,12 @@ def test_continuation_text_does_not_corrupt_line_number():
 
     parsed = parse_mitchell([page])
 
+    # "Grille" in the line_num column does not get parsed as a line number.
+    # "Molding" is not merged because no line 8 follows (sequence break stops accumulation).
     assert parsed["labor_items"] == [
         {
             "line": "7",
-            "description": "[Repair|Body] Upper Grille Molding",
+            "description": "[Repair|Body] Upper Grille",
             "value": 1.0,
         }
     ]
