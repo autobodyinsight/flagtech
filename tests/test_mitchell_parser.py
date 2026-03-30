@@ -76,15 +76,15 @@ def test_parts_item_from_row_with_inc_units_and_wrapped_continuation():
 
     parsed = parse_mitchell([page])
 
-    assert parsed["parts_items"] == [
-        {
-            "line": 2,
-            "description": "Frt Bumper Cover",
-            "part_type": "Aftermarket",
-            "price": 464.0,
-            "qty": 1.0,
-        }
-    ]
+    assert len(parsed["parts_items"]) == 1
+    part = parsed["parts_items"][0]
+    assert part["line"] == 2
+    assert part["description"] == "Frt Bumper Cover"
+    assert part["part_type"] == "A/M"
+    assert part["part_number"] == "GM1014122"
+    assert part["price"] == 464.0
+    assert part["qty"] == 1.0
+    assert "row_text" in part
     assert all(item["line"] != "2" for item in parsed["labor_items"])
     assert all(item["line"] != "2" for item in parsed["paint_items"])
 

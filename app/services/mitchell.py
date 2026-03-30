@@ -36,6 +36,19 @@ _MITCHELL_OPERATION_BLOCKLIST = (
     "net estimate total",
 )
 
+# Tokens that prove a line is NOT a paint/refinish operation even if
+# "clear coat" or "refinish" appears in noisy OCR text.
+_PAINT_NEGATION_TOKENS = (
+    "mechanical",
+    "sublet",
+    "pre-scan",
+    "post-scan",
+    "pre scan",
+    "post scan",
+    "scan",
+    "calibration",
+)
+
 
 _VIN_RE = re.compile(r"[A-HJ-NPR-Z0-9]{17}", re.IGNORECASE)
 
@@ -333,8 +346,25 @@ def _clean_mitchell_description(text: str) -> str:
     return re.sub(r"\s+", " ", cleaned).strip()
 
 
-def _is_paint_line(operation_text: str, labor_type_text: str) -> bool:
-    haystack = f"{operation_text} {labor_type_text}".lower()
+def _normalize_mitchell_part_type(text: str) -> str:
+    """Normalize raw Mitchell part-type text to a canonical label."""
+    t = str(text or "").strip()
+    lower = t.lower()
+    if not t:
+        return "OEM"
+    if "recycled" in lower or "lkq" in lower:
+        return "LKQ"
+    if "aftermarket" in lower or "a/m" in lower:
+        return "A/M"
+    if "sublet" in lower:
+        return "SUBLET"
+    return t
+
+
+def _is_paint_line(operation_text: str, labor_type_text: str, description: str = "") -> bool:
+    haystack = f"{operation_text} {labor_type_text} {description}".lower()
+    if any(token in haystack for token in _PAINT_NEGATION_TOKENS):
+        return False
     paint_tokens = ("refinish", "blend", "clear coat", "clearcoat")
     return any(token in haystack for token in paint_tokens)
 
@@ -412,9 +442,11 @@ def _extract_mitchell_repair_lines(pages: List[Dict[str, Any]]) -> tuple[List[Di
                         {
                             "line": line_num,
                             "description": description,
-                            "part_type": part_type_text,
+                            "part_type": _normalize_mitchell_part_type(part_type_text),
+                            "part_number": part_number_text,
                             "price": float(total_price),
                             "qty": float(qty_value),
+                            "row_text": str(current_row.get("row_text", "")).strip(),
                         }
                     )
 
@@ -433,7 +465,7 @@ def _extract_mitchell_repair_lines(pages: List[Dict[str, Any]]) -> tuple[List[Di
                 }
 
                 description_lower = description.lower()
-                paint_line = _is_paint_line(operation_text, labor_type_text)
+                paint_line = _is_paint_line(operation_text, labor_type_text, description)
                 if paint_line:
                     paint_items.append(item)
                     return
