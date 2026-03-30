@@ -562,6 +562,18 @@ def _extract_mitchell_repair_lines(pages: List[Dict[str, Any]]) -> tuple[List[Di
                 has_any_column_text = any(str(value or "").strip() for value in row_fields.values())
 
                 if line_match:
+                    previous_line_num = None
+                    if current_row:
+                        prev_match = re.search(r"\b(\d{1,4})\b", str(current_row.get("line_num", "")))
+                        if prev_match:
+                            previous_line_num = int(prev_match.group(1))
+
+                    next_line_num = int(line_match.group(1))
+                    if previous_line_num is not None and next_line_num > (previous_line_num + 1):
+                        _flush_current_row()
+                        current_row = None
+                        break
+
                     _flush_current_row()
                     row_fields["line_num"] = line_match.group(1)
                     current_row = row_fields
