@@ -241,3 +241,41 @@ def test_continuation_text_does_not_corrupt_line_number():
             "value": 1.0,
         }
     ]
+
+
+def test_footer_noise_rows_are_not_parsed_as_labor_lines():
+    page = _make_repair_page(
+        [
+            {
+                "line_num": "20",
+                "description": "R Fender Assy",
+                "operation": "Remove /",
+                "type": "Body Install",
+                "total_units": "0.3",
+            },
+            {
+                "line_num": "3370",
+                "description": "Mountain Rd. 89081",
+                "operation": "",
+                "type": "Way 98409",
+                "total_units": "2667.0",
+            },
+            {
+                "line_num": "602",
+                "description": "(Work) #",
+                "operation": "Total Price",
+                "type": "(Work) prts@performanceradiator.com",
+                "total_units": "303.0",
+            },
+        ]
+    )
+
+    parsed = parse_mitchell([page])
+
+    assert parsed["labor_items"] == [
+        {
+            "line": "20",
+            "description": "[Remove /|Body Install] R Fender Assy",
+            "value": 0.3,
+        }
+    ]

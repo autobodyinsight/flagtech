@@ -18,6 +18,24 @@ _MITCHELL_SUMMARY_TOTAL_LABELS = {
     "net estimate total": "insurance_pay",
 }
 
+_MITCHELL_REPAIR_END_MARKERS = (
+    "estimate totals",
+    "taxable parts",
+    "gross total",
+    "net estimate total",
+    "total customer",
+)
+
+_MITCHELL_OPERATION_BLOCKLIST = (
+    "total price",
+    "printed on",
+    "mitchell cloud estimating",
+    "taxable parts",
+    "gross total",
+    "estimate totals",
+    "net estimate total",
+)
+
 
 _VIN_RE = re.compile(r"[A-HJ-NPR-Z0-9]{17}", re.IGNORECASE)
 
@@ -321,6 +339,24 @@ def _is_paint_line(operation_text: str, labor_type_text: str) -> bool:
     return any(token in haystack for token in paint_tokens)
 
 
+def _is_end_of_mitchell_repair_section(row_text: str) -> bool:
+    normalized = _normalize_line_text(row_text)
+    if not normalized:
+        return False
+    return any(marker in normalized for marker in _MITCHELL_REPAIR_END_MARKERS)
+
+
+def _is_valid_mitchell_operation_text(text: str) -> bool:
+    value = str(text or "").strip().lower()
+    if not value:
+        return False
+    if not re.search(r"[a-z]", value):
+        return False
+    if any(token in value for token in _MITCHELL_OPERATION_BLOCKLIST):
+        return False
+    return True
+
+
 def _extract_mitchell_repair_lines(pages: List[Dict[str, Any]]) -> tuple[List[Dict[str, Any]], List[Dict[str, Any]], List[Dict[str, Any]]]:
     labor_items: List[Dict[str, Any]] = []
     paint_items: List[Dict[str, Any]] = []
@@ -355,6 +391,8 @@ def _extract_mitchell_repair_lines(pages: List[Dict[str, Any]]) -> tuple[List[Di
                 if not line_num_match:
                     return
                 line_num = int(line_num_match.group(1))
+                if line_num >= 1000:
+                    return
                 description = _clean_mitchell_description(current_row.get("description", ""))
                 operation_text = str(current_row.get("operation", "")).strip()
                 labor_type_text = str(current_row.get("type", "")).strip()
@@ -382,6 +420,10 @@ def _extract_mitchell_repair_lines(pages: List[Dict[str, Any]]) -> tuple[List[Di
 
                 if total_units is None or total_units <= 0:
                     return
+                if total_units > 40:
+                    return
+                if not _is_valid_mitchell_operation_text(operation_text):
+                    return
 
                 op_type_prefix = f"[{operation_text}|{labor_type_text}]"
                 item = {
@@ -405,6 +447,8 @@ def _extract_mitchell_repair_lines(pages: List[Dict[str, Any]]) -> tuple[List[Di
             while cursor < len(rows):
                 row = rows[cursor]
                 if _detect_repair_columns(row):
+                    break
+                if _is_end_of_mitchell_repair_section(_row_text(row)):
                     break
 
                 line_text = _text_in_bounds(row, *header_ranges["line_num"])

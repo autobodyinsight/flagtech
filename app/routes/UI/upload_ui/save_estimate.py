@@ -328,6 +328,13 @@ function formatEstimateValue(value) {{
 function shouldDisplayPartReplacement(item) {{
   if (!item || typeof item !== 'object') return false;
   const explicitPartType = String(item.part_type || '').trim().toUpperCase();
+  const qtyVal = parseFloat(item.qty);
+  const priceVal = parseFloat(item.price);
+
+  if (explicitPartType && ((Number.isFinite(qtyVal) && qtyVal > 0) || (Number.isFinite(priceVal) && priceVal > 0))) {{
+    return true;
+  }}
+
   if (explicitPartType === 'OEM' || explicitPartType === 'LKQ' || explicitPartType === 'A/M') {{
     return true;
   }}
@@ -335,8 +342,6 @@ function shouldDisplayPartReplacement(item) {{
     return true;
   }}
 
-  const qtyVal = parseFloat(item.qty);
-  const priceVal = parseFloat(item.price);
   const rowText = String(item.row_text || '').trim().toLowerCase();
   const descText = String(item.description || '').trim().toLowerCase();
   const sourceText = rowText || descText;
