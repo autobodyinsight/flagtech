@@ -392,6 +392,53 @@ def _extract_mitchell_repair_lines(pages: List[Dict[str, Any]]) -> tuple[List[Di
     paint_items: List[Dict[str, Any]] = []
     parts_items: List[Dict[str, Any]] = []
 
+    continuation_break_prefixes = (
+        "additional",
+        "included",
+        "add for",
+        "add to",
+        "[ ]",
+        "*",
+    )
+
+    def _parse_labor_hours(value: str) -> Optional[float]:
+        text = str(value or "").strip()
+        if not text:
+            return None
+        compact_upper = re.sub(r"\s+", "", text).upper()
+        if compact_upper.startswith("INC"):
+            return 0.0
+        number_match = re.search(r"-?\d+(?:\.\d+)?", text)
+        if not number_match:
+            return None
+        return _to_float(number_match.group(0))
+
+    def _parse_qty_and_price(qty_text: str, total_price_text: str, row_text: str) -> tuple[Optional[float], Optional[float]]:
+        qty_value = _to_float(qty_text)
+        price_value = _to_float(total_price_text)
+        if price_value is None:
+            price_value = _parse_last_money_value(total_price_text)
+        if price_value is None:
+            price_value = _parse_last_money_value(row_text)
+
+        combined = f"{str(qty_text or '').strip()} {str(total_price_text or '').strip()}".strip()
+        same_cell_match = re.search(r"(\d+(?:\.\d+)?)\s+\$?\s*(\d{1,3}(?:,\d{3})*(?:\.\d+)?)", combined)
+        if same_cell_match:
+            if qty_value is None:
+                qty_value = _to_float(same_cell_match.group(1))
+            if price_value is None:
+                price_value = _to_float(same_cell_match.group(2))
+
+        return qty_value, price_value
+
+    def _is_continuation_break_row(fields: Dict[str, Any]) -> bool:
+        description_text = str(fields.get("description", "") or "").strip()
+        operation_text = str(fields.get("operation", "") or "").strip()
+        row_text = str(fields.get("row_text", "") or "").strip()
+        probe = description_text or operation_text or row_text
+        probe_lower = probe.lower()
+        return any(probe_lower.startswith(prefix) for prefix in continuation_break_prefixes)
+
     for page in pages:
         rows = _group_rows(page.get("words", []), y_thresh=6.0)
         row_index = 0
@@ -429,43 +476,62 @@ def _extract_mitchell_repair_lines(pages: List[Dict[str, Any]]) -> tuple[List[Di
                 part_type_text = str(current_row.get("part_type", "")).strip()
                 part_number_text = str(current_row.get("part_number", "")).strip()
 
-                total_units = _parse_total_units(current_row.get("total_units", ""))
-                qty_value = _to_float(current_row.get("qty", ""))
-                total_price = _to_float(current_row.get("total_price", ""))
-                if total_price is None:
-                    total_price = _parse_last_money_value(current_row.get("row_text", ""))
+                labor_hours = _parse_labor_hours(current_row.get("total_units", ""))
+                qty_value, total_price = _parse_qty_and_price(
+                    str(current_row.get("qty", "")),
+                    str(current_row.get("total_price", "")),
+                    str(current_row.get("row_text", "")),
+                )
 
-                if qty_value is not None and qty_value >= 1 and total_price is not None and total_price > 0 and (
-                    part_number_text or part_type_text
+                parsed_row = {
+                    "line": line_num,
+                    "description": description,
+                    "operation": operation_text,
+                    "labor_type": labor_type_text,
+                    "labor_hours": labor_hours,
+                    "part_type": part_type_text,
+                    "part_number": part_number_text,
+                    "qty": qty_value,
+                    "price": total_price,
+                }
+
+                if (
+                    parsed_row["qty"] is not None
+                    and parsed_row["qty"] >= 1
+                    and parsed_row["price"] is not None
+                    and parsed_row["price"] > 0
+                    and parsed_row["part_number"]
                 ):
                     parts_items.append(
                         {
-                            "line": line_num,
-                            "description": description,
-                            "part_type": _normalize_mitchell_part_type(part_type_text),
-                            "part_number": part_number_text,
-                            "price": float(total_price),
-                            "qty": float(qty_value),
+                            "line": parsed_row["line"],
+                            "description": parsed_row["description"],
+                            "part_type": _normalize_mitchell_part_type(parsed_row["part_type"]),
+                            "part_number": parsed_row["part_number"],
+                            "price": float(parsed_row["price"]),
+                            "qty": float(parsed_row["qty"]),
                             "row_text": str(current_row.get("row_text", "")).strip(),
                         }
                     )
 
-                if total_units is None or total_units <= 0:
+                if not parsed_row["operation"]:
                     return
-                if total_units > 40:
+                if parsed_row["labor_hours"] is None or parsed_row["labor_hours"] < 0.0:
                     return
-                if not _is_valid_mitchell_operation_text(operation_text):
+                if parsed_row["labor_hours"] > 40:
+                    return
+                if not _is_valid_mitchell_operation_text(parsed_row["operation"]):
                     return
 
-                op_type_prefix = f"[{operation_text}|{labor_type_text}]"
+                op_type_prefix = f"[{parsed_row['operation']}|{parsed_row['labor_type']}]"
                 item = {
                     "line": str(line_num),
-                    "description": f"{op_type_prefix} {description}".strip(),
-                    "value": float(total_units),
+                    "description": f"{op_type_prefix} {parsed_row['description']}".strip(),
+                    "value": float(parsed_row["labor_hours"]),
                 }
 
-                description_lower = description.lower()
-                paint_line = _is_paint_line(operation_text, labor_type_text, description)
+                description_lower = parsed_row["description"].lower()
+                paint_line = _is_paint_line(parsed_row["operation"], parsed_row["labor_type"], parsed_row["description"])
                 if paint_line:
                     paint_items.append(item)
                     return
@@ -500,6 +566,11 @@ def _extract_mitchell_repair_lines(pages: List[Dict[str, Any]]) -> tuple[List[Di
                     row_fields["line_num"] = line_match.group(1)
                     current_row = row_fields
                 elif current_row and has_any_column_text:
+                    if _is_continuation_break_row(row_fields):
+                        _flush_current_row()
+                        current_row = None
+                        cursor += 1
+                        continue
                     for key in ordered_keys:
                         if key == "line_num":
                             continue
