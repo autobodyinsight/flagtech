@@ -356,66 +356,11 @@ function shouldDisplayPartReplacement(item) {{
   return Number.isFinite(priceVal) && priceVal > 0 && !!explicitPartType;
 }}
 
-function parseRepairDescriptionMetadata(text) {{
-  const source = String(text || '').trim();
-  const match = source.match(/^\[([^|\]]*)\|([^\]]*)\]\s*(.*)$/);
-  if (!match) return null;
-  return {{
-    operation: String(match[1] || '').trim(),
-    partType: String(match[2] || '').trim(),
-    description: String(match[3] || '').trim(),
-  }};
-}}
-
-function buildFallbackPartsReplacements() {{
-  if (!Array.isArray(saveLaborItems) || saveLaborItems.length === 0) {{
-    return [];
-  }}
-
-  const replacements = [];
-  saveLaborItems.forEach((item) => {{
-    const parsed = parseRepairDescriptionMetadata(item && item.description);
-    if (!parsed) return;
-
-    const operation = parsed.operation.toLowerCase();
-    const partType = parsed.partType.trim();
-    const description = parsed.description.trim();
-    if (!partType || !description) return;
-    if (partType.toLowerCase() === 'existing') return;
-    if (!(operation.includes('replace') || operation.includes('overhaul'))) return;
-
-    replacements.push({{
-      line: item.line || null,
-      description,
-      part_type: partType,
-      price: null,
-      qty: null,
-      row_text: null,
-      derived_from: 'labor'
-    }});
-  }});
-
-  return replacements;
-}}
-
 function extractPartsReplacements() {{
   const replacements = [];
-  const replacementKeys = new Set();
   let partsTotal = 0;
 
-  function appendReplacement(item) {{
-    const lineValue = item && item.line !== undefined && item.line !== null ? String(item.line).trim() : '';
-    const descriptionValue = String((item && item.description) || '').trim().toLowerCase();
-    const key = lineValue + '|' + descriptionValue;
-    if (replacementKeys.has(key)) {{
-      return;
-    }}
-    replacementKeys.add(key);
-    replacements.push(item);
-  }}
-
   if (!savePartsItems || savePartsItems.length === 0) {{
-    buildFallbackPartsReplacements().forEach((item) => appendReplacement(item));
     return {{items: replacements, total: partsTotal}};
   }}
 
@@ -428,7 +373,7 @@ function extractPartsReplacements() {{
     const rowText = String(item.row_text || '').trim();
     const partType = resolvePartType(item);
     const cleanedDesc = (rowText || descText || 'Part').replace(/^\\s*\\d+\\s+/, '').trim();
-    appendReplacement({{
+    replacements.push({{
       line: item.line || null,
       description: cleanedDesc,
       part_type: partType,
@@ -436,12 +381,8 @@ function extractPartsReplacements() {{
       qty: item.qty || null,
       row_text: rowText || null
     }});
-    if (Number.isFinite(priceVal)) {{
-      partsTotal += priceVal;
-    }}
+    partsTotal += priceVal;
   }});
-
-  buildFallbackPartsReplacements().forEach((item) => appendReplacement(item));
 
   return {{items: replacements, total: partsTotal}};
 }}
@@ -591,24 +532,33 @@ function openSaveEstimateModal(estimateTotals) {{
   
   // Populate paint repairs
   let paintHtml = '';
-  const partsResult = extractPartsReplacements();
-  if (partsResult.items.length === 0) {{
-      const rawDesc = rowText || descText || 'Part';
+  if (savePaintItems.length === 0) {{
+    paintHtml = '<p style="padding: 12px; color: #666;">No paint items found.</p>';
   }} else {{
-    partsResult.items.forEach((item, index) => {{
+    savePaintItems.forEach((item, index) => {{
+      paintHtml += '<div class="repair-item" id="paint-item-' + index + '">';
+      paintHtml += '<div class="repair-item-label"><strong>Line ' + item.line + '</strong> - ' + item.description + '</div>';
+      paintHtml += '<div class="repair-item-value">' + parseFloat(item.value).toFixed(1) + ' hrs</div>';
+      paintHtml += '</div>';
+    }});
+  }}
+  document.getElementById('saveEstimatePaintList').innerHTML = paintHtml;
+
+  // Populate parts replacements
+  let partsHtml = '';
+  let partsCount = 0;
+  let partsTotal = 0;
+  if (savePartsItems && savePartsItems.length > 0) {{
+    savePartsItems.forEach((item) => {{
+      if (!shouldDisplayPartReplacement(item)) {{
+        return;
+      }}
       const priceVal = parseFloat(item.price);
       const descText = String(item.description || '').trim();
       const rowText = String(item.row_text || '').trim();
       const partType = resolvePartType(item);
       const lineText = item.line ? ('Line ' + item.line + ' - ') : '';
       const rawDesc = rowText || descText || 'Part';
-      const cleanedDesc = rawDesc.replace(/^\s*\d+\s+/, '').trim();
-      const priceText = Number.isFinite(priceVal) && priceVal > 0 ? ('$' + formatPartPrice(priceVal)) : '-';
-      partsHtml += '<div class="repair-item" id="part-item-' + index + '">';
-      partsHtml += '<div class="repair-item-label"><strong>' + lineText + '</strong>' + cleanedDesc + ' - ' + partType + '</div>';
-      partsHtml += '<div class="repair-item-value">' + priceText + '</div>';
-      partsHtml += '</div>';
-    }});
       const cleanedDesc = rawDesc.replace(/^\\s*\\d+\\s+/, '').trim();
       const priceText = Number.isFinite(priceVal) && priceVal > 0 ? ('$' + formatPartPrice(priceVal)) : '-';
       partsHtml += '<div class="repair-item" id="part-item-' + partsCount + '">';

@@ -36,17 +36,6 @@ _MITCHELL_OPERATION_BLOCKLIST = (
     "net estimate total",
 )
 
-_MITCHELL_FIELD_BLOCKLIST = (
-    "included in clear coat",
-    "verify the part number",
-    "pre scan",
-    "pre-scan",
-    "calculation",
-    "manufacturer",
-    "corporate",
-    "printed on",
-)
-
 
 _VIN_RE = re.compile(r"[A-HJ-NPR-Z0-9]{17}", re.IGNORECASE)
 
@@ -368,21 +357,6 @@ def _is_valid_mitchell_operation_text(text: str) -> bool:
     return True
 
 
-def _is_valid_mitchell_field_text(text: str, *, allow_empty: bool) -> bool:
-    value = str(text or "").strip().lower()
-    if not value:
-        return allow_empty
-    if not re.search(r"[a-z]", value):
-        return False
-    if any(token in value for token in _MITCHELL_FIELD_BLOCKLIST):
-        return False
-    if len(value) > 60:
-        return False
-    if len(value.split()) > 8:
-        return False
-    return True
-
-
 def _extract_mitchell_repair_lines(pages: List[Dict[str, Any]]) -> tuple[List[Dict[str, Any]], List[Dict[str, Any]], List[Dict[str, Any]]]:
     labor_items: List[Dict[str, Any]] = []
     paint_items: List[Dict[str, Any]] = []
@@ -449,8 +423,6 @@ def _extract_mitchell_repair_lines(pages: List[Dict[str, Any]]) -> tuple[List[Di
                 if total_units > 40:
                     return
                 if not _is_valid_mitchell_operation_text(operation_text):
-                    return
-                if not _is_valid_mitchell_field_text(labor_type_text, allow_empty=True):
                     return
 
                 op_type_prefix = f"[{operation_text}|{labor_type_text}]"
