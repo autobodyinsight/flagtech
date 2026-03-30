@@ -279,3 +279,34 @@ def test_footer_noise_rows_are_not_parsed_as_labor_lines():
             "value": 0.3,
         }
     ]
+
+
+def test_disclaimer_wrapped_row_is_not_parsed_as_refinish_item():
+    page = _make_repair_page(
+        [
+            {
+                "line_num": "46",
+                "description": "Clear Coat",
+                "operation": "Additional",
+                "type": "Refinish Operation",
+                "total_units": "2.8",
+            },
+            {
+                "line_num": "48",
+                "description": "Pre- Scan Calculation Manufacturer Nevada #1725",
+                "operation": "Additional Mechanical* Labor C Included in Clear Coat",
+                "type": "Verify the part number Corporate",
+                "total_units": "0.5",
+            },
+        ]
+    )
+
+    parsed = parse_mitchell([page])
+
+    assert parsed["paint_items"] == [
+        {
+            "line": "46",
+            "description": "[Additional|Refinish Operation] Clear Coat",
+            "value": 2.8,
+        }
+    ]
