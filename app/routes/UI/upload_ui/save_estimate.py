@@ -325,11 +325,51 @@ function formatEstimateValue(value) {{
   return normalized;
 }}
 
+function parsePartQtyPrice(item) {{
+  const qtyRaw = item && item.qty !== undefined && item.qty !== null ? String(item.qty).trim() : '';
+  const priceRaw = item && item.price !== undefined && item.price !== null ? String(item.price).trim() : '';
+  const rowRaw = item && item.row_text !== undefined && item.row_text !== null ? String(item.row_text).trim() : '';
+
+  let qtyVal = parseFloat(qtyRaw);
+  let priceVal = parseFloat(priceRaw);
+
+  // Handle merged values like "1 $186.85" inside either qty or price field.
+  const combined = `${{qtyRaw}} ${{priceRaw}}`.trim();
+  const mergedMatch = combined.match(/(\d+(?:\.\d+)?)\s+\$?\s*(\d{1,3}(?:,\d{3})*(?:\.\d+)?)/);
+  if (mergedMatch) {{
+    if (!Number.isFinite(qtyVal)) {{
+      qtyVal = parseFloat(mergedMatch[1]);
+    }}
+    const mergedPrice = parseFloat(String(mergedMatch[2]).replace(/,/g, ''));
+    if (Number.isFinite(mergedPrice)) {{
+      priceVal = mergedPrice;
+    }}
+  }}
+
+  // If price still looks like a qty, try extracting the last money-like number from source text.
+  if (!Number.isFinite(priceVal) || (Number.isFinite(qtyVal) && priceVal === qtyVal)) {{
+    const source = `${{priceRaw}} ${{rowRaw}}`;
+    const moneyMatches = source.match(/\$?\d{1,3}(?:,\d{3})*(?:\.\d{1,2})/g);
+    if (moneyMatches && moneyMatches.length) {{
+      const lastMoney = parseFloat(String(moneyMatches[moneyMatches.length - 1]).replace(/[^0-9.]/g, ''));
+      if (Number.isFinite(lastMoney)) {{
+        priceVal = lastMoney;
+      }}
+    }}
+  }}
+
+  return {{
+    qty: Number.isFinite(qtyVal) ? qtyVal : null,
+    price: Number.isFinite(priceVal) ? priceVal : null,
+  }};
+}
+
 function shouldDisplayPartReplacement(item) {{
   if (!item || typeof item !== 'object') return false;
   const explicitPartType = String(item.part_type || '').trim().toUpperCase();
-  const qtyVal = parseFloat(item.qty);
-  const priceVal = parseFloat(item.price);
+  const parsed = parsePartQtyPrice(item);
+  const qtyVal = parsed.qty;
+  const priceVal = parsed.price;
 
   if (explicitPartType && ((Number.isFinite(qtyVal) && qtyVal > 0) || (Number.isFinite(priceVal) && priceVal > 0))) {{
     return true;
@@ -368,7 +408,8 @@ function extractPartsReplacements() {{
     if (!shouldDisplayPartReplacement(item)) {{
       return;
     }}
-    const priceVal = parseFloat(item.price);
+    const parsed = parsePartQtyPrice(item);
+    const priceVal = parsed.price;
     const descText = String(item.description || '').trim();
     const rowText = String(item.row_text || '').trim();
     const partType = resolvePartType(item);
@@ -378,10 +419,12 @@ function extractPartsReplacements() {{
       description: cleanedDesc,
       part_type: partType,
       price: priceVal,
-      qty: item.qty || null,
+      qty: parsed.qty,
       row_text: rowText || null
     }});
-    partsTotal += priceVal;
+    if (Number.isFinite(priceVal)) {{
+      partsTotal += priceVal;
+    }}
   }});
 
   return {{items: replacements, total: partsTotal}};
@@ -553,7 +596,8 @@ function openSaveEstimateModal(estimateTotals) {{
       if (!shouldDisplayPartReplacement(item)) {{
         return;
       }}
-      const priceVal = parseFloat(item.price);
+      const parsed = parsePartQtyPrice(item);
+      const priceVal = parsed.price;
       const descText = String(item.description || '').trim();
       const rowText = String(item.row_text || '').trim();
       const partType = resolvePartType(item);
