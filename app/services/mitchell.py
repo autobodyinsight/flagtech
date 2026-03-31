@@ -362,6 +362,64 @@ def _normalize_mitchell_part_type(text: str) -> str:
     return t
 
 
+def _clean_part_type_display(text: str) -> str:
+    value = re.sub(r"\s+", " ", str(text or "")).strip()
+    if not value:
+        return ""
+    if value.lower() == "a/m":
+        return "Aftermarket"
+    return value
+
+
+def _clean_operation_for_parts(text: str) -> str:
+    value = re.sub(r"\s+", " ", str(text or "")).strip()
+    if not value:
+        return ""
+    value = re.sub(r"\breplace\s+new\b", "replace", value, flags=re.IGNORECASE)
+    if value.endswith("/") and "replace" not in value.lower():
+        value = f"{value} replace"
+    value = re.sub(r"\s+", " ", value).strip()
+    return value
+
+
+def _format_part_qty_for_display(value: Optional[float]) -> str:
+    if value is None:
+        return ""
+    numeric = float(value)
+    if numeric.is_integer():
+        return str(int(numeric))
+    return f"{numeric:g}"
+
+
+def _format_part_price_for_display(value: Optional[float]) -> str:
+    if value is None:
+        return ""
+    numeric = float(value)
+    if numeric.is_integer():
+        return f"${int(numeric)}"
+    return f"${numeric:.2f}".rstrip("0").rstrip(".")
+
+
+def _build_parts_row_text(description: str, operation: str, part_type: str, part_number: str, qty: Optional[float], price: Optional[float]) -> str:
+    base_description = _clean_mitchell_description(description)
+    operation_display = _clean_operation_for_parts(operation)
+    if operation_display and operation_display.lower() not in base_description.lower():
+        base_description = _append_text(base_description, operation_display)
+
+    part_type_display = _clean_part_type_display(part_type)
+    qty_display = _format_part_qty_for_display(qty)
+    price_display = _format_part_price_for_display(price)
+
+    tokens = [
+        base_description,
+        part_type_display,
+        str(part_number or "").strip(),
+        qty_display,
+        price_display,
+    ]
+    return re.sub(r"\s+", " ", " ".join(token for token in tokens if token)).strip()
+
+
 def _is_paint_line(operation_text: str, labor_type_text: str, description: str = "") -> bool:
     haystack = f"{operation_text} {labor_type_text} {description}".lower()
     if any(token in haystack for token in _PAINT_NEGATION_TOKENS):
@@ -535,7 +593,14 @@ def _extract_mitchell_repair_lines(pages: List[Dict[str, Any]]) -> tuple[List[Di
                             "part_number": parsed_row["part_number"],
                             "price": float(parts_price),
                             "qty": float(parsed_row["qty"]),
-                            "row_text": str(current_row.get("row_text", "")).strip(),
+                            "row_text": _build_parts_row_text(
+                                parsed_row["description"],
+                                parsed_row["operation"],
+                                parsed_row["part_type"],
+                                parsed_row["part_number"],
+                                parsed_row["qty"],
+                                parts_price,
+                            ),
                         }
                     )
 
