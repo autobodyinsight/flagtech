@@ -339,3 +339,77 @@ def test_parts_type_normalization_and_clean_row_text_display():
         "~450555608",
         "955 559 66603 G2X",
     ]
+
+
+def test_estimate_totals_extracts_labor_subtotals_from_labor_grid():
+    words = []
+    y = 100.0
+
+    header_columns = {
+        "labor": 40,
+        "units": 360,
+        "rate": 520,
+        "sublet": 700,
+        "addl_amount": 900,
+        "totals": 1180,
+    }
+
+    header = {
+        "labor": "Labor",
+        "units": "Units",
+        "rate": "Rate",
+        "sublet": "Sublet",
+        "addl_amount": "Add'l Amount",
+        "totals": "Totals",
+    }
+    for key, value in header.items():
+        words.extend(_make_cell_words(value, header_columns[key], y))
+
+    y += 14.0
+    rows = [
+        {
+            "labor": "Body Labor",
+            "units": "16.5",
+            "rate": "$60.00",
+            "totals": "$990.00",
+        },
+        {
+            "labor": "Refinish Labor",
+            "units": "15.8",
+            "rate": "$60.00",
+            "totals": "$948.00",
+        },
+        {
+            "labor": "Mechanical Labor",
+            "units": "3.3",
+            "rate": "$110.00",
+            "sublet": "$99.00",
+            "totals": "$462.00",
+        },
+        {
+            "labor": "Frame Labor",
+            "units": "1.2",
+            "rate": "$75.00",
+            "totals": "$90.00",
+        },
+        {
+            "labor": "Glass Labor",
+            "units": "2.0",
+            "rate": "$80.00",
+            "totals": "$160.00",
+        },
+    ]
+
+    for row in rows:
+        for key, value in row.items():
+            words.extend(_make_cell_words(value, header_columns[key], y))
+        y += 14.0
+
+    page = {"width": 1600, "height": 1200, "words": words}
+    parsed = parse_mitchell([page])
+
+    assert parsed["body_labor"] == 990.0
+    assert parsed["paint_labor"] == 948.0
+    assert parsed["mechanical_labor"] == 462.0
+    assert parsed["frame_labor"] == 90.0
+    assert parsed["glass_labor"] == 160.0

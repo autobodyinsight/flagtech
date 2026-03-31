@@ -18,6 +18,15 @@ _MITCHELL_SUMMARY_TOTAL_LABELS = {
     "net estimate total": "insurance_pay",
 }
 
+_MITCHELL_LABOR_TOTAL_LABELS = {
+    "body labor": "body_labor",
+    "refinish labor": "paint_labor",
+    "paint labor": "paint_labor",
+    "frame labor": "frame_labor",
+    "mechanical labor": "mechanical_labor",
+    "glass labor": "glass_labor",
+}
+
 _MITCHELL_REPAIR_END_MARKERS = (
     "estimate totals",
     "taxable parts",
@@ -244,6 +253,24 @@ def _row_money_values(row: Dict[str, Any]) -> List[float]:
     return values
 
 
+def _row_money_values_in_bounds(
+    row: Dict[str, Any],
+    left_bound: float,
+    right_bound: Optional[float] = None,
+) -> List[float]:
+    values: List[float] = []
+    for word in sorted(row.get("words", []), key=lambda item: item.get("x0", 0)):
+        xmid = word.get("xmid", 0)
+        if xmid < left_bound:
+            continue
+        if right_bound is not None and xmid >= right_bound:
+            continue
+        parsed = _to_float(str(word.get("text", "")))
+        if parsed is not None:
+            values.append(parsed)
+    return values
+
+
 def _normalize_header_text(text: str) -> str:
     cleaned = re.sub(r"[^a-z0-9#]+", " ", str(text or "").lower())
     return re.sub(r"\s+", " ", cleaned).strip()
@@ -275,6 +302,31 @@ def _repair_header_key(text: str) -> Optional[str]:
     ):
         return "total_price"
     return None
+
+
+def _detect_mitchell_labor_totals_columns(row: Dict[str, Any]) -> Dict[str, tuple[float, Optional[float]]]:
+    groups = _group_row_words_by_x(row.get("words", []), gap=14.0)
+    labor_min_x: Optional[float] = None
+    units_min_x: Optional[float] = None
+    totals_min_x: Optional[float] = None
+
+    for group in groups:
+        normalized = _normalize_header_text(group.get("text", ""))
+        min_x = float(group.get("min_x", 0.0))
+        if labor_min_x is None and normalized == "labor":
+            labor_min_x = min_x
+        elif units_min_x is None and "units" in normalized:
+            units_min_x = min_x
+        elif totals_min_x is None and "totals" in normalized:
+            totals_min_x = min_x
+
+    if labor_min_x is None or units_min_x is None or totals_min_x is None:
+        return {}
+
+    return {
+        "label": (labor_min_x - 2.0, units_min_x - 2.0),
+        "totals": (totals_min_x - 2.0, None),
+    }
 
 
 def _detect_repair_columns(row: Dict[str, Any]) -> Dict[str, tuple[float, Optional[float]]]:
@@ -781,6 +833,44 @@ def _extract_mitchell_estimate_totals(pages: List[Dict[str, Any]]) -> Dict[str, 
                     monies = _row_money_values(row)
                     value = monies[-1] if monies else None
                 totals[schema_key] = value
+
+        labor_columns: Dict[str, tuple[float, Optional[float]]] = {}
+        for row_index, row in enumerate(rows):
+            if not labor_columns:
+                labor_columns = _detect_mitchell_labor_totals_columns(row)
+                if labor_columns:
+                    continue
+                continue
+
+            line_text = _row_text(row)
+            normalized_line = _normalize_line_text(line_text)
+            if not normalized_line:
+                continue
+            if _is_end_of_mitchell_repair_section(line_text):
+                break
+
+            label_text = _text_in_bounds(row, *labor_columns["label"])
+            normalized_label = _normalize_line_text(label_text)
+            if not normalized_label:
+                continue
+
+            matched_key = None
+            for label, schema_key in _MITCHELL_LABOR_TOTAL_LABELS.items():
+                if label in normalized_label:
+                    matched_key = schema_key
+                    break
+
+            if not matched_key or totals.get(matched_key) is not None:
+                continue
+
+            total_text = _text_in_bounds(row, *labor_columns["totals"])
+            value = _parse_last_money_value(total_text)
+            if value is None:
+                monies = _row_money_values_in_bounds(row, *labor_columns["totals"])
+                value = monies[-1] if monies else None
+            if value is None:
+                continue
+            totals[matched_key] = value
 
     return totals
 
