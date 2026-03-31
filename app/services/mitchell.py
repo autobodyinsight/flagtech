@@ -352,35 +352,37 @@ def _normalize_mitchell_part_type(text: str) -> str:
     t = str(text or "").strip()
     lower = t.lower()
     if not t:
-        return "OEM"
+        return ""
     if "recycled" in lower or "lkq" in lower:
+        return "LKQ"
+    if "qual" in lower and "part" in lower:
         return "LKQ"
     if "aftermarket" in lower or "a/m" in lower:
         return "A/M"
+    if re.fullmatch(r"new", lower) or re.search(r"\bnew\b", lower):
+        return "OEM"
     if "sublet" in lower:
         return "SUBLET"
     return t
 
 
-def _clean_part_type_display(text: str) -> str:
-    value = re.sub(r"\s+", " ", str(text or "")).strip()
-    if not value:
-        return ""
-    if value.lower() == "a/m":
-        return "Aftermarket"
-    return value
+def _resolve_mitchell_part_type(part_type_text: str, description: str, operation: str, row_text: str) -> str:
+    explicit = _normalize_mitchell_part_type(part_type_text)
+    if explicit:
+        return explicit
 
+    inferred_source = " ".join(
+        [
+            str(description or "").strip(),
+            str(operation or "").strip(),
+            str(row_text or "").strip(),
+        ]
+    )
+    inferred = _normalize_mitchell_part_type(inferred_source)
+    if inferred:
+        return inferred
 
-def _clean_operation_for_parts(text: str) -> str:
-    value = re.sub(r"\s+", " ", str(text or "")).strip()
-    if not value:
-        return ""
-    value = re.sub(r"\breplace\s+new\b", "Replace", value, flags=re.IGNORECASE)
-    value = re.sub(r"\breplace\b", "Replace", value, flags=re.IGNORECASE)
-    if value.endswith("/") and "replace" not in value.lower():
-        value = f"{value} Replace"
-    value = re.sub(r"\s+", " ", value).strip()
-    return value
+    return "OEM"
 
 
 def _format_part_qty_for_display(value: Optional[float]) -> str:
@@ -403,28 +405,10 @@ def _format_part_price_for_display(value: Optional[float]) -> str:
 
 def _build_parts_row_text(
     description: str,
-    operation: str,
-    labor_type: str,
     part_number: str,
     qty: Optional[float],
 ) -> str:
     base_description = _clean_mitchell_description(description)
-    operation_display = _clean_operation_for_parts(operation)
-    labor_display = re.sub(r"\s+", " ", str(labor_type or "")).strip()
-
-    if operation_display and labor_display:
-        operation_lower = operation_display.lower()
-        labor_lower = labor_display.lower()
-        if "replace" in operation_lower and labor_lower not in operation_lower:
-            replace_index = operation_lower.rfind("replace")
-            before = operation_display[:replace_index].strip()
-            operation_display = _append_text(_append_text(before, labor_display), "Replace")
-        elif labor_lower not in operation_lower:
-            operation_display = _append_text(operation_display, labor_display)
-
-    if operation_display and operation_display.lower() not in base_description.lower():
-        base_description = _append_text(base_description, operation_display)
-
     qty_display = _format_part_qty_for_display(qty)
 
     tokens = [
@@ -600,18 +584,22 @@ def _extract_mitchell_repair_lines(pages: List[Dict[str, Any]]) -> tuple[List[Di
                     and parts_price > 0
                     and parsed_row["part_number"]
                 ):
+                    resolved_part_type = _resolve_mitchell_part_type(
+                        parsed_row["part_type"],
+                        parsed_row["description"],
+                        parsed_row["operation"],
+                        str(current_row.get("row_text", "")),
+                    )
                     parts_items.append(
                         {
                             "line": parsed_row["line"],
                             "description": parsed_row["description"],
-                            "part_type": _normalize_mitchell_part_type(parsed_row["part_type"]),
+                            "part_type": resolved_part_type,
                             "part_number": parsed_row["part_number"],
                             "price": float(parts_price),
                             "qty": float(parsed_row["qty"]),
                             "row_text": _build_parts_row_text(
                                 parsed_row["description"],
-                                parsed_row["operation"],
-                                parsed_row["labor_type"],
                                 parsed_row["part_number"],
                                 parsed_row["qty"],
                             ),

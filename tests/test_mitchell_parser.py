@@ -284,3 +284,58 @@ def test_footer_noise_rows_are_not_parsed_as_labor_lines():
             "value": 0.3,
         }
     ]
+
+
+def test_parts_type_normalization_and_clean_row_text_display():
+    page = _make_repair_page(
+        [
+            {
+                "line_num": "2",
+                "description": "102116 Frt Bumper Cover",
+                "operation": "Remove /",
+                "type": "Body",
+                "total_units": "INC#",
+                "part_type": "Aftermarket New",
+                "part_number": "GM1014122",
+                "qty": "1",
+                "total_price": "$464.00",
+            },
+            {
+                "line_num": "3",
+                "description": "Frt Bumper Cover Support",
+                "operation": "Remove /",
+                "type": "Body",
+                "total_units": "INC#",
+                "part_type": "Qual Recycled Part",
+                "part_number": "~450555608",
+                "qty": "1",
+                "total_price": "$55.00",
+            },
+            {
+                "line_num": "4",
+                "description": "R Frt Door Moulding",
+                "operation": "Remove / replace",
+                "type": "Body",
+                "total_units": "INC#",
+                "part_type": "New",
+                "part_number": "955 559 66603 G2X",
+                "qty": "1",
+                "total_price": "$313.75",
+            },
+        ]
+    )
+
+    parsed = parse_mitchell([page])
+    parts = parsed["parts_items"]
+
+    assert [item["part_type"] for item in parts] == ["A/M", "LKQ", "OEM"]
+    assert [item["row_text"] for item in parts] == [
+        "Frt Bumper Cover GM1014122 1",
+        "Frt Bumper Cover Support ~450555608 1",
+        "R Frt Door Moulding 955 559 66603 G2X 1",
+    ]
+    assert [item["part_number"] for item in parts] == [
+        "GM1014122",
+        "~450555608",
+        "955 559 66603 G2X",
+    ]
