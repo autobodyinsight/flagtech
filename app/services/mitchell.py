@@ -375,9 +375,10 @@ def _clean_operation_for_parts(text: str) -> str:
     value = re.sub(r"\s+", " ", str(text or "")).strip()
     if not value:
         return ""
-    value = re.sub(r"\breplace\s+new\b", "replace", value, flags=re.IGNORECASE)
+    value = re.sub(r"\breplace\s+new\b", "Replace", value, flags=re.IGNORECASE)
+    value = re.sub(r"\breplace\b", "Replace", value, flags=re.IGNORECASE)
     if value.endswith("/") and "replace" not in value.lower():
-        value = f"{value} replace"
+        value = f"{value} Replace"
     value = re.sub(r"\s+", " ", value).strip()
     return value
 
@@ -400,22 +401,36 @@ def _format_part_price_for_display(value: Optional[float]) -> str:
     return f"${numeric:.2f}".rstrip("0").rstrip(".")
 
 
-def _build_parts_row_text(description: str, operation: str, part_type: str, part_number: str, qty: Optional[float], price: Optional[float]) -> str:
+def _build_parts_row_text(
+    description: str,
+    operation: str,
+    labor_type: str,
+    part_number: str,
+    qty: Optional[float],
+) -> str:
     base_description = _clean_mitchell_description(description)
     operation_display = _clean_operation_for_parts(operation)
+    labor_display = re.sub(r"\s+", " ", str(labor_type or "")).strip()
+
+    if operation_display and labor_display:
+        operation_lower = operation_display.lower()
+        labor_lower = labor_display.lower()
+        if "replace" in operation_lower and labor_lower not in operation_lower:
+            replace_index = operation_lower.rfind("replace")
+            before = operation_display[:replace_index].strip()
+            operation_display = _append_text(_append_text(before, labor_display), "Replace")
+        elif labor_lower not in operation_lower:
+            operation_display = _append_text(operation_display, labor_display)
+
     if operation_display and operation_display.lower() not in base_description.lower():
         base_description = _append_text(base_description, operation_display)
 
-    part_type_display = _clean_part_type_display(part_type)
     qty_display = _format_part_qty_for_display(qty)
-    price_display = _format_part_price_for_display(price)
 
     tokens = [
         base_description,
-        part_type_display,
         str(part_number or "").strip(),
         qty_display,
-        price_display,
     ]
     return re.sub(r"\s+", " ", " ".join(token for token in tokens if token)).strip()
 
@@ -596,10 +611,9 @@ def _extract_mitchell_repair_lines(pages: List[Dict[str, Any]]) -> tuple[List[Di
                             "row_text": _build_parts_row_text(
                                 parsed_row["description"],
                                 parsed_row["operation"],
-                                parsed_row["part_type"],
+                                parsed_row["labor_type"],
                                 parsed_row["part_number"],
                                 parsed_row["qty"],
-                                parts_price,
                             ),
                         }
                     )
