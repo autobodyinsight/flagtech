@@ -51,6 +51,7 @@ _PAINT_NEGATION_TOKENS = (
 
 
 _VIN_RE = re.compile(r"[A-HJ-NPR-Z0-9]{17}", re.IGNORECASE)
+_STRICT_PART_PRICE_RE = re.compile(r"\$[0-9,]+\.[0-9]{2}")
 
 
 def _group_rows(words: List[Dict[str, Any]], y_thresh: float = 6.0) -> List[Dict[str, Any]]:
@@ -387,6 +388,15 @@ def _is_valid_mitchell_operation_text(text: str) -> bool:
     return True
 
 
+def _parse_strict_part_price(total_price_text: str, row_text: str) -> Optional[float]:
+    """Extract part extended price using strict currency format ($X.XX). Only the first match is used."""
+    for source in (total_price_text, row_text):
+        m = _STRICT_PART_PRICE_RE.search(str(source or ""))
+        if m:
+            return _to_float(m.group(0))
+    return None
+
+
 def _extract_mitchell_repair_lines(pages: List[Dict[str, Any]]) -> tuple[List[Dict[str, Any]], List[Dict[str, Any]], List[Dict[str, Any]]]:
     labor_items: List[Dict[str, Any]] = []
     paint_items: List[Dict[str, Any]] = []
@@ -493,6 +503,10 @@ def _extract_mitchell_repair_lines(pages: List[Dict[str, Any]]) -> tuple[List[Di
                     str(current_row.get("total_price", "")),
                     str(current_row.get("row_text", "")),
                 )
+                parts_price = _parse_strict_part_price(
+                    str(current_row.get("total_price", "")),
+                    str(current_row.get("row_text", "")),
+                )
 
                 parsed_row = {
                     "line": line_num,
@@ -509,8 +523,8 @@ def _extract_mitchell_repair_lines(pages: List[Dict[str, Any]]) -> tuple[List[Di
                 if (
                     parsed_row["qty"] is not None
                     and parsed_row["qty"] >= 1
-                    and parsed_row["price"] is not None
-                    and parsed_row["price"] > 0
+                    and parts_price is not None
+                    and parts_price > 0
                     and parsed_row["part_number"]
                 ):
                     parts_items.append(
@@ -519,7 +533,7 @@ def _extract_mitchell_repair_lines(pages: List[Dict[str, Any]]) -> tuple[List[Di
                             "description": parsed_row["description"],
                             "part_type": _normalize_mitchell_part_type(parsed_row["part_type"]),
                             "part_number": parsed_row["part_number"],
-                            "price": float(parsed_row["price"]),
+                            "price": float(parts_price),
                             "qty": float(parsed_row["qty"]),
                             "row_text": str(current_row.get("row_text", "")).strip(),
                         }
