@@ -419,6 +419,47 @@ def _build_parts_row_text(
     return re.sub(r"\s+", " ", " ".join(token for token in tokens if token)).strip()
 
 
+def _format_mitchell_labor_display_description(
+    operation: str,
+    labor_type: str,
+    part_type: str,
+    description: str,
+) -> Optional[str]:
+    op_raw = re.sub(r"\s+", " ", str(operation or "")).strip()
+    if not op_raw:
+        return None
+
+    lower = op_raw.lower()
+    op_display = ""
+    if "overhaul" in lower:
+        op_display = "Overhaul"
+    elif "remove" in lower and "/" in op_raw:
+        if "replace" in lower:
+            op_display = "Remove / Replace"
+        elif "install" in lower:
+            op_display = "Remove / Install"
+        elif "body" in lower:
+            op_display = "Remove /"
+        else:
+            return None
+    else:
+        return None
+
+    resolved_part_type = _normalize_mitchell_part_type(part_type)
+    if resolved_part_type not in {"A/M", "LKQ"}:
+        shifted = _normalize_mitchell_part_type(labor_type)
+        if shifted in {"A/M", "LKQ"}:
+            resolved_part_type = shifted
+    type_display = resolved_part_type if resolved_part_type in {"A/M", "LKQ"} else ""
+
+    if type_display:
+        prefix = f"[{op_display} | {type_display} ]"
+    else:
+        prefix = f"[{op_display} ]" if op_display.startswith("Remove /") else f"[{op_display}]"
+
+    return f"{prefix} {str(description or '').strip()}".strip()
+
+
 def _is_paint_line(operation_text: str, labor_type_text: str, description: str = "") -> bool:
     haystack = f"{operation_text} {labor_type_text} {description}".lower()
     if any(token in haystack for token in _PAINT_NEGATION_TOKENS):
@@ -616,9 +657,17 @@ def _extract_mitchell_repair_lines(pages: List[Dict[str, Any]]) -> tuple[List[Di
                     return
 
                 op_type_prefix = f"[{parsed_row['operation']}|{parsed_row['labor_type']}]"
+                labor_display_description = _format_mitchell_labor_display_description(
+                    parsed_row["operation"],
+                    parsed_row["labor_type"],
+                    parsed_row["part_type"],
+                    parsed_row["description"],
+                )
                 item = {
                     "line": str(line_num),
-                    "description": f"{op_type_prefix} {parsed_row['description']}".strip(),
+                    "description": labor_display_description
+                    if labor_display_description
+                    else f"{op_type_prefix} {parsed_row['description']}".strip(),
                     "value": float(parsed_row["labor_hours"]),
                 }
 
