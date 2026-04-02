@@ -109,6 +109,9 @@ def detect_anchors_and_vehicle_info(
     """
     anchor_page = None
     anchor_ymid = None
+    customer_anchor_page = None
+    customer_anchor_ymid = None
+    customer_anchor_line = ""
     subtotals_page = None
     subtotals_ymid = None
     ro_count = 0
@@ -125,6 +128,9 @@ def detect_anchors_and_vehicle_info(
             re.search(r"\bRO\b\s*(NUMBER|NO\.?)\b", text, re.IGNORECASE)
             or re.search(r"\bRO\s*#", text, re.IGNORECASE)
         )
+
+    def _is_customer_row(text: str) -> bool:
+        return bool(re.search(r"\bcustomer\s*:", text, re.IGNORECASE))
 
     def _is_vin_or_vehicle_row(text: str) -> bool:
         return bool(re.search(r"\b(VIN|VEHICLE)\b", text, re.IGNORECASE))
@@ -155,8 +161,13 @@ def detect_anchors_and_vehicle_info(
         for idx, r in enumerate(rows):
             row_text = " ".join(w.get("text", "") for w in r["words"]).strip()
 
-            if not header_started and _is_ro_number_row(row_text):
+            if not header_started and (_is_ro_number_row(row_text) or _is_customer_row(row_text)):
                 header_started = True
+
+            if customer_anchor_page is None and _is_customer_row(row_text):
+                customer_anchor_page = pi
+                customer_anchor_ymid = r["ymid"]
+                customer_anchor_line = row_text
 
             if header_started and not header_ended and _is_vin_or_vehicle_row(row_text):
                 header_ended = True
@@ -315,6 +326,11 @@ def detect_anchors_and_vehicle_info(
 
         if anchor_page and subtotals_page:
             break
+
+    if anchor_page is None and customer_anchor_page is not None:
+        anchor_page = customer_anchor_page
+        anchor_ymid = customer_anchor_ymid
+        first_ro_line = customer_anchor_line
 
     return anchor_page, anchor_ymid, subtotals_page, subtotals_ymid, first_ro_line, vehicle_info_line, owner_info, insurance_company, vin, claim_number
 
