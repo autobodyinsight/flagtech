@@ -153,6 +153,43 @@ def detect_anchors_and_vehicle_info(
             return match.group(1)
         return ""
 
+    def _extract_name_from_text(text: str) -> str:
+        cleaned = str(text or "").strip()
+        if not cleaned:
+            return ""
+
+        cleaned = re.split(r"\b(?:CLAIM|INSURANCE|VIN|POLICY)\b", cleaned, maxsplit=1, flags=re.IGNORECASE)[0].strip()
+        cleaned = re.sub(r"^\s*(owner|customer)\s*:\s*", "", cleaned, flags=re.IGNORECASE).strip()
+        if not cleaned:
+            return ""
+
+        # Prefer Last, First style names when present.
+        comma_name = re.match(
+            r"^([A-Za-z][A-Za-z\-\s']*,\s*[A-Za-z][A-Za-z\-\s']*)",
+            cleaned,
+        )
+        if comma_name:
+            return re.sub(r"\s+", " ", comma_name.group(1)).strip(" -,")
+
+        # Fallback to First Last (optionally with middle tokens).
+        simple_name = re.match(
+            r"^([A-Za-z][A-Za-z\-']*(?:\s+[A-Za-z][A-Za-z\-']*){1,3})",
+            cleaned,
+        )
+        if simple_name:
+            return re.sub(r"\s+", " ", simple_name.group(1)).strip(" -,")
+
+        return ""
+
+    def _looks_like_vehicle_line(text: str) -> bool:
+        if not text:
+            return False
+        if not re.search(r"\b(19\d{2}|20[0-6]\d|2070)\b", text):
+            return False
+        if re.search(r"\b(owner|customer|claim|insurance|vin|ro)\b", text, re.IGNORECASE):
+            return False
+        return True
+
     header_started = False
     header_ended = False
 
@@ -171,6 +208,9 @@ def detect_anchors_and_vehicle_info(
 
             if header_started and not header_ended and _is_vin_or_vehicle_row(row_text):
                 header_ended = True
+
+            if not vehicle_info_line and _looks_like_vehicle_line(row_text):
+                vehicle_info_line = row_text
 
             if header_started and not header_ended and not claim_number:
                 if re.search(r"\bCLAIM\b", row_text, re.IGNORECASE):
@@ -218,16 +258,23 @@ def detect_anchors_and_vehicle_info(
                         w.get("text", "") for w in sorted(filtered_words, key=lambda w: w.get("x0", 0))
                     ).strip()
 
+                # Inline owner/customer value on the same label row (e.g., "Customer: John Doe").
+                current_line = _row_text_in_bounds(r)
+                inline_name = _extract_name_from_text(current_line)
+                if inline_name:
+                    name = inline_name
+
                 # Scan the next rows for name and phone within the same x column.
                 scan_end = min(len(rows), idx + 10)
-                for j in range(idx + 1, scan_end):
-                    full_line = _row_text_in_bounds(rows[j])
-                    if not full_line:
-                        continue
-                    name_match = re.match(r"^([A-Za-z][A-Za-z\-\s']*,\s*[A-Za-z][A-Za-z\-\s']*)", full_line)
-                    if name_match:
-                        name = name_match.group(1)
-                        break
+                if not name:
+                    for j in range(idx + 1, scan_end):
+                        full_line = _row_text_in_bounds(rows[j])
+                        if not full_line:
+                            continue
+                        parsed_name = _extract_name_from_text(full_line)
+                        if parsed_name:
+                            name = parsed_name
+                            break
 
                 for j in range(idx + 1, scan_end):
                     full_line = _row_text_in_bounds(rows[j])
