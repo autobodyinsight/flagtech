@@ -3996,6 +3996,25 @@ def get_dashboard_screen_html():
                 }
             }
 
+            function getEcdDateColor(isoDate) {
+                if (!isoDate) return '#333';
+                try {
+                    const [yearStr, monthStr, dayStr] = String(isoDate).split('-');
+                    const ecdDate = new Date(Number(yearStr), Number(monthStr) - 1, Number(dayStr));
+                    if (Number.isNaN(ecdDate.getTime())) return '#333';
+
+                    const today = new Date();
+                    today.setHours(0, 0, 0, 0);
+                    ecdDate.setHours(0, 0, 0, 0);
+
+                    if (ecdDate.getTime() < today.getTime()) return '#d32f2f';
+                    if (ecdDate.getTime() === today.getTime()) return '#fbc02d';
+                    return '#333';
+                } catch (error) {
+                    return '#333';
+                }
+            }
+
             function addWeekdaysIso(startIso, weekdayDays) {
                 if (!startIso) return '';
                 const [yearStr, monthStr, dayStr] = startIso.split('-');
@@ -4639,6 +4658,7 @@ def get_dashboard_screen_html():
                     const ecdIso = ro.ecd_date || computeEcdIso(inIso, Number(ro.hours || 0));
                     const inDisplay = formatShortDate(inIso);
                     const ecdDisplay = formatShortDate(ecdIso);
+                    const ecdTextColor = getEcdDateColor(ecdIso);
                     
                     // Calculate days since in date
                     const daysSinceIn = calculateDaysSince(inIso);
@@ -4694,7 +4714,7 @@ def get_dashboard_screen_html():
                             </td>
                             <td style="padding:12px; border-bottom:1px solid #eee; color:#333;">${inDisplay}</td>
                             <td style="padding:12px; border-bottom:1px solid #eee; color:#555; text-align:center; font-weight:bold;">${daysDisplay}</td>
-                            <td style="padding:12px; border-bottom:1px solid #eee; color:#333;">${ecdDisplay}</td>
+                            <td style="padding:12px; border-bottom:1px solid #eee; color:${ecdTextColor};">${ecdDisplay}</td>
                             <td style="padding:12px; border-bottom:1px solid #eee; text-align:right; font-weight:bold; color:#333;">
                                 <button type="button" onclick="toggleRoHrsAssignments(event, '${ro.ro}')" style="background:none; border:none; color:#0066cc; text-decoration:underline; cursor:pointer; padding:0; font:inherit; font-weight:bold;">
                                     ${ro.hours.toFixed(1)}
