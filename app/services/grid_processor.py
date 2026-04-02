@@ -112,6 +112,8 @@ def detect_anchors_and_vehicle_info(
     customer_anchor_page = None
     customer_anchor_ymid = None
     customer_anchor_line = ""
+    customer_label_count = 0
+    second_customer_vehicle_line = ""
     subtotals_page = None
     subtotals_ymid = None
     ro_count = 0
@@ -205,6 +207,20 @@ def detect_anchors_and_vehicle_info(
                 customer_anchor_page = pi
                 customer_anchor_ymid = r["ymid"]
                 customer_anchor_line = row_text
+
+            if _is_customer_row(row_text):
+                customer_label_count += 1
+                if customer_label_count == 2:
+                    scan_end = min(len(rows), idx + 4)
+                    for j in range(idx + 1, scan_end):
+                        below_text = " ".join(
+                            w.get("text", "") for w in sorted(rows[j]["words"], key=lambda w: w.get("x0", 0))
+                        ).strip()
+                        if not below_text:
+                            continue
+                        if re.search(r"\b(19\d{2}|20[0-6]\d|2070)\b", below_text):
+                            second_customer_vehicle_line = below_text
+                            break
 
             if header_started and not header_ended and _is_vin_or_vehicle_row(row_text):
                 header_ended = True
@@ -378,6 +394,10 @@ def detect_anchors_and_vehicle_info(
         anchor_page = customer_anchor_page
         anchor_ymid = customer_anchor_ymid
         first_ro_line = customer_anchor_line
+
+    # For no-RO PDFs, source vehicle info from the line below the second Customer label.
+    if ro_count == 0 and second_customer_vehicle_line:
+        vehicle_info_line = second_customer_vehicle_line
 
     return anchor_page, anchor_ymid, subtotals_page, subtotals_ymid, first_ro_line, vehicle_info_line, owner_info, insurance_company, vin, claim_number
 
