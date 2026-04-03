@@ -195,7 +195,7 @@ def get_phase_screen_html():
         </style>
 
         <script>
-            const PHASE_SPECIAL_SHOP = 'The Spray Gun Auto Body';
+            const PHASE_SPECIAL_SHOP = 'the spray gun auto body';
             let phaseBoardItems = [];
             let phaseEditModalEl = null;
 
@@ -211,12 +211,16 @@ def get_phase_screen_html():
                 }
             }
 
-            function isPhaseSpecialShop() {
+            function getPhaseCurrentShopName() {
                 const sessionSnapshot = getPhaseSessionSnapshot() || {};
-                const currentShopName = String(
-                    sessionSnapshot.shop_name || sessionSnapshot?.shop?.shop_name || ''
-                ).trim();
-                return currentShopName === PHASE_SPECIAL_SHOP;
+                const appShopName = String(window.appUiState?.shopName || '').trim();
+                const sessionShopName = String(sessionSnapshot?.shop?.shop_name || '').trim();
+                const legacySessionShopName = String(sessionSnapshot?.shop_name || '').trim();
+                return appShopName || sessionShopName || legacySessionShopName;
+            }
+
+            function isPhaseSpecialShop() {
+                return String(getPhaseCurrentShopName() || '').trim().toLowerCase() === PHASE_SPECIAL_SHOP;
             }
 
             function phaseEscapeHtml(value) {

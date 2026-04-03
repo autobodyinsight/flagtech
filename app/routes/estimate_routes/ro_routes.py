@@ -96,7 +96,7 @@
 )
 
 router = APIRouter()
-PHASE_SPECIAL_SHOP_NAME = "The Spray Gun Auto Body"
+PHASE_SPECIAL_SHOP_NAME = "the spray gun auto body"
 
 
 def _ensure_phase_ui_overrides_table(cur) -> None:
@@ -133,6 +133,28 @@ def _ensure_phase_ui_overrides_table(cur) -> None:
         ON ro_phase_ui_overrides (ro_key, domain, shop_id)
         """
     )
+
+
+def _resolve_phase_special_shop_enabled(cur, *, domain: str, shop_id: int, shop_uuid: str, fallback_shop_name: str = "") -> bool:
+    resolved_name = str(fallback_shop_name or "").strip()
+    cur.execute(
+        """
+        SELECT COALESCE(ss.shop_name, sh.name, '') AS shop_name
+        FROM shops sh
+        LEFT JOIN shop_settings ss
+          ON ss.shop_id = sh.id
+         AND ss.domain = %s
+        WHERE sh.id = %s
+           OR sh.shop_id = %s::uuid
+        ORDER BY ss.updated_at DESC NULLS LAST, ss.id DESC NULLS LAST
+        LIMIT 1
+        """,
+        (domain, shop_id, shop_uuid),
+    )
+    row = cur.fetchone() or {}
+    if row.get("shop_name"):
+        resolved_name = str(row.get("shop_name") or "").strip()
+    return resolved_name.lower() == PHASE_SPECIAL_SHOP_NAME
 
 @router.post("/ro-phone")
 async def update_ro_phone(request: Request):
@@ -1678,11 +1700,6 @@ async def phase_roadmap_edit(request: Request):
     if not domain:
         return JSONResponse(status_code=401, content={"error": "Not authenticated"})
 
-    authenticated_user = get_authenticated_user(request) or {}
-    current_shop_name = str(authenticated_user.get("shop_name") or "").strip()
-    if current_shop_name != PHASE_SPECIAL_SHOP_NAME:
-        return JSONResponse(status_code=403, content={"error": "Roadmap edit not enabled for this shop"})
-
     data = await request.json()
     ro_key = str(data.get("ro_key") or "").strip()
     display_ro = str(data.get("ro") or "").strip()
@@ -1704,6 +1721,15 @@ async def phase_roadmap_edit(request: Request):
         current_shop_uuid = _scope["shop_uuid"]
         if not current_shop_id or not current_shop_uuid:
             return JSONResponse(status_code=403, content={"error": "Shop scope not resolved"})
+        authenticated_user = get_authenticated_user(request) or {}
+        if not _resolve_phase_special_shop_enabled(
+            cur,
+            domain=domain,
+            shop_id=current_shop_id,
+            shop_uuid=current_shop_uuid,
+            fallback_shop_name=str(authenticated_user.get("shop_name") or "").strip(),
+        ):
+            return JSONResponse(status_code=403, content={"error": "Roadmap edit not enabled for this shop"})
 
         _ensure_phase_ui_overrides_table(cur)
         cur.execute(
@@ -1814,10 +1840,15 @@ async def phase_board(request: Request):
         phase_map = {row.get("ro"): row.get("phase") for row in phase_rows}
         closed_phase_keys = {"complete", "complete/finish"}
 
-        authenticated_user = get_authenticated_user(request) or {}
-        current_shop_name = str(authenticated_user.get("shop_name") or "").strip()
         phase_ui_overrides_map = {}
-        if current_shop_name == PHASE_SPECIAL_SHOP_NAME:
+        authenticated_user = get_authenticated_user(request) or {}
+        if _resolve_phase_special_shop_enabled(
+            cur,
+            domain=domain,
+            shop_id=current_shop_id,
+            shop_uuid=current_shop_uuid,
+            fallback_shop_name=str(authenticated_user.get("shop_name") or "").strip(),
+        ):
             _ensure_phase_ui_overrides_table(cur)
             cur.execute(
                 """
