@@ -223,7 +223,7 @@ def get_phase_screen_html():
                         <div class="vehicle">${item.vehicle || '—'}</div>
                         <div class="meta">
                             <div>TECH: ${item.labor_tech || 'Unassigned'}</div>
-                            <div>ESTIMATOR: ${item.estimator || '—'}</div>
+                            <div>ESTIMATOR: ${(item.estimator || '—').split(/\s+/)[0]}</div>
                         </div>
                     `;
                     card.addEventListener('dragstart', (event) => {
