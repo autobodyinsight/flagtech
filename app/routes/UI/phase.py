@@ -131,9 +131,243 @@ def get_phase_screen_html():
                 outline-offset: 4px;
                 background: #f3fff3;
             }
+            .phase-card .meta-block {
+                margin-top: 6px;
+                padding-top: 6px;
+                border-top: 1px solid #ececec;
+            }
+            .phase-mini-modal {
+                position: fixed;
+                z-index: 2500;
+                width: min(300px, calc(100vw - 24px));
+                background: #fff;
+                border: 1px solid #d8d8d8;
+                border-radius: 10px;
+                box-shadow: 0 12px 26px rgba(0, 0, 0, 0.22);
+                padding: 10px;
+            }
+            .phase-mini-modal h3 {
+                margin: 0 0 8px;
+                font-size: 13px;
+                color: #222;
+                letter-spacing: 0.4px;
+                text-transform: uppercase;
+            }
+            .phase-mini-modal .phase-form-row {
+                display: flex;
+                flex-direction: column;
+                margin-bottom: 7px;
+            }
+            .phase-mini-modal label {
+                font-size: 11px;
+                font-weight: 700;
+                color: #555;
+                margin-bottom: 2px;
+            }
+            .phase-mini-modal input {
+                border: 1px solid #cfcfcf;
+                border-radius: 5px;
+                padding: 6px 7px;
+                font-size: 12px;
+            }
+            .phase-mini-modal .phase-actions {
+                margin-top: 10px;
+                display: flex;
+                justify-content: flex-end;
+                gap: 6px;
+            }
+            .phase-mini-modal .phase-btn {
+                border: none;
+                border-radius: 5px;
+                font-size: 12px;
+                font-weight: 700;
+                padding: 6px 10px;
+                cursor: pointer;
+            }
+            .phase-mini-modal .phase-btn-cancel {
+                background: #ececec;
+                color: #333;
+            }
+            .phase-mini-modal .phase-btn-save {
+                background: #b22222;
+                color: #fff;
+            }
         </style>
 
         <script>
+            const PHASE_SPECIAL_SHOP = 'The Spray Gun Auto Body';
+            let phaseBoardItems = [];
+            let phaseEditModalEl = null;
+
+            function getPhaseSessionSnapshot() {
+                if (window.appUiState && window.appUiState.sessionSnapshot) {
+                    return window.appUiState.sessionSnapshot;
+                }
+                try {
+                    const raw = sessionStorage.getItem('flagtechSessionSnapshot');
+                    return raw ? JSON.parse(raw) : null;
+                } catch (_) {
+                    return null;
+                }
+            }
+
+            function isPhaseSpecialShop() {
+                const sessionSnapshot = getPhaseSessionSnapshot() || {};
+                const currentShopName = String(
+                    sessionSnapshot.shop_name || sessionSnapshot?.shop?.shop_name || ''
+                ).trim();
+                return currentShopName === PHASE_SPECIAL_SHOP;
+            }
+
+            function phaseEscapeHtml(value) {
+                return String(value === null || value === undefined ? '' : value)
+                    .replace(/&/g, '&amp;')
+                    .replace(/</g, '&lt;')
+                    .replace(/>/g, '&gt;')
+                    .replace(/"/g, '&quot;')
+                    .replace(/'/g, '&#39;');
+            }
+
+            function phaseDisplayValue(value) {
+                const normalized = String(value || '').trim();
+                return normalized || '—';
+            }
+
+            function closePhaseEditModal() {
+                if (phaseEditModalEl && phaseEditModalEl.parentNode) {
+                    phaseEditModalEl.parentNode.removeChild(phaseEditModalEl);
+                }
+                phaseEditModalEl = null;
+            }
+
+            async function savePhaseModalChanges() {
+                if (!phaseEditModalEl || !isPhaseSpecialShop()) return;
+
+                const originalRoKey = String(phaseEditModalEl.dataset.originalRoKey || '').trim();
+                const roInput = document.getElementById('phaseEditRoNumber');
+                const customerInput = document.getElementById('phaseEditCustomerName');
+                const unitInput = document.getElementById('phaseEditUnitNumber');
+                const vehicleTypeInput = document.getElementById('phaseEditVehicleType');
+                const locationInput = document.getElementById('phaseEditLocation');
+
+                const nextRo = String(roInput?.value || '').trim();
+                if (!nextRo) {
+                    alert('RO number is required.');
+                    roInput?.focus();
+                    return;
+                }
+
+                const index = phaseBoardItems.findIndex((entry) => String(entry.ro_key || entry.ro || '').trim() === originalRoKey);
+                if (index < 0) {
+                    closePhaseEditModal();
+                    return;
+                }
+
+                const payload = {
+                    ro_key: originalRoKey,
+                    ro: nextRo,
+                    customer: String(customerInput?.value || '').trim(),
+                    unit_number: String(unitInput?.value || '').trim(),
+                    vehicle_type: String(vehicleTypeInput?.value || '').trim(),
+                    location: String(locationInput?.value || '').trim(),
+                };
+
+                try {
+                    const response = await fetch('/api/phase/roadmap-edit', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        credentials: 'include',
+                        body: JSON.stringify(payload),
+                    });
+                    const result = await response.json();
+                    if (!response.ok || result.error) {
+                        throw new Error(result.error || 'Unable to save roadmap edit');
+                    }
+                    closePhaseEditModal();
+                    loadPhaseData();
+                } catch (error) {
+                    alert(error?.message || 'Unable to save roadmap edit.');
+                }
+            }
+
+            function openPhaseEditModal(anchorEl, roValue) {
+                if (!isPhaseSpecialShop() || !anchorEl) return;
+                const match = phaseBoardItems.find((entry) => String(entry.ro_key || entry.ro || '').trim() === String(roValue || '').trim());
+                if (!match) return;
+
+                closePhaseEditModal();
+
+                const modal = document.createElement('div');
+                modal.className = 'phase-mini-modal';
+                modal.dataset.originalRoKey = String(match.ro_key || match.ro || '').trim();
+                modal.innerHTML = `
+                    <h3>Edit RO</h3>
+                    <div class="phase-form-row">
+                        <label for="phaseEditRoNumber">RO number</label>
+                        <input id="phaseEditRoNumber" type="text" value="${phaseEscapeHtml(match.ro || '')}" />
+                    </div>
+                    <div class="phase-form-row">
+                        <label for="phaseEditCustomerName">Customer name</label>
+                        <input id="phaseEditCustomerName" type="text" value="${phaseEscapeHtml(match.customer || '')}" />
+                    </div>
+                    <div class="phase-form-row">
+                        <label for="phaseEditUnitNumber">Unit #</label>
+                        <input id="phaseEditUnitNumber" type="text" value="${phaseEscapeHtml(match.unit_number || '')}" />
+                    </div>
+                    <div class="phase-form-row">
+                        <label for="phaseEditVehicleType">Vehicle type</label>
+                        <input id="phaseEditVehicleType" type="text" value="${phaseEscapeHtml(match.vehicle_type || '')}" />
+                    </div>
+                    <div class="phase-form-row">
+                        <label for="phaseEditLocation">Location</label>
+                        <input id="phaseEditLocation" type="text" value="${phaseEscapeHtml(match.location || '')}" />
+                    </div>
+                    <div class="phase-actions">
+                        <button type="button" class="phase-btn phase-btn-cancel" id="phaseEditCancel">Cancel</button>
+                        <button type="button" class="phase-btn phase-btn-save" id="phaseEditSave">Save</button>
+                    </div>
+                `;
+
+                document.body.appendChild(modal);
+                const rect = anchorEl.getBoundingClientRect();
+                const modalWidth = Math.min(300, window.innerWidth - 24);
+                const left = Math.max(12, Math.min(window.innerWidth - modalWidth - 12, rect.left + 6));
+                let top = rect.bottom + 8;
+                const modalHeight = modal.offsetHeight || 320;
+                if (top + modalHeight > window.innerHeight - 12) {
+                    top = Math.max(12, rect.top - modalHeight - 8);
+                }
+                modal.style.left = `${left}px`;
+                modal.style.top = `${top}px`;
+
+                const saveBtn = modal.querySelector('#phaseEditSave');
+                const cancelBtn = modal.querySelector('#phaseEditCancel');
+                const roInput = modal.querySelector('#phaseEditRoNumber');
+                saveBtn?.addEventListener('click', savePhaseModalChanges);
+                cancelBtn?.addEventListener('click', closePhaseEditModal);
+                modal.addEventListener('keydown', (event) => {
+                    if (event.key === 'Escape') {
+                        event.preventDefault();
+                        closePhaseEditModal();
+                    }
+                    if (event.key === 'Enter') {
+                        event.preventDefault();
+                        savePhaseModalChanges();
+                    }
+                });
+
+                phaseEditModalEl = modal;
+                roInput?.focus();
+            }
+
+            document.addEventListener('click', (event) => {
+                if (!phaseEditModalEl) return;
+                const target = event.target;
+                if (phaseEditModalEl.contains(target)) return;
+                if (target && target.closest && target.closest('.phase-ro-link')) return;
+                closePhaseEditModal();
+            });
+
             function clearPhaseColumns() {
                 const columns = [
                     'phase-teardown', 'phase-auth', 'phase-parts', 'phase-body', 'phase-refinish',
@@ -170,6 +404,7 @@ def get_phase_screen_html():
 
             function renderPhaseCards(items) {
                 clearPhaseColumns();
+                closePhaseEditModal();
 
                 if (!items || items.length === 0) {
                     const teardown = document.getElementById('phase-teardown');
@@ -202,6 +437,7 @@ def get_phase_screen_html():
                     '#708090'  // slate
                 ];
                 items.forEach((item, idx) => {
+                    const featureEnabled = isPhaseSpecialShop();
                     const colId = phaseColumnFor(item.phase);
                     const col = document.getElementById(colId);
                     if (!col) return;
@@ -214,18 +450,40 @@ def get_phase_screen_html():
                     const card = document.createElement('div');
                     card.className = 'phase-card';
                     card.setAttribute('draggable', 'true');
-                    card.dataset.ro = item.ro || '';
+                    card.dataset.ro = item.ro_key || item.ro || '';
                     card.dataset.phase = item.phase || 'teardown';
                     // Assign color from pie chart palette
                     const roBarColor = roBarColors[idx % roBarColors.length];
+                    const roText = item.ro || '—';
+                    const roHeaderHtml = featureEnabled
+                        ? `<button type="button" class="phase-ro-link" style="background:none; border:none; color:#fff; font:inherit; font-weight:bold; text-decoration:underline; cursor:pointer; padding:0;">RO# ${phaseEscapeHtml(roText)}</button>`
+                        : `RO# ${roText}`;
+                    const sprayGunExtraHtml = featureEnabled
+                        ? `
+                            <div class="meta-block">
+                                <div>UNIT #: ${phaseDisplayValue(item.unit_number)}</div>
+                                <div>VEHICLE TYPE: ${phaseDisplayValue(item.vehicle_type)}</div>
+                                <div>LOCATION: ${phaseDisplayValue(item.location)}</div>
+                            </div>
+                        `
+                        : '';
                     card.innerHTML = `
-                        <div class="ro-bar" style="background:${roBarColor}">RO# ${item.ro || '—'}</div>
+                        <div class="ro-bar" style="background:${roBarColor}">${roHeaderHtml}</div>
                         <div class="vehicle">${item.vehicle || '—'}</div>
                         <div class="meta">
                             <div>TECH: ${item.labor_tech || 'Unassigned'}</div>
                             <div>ESTIMATOR: ${(item.estimator || '—').split(/\s+/)[0]}</div>
+                            ${sprayGunExtraHtml}
                         </div>
                     `;
+                    if (featureEnabled) {
+                        const roLink = card.querySelector('.phase-ro-link');
+                        roLink?.addEventListener('click', (event) => {
+                            event.preventDefault();
+                            event.stopPropagation();
+                            openPhaseEditModal(roLink, item.ro_key || item.ro || '');
+                        });
+                    }
                     card.addEventListener('dragstart', (event) => {
                         event.dataTransfer.setData('text/plain', JSON.stringify({
                             ro: card.dataset.ro,
@@ -310,10 +568,13 @@ def get_phase_screen_html():
                         if (res.error) {
                             throw new Error(res.error);
                         }
-                        renderPhaseCards(res.items || []);
+                        phaseBoardItems = Array.isArray(res.items) ? res.items : [];
+                        renderPhaseCards(phaseBoardItems);
                     })
                     .catch(err => {
                         console.error('Error loading phase data:', err);
+                        phaseBoardItems = [];
+                        closePhaseEditModal();
                         if (teardown) {
                             teardown.innerHTML = '<div style="color:#999; text-align:center; padding:10px;">Unable to load phase board</div>';
                         }

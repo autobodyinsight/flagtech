@@ -96,6 +96,43 @@
 )
 
 router = APIRouter()
+PHASE_SPECIAL_SHOP_NAME = "The Spray Gun Auto Body"
+
+
+def _ensure_phase_ui_overrides_table(cur) -> None:
+    cur.execute(
+        """
+        CREATE TABLE IF NOT EXISTS ro_phase_ui_overrides (
+            id SERIAL PRIMARY KEY,
+            ro_key TEXT NOT NULL,
+            display_ro TEXT,
+            customer_name TEXT,
+            unit_number TEXT,
+            vehicle_type TEXT,
+            location TEXT,
+            domain TEXT NOT NULL,
+            shop_id INTEGER,
+            shop_uuid UUID,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+        """
+    )
+    cur.execute("ALTER TABLE ro_phase_ui_overrides ADD COLUMN IF NOT EXISTS ro_key TEXT")
+    cur.execute("ALTER TABLE ro_phase_ui_overrides ADD COLUMN IF NOT EXISTS display_ro TEXT")
+    cur.execute("ALTER TABLE ro_phase_ui_overrides ADD COLUMN IF NOT EXISTS customer_name TEXT")
+    cur.execute("ALTER TABLE ro_phase_ui_overrides ADD COLUMN IF NOT EXISTS unit_number TEXT")
+    cur.execute("ALTER TABLE ro_phase_ui_overrides ADD COLUMN IF NOT EXISTS vehicle_type TEXT")
+    cur.execute("ALTER TABLE ro_phase_ui_overrides ADD COLUMN IF NOT EXISTS location TEXT")
+    cur.execute("ALTER TABLE ro_phase_ui_overrides ADD COLUMN IF NOT EXISTS domain TEXT")
+    cur.execute("ALTER TABLE ro_phase_ui_overrides ADD COLUMN IF NOT EXISTS shop_id INTEGER")
+    cur.execute("ALTER TABLE ro_phase_ui_overrides ADD COLUMN IF NOT EXISTS shop_uuid UUID")
+    cur.execute("ALTER TABLE ro_phase_ui_overrides ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP")
+    cur.execute(
+        """
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_ro_phase_ui_overrides_scope
+        ON ro_phase_ui_overrides (ro_key, domain, shop_id)
+        """
+    )
 
 @router.post("/ro-phone")
 async def update_ro_phone(request: Request):
@@ -1635,6 +1672,92 @@ async def phase_update(request: Request):
         cur.close()
 
 
+@router.post("/phase/roadmap-edit")
+async def phase_roadmap_edit(request: Request):
+    domain = get_user_domain(request)
+    if not domain:
+        return JSONResponse(status_code=401, content={"error": "Not authenticated"})
+
+    authenticated_user = get_authenticated_user(request) or {}
+    current_shop_name = str(authenticated_user.get("shop_name") or "").strip()
+    if current_shop_name != PHASE_SPECIAL_SHOP_NAME:
+        return JSONResponse(status_code=403, content={"error": "Roadmap edit not enabled for this shop"})
+
+    data = await request.json()
+    ro_key = str(data.get("ro_key") or "").strip()
+    display_ro = str(data.get("ro") or "").strip()
+    customer_name = str(data.get("customer") or "").strip()
+    unit_number = str(data.get("unit_number") or "").strip()
+    vehicle_type = str(data.get("vehicle_type") or "").strip()
+    location = str(data.get("location") or "").strip()
+
+    if not ro_key:
+        return JSONResponse(status_code=400, content={"error": "ro_key is required"})
+    if not display_ro:
+        return JSONResponse(status_code=400, content={"error": "ro is required"})
+
+    conn = get_conn()
+    cur = conn.cursor()
+    try:
+        _scope = resolve_request_scope(request, cur, domain=domain)
+        current_shop_id = _scope["shop_id"]
+        current_shop_uuid = _scope["shop_uuid"]
+        if not current_shop_id or not current_shop_uuid:
+            return JSONResponse(status_code=403, content={"error": "Shop scope not resolved"})
+
+        _ensure_phase_ui_overrides_table(cur)
+        cur.execute(
+            """
+            INSERT INTO ro_phase_ui_overrides (
+                ro_key,
+                display_ro,
+                customer_name,
+                unit_number,
+                vehicle_type,
+                location,
+                domain,
+                shop_id,
+                shop_uuid,
+                updated_at
+            )
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s::uuid, CURRENT_TIMESTAMP)
+            ON CONFLICT (ro_key, domain, shop_id)
+            DO UPDATE SET display_ro = EXCLUDED.display_ro,
+                          customer_name = EXCLUDED.customer_name,
+                          unit_number = EXCLUDED.unit_number,
+                          vehicle_type = EXCLUDED.vehicle_type,
+                          location = EXCLUDED.location,
+                          shop_uuid = EXCLUDED.shop_uuid,
+                          updated_at = CURRENT_TIMESTAMP
+            """,
+            (
+                ro_key,
+                display_ro,
+                customer_name or None,
+                unit_number or None,
+                vehicle_type or None,
+                location or None,
+                domain,
+                current_shop_id,
+                current_shop_uuid,
+            ),
+        )
+        conn.commit()
+        return {
+            "status": "ok",
+            "item": {
+                "ro_key": ro_key,
+                "ro": display_ro,
+                "customer": customer_name,
+                "unit_number": unit_number,
+                "vehicle_type": vehicle_type,
+                "location": location,
+            },
+        }
+    finally:
+        cur.close()
+
+
 
 @router.get("/phase/board")
 async def phase_board(request: Request):
@@ -1691,6 +1814,28 @@ async def phase_board(request: Request):
         phase_map = {row.get("ro"): row.get("phase") for row in phase_rows}
         closed_phase_keys = {"complete", "complete/finish"}
 
+        authenticated_user = get_authenticated_user(request) or {}
+        current_shop_name = str(authenticated_user.get("shop_name") or "").strip()
+        phase_ui_overrides_map = {}
+        if current_shop_name == PHASE_SPECIAL_SHOP_NAME:
+            _ensure_phase_ui_overrides_table(cur)
+            cur.execute(
+                """
+                SELECT ro_key, display_ro, customer_name, unit_number, vehicle_type, location
+                FROM ro_phase_ui_overrides
+                WHERE (
+                        shop_uuid = %s::uuid
+                     OR (shop_uuid IS NULL AND shop_id = %s AND domain = %s)
+                      )
+                """,
+                (current_shop_uuid, current_shop_id, domain),
+            )
+            phase_ui_overrides_map = {
+                str((row or {}).get("ro_key") or "").strip(): row
+                for row in (cur.fetchall() or [])
+                if str((row or {}).get("ro_key") or "").strip()
+            }
+
         for row in estimate_rows:
             ro_value = (row.get("ro") or "").strip()
             if ro_value:
@@ -1727,6 +1872,7 @@ async def phase_board(request: Request):
         items = []
         for row in estimate_rows:
             ro = row.get("ro")
+            ro_key = str(ro or "").strip()
             phase_value = str(phase_map.get(ro, "teardown") or "teardown").strip().lower()
             if phase_value in closed_phase_keys:
                 continue
@@ -1742,13 +1888,16 @@ async def phase_board(request: Request):
             short_vehicle = " ".join(part for part in (year, make, model) if part)
             vehicle_display = short_vehicle or row.get("vehicle") or ""
             estimator_display = (row.get("estimator") or "").strip() or (row.get("written_by") or "").strip()
-            ro_tech = tech_map.get(str(ro or "").strip(), {})
+            ro_tech = tech_map.get(ro_key, {})
             labor_tech = (ro_tech.get("labor_tech") or "").strip() or "Unassigned"
             paint_tech = (ro_tech.get("paint_tech") or "").strip() or "Unassigned"
+            ui_override = phase_ui_overrides_map.get(ro_key) or {}
+            display_ro = str((ui_override.get("display_ro") or ro) or "").strip() or str(ro or "")
 
             items.append(
                 {
-                    "ro": ro,
+                    "ro_key": ro_key,
+                    "ro": display_ro,
                     "vehicle": vehicle_display,
                     "phase": phase_value,
                     "estimator": estimator_display,
@@ -1756,6 +1905,10 @@ async def phase_board(request: Request):
                     "labor_hours": labor_hours,
                     "paint_tech": paint_tech,
                     "paint_hours": paint_hours,
+                    "customer": str(ui_override.get("customer_name") or "").strip(),
+                    "unit_number": str(ui_override.get("unit_number") or "").strip(),
+                    "vehicle_type": str(ui_override.get("vehicle_type") or "").strip(),
+                    "location": str(ui_override.get("location") or "").strip(),
                 }
             )
 
