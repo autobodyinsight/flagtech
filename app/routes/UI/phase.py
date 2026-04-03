@@ -198,10 +198,20 @@ def get_phase_screen_html():
             const PHASE_SPECIAL_SHOP = 'the spray gun auto body';
             let phaseBoardItems = [];
             let phaseEditModalEl = null;
+            let phaseResolvedShopName = '';
+
+            function getPhaseAppUiState() {
+                try {
+                    return typeof appUiState !== 'undefined' ? appUiState : (window.appUiState || null);
+                } catch (_) {
+                    return window.appUiState || null;
+                }
+            }
 
             function getPhaseSessionSnapshot() {
-                if (window.appUiState && window.appUiState.sessionSnapshot) {
-                    return window.appUiState.sessionSnapshot;
+                const currentAppState = getPhaseAppUiState();
+                if (currentAppState && currentAppState.sessionSnapshot) {
+                    return currentAppState.sessionSnapshot;
                 }
                 try {
                     const raw = sessionStorage.getItem('flagtechSessionSnapshot');
@@ -213,14 +223,48 @@ def get_phase_screen_html():
 
             function getPhaseCurrentShopName() {
                 const sessionSnapshot = getPhaseSessionSnapshot() || {};
-                const appShopName = String(window.appUiState?.shopName || '').trim();
+                const currentAppState = getPhaseAppUiState();
+                const appShopName = String(currentAppState?.shopName || '').trim();
                 const sessionShopName = String(sessionSnapshot?.shop?.shop_name || '').trim();
                 const legacySessionShopName = String(sessionSnapshot?.shop_name || '').trim();
-                return appShopName || sessionShopName || legacySessionShopName;
+                return phaseResolvedShopName || appShopName || sessionShopName || legacySessionShopName;
             }
 
             function isPhaseSpecialShop() {
                 return String(getPhaseCurrentShopName() || '').trim().toLowerCase() === PHASE_SPECIAL_SHOP;
+            }
+
+            async function resolvePhaseShopContext() {
+                const currentName = String(getPhaseCurrentShopName() || '').trim();
+                if (currentName) {
+                    phaseResolvedShopName = currentName;
+                    return currentName;
+                }
+
+                const currentAppState = getPhaseAppUiState();
+                const shopDomain = String(
+                    currentAppState?.shopDomain
+                    || getPhaseSessionSnapshot()?.isolation_rules?.shop_domain
+                    || getPhaseSessionSnapshot()?.shop?.domain
+                    || ''
+                ).trim();
+                const shopScopeQuery = shopDomain ? `?shop_domain=${encodeURIComponent(shopDomain)}` : '';
+
+                try {
+                    const response = await fetch('/api/setup/shop' + shopScopeQuery, { credentials: 'include' });
+                    const data = await response.json();
+                    const resolvedName = String(data?.shop?.shop_name || '').trim();
+                    if (resolvedName) {
+                        phaseResolvedShopName = resolvedName;
+                        if (currentAppState) {
+                            currentAppState.shopName = resolvedName;
+                        }
+                    }
+                } catch (error) {
+                    console.error('Unable to resolve roadmap shop context:', error);
+                }
+
+                return phaseResolvedShopName;
             }
 
             function phaseEscapeHtml(value) {
@@ -559,12 +603,14 @@ def get_phase_screen_html():
                 });
             }
 
-            function loadPhaseData() {
+            async function loadPhaseData() {
                 clearPhaseColumns();
                 const teardown = document.getElementById('phase-teardown');
                 if (teardown) {
                     teardown.innerHTML = '<div style="color:#999; text-align:center; padding:10px;">Loading...</div>';
                 }
+
+                await resolvePhaseShopContext();
 
                 fetch('/api/phase/board', { credentials: 'include' })
                     .then(r => r.json())
