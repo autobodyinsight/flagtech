@@ -352,6 +352,12 @@ def get_dashboard_screen_html():
                 transform: translateY(0);
                 pointer-events: auto;
             }
+            .sublet-panel {
+                position: fixed;
+                z-index: 5000;
+                max-height: min(360px, calc(100vh - 24px));
+                overflow: auto;
+            }
             .modal {
                 position: fixed;
                 z-index: 1000;
@@ -4572,6 +4578,41 @@ def get_dashboard_screen_html():
                 printWindow.document.close();
                 setTimeout(() => printWindow.print(), 150);
             }
+
+            function positionSubletPanel(panel, triggerEl) {
+                if (!panel || !triggerEl) return;
+
+                panel.style.left = '-9999px';
+                panel.style.top = '-9999px';
+
+                const triggerRect = triggerEl.getBoundingClientRect();
+                const panelRect = panel.getBoundingClientRect();
+                const spacing = 8;
+                const viewportWidth = window.innerWidth || document.documentElement.clientWidth || 0;
+                const viewportHeight = window.innerHeight || document.documentElement.clientHeight || 0;
+
+                const panelWidth = panelRect.width || 300;
+                const panelHeight = panelRect.height || 180;
+
+                let left = triggerRect.left;
+                const maxLeft = Math.max(spacing, viewportWidth - panelWidth - spacing);
+                if (left > maxLeft) left = maxLeft;
+                if (left < spacing) left = spacing;
+
+                const spaceBelow = viewportHeight - triggerRect.bottom;
+                const openAbove = spaceBelow < panelHeight + spacing;
+
+                let top = openAbove
+                    ? (triggerRect.top - panelHeight - spacing)
+                    : (triggerRect.bottom + spacing);
+
+                const maxTop = Math.max(spacing, viewportHeight - panelHeight - spacing);
+                if (top > maxTop) top = maxTop;
+                if (top < spacing) top = spacing;
+
+                panel.style.left = `${Math.round(left)}px`;
+                panel.style.top = `${Math.round(top)}px`;
+            }
             
             function toggleSubletPanel(event, roNumber) {
                 event.stopPropagation();
@@ -4583,6 +4624,12 @@ def get_dashboard_screen_html():
                 if (!panel) return;
 
                 toggleMiniPopup(panel);
+                if (currentOpenMiniPopup === panel) {
+                    const triggerEl = event.currentTarget || (event.target && event.target.closest && event.target.closest('.sublet-warning-icon'));
+                    if (triggerEl) {
+                        positionSubletPanel(panel, triggerEl);
+                    }
+                }
             }
             
             // Close panel when clicking outside
