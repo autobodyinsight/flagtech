@@ -272,6 +272,7 @@ async def home_screen(request: Request):
             margin-bottom: 6px;
             flex: 0 0 auto;
             overflow: hidden;
+            cursor: pointer;
         }}
         .side-brand-logo {{
             width: 32px;
@@ -1699,17 +1700,12 @@ async def home_screen(request: Request):
 
         function initGlobalHeaderUi() {{
             const sidebar = document.getElementById('sideNavSidebar');
+            const sidebarBrand = document.querySelector('#sideNavSidebar .side-brand-wrap');
             const userButton = document.getElementById('headerUserButton');
-            let sidebarSuppressed = false;
 
-            if (sidebar) {{
-                sidebar.addEventListener('mouseenter', () => {{
-                    if (sidebarSuppressed) return;
-                    sidebar.classList.add('expanded');
-                }});
-                sidebar.addEventListener('mouseleave', () => {{
-                    sidebar.classList.remove('expanded');
-                    sidebarSuppressed = false;
+            if (sidebar && sidebarBrand) {{
+                sidebarBrand.addEventListener('click', () => {{
+                    sidebar.classList.toggle('expanded');
                 }});
             }}
             if (userButton) userButton.addEventListener('click', () => toggleUserDropdown());
@@ -1719,14 +1715,12 @@ async def home_screen(request: Request):
                     const target = item.getAttribute('data-screen');
                     switchScreen(target, item);
                     if (sidebar) sidebar.classList.remove('expanded');
-                    sidebarSuppressed = true;
                 }});
             }});
 
             document.querySelectorAll('.side-menu-item[data-action="chat"]').forEach((item) => {{
                 item.addEventListener('click', async () => {{
                     if (sidebar) sidebar.classList.remove('expanded');
-                    sidebarSuppressed = true;
                     await openChatModal();
                 }});
             }});

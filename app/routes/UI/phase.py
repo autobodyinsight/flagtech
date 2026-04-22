@@ -7,7 +7,11 @@ def get_phase_screen_html():
     <div id="phase" class="screen" style="padding:20px;">
         <h1 style="text-align:center; margin-bottom:20px;">ROADMAP</h1>
 
-        <div class="phase-board" style="display:grid; grid-template-columns:repeat(9, minmax(140px, 1fr)); gap:12px; align-items:start;">
+        <div class="phase-board" style="display:grid; grid-template-columns:repeat(10, minmax(140px, 1fr)); gap:12px; align-items:start;">
+            <div class="phase-lane">
+                <div class="phase-header">Arrived <span class="phase-count" id="phase-count-arrived">0</span></div>
+                <div id="phase-arrived" class="phase-cards"></div>
+            </div>
             <div class="phase-lane">
                 <div class="phase-header">Teardown <span class="phase-count" id="phase-count-teardown">0</span></div>
                 <div id="phase-teardown" class="phase-cards"></div>
@@ -418,7 +422,7 @@ def get_phase_screen_html():
 
             function clearPhaseColumns() {
                 const columns = [
-                    'phase-teardown', 'phase-auth', 'phase-parts', 'phase-body', 'phase-refinish',
+                    'phase-arrived', 'phase-teardown', 'phase-auth', 'phase-parts', 'phase-body', 'phase-refinish',
                     'phase-reassy', 'phase-sublet', 'phase-washqc', 'phase-complete'
                 ];
                 columns.forEach(id => {
@@ -427,7 +431,7 @@ def get_phase_screen_html():
                 });
 
                 const counts = [
-                    'phase-count-teardown', 'phase-count-auth', 'phase-count-parts', 'phase-count-body',
+                    'phase-count-arrived', 'phase-count-teardown', 'phase-count-auth', 'phase-count-parts', 'phase-count-body',
                     'phase-count-refinish', 'phase-count-reassy', 'phase-count-sublet',
                     'phase-count-washqc', 'phase-count-complete'
                 ];
@@ -439,6 +443,7 @@ def get_phase_screen_html():
 
             function phaseColumnFor(phase) {
                 const key = (phase || '').toLowerCase();
+                if (key === 'arrived') return 'phase-arrived';
                 if (key === 'auth') return 'phase-auth';
                 if (key === 'parts') return 'phase-parts';
                 if (key === 'body') return 'phase-body';
@@ -463,6 +468,7 @@ def get_phase_screen_html():
                 }
 
                 const tally = {
+                    arrived: 0,
                     teardown: 0,
                     auth: 0,
                     parts: 0,
