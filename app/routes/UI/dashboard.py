@@ -4579,60 +4579,70 @@ def get_dashboard_screen_html():
                 setTimeout(() => printWindow.print(), 150);
             }
 
-            function positionSubletPanel(panel, triggerEl) {
-                if (!panel || !triggerEl) return;
-
-                panel.style.left = '-9999px';
-                panel.style.top = '-9999px';
-
-                const triggerRect = triggerEl.getBoundingClientRect();
-                const panelRect = panel.getBoundingClientRect();
-                const spacing = 8;
-                const viewportWidth = window.innerWidth || document.documentElement.clientWidth || 0;
-                const viewportHeight = window.innerHeight || document.documentElement.clientHeight || 0;
-
-                const panelWidth = panelRect.width || 300;
-                const panelHeight = panelRect.height || 180;
-
-                let left = triggerRect.left;
-                const maxLeft = Math.max(spacing, viewportWidth - panelWidth - spacing);
-                if (left > maxLeft) left = maxLeft;
-                if (left < spacing) left = spacing;
-
-                const spaceBelow = viewportHeight - triggerRect.bottom;
-                const openAbove = spaceBelow < panelHeight + spacing;
-
-                let top = openAbove
-                    ? (triggerRect.top - panelHeight - spacing)
-                    : (triggerRect.bottom + spacing);
-
-                const maxTop = Math.max(spacing, viewportHeight - panelHeight - spacing);
-                if (top > maxTop) top = maxTop;
-                if (top < spacing) top = spacing;
-
-                panel.style.left = `${Math.round(left)}px`;
-                panel.style.top = `${Math.round(top)}px`;
-            }
-            
             function toggleSubletPanel(event, roNumber, triggerEl) {
                 if (event) {
                     event.stopPropagation();
                     event.preventDefault();
                 }
-                
+
                 const panelId = `sublet-panel-${safeId(roNumber)}`;
                 const panel = document.getElementById(panelId);
-                
                 if (!panel) return;
 
-                toggleMiniPopup(panel);
+                // Toggle: close if already open
                 if (currentOpenMiniPopup === panel) {
-                    const resolvedTrigger = triggerEl
-                        || (event && event.currentTarget)
-                        || (event && event.target && event.target.closest && event.target.closest('.sublet-warning-icon'));
-                    if (!resolvedTrigger) return;
-                    requestAnimationFrame(() => positionSubletPanel(panel, resolvedTrigger));
+                    panel.classList.remove('open');
+                    setTimeout(() => { panel.style.display = 'none'; }, 200);
+                    currentOpenMiniPopup = null;
+                    return;
                 }
+
+                // Close any other open popup first
+                if (currentOpenMiniPopup) {
+                    currentOpenMiniPopup.classList.remove('open');
+                    currentOpenMiniPopup.style.display = 'none';
+                    currentOpenMiniPopup = null;
+                }
+
+                // Move panel to document.body to escape table clipping/overflow
+                if (panel.parentElement !== document.body) {
+                    document.body.appendChild(panel);
+                }
+
+                // Get anchor position from the icon element passed directly
+                const anchor = triggerEl || (event && event.target);
+                if (!anchor) return;
+                const rect = anchor.getBoundingClientRect();
+
+                // Render off-screen to measure dimensions, then snap into position
+                panel.style.position = 'fixed';
+                panel.style.zIndex = '9999';
+                panel.style.left = '-9999px';
+                panel.style.top = '-9999px';
+                panel.style.display = 'block';
+                panel.classList.remove('open');
+
+                requestAnimationFrame(() => {
+                    const pw = panel.offsetWidth || 320;
+                    const ph = panel.offsetHeight || 200;
+                    const vw = window.innerWidth;
+                    const vh = window.innerHeight;
+                    const gap = 8;
+
+                    let left = rect.left;
+                    if (left + pw > vw - gap) left = vw - pw - gap;
+                    if (left < gap) left = gap;
+
+                    // Prefer below; flip above if not enough room
+                    let top = rect.bottom + gap;
+                    if (top + ph > vh - gap) top = rect.top - ph - gap;
+                    if (top < gap) top = gap;
+
+                    panel.style.left = `${Math.round(left)}px`;
+                    panel.style.top = `${Math.round(top)}px`;
+                    panel.classList.add('open');
+                    currentOpenMiniPopup = panel;
+                });
             }
             
             // Close panel when clicking outside
