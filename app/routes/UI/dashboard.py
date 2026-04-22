@@ -4614,9 +4614,11 @@ def get_dashboard_screen_html():
                 panel.style.top = `${Math.round(top)}px`;
             }
             
-            function toggleSubletPanel(event, roNumber) {
-                event.stopPropagation();
-                event.preventDefault();
+            function toggleSubletPanel(event, roNumber, triggerEl) {
+                if (event) {
+                    event.stopPropagation();
+                    event.preventDefault();
+                }
                 
                 const panelId = `sublet-panel-${safeId(roNumber)}`;
                 const panel = document.getElementById(panelId);
@@ -4625,10 +4627,11 @@ def get_dashboard_screen_html():
 
                 toggleMiniPopup(panel);
                 if (currentOpenMiniPopup === panel) {
-                    const triggerEl = event.currentTarget || (event.target && event.target.closest && event.target.closest('.sublet-warning-icon'));
-                    if (triggerEl) {
-                        positionSubletPanel(panel, triggerEl);
-                    }
+                    const resolvedTrigger = triggerEl
+                        || (event && event.currentTarget)
+                        || (event && event.target && event.target.closest && event.target.closest('.sublet-warning-icon'));
+                    if (!resolvedTrigger) return;
+                    requestAnimationFrame(() => positionSubletPanel(panel, resolvedTrigger));
                 }
             }
             
@@ -4724,7 +4727,7 @@ def get_dashboard_screen_html():
                                         ${ro.ro}
                                     </button>
                                     ${showSubletWarning ? `
-                                        <span class="sublet-warning-icon mini-popup-trigger" onclick="toggleSubletPanel(event, '${ro.ro}')" style="cursor:pointer; color:#ff9800; font-size:18px; line-height:1;" title="Pending Sublets">⚠️</span>
+                                        <span class="sublet-warning-icon mini-popup-trigger" onclick="toggleSubletPanel(event, '${ro.ro}', this)" style="cursor:pointer; color:#ff9800; font-size:18px; line-height:1;" title="Pending Sublets">⚠️</span>
                                         <div id="sublet-panel-${rowId}" class="sublet-panel mini-popup-panel" style="display:none;">
                                             <div style="font-weight:bold; color:#e65100; margin-bottom:8px; font-size:14px;">Pending Sublet Items:</div>
                                             <ul style="margin:0; padding-left:20px; font-size:13px;">
