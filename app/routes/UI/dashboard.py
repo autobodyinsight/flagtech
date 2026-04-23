@@ -696,11 +696,11 @@ def get_dashboard_screen_html():
                 }
 
                 return `
-                    <div style="position:absolute; left:50%; transform:translateX(-50%); top:26px; width:70%; text-align:center; z-index:2;">
-                        ${name ? `<div style="font-size:36px; font-weight:800; line-height:1.12;">${name}</div>` : ''}
-                        ${address ? `<div style="font-size:24px; color:#444; margin-top:4px; line-height:1.15;">${address}</div>` : ''}
-                        ${cityStateZip ? `<div style="font-size:24px; color:#444; margin-top:4px; line-height:1.15;">${cityStateZip}</div>` : ''}
-                        ${phone ? `<div style="font-size:24px; color:#444; margin-top:4px; line-height:1.15;">${phone}</div>` : ''}
+                    <div class="ro-print-shop">
+                        ${name ? `<div class="ro-print-shop-name">${name}</div>` : ''}
+                        ${address ? `<div class="ro-print-shop-line">${address}</div>` : ''}
+                        ${cityStateZip ? `<div class="ro-print-shop-line">${cityStateZip}</div>` : ''}
+                        ${phone ? `<div class="ro-print-shop-line">${phone}</div>` : ''}
                     </div>
                 `;
             }
@@ -899,6 +899,37 @@ def get_dashboard_screen_html():
                                 .header { text-align:center; margin-bottom:16px; border-bottom:2px solid #b22222; padding-bottom:8px; }
                                 .header h1 { margin:0 0 6px 0; color:#b22222; font-size:24px; }
                                 .header p { margin:0; color:#666; }
+                                .header, .header * { box-sizing:border-box; max-width:100%; }
+                                .header div, .header span { overflow-wrap:anywhere; word-break:break-word; }
+                                .ro-print-header { text-align:left; position:relative; min-height:170px; overflow:hidden; }
+                                .ro-print-shop {
+                                    position:absolute;
+                                    left:50%;
+                                    transform:translateX(-50%);
+                                    top:26px;
+                                    width:min(70%, 6.3in);
+                                    text-align:center;
+                                    z-index:2;
+                                }
+                                .ro-print-shop-name { font-size:clamp(22px, 4vw, 36px); font-weight:800; line-height:1.12; }
+                                .ro-print-shop-line { font-size:clamp(14px, 2.7vw, 24px); color:#444; margin-top:4px; line-height:1.15; }
+                                .ro-print-title { font-size:clamp(34px, 8vw, 72px); font-weight:800; line-height:1; margin-bottom:8px; }
+                                .ro-print-row { display:flex; justify-content:space-between; align-items:flex-end; gap:18px; margin-bottom:6px; flex-wrap:wrap; }
+                                .ro-print-row-top { align-items:flex-start; }
+                                .ro-print-grow { flex:1 1 300px; min-width:0; }
+                                .ro-print-right { text-align:right; flex:1 1 260px; min-width:220px; }
+                                .ro-print-label { font-size:clamp(18px, 2.7vw, 32px); font-weight:800; letter-spacing:1px; }
+                                .ro-print-meta { font-size:clamp(14px, 2.2vw, 24px); font-weight:600; line-height:1.2; }
+                                .ro-print-meta-sm { font-size:clamp(14px, 2vw, 22px); font-weight:600; line-height:1.2; margin-top:4px; }
+                                .ro-print-tag-head { height:50vh; display:flex; flex-direction:column; justify-content:center; gap:14px; }
+                                .ro-print-tag-row { display:flex; justify-content:space-between; align-items:flex-end; gap:16px; flex-wrap:wrap; min-width:0; }
+                                .ro-print-tag-ro { font-size:clamp(46px, 12vw, 108px); font-weight:800; line-height:1; min-width:0; }
+                                .ro-print-tag-date { font-size:clamp(18px, 4.2vw, 32px); font-weight:700; line-height:1.1; min-width:0; }
+                                .ro-print-tag-line-lg { font-size:clamp(20px, 5vw, 36px); font-weight:600; line-height:1.1; min-width:0; }
+                                .ro-print-tag-line-md { font-size:clamp(19px, 4.4vw, 34px); font-weight:600; line-height:1.1; min-width:0; }
+                                .ro-print-tag-line-sm { font-size:clamp(16px, 3.6vw, 26px); font-weight:600; line-height:1.1; min-width:0; }
+                                .ro-print-tag-vin { font-size:clamp(17px, 4vw, 32px); font-weight:600; line-height:1.1; min-width:0; }
+                                .ro-print-tech-row { display:flex; align-items:flex-end; font-size:clamp(16px, 3.8vw, 28px); font-weight:700; padding-top:2px; min-width:0; }
                                 table { width:100%; border-collapse:collapse; margin-top:10px; }
                                 thead th { background:#3c4142; color:#fff; text-align:left; padding:8px; font-size:12px; }
                                 tbody td { padding:8px; border-bottom:1px solid #eee; font-size:12px; }
@@ -959,14 +990,14 @@ def get_dashboard_screen_html():
                     roOpenPrintWindow(
                         `RO ${ro.ro} Bill`,
                         `
-                            <div class="header" style="text-align:left; position:relative; min-height:170px;">
+                            <div class="header ro-print-header">
                                 ${shopHeaderHtml}
-                                <div style="font-size:72px; font-weight:800; line-height:1; margin-bottom:8px;">RO #${escapePopupHtml(ro.ro || '-')}</div>
-                                <div style="display:flex; justify-content:space-between; align-items:flex-end; gap:18px; margin-bottom:6px;">
-                                    <div style="font-size:24px; font-weight:600;">Vehicle: ${escapePopupHtml(ro.vehicle || '-')}</div>
-                                    <div style="font-size:32px; font-weight:800; letter-spacing:1px;">INVOICE</div>
+                                <div class="ro-print-title">RO #${escapePopupHtml(ro.ro || '-')}</div>
+                                <div class="ro-print-row">
+                                    <div class="ro-print-meta ro-print-grow">Vehicle: ${escapePopupHtml(ro.vehicle || '-')}</div>
+                                    <div class="ro-print-label">INVOICE</div>
                                 </div>
-                                <div style="font-size:24px; font-weight:600;">VIN: ${escapePopupHtml(ro.vin || '-')}</div>
+                                <div class="ro-print-meta">VIN: ${escapePopupHtml(ro.vin || '-')}</div>
                             </div>
                             <div style="display:grid; grid-template-columns:1fr 1fr; gap:14px; font-size:13px;">
                                 <div>
@@ -1130,18 +1161,18 @@ def get_dashboard_screen_html():
                     roOpenPrintWindow(
                         `RO ${ro.ro} Service Order`,
                         `
-                            <div class="header" style="text-align:left; position:relative; min-height:170px;">
+                            <div class="header ro-print-header">
                                 ${shopHeaderHtml}
-                                <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:18px; margin-bottom:6px;">
-                                    <div style="font-size:72px; font-weight:800; line-height:1; margin-bottom:8px;">RO #${escapePopupHtml(ro.ro || '-')}</div>
-                                    <div style="text-align:right;">
-                                        <div style="font-size:32px; font-weight:800; letter-spacing:1px;">SERVICE ORDER</div>
-                                        <div style="font-size:22px; font-weight:600; margin-top:4px;">Estimator: ${estimatorText}</div>
-                                        <div style="font-size:22px; font-weight:600; margin-top:4px;">Insurance: ${insuranceText}</div>
+                                <div class="ro-print-row ro-print-row-top">
+                                    <div class="ro-print-title ro-print-grow">RO #${escapePopupHtml(ro.ro || '-')}</div>
+                                    <div class="ro-print-right">
+                                        <div class="ro-print-label">SERVICE ORDER</div>
+                                        <div class="ro-print-meta-sm">Estimator: ${estimatorText}</div>
+                                        <div class="ro-print-meta-sm">Insurance: ${insuranceText}</div>
                                     </div>
                                 </div>
-                                <div style="font-size:24px; font-weight:600; margin-bottom:4px;">Vehicle: ${vehicleText}</div>
-                                <div style="font-size:24px; font-weight:600;">VIN: ${vinText}</div>
+                                <div class="ro-print-meta" style="margin-bottom:4px;">Vehicle: ${vehicleText}</div>
+                                <div class="ro-print-meta">VIN: ${vinText}</div>
                             </div>
                             ${sections.join('')}
                             ${totalFooterHtml}
@@ -1238,17 +1269,17 @@ def get_dashboard_screen_html():
                     roOpenPrintWindow(
                         `RO ${ro.ro} Parts`,
                         `
-                            <div class="header" style="text-align:left; position:relative; min-height:170px;">
+                            <div class="header ro-print-header">
                                 ${shopHeaderHtml}
-                                <div style="font-size:72px; font-weight:800; line-height:1; margin-bottom:8px;">RO #${escapePopupHtml(ro.ro || '-')}</div>
-                                <div style="display:flex; justify-content:space-between; align-items:flex-end; gap:18px; margin-bottom:6px;">
-                                    <div style="font-size:24px; font-weight:600;">Vehicle: ${vehicleText}</div>
-                                    <div style="text-align:right;">
-                                        <div style="font-size:32px; font-weight:800; letter-spacing:1px;">PARTS</div>
-                                        <div style="font-size:24px; font-weight:600; margin-top:4px;">TECH ASSIGNED: ${techAssignedText}</div>
+                                <div class="ro-print-title">RO #${escapePopupHtml(ro.ro || '-')}</div>
+                                <div class="ro-print-row">
+                                    <div class="ro-print-meta ro-print-grow">Vehicle: ${vehicleText}</div>
+                                    <div class="ro-print-right">
+                                        <div class="ro-print-label">PARTS</div>
+                                        <div class="ro-print-meta">TECH ASSIGNED: ${techAssignedText}</div>
                                     </div>
                                 </div>
-                                <div style="font-size:24px; font-weight:600;">VIN: ${vinText}</div>
+                                <div class="ro-print-meta">VIN: ${vinText}</div>
                             </div>
                             <table>
                                 <thead>
@@ -1296,24 +1327,24 @@ def get_dashboard_screen_html():
                 roOpenPrintWindow(
                     `RO ${ro.ro} Service Tag`,
                     `
-                        <div style="height:50vh; display:flex; flex-direction:column; justify-content:center; gap:14px;">
-                            <div style="display:flex; justify-content:space-between; align-items:flex-end;">
-                                <div style="font-size:108px; font-weight:800; line-height:1;">RO ${escapePopupHtml(ro.ro || '-')}</div>
-                                <div style="font-size:32px; font-weight:700;">IN DATE: ${inDateText}</div>
+                        <div class="ro-print-tag-head">
+                            <div class="ro-print-tag-row">
+                                <div class="ro-print-tag-ro">RO ${escapePopupHtml(ro.ro || '-')}</div>
+                                <div class="ro-print-tag-date">IN DATE: ${inDateText}</div>
                             </div>
-                            <div style="display:flex; justify-content:space-between; align-items:flex-end; font-size:36px; font-weight:600; line-height:1.1;">
+                            <div class="ro-print-tag-row ro-print-tag-line-lg">
                                 <div>${customerText}</div>
                                 <div>OUT DATE: ${outDateText}</div>
                             </div>
-                            <div style="display:flex; justify-content:space-between; align-items:flex-end; font-size:34px; font-weight:600; line-height:1.1;">
+                            <div class="ro-print-tag-row ro-print-tag-line-md">
                                 <div>${vehicleText}</div>
                                 <div>${insuranceText}</div>
                             </div>
-                            <div style="display:flex; justify-content:flex-end; font-size:26px; font-weight:600; line-height:1.1;">
+                            <div class="ro-print-tag-row ro-print-tag-line-sm" style="justify-content:flex-end;">
                                 <div>WRITTEN BY: ${estimatorText}</div>
                             </div>
-                            <div style="font-size:32px; font-weight:600; line-height:1.1;">${vinText}</div>
-                            <div style="display:flex; align-items:flex-end; font-size:28px; font-weight:700; padding-top:2px;">
+                            <div class="ro-print-tag-vin">${vinText}</div>
+                            <div class="ro-print-tech-row">
                                 <span style="white-space:nowrap; padding-right:10px;">TECH:</span>
                                 <div style="flex:1; border-bottom:2px solid #333; min-height:28px;"></div>
                             </div>
@@ -1347,24 +1378,24 @@ def get_dashboard_screen_html():
                     roOpenPrintWindow(
                         `RO ${ro.ro} Service Cover`,
                         `
-                            <div style="height:50vh; display:flex; flex-direction:column; justify-content:center; gap:14px;">
-                                <div style="display:flex; justify-content:space-between; align-items:flex-end;">
-                                    <div style="font-size:108px; font-weight:800; line-height:1;">RO ${escapePopupHtml(ro.ro || '-')}</div>
-                                    <div style="font-size:32px; font-weight:700;">IN DATE: ${inDateText}</div>
+                            <div class="ro-print-tag-head">
+                                <div class="ro-print-tag-row">
+                                    <div class="ro-print-tag-ro">RO ${escapePopupHtml(ro.ro || '-')}</div>
+                                    <div class="ro-print-tag-date">IN DATE: ${inDateText}</div>
                                 </div>
-                                <div style="display:flex; justify-content:space-between; align-items:flex-end; font-size:36px; font-weight:600; line-height:1.1;">
+                                <div class="ro-print-tag-row ro-print-tag-line-lg">
                                     <div>${customerText}</div>
                                     <div>OUT DATE: ${outDateText}</div>
                                 </div>
-                                <div style="display:flex; justify-content:space-between; align-items:flex-end; font-size:34px; font-weight:600; line-height:1.1;">
+                                <div class="ro-print-tag-row ro-print-tag-line-md">
                                     <div>${vehicleText}</div>
                                     <div>${insuranceText}</div>
                                 </div>
-                                <div style="display:flex; justify-content:flex-end; font-size:26px; font-weight:600; line-height:1.1;">
+                                <div class="ro-print-tag-row ro-print-tag-line-sm" style="justify-content:flex-end;">
                                     <div>WRITTEN BY: ${estimatorText}</div>
                                 </div>
-                                <div style="font-size:32px; font-weight:600; line-height:1.1;">${vinText}</div>
-                                <div style="display:flex; align-items:flex-end; font-size:28px; font-weight:700; padding-top:2px;">
+                                <div class="ro-print-tag-vin">${vinText}</div>
+                                <div class="ro-print-tech-row">
                                     <span style="white-space:nowrap; padding-right:10px;">TECH:</span>
                                     <div style="flex:1; border-bottom:2px solid #333; min-height:28px;"></div>
                                 </div>
