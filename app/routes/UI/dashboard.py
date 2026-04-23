@@ -911,25 +911,25 @@ def get_dashboard_screen_html():
                                     text-align:center;
                                     z-index:2;
                                 }
-                                .ro-print-shop-name { font-size:clamp(22px, 4vw, 36px); font-weight:800; line-height:1.12; }
-                                .ro-print-shop-line { font-size:clamp(14px, 2.7vw, 24px); color:#444; margin-top:4px; line-height:1.15; }
-                                .ro-print-title { font-size:clamp(34px, 8vw, 72px); font-weight:800; line-height:1; margin-bottom:8px; }
+                                .ro-print-shop-name { font-size:clamp(15px, 2.8vw, 25px); font-weight:800; line-height:1.12; }
+                                .ro-print-shop-line { font-size:clamp(10px, 1.9vw, 17px); color:#444; margin-top:4px; line-height:1.15; }
+                                .ro-print-title { font-size:clamp(24px, 5.6vw, 50px); font-weight:800; line-height:1; margin-bottom:8px; }
                                 .ro-print-row { display:flex; justify-content:space-between; align-items:flex-end; gap:18px; margin-bottom:6px; flex-wrap:wrap; }
                                 .ro-print-row-top { align-items:flex-start; }
                                 .ro-print-grow { flex:1 1 300px; min-width:0; }
                                 .ro-print-right { text-align:right; flex:1 1 260px; min-width:220px; }
-                                .ro-print-label { font-size:clamp(18px, 2.7vw, 32px); font-weight:800; letter-spacing:1px; }
-                                .ro-print-meta { font-size:clamp(14px, 2.2vw, 24px); font-weight:600; line-height:1.2; }
-                                .ro-print-meta-sm { font-size:clamp(14px, 2vw, 22px); font-weight:600; line-height:1.2; margin-top:4px; }
+                                .ro-print-label { font-size:clamp(13px, 1.9vw, 22px); font-weight:800; letter-spacing:1px; }
+                                .ro-print-meta { font-size:clamp(10px, 1.5vw, 17px); font-weight:600; line-height:1.2; }
+                                .ro-print-meta-sm { font-size:clamp(10px, 1.4vw, 15px); font-weight:600; line-height:1.2; margin-top:4px; }
                                 .ro-print-tag-head { height:50vh; display:flex; flex-direction:column; justify-content:center; gap:14px; }
                                 .ro-print-tag-row { display:flex; justify-content:space-between; align-items:flex-end; gap:16px; flex-wrap:wrap; min-width:0; }
-                                .ro-print-tag-ro { font-size:clamp(46px, 12vw, 108px); font-weight:800; line-height:1; min-width:0; }
-                                .ro-print-tag-date { font-size:clamp(18px, 4.2vw, 32px); font-weight:700; line-height:1.1; min-width:0; }
-                                .ro-print-tag-line-lg { font-size:clamp(20px, 5vw, 36px); font-weight:600; line-height:1.1; min-width:0; }
-                                .ro-print-tag-line-md { font-size:clamp(19px, 4.4vw, 34px); font-weight:600; line-height:1.1; min-width:0; }
-                                .ro-print-tag-line-sm { font-size:clamp(16px, 3.6vw, 26px); font-weight:600; line-height:1.1; min-width:0; }
-                                .ro-print-tag-vin { font-size:clamp(17px, 4vw, 32px); font-weight:600; line-height:1.1; min-width:0; }
-                                .ro-print-tech-row { display:flex; align-items:flex-end; font-size:clamp(16px, 3.8vw, 28px); font-weight:700; padding-top:2px; min-width:0; }
+                                .ro-print-tag-ro { font-size:clamp(32px, 8.4vw, 75px); font-weight:800; line-height:1; min-width:0; }
+                                .ro-print-tag-date { font-size:clamp(12px, 2.9vw, 22px); font-weight:700; line-height:1.1; min-width:0; }
+                                .ro-print-tag-line-lg { font-size:clamp(14px, 3.5vw, 25px); font-weight:600; line-height:1.1; min-width:0; }
+                                .ro-print-tag-line-md { font-size:clamp(13px, 3.1vw, 24px); font-weight:600; line-height:1.1; min-width:0; }
+                                .ro-print-tag-line-sm { font-size:clamp(11px, 2.5vw, 18px); font-weight:600; line-height:1.1; min-width:0; }
+                                .ro-print-tag-vin { font-size:clamp(12px, 2.8vw, 22px); font-weight:600; line-height:1.1; min-width:0; }
+                                .ro-print-tech-row { display:flex; align-items:flex-end; font-size:clamp(11px, 2.7vw, 19px); font-weight:700; padding-top:2px; min-width:0; }
                                 table { width:100%; border-collapse:collapse; margin-top:10px; }
                                 thead th { background:#3c4142; color:#fff; text-align:left; padding:8px; font-size:12px; }
                                 tbody td { padding:8px; border-bottom:1px solid #eee; font-size:12px; }
