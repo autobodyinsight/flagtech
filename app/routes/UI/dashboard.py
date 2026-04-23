@@ -929,6 +929,10 @@ def get_dashboard_screen_html():
                                 .ro-print-tag-line-md { font-size:clamp(13px, 3.1vw, 24px); font-weight:600; line-height:1.1; min-width:0; }
                                 .ro-print-tag-line-sm { font-size:clamp(11px, 2.5vw, 18px); font-weight:600; line-height:1.1; min-width:0; }
                                 .ro-print-tag-vin { font-size:clamp(12px, 2.8vw, 22px); font-weight:600; line-height:1.1; min-width:0; }
+                                .ro-tag-date-reduced { font-size:clamp(10px, 2.32vw, 18px); font-weight:700; line-height:1.1; min-width:0; }
+                                .ro-tag-line-lg-reduced { font-size:clamp(11px, 2.8vw, 20px); font-weight:600; line-height:1.1; min-width:0; }
+                                .ro-tag-line-md-reduced { font-size:clamp(10px, 2.48vw, 19px); font-weight:600; line-height:1.1; min-width:0; }
+                                .ro-tag-vin-reduced { font-size:clamp(10px, 2.24vw, 18px); font-weight:600; line-height:1.1; min-width:0; }
                                 .ro-print-tech-row { display:flex; align-items:flex-end; font-size:clamp(11px, 2.7vw, 19px); font-weight:700; padding-top:2px; min-width:0; }
                                 table { width:100%; border-collapse:collapse; margin-top:10px; }
                                 thead th { background:#3c4142; color:#fff; text-align:left; padding:8px; font-size:12px; }
@@ -1330,20 +1334,20 @@ def get_dashboard_screen_html():
                         <div class="ro-print-tag-head">
                             <div class="ro-print-tag-row">
                                 <div class="ro-print-tag-ro">RO ${escapePopupHtml(ro.ro || '-')}</div>
-                                <div class="ro-print-tag-date">IN DATE: ${inDateText}</div>
+                                <div class="ro-tag-date-reduced">IN DATE: ${inDateText}</div>
                             </div>
-                            <div class="ro-print-tag-row ro-print-tag-line-lg">
-                                <div>${customerText}</div>
-                                <div>OUT DATE: ${outDateText}</div>
+                            <div class="ro-print-tag-row">
+                                <div class="ro-tag-line-lg-reduced">${customerText}</div>
+                                <div class="ro-tag-line-lg-reduced">OUT DATE: ${outDateText}</div>
                             </div>
-                            <div class="ro-print-tag-row ro-print-tag-line-md">
-                                <div>${vehicleText}</div>
-                                <div>${insuranceText}</div>
+                            <div class="ro-print-tag-row">
+                                <div class="ro-tag-line-md-reduced">${vehicleText}</div>
+                                <div class="ro-tag-line-md-reduced">${insuranceText}</div>
                             </div>
                             <div class="ro-print-tag-row ro-print-tag-line-sm" style="justify-content:flex-end;">
                                 <div>WRITTEN BY: ${estimatorText}</div>
                             </div>
-                            <div class="ro-print-tag-vin">${vinText}</div>
+                            <div class="ro-tag-vin-reduced">${vinText}</div>
                             <div class="ro-print-tech-row">
                                 <span style="white-space:nowrap; padding-right:10px;">TECH:</span>
                                 <div style="flex:1; border-bottom:2px solid #333; min-height:28px;"></div>
@@ -1381,20 +1385,20 @@ def get_dashboard_screen_html():
                             <div class="ro-print-tag-head">
                                 <div class="ro-print-tag-row">
                                     <div class="ro-print-tag-ro">RO ${escapePopupHtml(ro.ro || '-')}</div>
-                                    <div class="ro-print-tag-date">IN DATE: ${inDateText}</div>
+                                    <div class="ro-tag-date-reduced">IN DATE: ${inDateText}</div>
                                 </div>
-                                <div class="ro-print-tag-row ro-print-tag-line-lg">
-                                    <div>${customerText}</div>
-                                    <div>OUT DATE: ${outDateText}</div>
+                                <div class="ro-print-tag-row">
+                                    <div class="ro-tag-line-lg-reduced">${customerText}</div>
+                                    <div class="ro-tag-line-lg-reduced">OUT DATE: ${outDateText}</div>
                                 </div>
-                                <div class="ro-print-tag-row ro-print-tag-line-md">
-                                    <div>${vehicleText}</div>
-                                    <div>${insuranceText}</div>
+                                <div class="ro-print-tag-row">
+                                    <div class="ro-tag-line-md-reduced">${vehicleText}</div>
+                                    <div class="ro-tag-line-md-reduced">${insuranceText}</div>
                                 </div>
                                 <div class="ro-print-tag-row ro-print-tag-line-sm" style="justify-content:flex-end;">
                                     <div>WRITTEN BY: ${estimatorText}</div>
                                 </div>
-                                <div class="ro-print-tag-vin">${vinText}</div>
+                                <div class="ro-tag-vin-reduced">${vinText}</div>
                                 <div class="ro-print-tech-row">
                                     <span style="white-space:nowrap; padding-right:10px;">TECH:</span>
                                     <div style="flex:1; border-bottom:2px solid #333; min-height:28px;"></div>
