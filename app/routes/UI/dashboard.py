@@ -913,7 +913,7 @@ def get_dashboard_screen_html():
                                 }
                                 .ro-print-shop-name { font-size:clamp(15px, 2.8vw, 25px); font-weight:800; line-height:1.12; }
                                 .ro-print-shop-line { font-size:clamp(10px, 1.9vw, 17px); color:#444; margin-top:4px; line-height:1.15; }
-                                .ro-print-title { font-size:clamp(24px, 5.6vw, 50px); font-weight:800; line-height:1; margin-bottom:8px; }
+                                .ro-print-title { font-size:clamp(19px, 4.48vw, 40px); font-weight:800; line-height:1; margin-bottom:8px; }
                                 .ro-print-row { display:flex; justify-content:space-between; align-items:flex-end; gap:18px; margin-bottom:6px; flex-wrap:wrap; }
                                 .ro-print-row-top { align-items:flex-start; }
                                 .ro-print-grow { flex:1 1 300px; min-width:0; }
@@ -923,7 +923,7 @@ def get_dashboard_screen_html():
                                 .ro-print-meta-sm { font-size:clamp(10px, 1.4vw, 15px); font-weight:600; line-height:1.2; margin-top:4px; }
                                 .ro-print-tag-head { height:50vh; display:flex; flex-direction:column; justify-content:center; gap:14px; }
                                 .ro-print-tag-row { display:flex; justify-content:space-between; align-items:flex-end; gap:16px; flex-wrap:wrap; min-width:0; }
-                                .ro-print-tag-ro { font-size:clamp(32px, 8.4vw, 75px); font-weight:800; line-height:1; min-width:0; }
+                                .ro-print-tag-ro { font-size:clamp(26px, 6.72vw, 60px); font-weight:800; line-height:1; min-width:0; }
                                 .ro-print-tag-date { font-size:clamp(12px, 2.9vw, 22px); font-weight:700; line-height:1.1; min-width:0; }
                                 .ro-print-tag-line-lg { font-size:clamp(14px, 3.5vw, 25px); font-weight:600; line-height:1.1; min-width:0; }
                                 .ro-print-tag-line-md { font-size:clamp(13px, 3.1vw, 24px); font-weight:600; line-height:1.1; min-width:0; }
