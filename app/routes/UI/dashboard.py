@@ -1321,7 +1321,6 @@ def get_dashboard_screen_html():
                 `).join('');
 
                 const inDateText = escapePopupHtml(popupFormatDate(ro.in_date));
-                const outDateText = escapePopupHtml(popupFormatDate(ro.picked_up));
                 const customerText = escapePopupHtml(ro.customer || '-');
                 const insuranceText = escapePopupHtml(ro.insurance || '-');
                 const vehicleText = escapePopupHtml(ro.vehicle || '-');
@@ -1338,7 +1337,6 @@ def get_dashboard_screen_html():
                             </div>
                             <div class="ro-print-tag-row">
                                 <div class="ro-tag-line-lg-reduced">${customerText}</div>
-                                <div class="ro-tag-line-lg-reduced">OUT DATE: ${outDateText}</div>
                             </div>
                             <div class="ro-print-tag-row">
                                 <div class="ro-tag-line-md-reduced">${vehicleText}</div>
@@ -1364,7 +1362,6 @@ def get_dashboard_screen_html():
                 try {
                     const printData = await popupFetchJson(`/api/ro-print-data?ro=${encodeURIComponent(ro.ro)}`);
                     const inDateText = escapePopupHtml(popupFormatDate(printData?.in_date || ro.in_date));
-                    const outDateText = escapePopupHtml(popupFormatDate(ro.picked_up));
                     const customerText = escapePopupHtml(printData?.customer || ro.customer || '-');
                     const insuranceText = escapePopupHtml(printData?.insurance || ro.insurance || '-');
                     const vehicleText = escapePopupHtml(printData?.vehicle || ro.vehicle || '-');
@@ -1389,7 +1386,6 @@ def get_dashboard_screen_html():
                                 </div>
                                 <div class="ro-print-tag-row">
                                     <div class="ro-tag-line-lg-reduced">${customerText}</div>
-                                    <div class="ro-tag-line-lg-reduced">OUT DATE: ${outDateText}</div>
                                 </div>
                                 <div class="ro-print-tag-row">
                                     <div class="ro-tag-line-md-reduced">${vehicleText}</div>
@@ -1406,11 +1402,10 @@ def get_dashboard_screen_html():
                             </div>
                             <div class="line-break"></div>
                             <div style="height:45vh; display:flex; flex-direction:column; justify-content:flex-start; margin-top:8px;">
-                                <div style="display:grid; grid-template-columns:1fr 1fr 1fr 1fr; gap:16px; margin-bottom:18px; font-size:18px;">
+                                <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:16px; margin-bottom:18px; font-size:18px;">
                                     <div><strong>Insurance Total:</strong> ${popupFormatMoney(insuranceTotal)}</div>
                                     <div><strong>Customer Total:</strong> ${popupFormatMoney(customerTotal)}</div>
                                     <div><strong>In Date:</strong> ${inDateText}</div>
-                                    <div><strong>Out Date:</strong> ${outDateText}</div>
                                 </div>
                                 ${noteLinesHtml}
                             </div>
