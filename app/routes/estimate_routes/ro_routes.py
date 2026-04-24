@@ -1694,6 +1694,93 @@ async def phase_update(request: Request):
         cur.close()
 
 
+@router.post("/ro/reopen")
+async def reopen_ro(request: Request):
+    """Reopen a closed RO by changing its phase from complete/finish back to teardown."""
+    domain = get_user_domain(request)
+    if not domain:
+        return JSONResponse(status_code=401, content={"error": "Not authenticated"})
+
+    data = await request.json()
+    ro = (data.get("ro") or "").strip()
+
+    if not ro:
+        return JSONResponse(status_code=400, content={"error": "ro is required"})
+
+    conn = get_conn()
+    cur = conn.cursor()
+    try:
+        _scope = resolve_request_scope(request, cur, domain=domain)
+        current_shop_id = _scope["shop_id"]
+        current_shop_uuid = _scope["shop_uuid"]
+        if not current_shop_id or not current_shop_uuid:
+            return JSONResponse(status_code=403, content={"error": "Shop scope not resolved"})
+
+        # Get the current phase
+        cur.execute(
+            """
+            SELECT phase
+            FROM ro_phases
+            WHERE ro = %s
+                AND (
+                    shop_uuid = %s::uuid
+                    OR (shop_uuid IS NULL AND shop_id = %s AND domain = %s)
+                )
+            """,
+            (ro, current_shop_uuid, current_shop_id, domain),
+        )
+        prev_row = cur.fetchone() or {}
+        previous_phase = (prev_row.get("phase") or "").strip().lower()
+
+        # Only allow reopening if it's currently in a closed state
+        if previous_phase not in ("complete", "complete/finish"):
+            return JSONResponse(status_code=400, content={"error": "RO is not in a closed state"})
+
+        # Set the phase back to teardown
+        new_phase = "teardown"
+        cur.execute(
+            """
+            INSERT INTO ro_phases (ro, phase, domain, shop_id, shop_uuid)
+            VALUES (%s, %s, %s, %s, %s::uuid)
+            ON CONFLICT (ro, domain)
+            DO UPDATE SET phase = EXCLUDED.phase,
+                          shop_id = EXCLUDED.shop_id,
+                          shop_uuid = EXCLUDED.shop_uuid,
+                          updated_at = CURRENT_TIMESTAMP
+            """,
+            (ro, new_phase, domain, current_shop_id, current_shop_uuid),
+        )
+
+        # Log the activity
+        phase_label_map = {
+            "teardown": "Teardown",
+            "auth": "Auth",
+            "parts": "Parts",
+            "body": "Body",
+            "refinish": "Refinish",
+            "reassy": "Reassy",
+            "sublet": "Sublet",
+            "washqc": "Wash/QC",
+            "wash/qc": "Wash/QC",
+            "complete": "Complete/Finish",
+            "complete/finish": "Complete/Finish",
+        }
+        old_label = phase_label_map.get(previous_phase, previous_phase or "Unassigned")
+        new_label = phase_label_map.get(new_phase, new_phase or "Unassigned")
+        _log_ro_activity(
+            cur,
+            domain,
+            ro,
+            "ro_reopened",
+            f"RO reopened: {old_label} → {new_label}",
+        )
+
+        conn.commit()
+        return {"status": "ok", "message": f"RO {ro} has been reopened"}
+    finally:
+        cur.close()
+
+
 @router.post("/phase/roadmap-edit")
 async def phase_roadmap_edit(request: Request):
     domain = get_user_domain(request)

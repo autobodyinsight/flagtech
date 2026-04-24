@@ -470,6 +470,73 @@ def get_reports_screen_html():
             #reports .reports-sidebar-btn svg { width:22px; height:22px; }
             .reports-summary-grid { grid-template-columns: 1fr; }
         }
+        .reports-ro-reopen-btn {
+            background: none;
+            border: none;
+            padding: 0 8px 0 0;
+            cursor: pointer;
+            color: #2e7d32;
+            font-size: 20px;
+            font-weight: bold;
+            line-height: 1;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            transition: transform 0.15s ease, color 0.15s ease;
+            position: relative;
+        }
+        .reports-ro-reopen-btn:hover {
+            transform: scale(1.15);
+            color: #1b5e20;
+        }
+        .reports-reopen-confirmation-popover {
+            position: absolute;
+            background: #fff;
+            border: 2px solid #2e7d32;
+            border-radius: 6px;
+            padding: 14px;
+            min-width: 260px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.25);
+            z-index: 2000;
+            display: none;
+        }
+        .reports-reopen-confirmation-popover.show {
+            display: block;
+        }
+        .reports-reopen-confirmation-popover p {
+            margin: 0 0 12px 0;
+            font-size: 14px;
+            color: #333;
+            font-weight: 500;
+        }
+        .reports-reopen-confirmation-popover-buttons {
+            display: flex;
+            gap: 8px;
+            justify-content: flex-end;
+        }
+        .reports-reopen-confirmation-popover button {
+            padding: 8px 14px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 600;
+            transition: background-color 0.15s ease, color 0.15s ease;
+        }
+        .reports-reopen-confirmation-popover .btn-yes {
+            background: #2e7d32;
+            color: #fff;
+        }
+        .reports-reopen-confirmation-popover .btn-yes:hover {
+            background: #1b5e20;
+        }
+        .reports-reopen-confirmation-popover .btn-cancel {
+            background: #f0f0f0;
+            color: #333;
+        }
+        .reports-reopen-confirmation-popover .btn-cancel:hover {
+            background: #e0e0e0;
+        }
     </style>
     <script>
     let reportsDataCache = { summary: [], closed_ros: [], open_ros: [] };
@@ -1037,7 +1104,7 @@ def get_reports_screen_html():
             roBody.innerHTML = `<tr><td colspan='10' style='padding:20px; text-align:center; color:#999;'>${noneLabel}</td></tr>`;
             return;
         }
-        roBody.innerHTML = reportsBuildRoRowsHtml(rows, { roClickable: !isOpenView });
+        roBody.innerHTML = reportsBuildRoRowsHtml(rows, { roClickable: !isOpenView, showReopenBtn: !isOpenView });
     }
 
     function reportsApplyFiltersFromControls() {
@@ -1926,6 +1993,7 @@ def get_reports_screen_html():
     function reportsBuildRoRowsHtml(rows, options = {}) {
         const boldGpDollar = !!options.boldGpDollar;
         const roClickable = options.roClickable !== false;
+        const showReopenBtn = !!options.showReopenBtn;
         const normalizedRows = Array.isArray(rows) ? rows : [];
         return normalizedRows.map((ro, index) => {
             const partsSales = Number(ro.parts_sales || 0);
@@ -1950,9 +2018,31 @@ def get_reports_screen_html():
                 : `${formatReportsMoney(totalGp.gpDollar)}`;
 
             const roNumber = reportsEscapeHtml(ro.ro_number || '');
-            const roCellHtml = roClickable
-                ? `<button type="button" data-ro="${roNumber}" onclick="reportsOpenClosedRoWindow(event, this.dataset.ro)" style="background:none; border:none; padding:0; color:#1b4f9c; font-weight:700; text-decoration:underline; cursor:pointer;">${roNumber}</button>`
-                : `<span style="color:#222; font-weight:700;">${roNumber}</span>`;
+            const roNumberDisplay = reportsEscapeHtml(ro.ro_number || ro.ro || '');
+            
+            let roCellHtml;
+            if (showReopenBtn) {
+                // Show plus icon and RO number for closed ROs
+                const reopenBtnId = `reports-reopen-btn-${roNumber}`;
+                const popoverId = `reports-reopen-popover-${roNumber}`;
+                roCellHtml = `
+                    <div style="position:relative; display:flex; align-items:center; gap:4px;">
+                        <button type="button" class="reports-ro-reopen-btn" id="${reopenBtnId}" onclick="reportsShowReopenConfirmation(event, '${roNumber}', '${popoverId}')" title="Reopen this RO">+</button>
+                        <div class="reports-reopen-confirmation-popover" id="${popoverId}" style="position:absolute; left:0; top:100%; white-space:nowrap;">
+                            <p style="white-space:normal;">Are you sure you want to reopen this RO?</p>
+                            <div class="reports-reopen-confirmation-popover-buttons">
+                                <button class="btn-cancel" onclick="reportsCloseReopenConfirmation('${popoverId}')">Cancel</button>
+                                <button class="btn-yes" onclick="reportsConfirmReopen('${roNumber}', '${popoverId}')">Yes</button>
+                            </div>
+                        </div>
+                        <button type="button" data-ro="${roNumber}" onclick="reportsOpenClosedRoWindow(event, this.dataset.ro)" style="background:none; border:none; padding:0; color:#1b4f9c; font-weight:700; text-decoration:underline; cursor:pointer; margin:0;">${roNumberDisplay}</button>
+                    </div>
+                `;
+            } else if (roClickable) {
+                roCellHtml = `<button type="button" data-ro="${roNumber}" onclick="reportsOpenClosedRoWindow(event, this.dataset.ro)" style="background:none; border:none; padding:0; color:#1b4f9c; font-weight:700; text-decoration:underline; cursor:pointer;">${roNumberDisplay}</button>`;
+            } else {
+                roCellHtml = `<span style="color:#222; font-weight:700;">${roNumberDisplay}</span>`;
+            }
 
             return `
                 <tr class="reports-ro-main-row">
@@ -1986,6 +2076,62 @@ def get_reports_screen_html():
             .replace(/>/g, '&gt;')
             .replace(/"/g, '&quot;')
             .replace(/'/g, '&#39;');
+    }
+
+    function reportsShowReopenConfirmation(event, roNumber, popoverId) {
+        event.stopPropagation();
+        const popover = document.getElementById(popoverId);
+        if (popover) {
+            // Close any other open popovers
+            document.querySelectorAll('.reports-reopen-confirmation-popover.show').forEach((p) => {
+                if (p.id !== popoverId) p.classList.remove('show');
+            });
+            popover.classList.add('show');
+        }
+    }
+
+    function reportsCloseReopenConfirmation(popoverId) {
+        const popover = document.getElementById(popoverId);
+        if (popover) {
+            popover.classList.remove('show');
+        }
+    }
+
+    async function reportsConfirmReopen(roNumber, popoverId) {
+        const roNum = String(roNumber || '').trim();
+        if (!roNum) {
+            alert('Invalid RO number');
+            return;
+        }
+
+        try {
+            const response = await fetch('/api/ro/reopen', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
+                body: JSON.stringify({ ro: roNum }),
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json();
+                alert(`Error: ${errorData.error || 'Failed to reopen RO'}`);
+                return;
+            }
+
+            const data = await response.json();
+            
+            // Close the popover
+            reportsCloseReopenConfirmation(popoverId);
+
+            // Reload the reports data
+            await loadReportsData();
+
+            // Show a success message
+            alert(`RO ${roNum} has been reopened successfully.`);
+        } catch (error) {
+            console.error('Error reopening RO:', error);
+            alert('Error reopening RO. Please try again.');
+        }
     }
 
     function reportsToggleMiniPopup(panel) {
@@ -2316,6 +2462,20 @@ def get_reports_screen_html():
             if (!modal || modal.style.display !== 'block') return;
             if (event.target === modal) {
                 reportsClosePartsVendorModal();
+            }
+        });
+
+        // Close reopen confirmation popovers when clicking outside them
+        window.addEventListener('click', function(event) {
+            const openPopovers = document.querySelectorAll('.reports-reopen-confirmation-popover.show');
+            if (openPopovers.length === 0) return;
+            
+            // Check if the click was on a reopen button or within a popover
+            const isReopenBtnClick = event.target.closest('.reports-ro-reopen-btn');
+            const isPopoverClick = event.target.closest('.reports-reopen-confirmation-popover');
+            
+            if (!isReopenBtnClick && !isPopoverClick) {
+                openPopovers.forEach((p) => p.classList.remove('show'));
             }
         });
     });
