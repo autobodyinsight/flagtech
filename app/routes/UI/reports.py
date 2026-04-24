@@ -490,7 +490,7 @@ def get_reports_screen_html():
             color: #1b5e20;
         }
         .reports-reopen-confirmation-popover {
-            position: absolute;
+            position: fixed;
             background: #fff;
             border: 2px solid #2e7d32;
             border-radius: 6px;
@@ -2028,7 +2028,7 @@ def get_reports_screen_html():
                 roCellHtml = `
                     <div style="position:relative; display:flex; align-items:center; gap:4px;">
                         <button type="button" class="reports-ro-reopen-btn" id="${reopenBtnId}" onclick="reportsShowReopenConfirmation(event, '${roNumber}', '${popoverId}')" title="Reopen this RO">+</button>
-                        <div class="reports-reopen-confirmation-popover" id="${popoverId}" style="position:absolute; left:0; top:100%; white-space:nowrap;">
+                        <div class="reports-reopen-confirmation-popover" id="${popoverId}" style="white-space:nowrap;">
                             <p style="white-space:normal;">Are you sure you want to reopen this RO?</p>
                             <div class="reports-reopen-confirmation-popover-buttons">
                                 <button class="btn-cancel" onclick="reportsCloseReopenConfirmation('${popoverId}')">Cancel</button>
@@ -2080,13 +2080,28 @@ def get_reports_screen_html():
 
     function reportsShowReopenConfirmation(event, roNumber, popoverId) {
         event.stopPropagation();
+        const btn = event.currentTarget;
         const popover = document.getElementById(popoverId);
         if (popover) {
             // Close any other open popovers
             document.querySelectorAll('.reports-reopen-confirmation-popover.show').forEach((p) => {
                 if (p.id !== popoverId) p.classList.remove('show');
             });
+            // Position using fixed coords so it is never clipped by overflow
+            const rect = btn.getBoundingClientRect();
+            popover.style.position = 'fixed';
+            popover.style.left = rect.left + 'px';
+            popover.style.top = (rect.bottom + 4) + 'px';
+            popover.style.right = 'auto';
+            // After showing, clamp so it doesn't go off-screen
             popover.classList.add('show');
+            const popRect = popover.getBoundingClientRect();
+            if (popRect.bottom > window.innerHeight - 8) {
+                popover.style.top = (rect.top - popRect.height - 4) + 'px';
+            }
+            if (popRect.right > window.innerWidth - 8) {
+                popover.style.left = (rect.right - popRect.width) + 'px';
+            }
         }
     }
 
