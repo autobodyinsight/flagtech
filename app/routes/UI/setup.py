@@ -184,35 +184,6 @@ def get_setup_screen_html():
             </div>
         </div>
 
-        <div id="setupModifyShopModal" class="modal" style="display:none;">
-            <div class="modal-content" style="max-width:600px; padding:24px;">
-                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:18px;">
-                    <h3 style="margin:0; color:#333; font-size:18px;">Modify Shop Information</h3>
-                    <button type="button" onclick="closeSetupModifyShopModal()" style="padding:6px 10px; background:none; border:none; font-size:20px; color:#999; cursor:pointer;">&times;</button>
-                </div>
-
-                <div style="display:grid; grid-template-columns:1fr; gap:14px;">
-                    <div>
-                        <label for="setupModifyShopAddress" style="display:block; font-weight:700; color:#333; margin-bottom:6px;">Address</label>
-                        <input id="setupModifyShopAddress" type="text" style="width:100%; padding:10px; border:1px solid #ccc; border-radius:4px; font-family: 'Segoe UI', Helvetica, Arial, sans-serif; font-size:14px;" />
-                    </div>
-                    <div>
-                        <label for="setupModifyShopPhone" style="display:block; font-weight:700; color:#333; margin-bottom:6px;">Phone</label>
-                        <input id="setupModifyShopPhone" type="tel" style="width:100%; padding:10px; border:1px solid #ccc; border-radius:4px; font-family: 'Segoe UI', Helvetica, Arial, sans-serif; font-size:14px;" />
-                    </div>
-                    <div>
-                        <label for="setupModifyShopEmail" style="display:block; font-weight:700; color:#333; margin-bottom:6px;">Email</label>
-                        <input id="setupModifyShopEmail" type="email" style="width:100%; padding:10px; border:1px solid #ccc; border-radius:4px; font-family: 'Segoe UI', Helvetica, Arial, sans-serif; font-size:14px;" />
-                    </div>
-                </div>
-
-                <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:18px;">
-                    <button type="button" onclick="closeSetupModifyShopModal()" style="padding:10px 14px; background:#505050; color:#fff; border:none; border-radius:4px; cursor:pointer; font-weight:600;">Cancel</button>
-                    <button id="setupModifyShopSaveBtn" type="button" onclick="setupSaveShop()" style="padding:10px 16px; background:#b22222; color:#fff; border:none; border-radius:4px; cursor:pointer; font-weight:bold;">Save Changes</button>
-                </div>
-            </div>
-        </div>
-
     </div>
     """
 
@@ -230,10 +201,6 @@ def get_setup_script():
         let setupShopInFlightPromise = null;
         let setupUsersRequestToken = 0;
         let setupShopRequestToken = 0;
-        let setupContextData = {};
-        let setupIsArchitect = false;
-        let setupModifyMode = false;
-        let setupShopOriginalValues = {};
         const setupUsersTtlMs = 15000;
         const setupShopTtlMs = 30000;
 
@@ -263,22 +230,7 @@ def get_setup_script():
                 setupRenderUsers();
                 return;
             }
-            await Promise.all([setupLoadContext(), setupLoadShop({ force }), setupLoadUsers({ force })]);
-        }
-
-        async function setupLoadContext(options = {}) {
-            try {
-                const resp = await fetch('/api/setup/context', { credentials: 'include' });
-                const data = await resp.json().catch(() => ({}));
-                if (!resp.ok || data.error) {
-                    console.error('Error loading setup context:', data.error);
-                    return;
-                }
-                setupContextData = data || {};
-                setupIsArchitect = !!data.is_architect;
-            } catch (error) {
-                console.error('Error loading setup context:', error);
-            }
+            await Promise.all([setupLoadShop({ force }), setupLoadUsers({ force })]);
         }
 
         async function setupLoadShop(options = {}) {
@@ -345,10 +297,6 @@ def get_setup_script():
             if (cityStateZip.trim()) html += `<div>${cityStateZip}</div>`;
             if (phone) html += `<div>${phone}</div>`;
             if (email) html += `<div>${email}</div>`;
-            
-            if (setupIsArchitect) {
-                html += `<div style="margin-top:12px;"><button type="button" onclick="setupToggleModifyShop()" class="setup-action-btn" style="background:#b22222; color:#fff; padding:8px 12px; font-size:13px;">${setupModifyMode ? 'CANCEL' : 'MODIFY'}</button></div>`;
-            }
             
             infoEl.innerHTML = html;
         }
@@ -671,95 +619,6 @@ def get_setup_script():
             modal.style.display = 'block';
         }
 
-        function setupToggleModifyShop() {
-            if (!setupIsArchitect) return;
-            
-            if (!setupModifyMode) {
-                setupModifyMode = true;
-                setupShopOriginalValues = {
-                    address: setupShopData.address || '',
-                    phone: setupShopData.phone || '',
-                    email: setupShopData.email || '',
-                };
-                const modal = document.getElementById('setupModifyShopModal');
-                if (modal) {
-                    document.getElementById('setupModifyShopAddress').value = setupShopOriginalValues.address;
-                    document.getElementById('setupModifyShopPhone').value = setupShopOriginalValues.phone;
-                    document.getElementById('setupModifyShopEmail').value = setupShopOriginalValues.email;
-                    modal.style.display = 'block';
-                }
-            } else {
-                closeSetupModifyShopModal();
-            }
-        }
-
-        function openSetupModifyShopModal() {
-            const modal = document.getElementById('setupModifyShopModal');
-            if (modal) modal.style.display = 'block';
-        }
-
-        function closeSetupModifyShopModal() {
-            const modal = document.getElementById('setupModifyShopModal');
-            if (modal) modal.style.display = 'none';
-            setupModifyMode = false;
-            setupRenderShopInfo();
-        }
-
-        async function setupSaveShop() {
-            const saveBtn = document.getElementById('setupModifyShopSaveBtn');
-            if (saveBtn) saveBtn.disabled = true;
-
-            try {
-                const address = (document.getElementById('setupModifyShopAddress')?.value || '').trim();
-                const phone = (document.getElementById('setupModifyShopPhone')?.value || '').trim();
-                const email = (document.getElementById('setupModifyShopEmail')?.value || '').trim();
-
-                const hasChanges =
-                    address !== setupShopOriginalValues.address ||
-                    phone !== setupShopOriginalValues.phone ||
-                    email !== setupShopOriginalValues.email;
-
-                if (!hasChanges) {
-                    closeSetupModifyShopModal();
-                    return;
-                }
-
-                const payload = {
-                    shop_name: setupShopData.shop_name || '',
-                    address: address,
-                    city: setupShopData.city || '',
-                    state: setupShopData.state || '',
-                    zip_code: setupShopData.zip_code || '',
-                    phone: phone,
-                    email: email,
-                };
-
-                const resp = await fetch('/api/setup/shop', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    credentials: 'include',
-                    body: JSON.stringify(payload),
-                });
-                const data = await setupReadJsonResponse(resp);
-                if (!resp.ok || data.error) throw new Error(data.error || 'Unable to save shop information');
-
-                closeSetupModifyShopModal();
-                await setupLoadShop({ force: true });
-                alert('Shop information updated successfully.');
-            } catch (error) {
-                console.error('Error saving shop information:', error);
-                alert(String(error.message || 'Error saving shop information.'));
-            } finally {
-                if (saveBtn) saveBtn.disabled = false;
-            }
-        }
-
-        function openSetupUserModal() {
-            const modal = document.getElementById('setupUserModal');
-            if (!modal) return;
-            modal.style.display = 'block';
-        }
-
         function closeSetupUserModal() {
             const modal = document.getElementById('setupUserModal');
             if (modal) modal.style.display = 'none';
@@ -821,11 +680,6 @@ def get_setup_script():
             if (resetModal && resetModal.style.display === 'block' && event.target === resetModal) {
                 closeSetupResetPasswordModal();
             }
-
-            const modifyModal = document.getElementById('setupModifyShopModal');
-            if (modifyModal && modifyModal.style.display === 'block' && event.target === modifyModal) {
-                closeSetupModifyShopModal();
-            }
         });
 
         document.addEventListener('keydown', (event) => {
@@ -843,17 +697,6 @@ def get_setup_script():
             if (event.key === 'Enter' && document.activeElement === input) {
                 event.preventDefault();
                 setupSaveResetPassword();
-            }
-        });
-
-        document.addEventListener('keydown', (event) => {
-            const modifyModal = document.getElementById('setupModifyShopModal');
-            if (!modifyModal || modifyModal.style.display !== 'block') {
-                return;
-            }
-
-            if (event.key === 'Escape') {
-                closeSetupModifyShopModal();
             }
         });
     """
