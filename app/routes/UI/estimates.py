@@ -257,7 +257,7 @@ def get_estimates_screen_html():
                                 </aside>
                             </div>
 
-                            <div id="estimateRightPane" style="flex:1 1 56%; min-width:420px; display:flex; flex-direction:column; gap:18px; overflow:visible; box-sizing:border-box; margin-right:0;">
+                            <div id="estimateRightPane" style="flex:1 1 56%; min-width:420px; display:flex; flex-direction:column; gap:18px; overflow:visible; box-sizing:border-box; margin-left:60px; margin-right:0; padding-right:10px;">
                                 <div id="estimateSchematicPane" style="flex:1.4; background:#fff; border:1px solid #e5e7eb; border-radius:14px; box-shadow:0 8px 20px rgba(15,23,42,.06); padding:0; overflow:visible; display:flex; flex-direction:column; box-sizing:border-box;">
                                     <div style="background:linear-gradient(180deg, #1f2937 0%, #374151 100%); color:#fff; padding:16px 18px; font-weight:800; letter-spacing:0.06em; font-size:13px; text-transform:uppercase;">Schematic</div>
                                     <div style="padding:14px; display:flex; flex-direction:column; gap:12px; background:#f8fafc; min-height:0; flex:1; overflow:visible; box-sizing:border-box;">
