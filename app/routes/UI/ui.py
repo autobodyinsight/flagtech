@@ -6,6 +6,7 @@ from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from .flagout import get_flagtech_screen_html
 from .parts import get_parts_screen_html, get_parts_script
 from .dashboard import get_dashboard_screen_html
+from .estimates import get_estimates_screen_html
 from .techs import get_techs_screen_html
 from .phase import get_phase_screen_html
 from .reports import get_reports_screen_html
@@ -930,6 +931,7 @@ async def home_screen(request: Request):
         <div class="side-menu-list">
             <button type="button" class="side-menu-item active" data-screen="dashboard" aria-label="Dashboard"><span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M4 13h6v7H4v-7zm10-9h6v16h-6V4zM4 4h6v7H4V4z" stroke="currentColor" stroke-width="1.8"/></svg></span><span class="nav-label">Dashboard</span></button>
             <button type="button" class="side-menu-item" data-screen="upload" aria-label="Upload"><span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 16V4m0 0l-4 4m4-4l4 4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M4 20h16" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></span><span class="nav-label">Upload</span></button>
+            <button type="button" class="side-menu-item" data-screen="estimate" aria-label="Estimates"><span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M7 4.5h8l4 4V18a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6.5a2 2 0 0 1 2-2z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M15 4.5v4h4" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M8 12h8M8 16h8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></span><span class="nav-label">Estimates</span></button>
             <button type="button" class="side-menu-item" data-screen="phase" aria-label="Roadmap"><span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M4 6h8M4 12h16M4 18h10" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></span><span class="nav-label">Roadmap</span></button>
             <button type="button" class="side-menu-item" data-screen="parts" aria-label="Parts"><span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="7.7" stroke="currentColor" stroke-width="1.8"/><circle cx="12" cy="12" r="4.5" stroke="currentColor" stroke-width="1.8"/><circle cx="12" cy="12" r="1.4" fill="currentColor"/><path d="M12 4.9v2.6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><path d="M12 16.5v2.6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><path d="M4.9 12h2.6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><path d="M16.5 12h2.6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><path d="M7.1 7.1l1.9 1.9" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/><path d="M15 15l1.9 1.9" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/><path d="M16.9 7.1L15 9" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/><path d="M9 15l-1.9 1.9" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg></span><span class="nav-label">Parts</span></button>
             <button type="button" class="side-menu-item" data-screen="tech" aria-label="Techs"><span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="8" r="3" stroke="currentColor" stroke-width="1.8"/><path d="M5 20c0-3.3 3.1-6 7-6s7 2.7 7 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></span><span class="nav-label">Techs</span></button>
@@ -1035,6 +1037,7 @@ async def home_screen(request: Request):
     <div class="content-area">
         {get_dashboard_screen_html()}
         {get_upload_screen_html()}
+        {get_estimates_screen_html()}
         {get_estimate_summary_html()}
         {get_parts_screen_html()}
         {get_techs_screen_html()}
@@ -1119,6 +1122,7 @@ async def home_screen(request: Request):
         const appScreenFeatureMap = {{
             dashboard: 'dashboard',
             upload: 'upload',
+            estimate: 'estimate',
             phase: 'phase',
             parts: 'parts',
             tech: 'tech',

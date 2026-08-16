@@ -19,6 +19,7 @@ ALL_WINDOW_FEATURES = (
     "main_ui",
     "dashboard",
     "upload",
+    "estimate",
     "phase",
     "parts",
     "tech",
@@ -36,6 +37,7 @@ FEATURE_RULES: dict[str, tuple[str, ...]] = {
     "main_ui": ALL_ACCESS_LEVELS,
     "dashboard": ALL_ACCESS_LEVELS,
     "upload": ALL_ACCESS_LEVELS,
+    "estimate": ALL_ACCESS_LEVELS,
     "phase": ALL_ACCESS_LEVELS,
     "parts": ALL_ACCESS_LEVELS,
     "tech": ALL_ACCESS_LEVELS,
@@ -141,6 +143,9 @@ def resolve_feature_for_path(path: str, method: str = "GET") -> str | None:
         "/ui/aligned",
     }:
         return "upload"
+
+    if normalized_path == "/api/estimate-list":
+        return "estimate"
 
     if normalized_path.startswith("/api/chat/"):
         return "chat"

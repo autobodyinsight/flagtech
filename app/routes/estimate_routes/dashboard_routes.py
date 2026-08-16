@@ -97,6 +97,64 @@
 
 router = APIRouter()
 
+
+def _estimate_sort_key(value):
+    if value is None:
+        return datetime.min
+    if isinstance(value, datetime):
+        return value
+    if isinstance(value, date):
+        return datetime.combine(value, datetime.min.time())
+    if isinstance(value, str):
+        candidate = value.strip()
+        if not candidate:
+            return datetime.min
+        try:
+            if candidate.endswith("Z"):
+                candidate = candidate[:-1] + "+00:00"
+            return datetime.fromisoformat(candidate)
+        except ValueError:
+            try:
+                return datetime.strptime(candidate, "%Y-%m-%d %H:%M:%S")
+            except ValueError:
+                return datetime.min
+    return datetime.min
+
+
+def _build_estimate_list_rows(rows):
+    normalized = []
+    for row in rows or []:
+        owner_info = str(row.get("owner_info") or "").strip()
+        customer_name, _ = _parse_owner_info(owner_info)
+        year = (row.get("year") or "").strip()
+        make = (row.get("make") or "").strip()
+        model = (row.get("model") or "").strip()
+        vehicle_display = " ".join(part for part in (year, make, model) if part)
+        if not vehicle_display:
+            vehicle_display = str(row.get("vehicle") or "-").strip() or "-"
+
+        total_value = _parse_float_value(row.get("grand_total"))
+        in_date_value = _coerce_date(row.get("in_date")) or _to_local_business_date(row.get("saved_at"))
+        saved_value = row.get("saved_at")
+
+        normalized.append({
+            "id": row.get("id"),
+            "estimate_number": None,
+            "vehicle": vehicle_display,
+            "customer": customer_name or "-",
+            "insurance": str(row.get("insurance_company") or "-").strip() or "-",
+            "in_date": in_date_value.isoformat() if in_date_value else "-",
+            "total": total_value,
+            "sort_key": _estimate_sort_key(saved_value),
+            "_id_value": row.get("id") or 0,
+        })
+
+    normalized.sort(key=lambda item: (item["sort_key"], item["_id_value"]))
+    for idx, row in enumerate(normalized, start=702):
+        row["estimate_number"] = idx
+    return normalized
+
+
 _RO_DELETE_TABLES = [
     "ro_flagout_lines",
     "ro_line_assignments",
@@ -163,6 +221,50 @@ async def delete_ro(request: Request):
             conn.close()
         except Exception:
             pass
+
+@router.get("/estimate-list")
+async def get_estimate_list(request: Request):
+    domain = get_user_domain(request)
+    if not domain:
+        return JSONResponse(status_code=401, content={"error": "Not authenticated"})
+
+    conn = get_conn()
+    cur = conn.cursor()
+    try:
+        _ensure_saved_estimates_table(cur)
+        _ensure_shop_isolation_infrastructure(cur)
+        _scope = resolve_request_scope(request, cur, domain=domain)
+        current_shop_id = _scope["shop_id"]
+        current_shop_uuid = _scope["shop_uuid"]
+        if not current_shop_id or not current_shop_uuid:
+            return JSONResponse(status_code=403, content={"error": "Shop scope not resolved"})
+
+        cur.execute(
+            """
+            SELECT id, vehicle, year, make, model, owner_info, insurance_company, in_date, grand_total, saved_at
+            FROM saved_estimates
+            WHERE (
+                    shop_uuid = %s::uuid
+                 OR (shop_uuid IS NULL AND shop_id = %s AND domain = %s)
+                  )
+              AND (vehicle IS NOT NULL OR owner_info IS NOT NULL OR insurance_company IS NOT NULL)
+            ORDER BY saved_at ASC, id ASC
+            """,
+            (current_shop_uuid, current_shop_id, domain),
+        )
+        rows = cur.fetchall()
+        estimate_list = _build_estimate_list_rows(rows)
+        return JSONResponse(content={"estimateList": estimate_list})
+    finally:
+        try:
+            cur.close()
+        except Exception:
+            pass
+        try:
+            conn.close()
+        except Exception:
+            pass
+
 
 @router.get("/dashboard-data")
 async def get_dashboard_data(request: Request):
