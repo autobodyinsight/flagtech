@@ -249,9 +249,15 @@ def get_estimates_screen_html():
                                     </div>
                                 </div>
                             </div>
-                            <aside id="estimateCategoriesPane" style="flex:1; min-width:280px; background:#fff; border:1px solid #e5e7eb; border-radius:14px; box-shadow:0 8px 20px rgba(15,23,42,.06); padding:0; overflow:hidden; transition:all 0.35s ease;">
+                            <aside id="estimateCategoriesPane" style="flex:1; min-width:280px; background:#fff; border:1px solid #e5e7eb; border-radius:14px; box-shadow:0 8px 20px rgba(15,23,42,.06); padding:0; overflow:hidden; transition:all 0.35s ease; display:flex; flex-direction:column;">
                                 <div style="background:linear-gradient(180deg, #111827 0%, #1f2937 100%); color:#fff; padding:16px 18px; font-weight:800; letter-spacing:0.06em; font-size:13px; text-transform:uppercase;">Part Categories</div>
-                                <div id="estimateCategoryList" style="padding:16px 14px; display:flex; flex-direction:column; gap:8px; max-height:calc(100vh - 240px); overflow:auto;"></div>
+                                <div id="estimateCategoryList" style="padding:16px 14px; display:flex; flex-direction:column; gap:8px; max-height:260px; overflow:auto; flex-shrink:0;"></div>
+                                <div style="padding:0 14px 14px; display:flex; flex-direction:column; gap:12px; background:#f8fafc; border-top:1px solid #e2e8f0; min-height:0; flex:1;">
+                                    <div style="padding-top:14px; font-size:12px; text-transform:uppercase; letter-spacing:0.08em; color:#475569; font-weight:700;">Vehicle Schematic</div>
+                                    <div id="estimateIllustrationArea" style="flex:1; min-height:200px; overflow:auto;"></div>
+                                    <div style="font-size:12px; text-transform:uppercase; letter-spacing:0.08em; color:#475569; font-weight:700;">Estimate Lines</div>
+                                    <div id="estimateLineList" style="display:flex; flex-direction:column; gap:8px; overflow:auto; max-height:220px;"></div>
+                                </div>
                             </aside>
                         </div>
                     </div>
@@ -342,6 +348,8 @@ def get_estimates_screen_html():
                 const infoPane = win.document.getElementById('estimateInfoPane');
                 const categoryPane = win.document.getElementById('estimateCategoriesPane');
                 const categoryList = win.document.getElementById('estimateCategoryList');
+                const illustrationArea = win.document.getElementById('estimateIllustrationArea');
+                const estimateLineList = win.document.getElementById('estimateLineList');
                 const productionDateInput = win.document.getElementById('estimateProductionDate');
                 const toggleButton = win.document.getElementById('estimateSidebarToggle');
 
@@ -378,17 +386,186 @@ def get_estimates_screen_html():
                     ));
                 };
 
+                const makeComponentMap = {
+                    'front bumper': ['bumper cover', 'bumper reinforcement', 'brackets', 'molding', 'lower valance'],
+                    grille: ['grille shell', 'grille insert', 'retainer clips', 'emblem'],
+                    headlight: ['lamp housing', 'lens', 'mounting bracket', 'aiming screw'],
+                    hood: ['hood skin', 'hinges', 'latch', 'insulation'],
+                    fender: ['outer fender', 'inner liner', 'brackets', 'molding'],
+                    'radiator support': ['core support', 'mounting tabs', 'support braces'],
+                    radiator: ['radiator core', 'fan shroud', 'hoses'],
+                    condenser: ['condenser core', 'lines', 'brackets'],
+                    frame: ['left rail', 'right rail', 'crossmember', 'mounting tabs'],
+                    windshield: ['glass', 'weatherstrip', 'adhesive', 'molding'],
+                    'front door': ['outer skin', 'inner panel', 'window regulator', 'hinges'],
+                    'rear door': ['outer skin', 'inner panel', 'window regulator', 'hinges'],
+                    'quarter panel': ['outer quarter panel', 'inner brace', 'wheelhouse', 'molding'],
+                    bedside: ['outer bedside', 'inner bedside', 'support braces', 'molding'],
+                    roof: ['roof skin', 'roof bows', 'weatherstrip', 'trim'],
+                    trunk: ['trunk lid', 'latch', 'striker', 'weatherstrip'],
+                    liftgate: ['liftgate shell', 'hinges', 'striker', 'glass'],
+                    'tailgate': ['tailgate shell', 'latches', 'hinges', 'support cables'],
+                    'rear body': ['rear quarter shell', 'reinforcement', 'sealant', 'trim'],
+                    floor: ['floor pan', 'inner brace', 'seam sealer', 'mounting points'],
+                    'tail light': ['tail lamp housing', 'lens', 'gasket', 'mounting clips'],
+                    'rear bumper': ['bumper cover', 'reinforcement', 'brackets', 'lower valance']
+                };
+
+                const partPriceMap = {
+                    'front bumper': [320, 145, 70, 55, 70],
+                    grille: [180, 120, 35, 25],
+                    headlight: [420, 190, 60, 35],
+                    hood: [640, 120, 95, 110],
+                    fender: [480, 145, 80, 45],
+                    'radiator support': [390, 90, 60],
+                    radiator: [240, 95, 65],
+                    condenser: [220, 70, 50],
+                    frame: [920, 590, 200, 80],
+                    windshield: [540, 80, 120, 60],
+                    'front door': [640, 240, 180, 95],
+                    'rear door': [620, 220, 170, 90],
+                    'quarter panel': [510, 230, 110, 70],
+                    bedside: [690, 330, 170, 80],
+                    roof: [760, 340, 125, 80],
+                    trunk: [420, 95, 75, 60],
+                    liftgate: [520, 115, 85, 80],
+                    'tailgate': [470, 105, 85, 65],
+                    'rear body': [710, 220, 160, 110],
+                    floor: [980, 420, 180, 120],
+                    'tail light': [210, 120, 35, 25],
+                    'rear bumper': [350, 160, 80, 65]
+                };
+
+                const makePartMap = {
+                    car: ['front bumper', 'grille', 'headlight', 'hood', 'fender', 'radiator support', 'radiator', 'condenser', 'frame', 'windshield', 'front door', 'rear door', 'quarter panel', 'roof', 'trunk', 'rear body', 'floor', 'tail light', 'rear bumper'],
+                    suv: ['front bumper', 'grille', 'headlight', 'hood', 'fender', 'radiator support', 'radiator', 'condenser', 'frame', 'windshield', 'front door', 'rear door', 'quarter panel', 'roof', 'liftgate', 'rear body', 'floor', 'tail light', 'rear bumper'],
+                    van: ['front bumper', 'grille', 'headlight', 'hood', 'fender', 'radiator support', 'radiator', 'condenser', 'frame', 'windshield', 'front door', 'rear door', 'quarter panel', 'roof', 'liftgate', 'rear body', 'floor', 'tail light', 'rear bumper'],
+                    truck: ['front bumper', 'grille', 'headlight', 'hood', 'fender', 'radiator support', 'radiator', 'condenser', 'frame', 'windshield', 'front door', 'rear door', 'bedside', 'roof', 'tailgate', 'rear body', 'floor', 'tail light', 'rear bumper']
+                };
+
+                const normalizePartName = (part) => String(part || '').trim().toLowerCase();
+
+                const getActiveVehicleType = () => getVehicleBodyType(makeSelect?.value || '', modelSelect?.value || '');
+
+                const getVehicleSpecificEstimateLines = (partName) => {
+                    const normalized = normalizePartName(partName);
+                    const bodyType = getActiveVehicleType();
+                    const componentList = makeComponentMap[normalized] || makeComponentMap['front bumper'];
+                    const priceList = partPriceMap[normalized] || partPriceMap['front bumper'];
+                    const components = componentList.map((component, index) => ({
+                        label: component,
+                        qty: index < 2 ? 1 : (bodyType === 'truck' && index === 2 ? 2 : 1),
+                        price: priceList[index] || 0,
+                        unit: 'EA'
+                    }));
+                    return components;
+                };
+
+                const buildSchematicSvg = (partName, bodyType) => {
+                    const part = normalizePartName(partName);
+                    const isFront = ['front bumper', 'grille', 'headlight', 'hood', 'fender', 'radiator support', 'radiator', 'condenser', 'frame', 'windshield'].includes(part);
+                    const isRear = ['rear body', 'floor', 'tail light', 'rear bumper', 'quarter panel', 'tailgate', 'liftgate', 'trunk', 'bedside', 'roof'].includes(part);
+
+                    const vehicleColor = bodyType === 'truck' ? '#6b7280' : bodyType === 'suv' ? '#3b82f6' : bodyType === 'van' ? '#8b5cf6' : '#e11d48';
+                    const accentColor = '#f2f2f2';
+                    const partLabel = part.split(' ').map((word) => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
+
+                    const genericBody = `
+                        <svg viewBox="0 0 420 260" width="100%" height="220" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="${partLabel} schematic">
+                            <rect x="48" y="28" width="324" height="194" rx="28" fill="${vehicleColor}" opacity="0.18" stroke="${vehicleColor}" stroke-width="3"/>
+                            <rect x="110" y="54" width="200" height="118" rx="18" fill="#ffffff" opacity="0.65" stroke="#111827" stroke-width="2"/>
+                            <path d="M80 90 L120 60 L300 60 L340 90" stroke="#111827" stroke-width="2.5" fill="none" opacity="0.8"/>
+                            ${isFront ? `<rect x="58" y="92" width="80" height="68" rx="12" fill="${accentColor}" stroke="#111827" stroke-width="2"/>` : ''}
+                            ${isRear ? `<rect x="282" y="92" width="80" height="68" rx="12" fill="${accentColor}" stroke="#111827" stroke-width="2"/>` : ''}
+                            ${part === 'front bumper' ? `<rect x="66" y="108" width="62" height="36" rx="10" fill="#dbeafe" stroke="#111827" stroke-width="2"/>` : ''}
+                            ${part === 'grille' ? `<rect x="120" y="88" width="180" height="36" rx="8" fill="#dbeafe" stroke="#111827" stroke-width="2"/>` : ''}
+                            ${part === 'headlight' ? `<rect x="78" y="85" width="60" height="52" rx="10" fill="#dbeafe" stroke="#111827" stroke-width="2"/>` : ''}
+                            ${part === 'hood' ? `<path d="M110 92 L310 92 L323 150 L97 150 Z" fill="#dbeafe" stroke="#111827" stroke-width="2"/>` : ''}
+                            ${part === 'fender' ? `<path d="M70 98 L112 74 L136 128 L84 160 Z" fill="#dbeafe" stroke="#111827" stroke-width="2"/>` : ''}
+                            ${part === 'radiator support' ? `<rect x="120" y="88" width="180" height="20" rx="6" fill="#e0f2fe" stroke="#111827" stroke-width="2"/>` : ''}
+                            ${part === 'radiator' ? `<rect x="136" y="92" width="148" height="38" rx="8" fill="#dbeafe" stroke="#111827" stroke-width="2"/>` : ''}
+                            ${part === 'condenser' ? `<rect x="150" y="94" width="120" height="30" rx="8" fill="#e0f2fe" stroke="#111827" stroke-width="2"/>` : ''}
+                            ${part === 'frame' ? `<path d="M96 74 L132 74 L150 170 L100 190 L90 136 Z M288 74 L324 74 L320 190 L270 170 L270 136 Z" fill="#dbeafe" stroke="#111827" stroke-width="2"/>` : ''}
+                            ${part === 'windshield' ? `<path d="M120 70 L300 70 L292 150 L128 150 Z" fill="#dbeafe" stroke="#111827" stroke-width="2"/>` : ''}
+                            ${part === 'front door' ? `<rect x="110" y="78" width="70" height="118" rx="8" fill="#dbeafe" stroke="#111827" stroke-width="2"/>` : ''}
+                            ${part === 'rear door' ? `<rect x="240" y="78" width="70" height="118" rx="8" fill="#dbeafe" stroke="#111827" stroke-width="2"/>` : ''}
+                            ${part === 'quarter panel' ? `<path d="M290 76 L328 90 L332 170 L270 174 L250 110 Z" fill="#dbeafe" stroke="#111827" stroke-width="2"/>` : ''}
+                            ${part === 'bedside' ? `<rect x="262" y="70" width="74" height="116" rx="8" fill="#dbeafe" stroke="#111827" stroke-width="2"/>` : ''}
+                            ${part === 'roof' ? `<path d="M132 52 L288 52 L305 84 L115 84 Z" fill="#dbeafe" stroke="#111827" stroke-width="2"/>` : ''}
+                            ${part === 'trunk' ? `<path d="M140 80 L280 80 L296 152 L124 152 Z" fill="#dbeafe" stroke="#111827" stroke-width="2"/>` : ''}
+                            ${part === 'liftgate' ? `<path d="M130 76 L290 76 L302 154 L118 154 Z" fill="#dbeafe" stroke="#111827" stroke-width="2"/>` : ''}
+                            ${part === 'tailgate' ? `<rect x="118" y="88" width="184" height="80" rx="10" fill="#dbeafe" stroke="#111827" stroke-width="2"/>` : ''}
+                            ${part === 'rear body' ? `<path d="M100 110 L320 110 L304 170 L116 170 Z" fill="#dbeafe" stroke="#111827" stroke-width="2"/>` : ''}
+                            ${part === 'floor' ? `<rect x="126" y="98" width="168" height="86" rx="10" fill="#dbeafe" stroke="#111827" stroke-width="2"/>` : ''}
+                            ${part === 'tail light' ? `<rect x="300" y="106" width="36" height="44" rx="8" fill="#dbeafe" stroke="#111827" stroke-width="2"/>` : ''}
+                            ${part === 'rear bumper' ? `<rect x="286" y="112" width="62" height="34" rx="10" fill="#dbeafe" stroke="#111827" stroke-width="2"/>` : ''}
+                            <text x="210" y="210" text-anchor="middle" font-size="15" font-weight="700" fill="#111827" font-family="Segoe UI, Arial, sans-serif">${partLabel}</text>
+                        </svg>
+                    `;
+                    return genericBody;
+                };
+
+                const renderIllustration = () => {
+                    const make = makeSelect?.value || '';
+                    const model = modelSelect?.value || '';
+                    const selectedPart = categoryList?.dataset.selectedPart || 'front bumper';
+                    const bodyType = getVehicleBodyType(make, model);
+                    const svgMarkup = buildSchematicSvg(selectedPart, bodyType);
+                    if (illustrationArea) {
+                        illustrationArea.innerHTML = `
+                            <div style="padding:14px; background:linear-gradient(180deg, #f8fafc 0%, #eef2ff 100%); border:1px solid #e2e8f0; border-radius:12px; margin-bottom:14px; min-height:220px; display:flex; align-items:center; justify-content:center;">
+                                ${svgMarkup}
+                            </div>
+                            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+                                <div style="font-size:12px; text-transform:uppercase; letter-spacing:0.08em; color:#475569; font-weight:700;">Selected Part</div>
+                                <div style="font-size:13px; color:#111827; font-weight:700; text-transform:capitalize;">${selectedPart}</div>
+                            </div>
+                        `;
+                    }
+
+                    const estimateLines = getVehicleSpecificEstimateLines(selectedPart);
+                    if (estimateLineList) {
+                        estimateLineList.innerHTML = `
+                            <div style="display:flex; flex-direction:column; gap:8px; margin-top:12px;">
+                                ${estimateLines.map((line) => `
+                                    <div style="display:grid; grid-template-columns:1.6fr 0.7fr 0.8fr; gap:8px; padding:9px 10px; border:1px solid #e2e8f0; border-radius:10px; background:#f8fafc; font-size:13px; color:#111827;">
+                                        <div style="font-weight:600; text-transform:capitalize;">${line.label}</div>
+                                        <div style="text-align:center; color:#475569;">${line.qty} ${line.unit}</div>
+                                        <div style="text-align:right; font-weight:700; color:#b22222;">$${line.price}</div>
+                                    </div>
+                                `).join('')}
+                            </div>
+                        `;
+                    }
+                };
+
                 const renderCategories = () => {
                     const make = makeSelect?.value || '';
                     const model = modelSelect?.value || '';
                     const categories = getVehicleCategoryList(make, model);
                     if (!categoryList) return;
-                    categoryList.innerHTML = categories.map((category) => `
-                        <label style="display:flex; align-items:center; justify-content:space-between; background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; padding:10px 12px; font-size:14px; color:#1f2937; gap:12px;">
-                            <span style="text-transform:capitalize;">${category}</span>
-                            <input type="checkbox" value="${category}" style="width:16px; height:16px; accent-color:#b22222;" />
-                        </label>
-                    `).join('');
+                    const selectedPart = normalizePartName(categoryList.dataset.selectedPart || categories[0] || 'front bumper');
+                    categoryList.dataset.selectedPart = selectedPart;
+                    categoryList.innerHTML = categories.map((category) => {
+                        const normalized = normalizePartName(category);
+                        const isSelected = normalized === selectedPart;
+                        return `
+                            <button type="button" data-part="${category}" style="width:100%; text-align:left; border:1px solid ${isSelected ? '#b22222' : '#e2e8f0'}; background:${isSelected ? '#fff1f2' : '#f8fafc'}; color:#111827; border-radius:10px; padding:10px 12px; font-size:14px; font-weight:600; cursor:pointer; text-transform:capitalize; ${isSelected ? 'box-shadow: inset 0 0 0 1px rgba(178,34,34,0.2);' : ''}">
+                                ${category}
+                            </button>
+                        `;
+                    }).join('');
+
+                    categoryList.querySelectorAll('button[data-part]').forEach((button) => {
+                        button.addEventListener('click', () => {
+                            const chosen = button.getAttribute('data-part');
+                            categoryList.dataset.selectedPart = normalizePartName(chosen);
+                            renderIllustration();
+                            renderCategories();
+                        });
+                    });
+
+                    renderIllustration();
                 };
 
                 const applyPanelLayout = (isCollapsed) => {
