@@ -215,7 +215,7 @@ def get_estimates_screen_html():
 
                 const formHtml = `
                     <div id="estimateWindowContent" style="padding:26px 28px 40px; min-height:180px; background:#f5f7fb; color:#23272a; overflow:auto;">
-                        <div id="estimateContentLayout" style="display:flex; gap:18px; min-height:560px; max-width:1200px; margin:0 auto;">
+                        <div id="estimateContentLayout" style="display:flex; gap:18px; min-height:560px; max-width:1300px; margin:0 auto;">
                             <div id="estimateInfoPane" style="flex:3; min-width:0; display:flex; flex-direction:column; gap:20px; transition:all 0.35s ease;">
                                 <div class="estimate-card" style="background:#fff; border:1px solid #e5e7eb; border-radius:14px; box-shadow:0 8px 20px rgba(15,23,42,.06); padding:20px;">
                                     <div class="estimate-section-header" style="font-weight:800; font-size:18px; color:#111827; margin:0 0 16px;">Customer</div>
@@ -249,14 +249,18 @@ def get_estimates_screen_html():
                                     </div>
                                 </div>
                             </div>
-                            <aside id="estimateCategoriesPane" style="flex:1; min-width:280px; background:#fff; border:1px solid #e5e7eb; border-radius:14px; box-shadow:0 8px 20px rgba(15,23,42,.06); padding:0; overflow:hidden; transition:all 0.35s ease; display:flex; flex-direction:column;">
+
+                            <aside id="estimateCategoriesPane" style="flex:1 1 25%; min-width:250px; background:#fff; border:1px solid #e5e7eb; border-radius:14px; box-shadow:0 8px 20px rgba(15,23,42,.06); padding:0; overflow:hidden; transition:all 0.35s ease; display:flex; flex-direction:column;">
                                 <div style="background:linear-gradient(180deg, #111827 0%, #1f2937 100%); color:#fff; padding:16px 18px; font-weight:800; letter-spacing:0.06em; font-size:13px; text-transform:uppercase;">Part Categories</div>
-                                <div id="estimateCategoryList" style="padding:16px 14px; display:flex; flex-direction:column; gap:8px; max-height:260px; overflow:auto; flex-shrink:0;"></div>
-                                <div style="padding:0 14px 14px; display:flex; flex-direction:column; gap:12px; background:#f8fafc; border-top:1px solid #e2e8f0; min-height:0; flex:1;">
-                                    <div style="padding-top:14px; font-size:12px; text-transform:uppercase; letter-spacing:0.08em; color:#475569; font-weight:700;">Vehicle Schematic</div>
-                                    <div id="estimateIllustrationArea" style="flex:1; min-height:200px; overflow:auto;"></div>
+                                <div id="estimateCategoryList" style="padding:16px 14px; display:flex; flex-direction:column; gap:8px; overflow:auto; flex:1; min-height:0;"></div>
+                            </aside>
+
+                            <aside id="estimateSchematicPane" style="flex:2 1 75%; min-width:320px; background:#fff; border:1px solid #e5e7eb; border-radius:14px; box-shadow:0 8px 20px rgba(15,23,42,.06); padding:0; overflow:hidden; transition:all 0.35s ease; display:flex; flex-direction:column;">
+                                <div style="background:linear-gradient(180deg, #1f2937 0%, #374151 100%); color:#fff; padding:16px 18px; font-weight:800; letter-spacing:0.06em; font-size:13px; text-transform:uppercase;">Schematic</div>
+                                <div style="padding:14px 14px 10px; display:flex; flex-direction:column; gap:12px; background:#f8fafc; min-height:0; flex:1; overflow:auto;">
+                                    <div id="estimateIllustrationArea" style="min-height:220px;"></div>
                                     <div style="font-size:12px; text-transform:uppercase; letter-spacing:0.08em; color:#475569; font-weight:700;">Estimate Lines</div>
-                                    <div id="estimateLineList" style="display:flex; flex-direction:column; gap:8px; overflow:auto; max-height:220px;"></div>
+                                    <div id="estimateLineList" style="display:flex; flex-direction:column; gap:8px;"></div>
                                 </div>
                             </aside>
                         </div>
@@ -337,8 +341,13 @@ def get_estimates_screen_html():
                         transition:all 0.35s ease;
                         overflow:visible;
                     }
-                    #estimateCategoriesPane {
+                    #estimateCategoriesPane,
+                    #estimateSchematicPane {
                         transition:all 0.35s ease;
+                    }
+                    #estimateCategoryList,
+                    #estimateLineList {
+                        scrollbar-width: thin;
                     }
                 `;
                 win.document.head.appendChild(style);
@@ -347,6 +356,7 @@ def get_estimates_screen_html():
                 const modelSelect = win.document.getElementById('estimateModel');
                 const infoPane = win.document.getElementById('estimateInfoPane');
                 const categoryPane = win.document.getElementById('estimateCategoriesPane');
+                const schematicPane = win.document.getElementById('estimateSchematicPane');
                 const categoryList = win.document.getElementById('estimateCategoryList');
                 const illustrationArea = win.document.getElementById('estimateIllustrationArea');
                 const estimateLineList = win.document.getElementById('estimateLineList');
@@ -569,23 +579,29 @@ def get_estimates_screen_html():
                 };
 
                 const applyPanelLayout = (isCollapsed) => {
-                    if (!infoPane || !categoryPane) return;
+                    if (!infoPane || !categoryPane || !schematicPane) return;
                     if (isCollapsed) {
+                        infoPane.style.display = 'none';
                         infoPane.style.transform = 'translateX(-110%)';
                         infoPane.style.opacity = '0';
                         infoPane.style.pointerEvents = 'none';
                         infoPane.style.maxWidth = '0';
                         infoPane.style.marginRight = '-10px';
                         infoPane.style.minWidth = '0';
-                        categoryPane.style.flex = '1 1 100%';
+                        infoPane.style.flexBasis = '0';
+                        categoryPane.style.flex = '1 1 35%';
+                        schematicPane.style.flex = '2 1 65%';
                     } else {
+                        infoPane.style.display = 'flex';
                         infoPane.style.transform = 'translateX(0)';
                         infoPane.style.opacity = '1';
                         infoPane.style.pointerEvents = 'auto';
                         infoPane.style.maxWidth = 'none';
                         infoPane.style.marginRight = '0';
                         infoPane.style.minWidth = '0';
-                        categoryPane.style.flex = '1';
+                        infoPane.style.flexBasis = 'auto';
+                        categoryPane.style.flex = '1 1 25%';
+                        schematicPane.style.flex = '2 1 75%';
                     }
                 };
 
