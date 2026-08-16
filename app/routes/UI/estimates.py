@@ -208,29 +208,39 @@ def get_estimates_screen_html():
                     </div>
                 `;
 
+                const defaultRateValues = {
+                    body: 0,
+                    paint: 0,
+                    frame: 0,
+                    mechanical: 0,
+                    glass: 0,
+                    paintMaterials: 0,
+                    taxRate: 0
+                };
+
                 const formHtml = `
                     <div id="estimateWindowContent" style="padding:24px 20px 30px 20px; min-height:180px; background:#f5f7fb; color:#23272a; overflow:auto; box-sizing:border-box; flex:1 1 auto;">
                         <div id="estimateWindowShell" style="display:flex; align-items:stretch; gap:18px; width:100%; min-height:100%; box-sizing:border-box;">
-                            <aside id="estimateSidebarNav" style="width:100px; min-width:100px; background:linear-gradient(180deg, #ffffff 0%, #f8fafc 100%); border:1px solid #e5e7eb; border-radius:16px; box-shadow:0 8px 20px rgba(15,23,42,.06); display:flex; flex-direction:column; gap:14px; padding:14px 10px; box-sizing:border-box; align-self:stretch;">
+                            <aside id="estimateSidebarNav" style="width:120px; min-width:120px; background:linear-gradient(180deg, #ffffff 0%, #f8fafc 100%); border:1px solid #e5e7eb; border-radius:16px; box-shadow:0 8px 20px rgba(15,23,42,.06); display:flex; flex-direction:column; gap:14px; padding:14px 10px; box-sizing:border-box; align-self:stretch;">
                                 <div class="estimate-nav-label" style="font-size:11px; font-weight:800; letter-spacing:0.12em; text-transform:uppercase; color:#64748b; text-align:center; padding:0 4px 8px;">Menu</div>
-                                <button type="button" class="estimate-nav-button estimate-nav-button-selected" style="display:flex; flex-direction:column; align-items:center; justify-content:center; gap:8px; width:100%; min-height:82px; border:1px solid #dbe2ea; border-radius:12px; background:linear-gradient(180deg, #fff1f2 0%, #fff 100%); color:#b22222; font-size:12px; font-weight:700; cursor:default; box-shadow:inset 0 0 0 1px rgba(178,34,34,0.08);">
+                                <button type="button" class="estimate-nav-button estimate-nav-button-selected" data-estimate-view="customerVehicle" style="display:flex; flex-direction:column; align-items:center; justify-content:center; gap:8px; width:100%; min-height:82px; border:1px solid #dbe2ea; border-radius:12px; background:linear-gradient(180deg, #fff1f2 0%, #fff 100%); color:#b22222; font-size:12px; font-weight:700; cursor:pointer; box-shadow:inset 0 0 0 1px rgba(178,34,34,0.08);">
                                     <span aria-hidden="true" style="font-size:22px; line-height:1;">👤</span>
                                     <span>Customer / Vehicle</span>
                                 </button>
-                                <button type="button" class="estimate-nav-button" style="display:flex; flex-direction:column; align-items:center; justify-content:center; gap:8px; width:100%; min-height:74px; border:1px solid #e5e7eb; border-radius:12px; background:#fff; color:#374151; font-size:11px; font-weight:700; cursor:default;">
-                                    <span aria-hidden="true" style="font-size:20px; line-height:1;">👤</span>
-                                    <span>Customer</span>
+                                <button type="button" class="estimate-nav-button" data-estimate-view="rates" style="display:flex; flex-direction:column; align-items:center; justify-content:center; gap:8px; width:100%; min-height:74px; border:1px solid #e5e7eb; border-radius:12px; background:#fff; color:#374151; font-size:11px; font-weight:700; cursor:pointer;">
+                                    <span aria-hidden="true" style="font-size:20px; line-height:1;">📊</span>
+                                    <span>Rates</span>
                                 </button>
-                                <button type="button" class="estimate-nav-button" style="display:flex; flex-direction:column; align-items:center; justify-content:center; gap:8px; width:100%; min-height:74px; border:1px solid #e5e7eb; border-radius:12px; background:#fff; color:#374151; font-size:11px; font-weight:700; cursor:default;">
-                                    <span aria-hidden="true" style="font-size:20px; line-height:1;">🚗</span>
-                                    <span>Vehicle</span>
+                                <button type="button" class="estimate-nav-button" data-estimate-view="notes" style="display:flex; flex-direction:column; align-items:center; justify-content:center; gap:8px; width:100%; min-height:74px; border:1px solid #e5e7eb; border-radius:12px; background:#fff; color:#374151; font-size:11px; font-weight:700; cursor:pointer;">
+                                    <span aria-hidden="true" style="font-size:20px; line-height:1;">📝</span>
+                                    <span>Notes</span>
                                 </button>
                             </aside>
 
                             <div id="estimateContentLayout" style="display:flex; align-items:stretch; gap:24px; flex:1 1 auto; min-width:0; min-height:560px; height:100%; overflow:visible; box-sizing:border-box; margin-left:0;">
-                                <div id="estimateLeftPane" style="flex:0 0 58%; min-width:0; display:flex; gap:18px; align-items:stretch; overflow:visible; box-sizing:border-box;">
-                                    <div id="estimateInfoPane" style="flex:1 1 auto; min-width:0; display:flex; flex-direction:column; gap:20px; transition:all 0.35s ease; overflow:visible; box-sizing:border-box;">
-                                        <div class="estimate-card" style="background:#fff; border:1px solid #e5e7eb; border-radius:14px; box-shadow:0 8px 20px rgba(15,23,42,.06); padding:20px; width:100%; min-width:0; box-sizing:border-box;">
+                                <div id="estimateCustomerVehiclePanel" style="display:flex; flex:1 1 auto; min-width:0; gap:18px; align-items:stretch; overflow:visible; box-sizing:border-box;">
+                                    <div id="estimateInfoPane" style="flex:1 1 auto; min-width:0; display:flex; flex-direction:row; gap:20px; transition:all 0.35s ease; overflow:visible; box-sizing:border-box;">
+                                        <div class="estimate-card" style="background:#fff; border:1px solid #e5e7eb; border-radius:14px; box-shadow:0 8px 20px rgba(15,23,42,.06); padding:20px; width:100%; min-width:0; box-sizing:border-box; flex:1 1 50%;">
                                             <div class="estimate-section-header" style="font-weight:800; font-size:18px; color:#111827; margin:0 0 16px;">Customer</div>
                                             <div style="display:grid; grid-template-columns:repeat(2, minmax(180px, 1fr)); gap:16px; width:100%; box-sizing:border-box;">
                                                 <div class="estimate-field"><label>First Name</label><input id="estimateFirstName" type="text" placeholder="First name" /></div>
@@ -246,7 +256,7 @@ def get_estimates_screen_html():
                                             </div>
                                         </div>
 
-                                        <div class="estimate-card" style="background:#fff; border:1px solid #e5e7eb; border-radius:14px; box-shadow:0 8px 20px rgba(15,23,42,.06); padding:20px; width:100%; min-width:0; box-sizing:border-box;">
+                                        <div class="estimate-card" style="background:#fff; border:1px solid #e5e7eb; border-radius:14px; box-shadow:0 8px 20px rgba(15,23,42,.06); padding:20px; width:100%; min-width:0; box-sizing:border-box; flex:1 1 50%;">
                                             <div class="estimate-section-header" style="font-weight:800; font-size:18px; color:#111827; margin:0 0 16px;">Vehicle Info</div>
                                             <div style="display:grid; grid-template-columns:repeat(2, minmax(180px, 1fr)); gap:16px; width:100%; box-sizing:border-box;">
                                                 <div class="estimate-field" style="grid-column:1 / -1;"><label>VIN</label><input id="estimateVin" type="text" maxlength="17" placeholder="VIN" style="letter-spacing:0.12em; text-transform:uppercase;" /></div>
@@ -261,6 +271,45 @@ def get_estimates_screen_html():
                                                 <div class="estimate-field"><label>State</label><select id="estimatePlateState">${['<option value="">Select</option>', ...usStates.map((state) => `<option value="${state}">${state}</option>`)].join('')}</select></div>
                                             </div>
                                         </div>
+                                    </div>
+                                </div>
+
+                                <div id="estimateRatesPanel" style="display:none; flex:1 1 auto; min-width:0; background:#fff; border:1px solid #e5e7eb; border-radius:14px; box-shadow:0 8px 20px rgba(15,23,42,.06); padding:18px; box-sizing:border-box;">
+                                    <div style="display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:16px;">
+                                        <div style="font-size:18px; font-weight:800; color:#111827;">Rate Settings</div>
+                                    </div>
+                                    <div style="overflow:auto; border:1px solid #e5e7eb; border-radius:12px; background:#f8fafc;">
+                                        <table style="width:100%; border-collapse:collapse; min-width:520px;">
+                                            <thead>
+                                                <tr style="background:#f1f5f9;">
+                                                    <th style="padding:12px 14px; text-align:left; font-size:12px; letter-spacing:0.08em; text-transform:uppercase; color:#475569;">Category</th>
+                                                    <th style="padding:12px 14px; text-align:right; font-size:12px; letter-spacing:0.08em; text-transform:uppercase; color:#475569;">Rate</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody id="estimateRatesTableBody">
+                                                ${Object.entries(defaultRateValues).map(([key, value]) => `
+                                                    <tr style="border-top:1px solid #e5e7eb;">
+                                                        <td style="padding:12px 14px; font-weight:600; color:#111827; text-transform:capitalize;">${key === 'paintMaterials' ? 'Paint Materials' : key === 'taxRate' ? 'Tax Rate' : key.replace(/([A-Z])/g, ' $1').trim()}</td>
+                                                        <td style="padding:12px 14px; text-align:right;">
+                                                            <input type="number" class="estimate-rate-input" data-rate-key="${key}" value="${value}" step="0.01" min="0" style="width:150px; height:40px; border:1px solid #dfe6ee; border-radius:10px; background:#fff; padding:8px 10px; text-align:right; font-size:15px; color:#0f172a; box-sizing:border-box;" />
+                                                        </td>
+                                                    </tr>
+                                                `).join('')}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+
+                                <div id="estimateNotesPanel" style="display:none; flex:1 1 auto; min-width:0; background:#fff; border:1px solid #e5e7eb; border-radius:14px; box-shadow:0 8px 20px rgba(15,23,42,.06); padding:18px; box-sizing:border-box;">
+                                    <div style="font-size:18px; font-weight:800; color:#111827; margin-bottom:14px;">Notes</div>
+                                    <div style="display:flex; flex-direction:column; gap:12px; margin-bottom:18px;">
+                                        <textarea id="estimateNotesInput" rows="4" placeholder="Add a note for this estimate..." style="width:100%; resize:vertical; min-height:120px; border:1px solid #dfe6ee; border-radius:12px; background:#f8fafc; padding:12px 14px; font-size:14px; color:#0f172a; box-sizing:border-box;"></textarea>
+                                        <div style="display:flex; justify-content:flex-end;">
+                                            <button type="button" id="estimateAddNoteButton" style="background:#b22222; color:#fff; border:none; border-radius:10px; padding:10px 16px; font-weight:700; cursor:pointer;">Add Note</button>
+                                        </div>
+                                    </div>
+                                    <div id="estimateNotesHistory" style="display:flex; flex-direction:column; gap:10px; max-height:420px; overflow:auto; padding-right:4px;">
+                                        <div style="color:#64748b; font-size:14px; font-weight:600;">No notes yet.</div>
                                     </div>
                                 </div>
 
@@ -600,6 +649,83 @@ def get_estimates_screen_html():
                     renderIllustration();
                 };
 
+                const estimateNotesHistory = [];
+                const estimateRatesState = { ...defaultRateValues };
+
+                const getLocalDateTimeStamp = (date = new Date()) => {
+                    const pad = (value) => String(value).padStart(2, '0');
+                    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
+                };
+
+                const collectEstimateRateValues = () => {
+                    const nextState = { ...defaultRateValues };
+                    const inputs = win.document.querySelectorAll('.estimate-rate-input');
+                    inputs.forEach((input) => {
+                        const key = input.getAttribute('data-rate-key');
+                        if (!key) return;
+                        const value = Number(input.value || 0);
+                        nextState[key] = Number.isFinite(value) ? value : 0;
+                    });
+                    Object.assign(estimateRatesState, nextState);
+                    return { ...estimateRatesState };
+                };
+
+                const renderNotesHistory = () => {
+                    const notesHistory = win.document.getElementById('estimateNotesHistory');
+                    if (!notesHistory) return;
+                    if (!estimateNotesHistory.length) {
+                        notesHistory.innerHTML = '<div style="color:#64748b; font-size:14px; font-weight:600;">No notes yet.</div>';
+                        return;
+                    }
+
+                    notesHistory.innerHTML = estimateNotesHistory.map((note) => `
+                        <div style="border:1px solid #e5e7eb; border-radius:12px; background:#f8fafc; padding:12px 14px;">
+                            <div style="display:flex; justify-content:space-between; align-items:center; gap:12px; margin-bottom:8px;">
+                                <div style="font-weight:700; color:#111827;">${note.user}</div>
+                                <div style="font-size:12px; color:#64748b;">${note.timestamp}</div>
+                            </div>
+                            <div style="white-space:pre-wrap; color:#334155; line-height:1.5;">${note.text}</div>
+                        </div>
+                    `).join('');
+                };
+
+                const setEstimateView = (viewName) => {
+                    const navButtons = win.document.querySelectorAll('.estimate-nav-button');
+                    navButtons.forEach((button) => {
+                        const isSelected = button.getAttribute('data-estimate-view') === viewName;
+                        button.classList.toggle('estimate-nav-button-selected', isSelected);
+                        button.style.borderColor = isSelected ? '#f3c4c8' : '#e5e7eb';
+                        button.style.background = isSelected ? 'linear-gradient(180deg, #fff1f2 0%, #fff 100%)' : '#fff';
+                        button.style.color = isSelected ? '#b22222' : '#374151';
+                        button.style.boxShadow = isSelected ? 'inset 0 0 0 1px rgba(178,34,34,0.08), 0 6px 14px rgba(178,34,34,0.08)' : 'none';
+                    });
+
+                    const customerVehiclePanel = win.document.getElementById('estimateCustomerVehiclePanel');
+                    const ratesPanel = win.document.getElementById('estimateRatesPanel');
+                    const notesPanel = win.document.getElementById('estimateNotesPanel');
+
+                    if (customerVehiclePanel) customerVehiclePanel.style.display = viewName === 'customerVehicle' ? 'flex' : 'none';
+                    if (ratesPanel) ratesPanel.style.display = viewName === 'rates' ? 'block' : 'none';
+                    if (notesPanel) notesPanel.style.display = viewName === 'notes' ? 'block' : 'none';
+                };
+
+                const addEstimateNote = () => {
+                    const notesInput = win.document.getElementById('estimateNotesInput');
+                    if (!notesInput) return;
+                    const text = notesInput.value.trim();
+                    if (!text) {
+                        notesInput.focus();
+                        return;
+                    }
+                    estimateNotesHistory.unshift({
+                        text,
+                        user: (window.currentUserName || window.user?.name || 'Current User'),
+                        timestamp: getLocalDateTimeStamp(new Date())
+                    });
+                    notesInput.value = '';
+                    renderNotesHistory();
+                };
+
                 const applyPanelLayout = (isCollapsed) => {
                     if (!leftPane || !rightPane || !infoPane || !categoryPane) return;
                     if (isCollapsed) {
@@ -658,6 +784,27 @@ def get_estimates_screen_html():
                     modelSelect.addEventListener('change', renderCategories);
                 }
 
+                win.document.querySelectorAll('.estimate-nav-button').forEach((button) => {
+                    button.addEventListener('click', () => {
+                        setEstimateView(button.getAttribute('data-estimate-view') || 'customerVehicle');
+                    });
+                });
+
+                const addNoteButton = win.document.getElementById('estimateAddNoteButton');
+                if (addNoteButton) {
+                    addNoteButton.addEventListener('click', addEstimateNote);
+                    const notesInput = win.document.getElementById('estimateNotesInput');
+                    if (notesInput) {
+                        notesInput.addEventListener('keydown', (event) => {
+                            if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') {
+                                addEstimateNote();
+                            }
+                        });
+                    }
+                }
+
+                setEstimateView('customerVehicle');
+                renderNotesHistory();
                 renderCategories();
 
                 const saveButton = win.document.getElementById('estimateSaveButton');
@@ -683,6 +830,7 @@ def get_estimates_screen_html():
                         const miles = (win.document.getElementById('estimateMiles')?.value || '').trim();
                         const licensePlate = (win.document.getElementById('estimateLicensePlate')?.value || '').trim();
                         const plateState = (win.document.getElementById('estimatePlateState')?.value || '').trim();
+                        const estimateRates = collectEstimateRateValues();
 
                         const payload = {
                             ro_number: `EST-${nextEstimateNumber}`,
@@ -712,7 +860,12 @@ def get_estimates_screen_html():
                             license_plate: licensePlate,
                             license_plate_state: plateState,
                             estimate_totals: {},
-                            estimate_snapshot: {},
+                            estimate_snapshot: {
+                                rates: estimateRates,
+                                notes: [...estimateNotesHistory]
+                            },
+                            estimate_rates: estimateRates,
+                            estimate_notes: [...estimateNotesHistory],
                             labor_repairs: [],
                             paint_repairs: [],
                             parts_repairs: [],
