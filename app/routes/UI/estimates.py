@@ -215,12 +215,12 @@ def get_estimates_screen_html():
 
                 const formHtml = `
                     <div id="estimateWindowContent" style="padding:20px 10px 24px 20px; min-height:180px; background:#f5f7fb; color:#23272a; overflow:hidden; box-sizing:border-box;">
-                        <div id="estimateContentLayout" style="display:flex; gap:18px; min-height:560px; width:100%; max-width:100%; margin:0; height:100%; overflow:visible; box-sizing:border-box;">
-                            <div id="estimateLeftPane" style="flex:0 0 44%; min-width:0; display:flex; gap:18px; align-items:stretch; overflow:visible; box-sizing:border-box;">
+                        <div id="estimateContentLayout" style="display:flex; align-items:stretch; gap:24px; min-height:560px; width:calc(100% + 60px); max-width:calc(100% + 60px); margin:0; height:100%; overflow:visible; box-sizing:border-box;">
+                            <div id="estimateLeftPane" style="flex:0 0 58%; min-width:0; display:flex; gap:18px; align-items:stretch; overflow:visible; box-sizing:border-box;">
                                 <div id="estimateInfoPane" style="flex:1 1 auto; min-width:0; display:flex; flex-direction:column; gap:20px; transition:all 0.35s ease; overflow:visible; box-sizing:border-box;">
                                     <div class="estimate-card" style="background:#fff; border:1px solid #e5e7eb; border-radius:14px; box-shadow:0 8px 20px rgba(15,23,42,.06); padding:20px; width:100%; min-width:0; box-sizing:border-box;">
                                         <div class="estimate-section-header" style="font-weight:800; font-size:18px; color:#111827; margin:0 0 16px;">Customer</div>
-                                        <div style="display:grid; grid-template-columns:repeat(2, minmax(170px, 1fr)); gap:16px; width:100%; box-sizing:border-box;">
+                                        <div style="display:grid; grid-template-columns:repeat(2, minmax(180px, 1fr)); gap:16px; width:100%; box-sizing:border-box;">
                                             <div class="estimate-field"><label>First Name</label><input id="estimateFirstName" type="text" placeholder="First name" /></div>
                                             <div class="estimate-field"><label>Last Name</label><input id="estimateLastName" type="text" placeholder="Last name" /></div>
                                             <div class="estimate-field" style="grid-column:1 / -1;"><label>Address</label><input id="estimateAddress" type="text" placeholder="Street address" /></div>
@@ -236,7 +236,7 @@ def get_estimates_screen_html():
 
                                     <div class="estimate-card" style="background:#fff; border:1px solid #e5e7eb; border-radius:14px; box-shadow:0 8px 20px rgba(15,23,42,.06); padding:20px; width:100%; min-width:0; box-sizing:border-box;">
                                         <div class="estimate-section-header" style="font-weight:800; font-size:18px; color:#111827; margin:0 0 16px;">Vehicle Info</div>
-                                        <div style="display:grid; grid-template-columns:repeat(2, minmax(170px, 1fr)); gap:16px; width:100%; box-sizing:border-box;">
+                                        <div style="display:grid; grid-template-columns:repeat(2, minmax(180px, 1fr)); gap:16px; width:100%; box-sizing:border-box;">
                                             <div class="estimate-field" style="grid-column:1 / -1;"><label>VIN</label><input id="estimateVin" type="text" maxlength="17" placeholder="VIN" style="letter-spacing:0.12em; text-transform:uppercase;" /></div>
                                             <div class="estimate-field"><label>Year</label><select id="estimateYear">${years.map((year) => `<option value="${year}">${year}</option>`).join('')}</select></div>
                                             <div class="estimate-field"><label>Make</label><select id="estimateMake">${createMakeOptions()}</select></div>
@@ -257,7 +257,7 @@ def get_estimates_screen_html():
                                 </aside>
                             </div>
 
-                            <div id="estimateRightPane" style="flex:1 1 56%; min-width:420px; display:flex; flex-direction:column; gap:18px; overflow:visible; box-sizing:border-box; margin-left:60px; margin-right:0; padding-right:10px;">
+                            <div id="estimateRightPane" style="flex:1 1 auto; min-width:420px; display:flex; flex-direction:column; gap:18px; overflow:visible; box-sizing:border-box; margin-left:60px; margin-right:0; padding-right:10px;">
                                 <div id="estimateSchematicPane" style="flex:1.4; background:#fff; border:1px solid #e5e7eb; border-radius:14px; box-shadow:0 8px 20px rgba(15,23,42,.06); padding:0; overflow:visible; display:flex; flex-direction:column; box-sizing:border-box;">
                                     <div style="background:linear-gradient(180deg, #1f2937 0%, #374151 100%); color:#fff; padding:16px 18px; font-weight:800; letter-spacing:0.06em; font-size:13px; text-transform:uppercase;">Schematic</div>
                                     <div style="padding:14px; display:flex; flex-direction:column; gap:12px; background:#f8fafc; min-height:0; flex:1; overflow:visible; box-sizing:border-box;">
