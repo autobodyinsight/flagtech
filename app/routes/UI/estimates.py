@@ -199,7 +199,12 @@ def get_estimates_screen_html():
                 };
 
                 const bannerHtml = `
-                    <div id="estimateHeaderBar" style="background:linear-gradient(90deg, #111 0%, #23272a 48%, #d32f2f 100%); color:#fff; padding:12px 24px; position:relative; z-index:120; display:flex; align-items:center; justify-content:space-between; gap:16px;">
+                    <div id="estimateHeaderBar" style="background:linear-gradient(90deg, #111 0%, #23272a 48%, #d32f2f 100%); color:#fff; padding:12px 24px 12px 62px; position:relative; z-index:120; display:flex; align-items:center; justify-content:space-between; gap:16px;">
+                        <button id="estimateSidebarToggle" type="button" class="estimate-toggle-button" aria-label="Toggle customer and vehicle info" title="Toggle info panel">
+                            <span></span>
+                            <span></span>
+                            <span></span>
+                        </button>
                         <div class="estimate-header-item" style="margin:0; display:flex; align-items:center; gap:10px;">
                             <span class="estimate-header-label" style="font-size:16px;">Estimate #:</span>
                             <span class="estimate-header-value" style="font-size:18px; font-weight:800;">${nextEstimateNumber}</span>
@@ -210,38 +215,44 @@ def get_estimates_screen_html():
 
                 const formHtml = `
                     <div id="estimateWindowContent" style="padding:26px 28px 40px; min-height:180px; background:#f5f7fb; color:#23272a; overflow:auto;">
-                        <div style="max-width:980px; margin:0 auto; display:flex; flex-direction:column; gap:20px;">
-                            <div class="estimate-card" style="background:#fff; border:1px solid #e5e7eb; border-radius:14px; box-shadow:0 8px 20px rgba(15,23,42,.06); padding:20px;">
-                                <div class="estimate-section-header" style="font-weight:800; font-size:18px; color:#111827; margin:0 0 16px;">Customer</div>
-                                <div style="display:grid; grid-template-columns:repeat(2, minmax(220px, 1fr)); gap:16px;">
-                                    <div class="estimate-field"><label>First Name</label><input id="estimateFirstName" type="text" placeholder="First name" /></div>
-                                    <div class="estimate-field"><label>Last Name</label><input id="estimateLastName" type="text" placeholder="Last name" /></div>
-                                    <div class="estimate-field" style="grid-column:1 / -1;"><label>Address</label><input id="estimateAddress" type="text" placeholder="Street address" /></div>
-                                    <div class="estimate-field"><label>City</label><input id="estimateCity" type="text" placeholder="City" /></div>
-                                    <div class="estimate-field"><label>State</label><input id="estimateCustomerState" type="text" maxlength="2" placeholder="ST" /></div>
-                                    <div class="estimate-field"><label>Zip Code</label><input id="estimateZip" type="text" inputmode="numeric" maxlength="10" placeholder="Zip code" /></div>
-                                    <div class="estimate-field"><label>Phone Number</label><input id="estimatePhone" type="tel" placeholder="(555) 123-4567" /></div>
-                                    <div class="estimate-field"><label>Email</label><input id="estimateEmail" type="email" placeholder="example@email.com" /></div>
-                                    <div class="estimate-field"><label>Insurance Company</label><input id="estimateInsuranceCompany" type="text" placeholder="Insurance company" /></div>
-                                    <div class="estimate-field"><label>Claim Number</label><input id="estimateClaimNumber" type="text" placeholder="Claim #" /></div>
+                        <div id="estimateContentLayout" style="display:flex; gap:18px; min-height:560px; max-width:1200px; margin:0 auto;">
+                            <div id="estimateInfoPane" style="flex:3; min-width:0; display:flex; flex-direction:column; gap:20px; transition:all 0.35s ease;">
+                                <div class="estimate-card" style="background:#fff; border:1px solid #e5e7eb; border-radius:14px; box-shadow:0 8px 20px rgba(15,23,42,.06); padding:20px;">
+                                    <div class="estimate-section-header" style="font-weight:800; font-size:18px; color:#111827; margin:0 0 16px;">Customer</div>
+                                    <div style="display:grid; grid-template-columns:repeat(2, minmax(220px, 1fr)); gap:16px;">
+                                        <div class="estimate-field"><label>First Name</label><input id="estimateFirstName" type="text" placeholder="First name" /></div>
+                                        <div class="estimate-field"><label>Last Name</label><input id="estimateLastName" type="text" placeholder="Last name" /></div>
+                                        <div class="estimate-field" style="grid-column:1 / -1;"><label>Address</label><input id="estimateAddress" type="text" placeholder="Street address" /></div>
+                                        <div class="estimate-field"><label>City</label><input id="estimateCity" type="text" placeholder="City" /></div>
+                                        <div class="estimate-field"><label>State</label><select id="estimateCustomerState"><option value="">Select</option>${usStates.map((state) => `<option value="${state}">${state}</option>`).join('')}</select></div>
+                                        <div class="estimate-field"><label>Zip Code</label><input id="estimateZip" type="text" inputmode="numeric" maxlength="10" placeholder="Zip code" /></div>
+                                        <div class="estimate-field"><label>Phone Number</label><input id="estimatePhone" type="tel" placeholder="(555) 123-4567" /></div>
+                                        <div class="estimate-field"><label>Email</label><input id="estimateEmail" type="email" placeholder="example@email.com" /></div>
+                                        <div class="estimate-field"><label>Insurance Company</label><input id="estimateInsuranceCompany" type="text" placeholder="Insurance company" /></div>
+                                        <div class="estimate-field"><label>Claim Number</label><input id="estimateClaimNumber" type="text" placeholder="Claim #" /></div>
+                                    </div>
                                 </div>
-                            </div>
 
-                            <div class="estimate-card" style="background:#fff; border:1px solid #e5e7eb; border-radius:14px; box-shadow:0 8px 20px rgba(15,23,42,.06); padding:20px;">
-                                <div class="estimate-section-header" style="font-weight:800; font-size:18px; color:#111827; margin:0 0 16px;">Vehicle Info</div>
-                                <div style="display:grid; grid-template-columns:repeat(2, minmax(220px, 1fr)); gap:16px;">
-                                    <div class="estimate-field" style="grid-column:1 / -1;"><label>VIN</label><input id="estimateVin" type="text" maxlength="17" placeholder="VIN" style="letter-spacing:0.12em; text-transform:uppercase;" /></div>
-                                    <div class="estimate-field"><label>Year</label><select id="estimateYear">${years.map((year) => `<option value="${year}">${year}</option>`).join('')}</select></div>
-                                    <div class="estimate-field"><label>Make</label><select id="estimateMake">${createMakeOptions()}</select></div>
-                                    <div class="estimate-field"><label>Model</label><select id="estimateModel">${createModelOptions()}</select></div>
-                                    <div class="estimate-field"><label>Production Date</label><input id="estimateProductionDate" type="date" /></div>
-                                    <div class="estimate-field"><label>Paint Code</label><input id="estimatePaintCode" type="text" placeholder="Paint code" /></div>
-                                    <div class="estimate-field"><label>Trim Code</label><input id="estimateTrimCode" type="text" placeholder="Trim code" /></div>
-                                    <div class="estimate-field"><label>Miles</label><input id="estimateMiles" type="number" min="0" step="1" placeholder="0" /></div>
-                                    <div class="estimate-field"><label>License Plate</label><input id="estimateLicensePlate" type="text" placeholder="License plate" /></div>
-                                    <div class="estimate-field"><label>State</label><select id="estimatePlateState">${['<option value="">Select</option>', ...usStates.map((state) => `<option value="${state}">${state}</option>`)].join('')}</select></div>
+                                <div class="estimate-card" style="background:#fff; border:1px solid #e5e7eb; border-radius:14px; box-shadow:0 8px 20px rgba(15,23,42,.06); padding:20px;">
+                                    <div class="estimate-section-header" style="font-weight:800; font-size:18px; color:#111827; margin:0 0 16px;">Vehicle Info</div>
+                                    <div style="display:grid; grid-template-columns:repeat(2, minmax(220px, 1fr)); gap:16px;">
+                                        <div class="estimate-field" style="grid-column:1 / -1;"><label>VIN</label><input id="estimateVin" type="text" maxlength="17" placeholder="VIN" style="letter-spacing:0.12em; text-transform:uppercase;" /></div>
+                                        <div class="estimate-field"><label>Year</label><select id="estimateYear">${years.map((year) => `<option value="${year}">${year}</option>`).join('')}</select></div>
+                                        <div class="estimate-field"><label>Make</label><select id="estimateMake">${createMakeOptions()}</select></div>
+                                        <div class="estimate-field"><label>Model</label><select id="estimateModel">${createModelOptions()}</select></div>
+                                        <div class="estimate-field"><label>Production Date</label><input id="estimateProductionDate" type="text" inputmode="numeric" maxlength="7" placeholder="MM/YYYY" /></div>
+                                        <div class="estimate-field"><label>Paint Code</label><input id="estimatePaintCode" type="text" placeholder="Paint code" /></div>
+                                        <div class="estimate-field"><label>Trim Code</label><input id="estimateTrimCode" type="text" placeholder="Trim code" /></div>
+                                        <div class="estimate-field"><label>Miles</label><input id="estimateMiles" type="number" min="0" step="1" placeholder="0" /></div>
+                                        <div class="estimate-field"><label>License Plate</label><input id="estimateLicensePlate" type="text" placeholder="License plate" /></div>
+                                        <div class="estimate-field"><label>State</label><select id="estimatePlateState">${['<option value="">Select</option>', ...usStates.map((state) => `<option value="${state}">${state}</option>`)].join('')}</select></div>
+                                    </div>
                                 </div>
                             </div>
+                            <aside id="estimateCategoriesPane" style="flex:1; min-width:280px; background:#fff; border:1px solid #e5e7eb; border-radius:14px; box-shadow:0 8px 20px rgba(15,23,42,.06); padding:0; overflow:hidden; transition:all 0.35s ease;">
+                                <div style="background:linear-gradient(180deg, #111827 0%, #1f2937 100%); color:#fff; padding:16px 18px; font-weight:800; letter-spacing:0.06em; font-size:13px; text-transform:uppercase;">Part Categories</div>
+                                <div id="estimateCategoryList" style="padding:16px 14px; display:flex; flex-direction:column; gap:8px; max-height:calc(100vh - 240px); overflow:auto;"></div>
+                            </aside>
                         </div>
                     </div>
                 `;
@@ -304,17 +315,140 @@ def get_estimates_screen_html():
                         color:#fff;
                         font-weight:800;
                     }
+                    #estimateSidebarToggle span {
+                        transition:transform 0.25s ease, opacity 0.25s ease;
+                    }
+                    #estimateSidebarToggle.is-collapsed span:nth-child(1) {
+                        transform:translateY(8px) rotate(45deg);
+                    }
+                    #estimateSidebarToggle.is-collapsed span:nth-child(2) {
+                        opacity:0;
+                    }
+                    #estimateSidebarToggle.is-collapsed span:nth-child(3) {
+                        transform:translateY(-8px) rotate(-45deg);
+                    }
+                    #estimateInfoPane {
+                        transition:all 0.35s ease;
+                        overflow:visible;
+                    }
+                    #estimateCategoriesPane {
+                        transition:all 0.35s ease;
+                    }
                 `;
                 win.document.head.appendChild(style);
 
                 const makeSelect = win.document.getElementById('estimateMake');
                 const modelSelect = win.document.getElementById('estimateModel');
+                const infoPane = win.document.getElementById('estimateInfoPane');
+                const categoryPane = win.document.getElementById('estimateCategoriesPane');
+                const categoryList = win.document.getElementById('estimateCategoryList');
+                const productionDateInput = win.document.getElementById('estimateProductionDate');
+                const toggleButton = win.document.getElementById('estimateSidebarToggle');
+
+                const getVehicleBodyType = (make = '', model = '') => {
+                    const normalized = `${make || ''} ${model || ''}`.toLowerCase();
+                    if (/(pickup|truck|1500|2500|3500|silverado|sierra|tacoma|tundra|f-150|f-250|f-350|ranger|ridgeline|dakota|ram |frontier|canyon|colorado|sequoia|tahoe|yukon|escalade|bedside|tailgate)/i.test(normalized)) return 'truck';
+                    if (/(transit|sprinter|promaster|express|voyager|caravan|pacifica|town & country|full-size van|minivan|van|liftgate)/i.test(normalized)) return 'van';
+                    if (/(x1|x3|x4|x5|x6|x7|xc40|xc60|xc70|xc90|qx|mdx|rdx|cr-v|rav4|highlander|pilot|explorer|escape|equinox|traverse|sportage|seltos|outback|forester|crosstrek|atlas|tiguan|pathfinder|murano|jeep|cherokee|wrangler|grand cherokee|durango|gladiator|nexo|palisade|telluride|ascent|cx-|m5|m4|m3|suv)/i.test(normalized)) return 'suv';
+                    return 'car';
+                };
+
+                const getVehicleCategoryList = (make = '', model = '') => {
+                    const basePartCategories = [
+                        'front bumper', 'grille', 'headlight', 'hood', 'fender', 'radiator support', 'radiator',
+                        'condenser', 'frame', 'windshield', 'front door', 'rear door', 'roof', 'rear body',
+                        'floor', 'tail light', 'rear bumper'
+                    ];
+                    const bodyType = getVehicleBodyType(make, model);
+                    const categories = [...basePartCategories];
+
+                    if (bodyType === 'truck') {
+                        categories.splice(categories.indexOf('roof') + 1, 0, 'bedside', 'tailgate');
+                    } else if (bodyType === 'van' || bodyType === 'suv') {
+                        categories.splice(categories.indexOf('roof') + 1, 0, 'quarter panel', 'liftgate');
+                    } else {
+                        categories.splice(categories.indexOf('roof') + 1, 0, 'quarter panel', 'trunk');
+                    }
+
+                    return categories.filter((item) => !(
+                        (bodyType === 'truck' && ['quarter panel', 'trunk', 'liftgate'].includes(item)) ||
+                        (bodyType === 'van' && ['bedside', 'tailgate', 'trunk'].includes(item)) ||
+                        (bodyType === 'suv' && ['bedside', 'tailgate', 'trunk'].includes(item)) ||
+                        (bodyType === 'car' && ['bedside', 'liftgate', 'tailgate'].includes(item))
+                    ));
+                };
+
+                const renderCategories = () => {
+                    const make = makeSelect?.value || '';
+                    const model = modelSelect?.value || '';
+                    const categories = getVehicleCategoryList(make, model);
+                    if (!categoryList) return;
+                    categoryList.innerHTML = categories.map((category) => `
+                        <label style="display:flex; align-items:center; justify-content:space-between; background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; padding:10px 12px; font-size:14px; color:#1f2937; gap:12px;">
+                            <span style="text-transform:capitalize;">${category}</span>
+                            <input type="checkbox" value="${category}" style="width:16px; height:16px; accent-color:#b22222;" />
+                        </label>
+                    `).join('');
+                };
+
+                const applyPanelLayout = (isCollapsed) => {
+                    if (!infoPane || !categoryPane) return;
+                    if (isCollapsed) {
+                        infoPane.style.transform = 'translateX(-110%)';
+                        infoPane.style.opacity = '0';
+                        infoPane.style.pointerEvents = 'none';
+                        infoPane.style.maxWidth = '0';
+                        infoPane.style.marginRight = '-10px';
+                        infoPane.style.minWidth = '0';
+                        categoryPane.style.flex = '1 1 100%';
+                    } else {
+                        infoPane.style.transform = 'translateX(0)';
+                        infoPane.style.opacity = '1';
+                        infoPane.style.pointerEvents = 'auto';
+                        infoPane.style.maxWidth = 'none';
+                        infoPane.style.marginRight = '0';
+                        infoPane.style.minWidth = '0';
+                        categoryPane.style.flex = '1';
+                    }
+                };
+
+                if (toggleButton) {
+                    let isCollapsed = false;
+                    toggleButton.addEventListener('click', () => {
+                        isCollapsed = !isCollapsed;
+                        toggleButton.classList.toggle('is-collapsed', isCollapsed);
+                        applyPanelLayout(isCollapsed);
+                    });
+                }
+
+                if (productionDateInput) {
+                    productionDateInput.addEventListener('input', (event) => {
+                        const raw = event.target.value.replace(/[^0-9]/g, '').slice(0, 6);
+                        if (!raw) {
+                            event.target.value = '';
+                            return;
+                        }
+                        let month = raw.slice(0, 2);
+                        const year = raw.slice(2, 6);
+                        if (month.length === 1) month = month.padStart(2, '0');
+                        if (Number(month) > 12) month = '12';
+                        event.target.value = year ? `${month}/${year}` : month;
+                    });
+                }
+
                 if (makeSelect) {
                     makeSelect.innerHTML = createMakeOptions();
                     makeSelect.addEventListener('change', () => {
                         modelSelect.innerHTML = createModelOptions(makeSelect.value, '');
+                        renderCategories();
                     });
                 }
+
+                if (modelSelect) {
+                    modelSelect.addEventListener('change', renderCategories);
+                }
+
+                renderCategories();
 
                 const saveButton = win.document.getElementById('estimateSaveButton');
                 if (saveButton) {
