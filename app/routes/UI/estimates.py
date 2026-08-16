@@ -215,50 +215,60 @@ def get_estimates_screen_html():
 
                 const formHtml = `
                     <div id="estimateWindowContent" style="padding:26px 28px 40px; min-height:180px; background:#f5f7fb; color:#23272a; overflow:auto;">
-                        <div id="estimateContentLayout" style="display:flex; gap:18px; min-height:560px; max-width:1200px; margin:0 auto;">
-                            <div id="estimateInfoPane" style="flex:3; min-width:0; display:flex; flex-direction:column; gap:20px; transition:all 0.35s ease;">
-                                <div class="estimate-card" style="background:#fff; border:1px solid #e5e7eb; border-radius:14px; box-shadow:0 8px 20px rgba(15,23,42,.06); padding:20px;">
-                                    <div class="estimate-section-header" style="font-weight:800; font-size:18px; color:#111827; margin:0 0 16px;">Customer</div>
-                                    <div style="display:grid; grid-template-columns:repeat(2, minmax(220px, 1fr)); gap:16px;">
-                                        <div class="estimate-field"><label>First Name</label><input id="estimateFirstName" type="text" placeholder="First name" /></div>
-                                        <div class="estimate-field"><label>Last Name</label><input id="estimateLastName" type="text" placeholder="Last name" /></div>
-                                        <div class="estimate-field" style="grid-column:1 / -1;"><label>Address</label><input id="estimateAddress" type="text" placeholder="Street address" /></div>
-                                        <div class="estimate-field"><label>City</label><input id="estimateCity" type="text" placeholder="City" /></div>
-                                        <div class="estimate-field"><label>State</label><select id="estimateCustomerState"><option value="">Select</option>${usStates.map((state) => `<option value="${state}">${state}</option>`).join('')}</select></div>
-                                        <div class="estimate-field"><label>Zip Code</label><input id="estimateZip" type="text" inputmode="numeric" maxlength="10" placeholder="Zip code" /></div>
-                                        <div class="estimate-field"><label>Phone Number</label><input id="estimatePhone" type="tel" placeholder="(555) 123-4567" /></div>
-                                        <div class="estimate-field"><label>Email</label><input id="estimateEmail" type="email" placeholder="example@email.com" /></div>
-                                        <div class="estimate-field"><label>Insurance Company</label><input id="estimateInsuranceCompany" type="text" placeholder="Insurance company" /></div>
-                                        <div class="estimate-field"><label>Claim Number</label><input id="estimateClaimNumber" type="text" placeholder="Claim #" /></div>
+                        <div id="estimateContentLayout" style="display:flex; gap:18px; min-height:560px; max-width:1300px; margin:0 auto;">
+                            <div id="estimateLeftPane" style="flex:1.2; min-width:0; display:flex; flex-direction:column; gap:20px; transition:all 0.35s ease;">
+                                <div id="estimateInfoPane" style="display:flex; flex-direction:column; gap:20px; min-width:0;">
+                                    <div class="estimate-card" style="background:#fff; border:1px solid #e5e7eb; border-radius:14px; box-shadow:0 8px 20px rgba(15,23,42,.06); padding:20px;">
+                                        <div class="estimate-section-header" style="font-weight:800; font-size:18px; color:#111827; margin:0 0 16px;">Customer</div>
+                                        <div style="display:grid; grid-template-columns:repeat(2, minmax(220px, 1fr)); gap:16px;">
+                                            <div class="estimate-field"><label>First Name</label><input id="estimateFirstName" type="text" placeholder="First name" /></div>
+                                            <div class="estimate-field"><label>Last Name</label><input id="estimateLastName" type="text" placeholder="Last name" /></div>
+                                            <div class="estimate-field" style="grid-column:1 / -1;"><label>Address</label><input id="estimateAddress" type="text" placeholder="Street address" /></div>
+                                            <div class="estimate-field"><label>City</label><input id="estimateCity" type="text" placeholder="City" /></div>
+                                            <div class="estimate-field"><label>State</label><select id="estimateCustomerState"><option value="">Select</option>${usStates.map((state) => `<option value="${state}">${state}</option>`).join('')}</select></div>
+                                            <div class="estimate-field"><label>Zip Code</label><input id="estimateZip" type="text" inputmode="numeric" maxlength="10" placeholder="Zip code" /></div>
+                                            <div class="estimate-field"><label>Phone Number</label><input id="estimatePhone" type="tel" placeholder="(555) 123-4567" /></div>
+                                            <div class="estimate-field"><label>Email</label><input id="estimateEmail" type="email" placeholder="example@email.com" /></div>
+                                            <div class="estimate-field"><label>Insurance Company</label><input id="estimateInsuranceCompany" type="text" placeholder="Insurance company" /></div>
+                                            <div class="estimate-field"><label>Claim Number</label><input id="estimateClaimNumber" type="text" placeholder="Claim #" /></div>
+                                        </div>
+                                    </div>
+
+                                    <div class="estimate-card" style="background:#fff; border:1px solid #e5e7eb; border-radius:14px; box-shadow:0 8px 20px rgba(15,23,42,.06); padding:20px;">
+                                        <div class="estimate-section-header" style="font-weight:800; font-size:18px; color:#111827; margin:0 0 16px;">Vehicle Info</div>
+                                        <div style="display:grid; grid-template-columns:repeat(2, minmax(220px, 1fr)); gap:16px;">
+                                            <div class="estimate-field" style="grid-column:1 / -1;"><label>VIN</label><input id="estimateVin" type="text" maxlength="17" placeholder="VIN" style="letter-spacing:0.12em; text-transform:uppercase;" /></div>
+                                            <div class="estimate-field"><label>Year</label><select id="estimateYear">${years.map((year) => `<option value="${year}">${year}</option>`).join('')}</select></div>
+                                            <div class="estimate-field"><label>Make</label><select id="estimateMake">${createMakeOptions()}</select></div>
+                                            <div class="estimate-field"><label>Model</label><select id="estimateModel">${createModelOptions()}</select></div>
+                                            <div class="estimate-field"><label>Production Date</label><input id="estimateProductionDate" type="text" inputmode="numeric" maxlength="7" placeholder="MM/YYYY" /></div>
+                                            <div class="estimate-field"><label>Paint Code</label><input id="estimatePaintCode" type="text" placeholder="Paint code" /></div>
+                                            <div class="estimate-field"><label>Trim Code</label><input id="estimateTrimCode" type="text" placeholder="Trim code" /></div>
+                                            <div class="estimate-field"><label>Miles</label><input id="estimateMiles" type="number" min="0" step="1" placeholder="0" /></div>
+                                            <div class="estimate-field"><label>License Plate</label><input id="estimateLicensePlate" type="text" placeholder="License plate" /></div>
+                                            <div class="estimate-field"><label>State</label><select id="estimatePlateState">${['<option value="">Select</option>', ...usStates.map((state) => `<option value="${state}">${state}</option>`)].join('')}</select></div>
+                                        </div>
                                     </div>
                                 </div>
 
-                                <div class="estimate-card" style="background:#fff; border:1px solid #e5e7eb; border-radius:14px; box-shadow:0 8px 20px rgba(15,23,42,.06); padding:20px;">
-                                    <div class="estimate-section-header" style="font-weight:800; font-size:18px; color:#111827; margin:0 0 16px;">Vehicle Info</div>
-                                    <div style="display:grid; grid-template-columns:repeat(2, minmax(220px, 1fr)); gap:16px;">
-                                        <div class="estimate-field" style="grid-column:1 / -1;"><label>VIN</label><input id="estimateVin" type="text" maxlength="17" placeholder="VIN" style="letter-spacing:0.12em; text-transform:uppercase;" /></div>
-                                        <div class="estimate-field"><label>Year</label><select id="estimateYear">${years.map((year) => `<option value="${year}">${year}</option>`).join('')}</select></div>
-                                        <div class="estimate-field"><label>Make</label><select id="estimateMake">${createMakeOptions()}</select></div>
-                                        <div class="estimate-field"><label>Model</label><select id="estimateModel">${createModelOptions()}</select></div>
-                                        <div class="estimate-field"><label>Production Date</label><input id="estimateProductionDate" type="text" inputmode="numeric" maxlength="7" placeholder="MM/YYYY" /></div>
-                                        <div class="estimate-field"><label>Paint Code</label><input id="estimatePaintCode" type="text" placeholder="Paint code" /></div>
-                                        <div class="estimate-field"><label>Trim Code</label><input id="estimateTrimCode" type="text" placeholder="Trim code" /></div>
-                                        <div class="estimate-field"><label>Miles</label><input id="estimateMiles" type="number" min="0" step="1" placeholder="0" /></div>
-                                        <div class="estimate-field"><label>License Plate</label><input id="estimateLicensePlate" type="text" placeholder="License plate" /></div>
-                                        <div class="estimate-field"><label>State</label><select id="estimatePlateState">${['<option value="">Select</option>', ...usStates.map((state) => `<option value="${state}">${state}</option>`)].join('')}</select></div>
+                                <aside id="estimateCategoriesPane" style="flex:0 0 240px; min-width:220px; background:#fff; border:1px solid #e5e7eb; border-radius:14px; box-shadow:0 8px 20px rgba(15,23,42,.06); padding:0; overflow:hidden; transition:all 0.35s ease; display:flex; flex-direction:column;">
+                                    <div style="background:linear-gradient(180deg, #111827 0%, #1f2937 100%); color:#fff; padding:16px 18px; font-weight:800; letter-spacing:0.06em; font-size:13px; text-transform:uppercase;">Part Categories</div>
+                                    <div id="estimateCategoryList" style="padding:16px 14px; display:flex; flex-direction:column; gap:8px; overflow:auto; flex:1; min-height:0;"></div>
+                                </aside>
+                            </div>
+
+                            <div id="estimateRightPane" style="flex:1.3; min-width:320px; display:flex; flex-direction:column; gap:18px; min-height:0;">
+                                <div id="estimateSchematicPane" style="flex:1.3; background:#fff; border:1px solid #e5e7eb; border-radius:14px; box-shadow:0 8px 20px rgba(15,23,42,.06); padding:0; overflow:hidden; display:flex; flex-direction:column;">
+                                    <div style="background:linear-gradient(180deg, #1f2937 0%, #374151 100%); color:#fff; padding:16px 18px; font-weight:800; letter-spacing:0.06em; font-size:13px; text-transform:uppercase;">Schematic</div>
+                                    <div style="padding:14px; display:flex; flex-direction:column; gap:12px; background:#f8fafc; min-height:0; flex:1; overflow:auto;">
+                                        <div id="estimateIllustrationArea" style="min-height:220px;"></div>
                                     </div>
                                 </div>
-                            </div>
-                            <aside id="estimateCategoriesPane" style="flex:1; min-width:280px; background:#fff; border:1px solid #e5e7eb; border-radius:14px; box-shadow:0 8px 20px rgba(15,23,42,.06); padding:0; overflow:hidden; transition:all 0.35s ease; display:flex; flex-direction:column;">
-                                <div style="background:linear-gradient(180deg, #111827 0%, #1f2937 100%); color:#fff; padding:16px 18px; font-weight:800; letter-spacing:0.06em; font-size:13px; text-transform:uppercase;">Part Categories</div>
-                                <div id="estimateCategoryList" style="padding:16px 14px; display:flex; flex-direction:column; gap:8px; max-height:260px; overflow:auto; flex-shrink:0;"></div>
-                                <div style="padding:0 14px 14px; display:flex; flex-direction:column; gap:12px; background:#f8fafc; border-top:1px solid #e2e8f0; min-height:0; flex:1;">
-                                    <div style="padding-top:14px; font-size:12px; text-transform:uppercase; letter-spacing:0.08em; color:#475569; font-weight:700;">Vehicle Schematic</div>
-                                    <div id="estimateIllustrationArea" style="flex:1; min-height:200px; overflow:auto;"></div>
-                                    <div style="font-size:12px; text-transform:uppercase; letter-spacing:0.08em; color:#475569; font-weight:700;">Estimate Lines</div>
-                                    <div id="estimateLineList" style="display:flex; flex-direction:column; gap:8px; overflow:auto; max-height:220px;"></div>
+                                <div id="estimateLinesPane" style="flex:0.7; background:#fff; border:1px solid #e5e7eb; border-radius:14px; box-shadow:0 8px 20px rgba(15,23,42,.06); padding:0; overflow:hidden; display:flex; flex-direction:column;">
+                                    <div style="background:linear-gradient(180deg, #374151 0%, #4b5563 100%); color:#fff; padding:16px 18px; font-weight:800; letter-spacing:0.06em; font-size:13px; text-transform:uppercase;">Estimate Lines</div>
+                                    <div id="estimateLineList" style="padding:14px; display:flex; flex-direction:column; gap:8px; overflow:auto; flex:1; min-height:0;"></div>
                                 </div>
-                            </aside>
+                            </div>
                         </div>
                     </div>
                 `;
@@ -333,20 +343,27 @@ def get_estimates_screen_html():
                     #estimateSidebarToggle.is-collapsed span:nth-child(3) {
                         transform:translateY(-8px) rotate(-45deg);
                     }
-                    #estimateInfoPane {
-                        transition:all 0.35s ease;
-                        overflow:visible;
-                    }
+                    #estimateInfoPane,
+                    #estimateLeftPane,
+                    #estimateRightPane,
+                    #estimateSchematicPane,
+                    #estimateLinesPane,
                     #estimateCategoriesPane {
                         transition:all 0.35s ease;
+                    }
+                    #estimateCategoryList,
+                    #estimateLineList {
+                        scrollbar-width: thin;
                     }
                 `;
                 win.document.head.appendChild(style);
 
                 const makeSelect = win.document.getElementById('estimateMake');
                 const modelSelect = win.document.getElementById('estimateModel');
+                const leftPane = win.document.getElementById('estimateLeftPane');
                 const infoPane = win.document.getElementById('estimateInfoPane');
                 const categoryPane = win.document.getElementById('estimateCategoriesPane');
+                const rightPane = win.document.getElementById('estimateRightPane');
                 const categoryList = win.document.getElementById('estimateCategoryList');
                 const illustrationArea = win.document.getElementById('estimateIllustrationArea');
                 const estimateLineList = win.document.getElementById('estimateLineList');
@@ -569,23 +586,21 @@ def get_estimates_screen_html():
                 };
 
                 const applyPanelLayout = (isCollapsed) => {
-                    if (!infoPane || !categoryPane) return;
+                    if (!leftPane || !rightPane || !infoPane || !categoryPane) return;
                     if (isCollapsed) {
-                        infoPane.style.transform = 'translateX(-110%)';
+                        infoPane.style.display = 'none';
                         infoPane.style.opacity = '0';
                         infoPane.style.pointerEvents = 'none';
-                        infoPane.style.maxWidth = '0';
-                        infoPane.style.marginRight = '-10px';
-                        infoPane.style.minWidth = '0';
-                        categoryPane.style.flex = '1 1 100%';
+                        leftPane.style.flex = '0.45';
+                        categoryPane.style.flex = '1';
+                        rightPane.style.flex = '1.8';
                     } else {
-                        infoPane.style.transform = 'translateX(0)';
+                        infoPane.style.display = 'flex';
                         infoPane.style.opacity = '1';
                         infoPane.style.pointerEvents = 'auto';
-                        infoPane.style.maxWidth = 'none';
-                        infoPane.style.marginRight = '0';
-                        infoPane.style.minWidth = '0';
-                        categoryPane.style.flex = '1';
+                        leftPane.style.flex = '1.2';
+                        categoryPane.style.flex = '0 0 240px';
+                        rightPane.style.flex = '1.3';
                     }
                 };
 
