@@ -658,11 +658,54 @@ def get_estimates_screen_html():
                     return supportParts[part] || supportParts['front bumper'];
                 };
 
+                const estimateActionChoices = ['R&I', 'REPAIR', 'REPLACE', 'REFINISH'];
+                const estimateSelectedLines = [];
+
+                const renderEstimateLines = () => {
+                    if (!estimateLineList) return;
+                    if (!estimateSelectedLines.length) {
+                        estimateLineList.innerHTML = `
+                            <div style="display:flex; align-items:center; justify-content:center; min-height:160px; border:1px dashed #dfe6ee; border-radius:12px; background:#fafbfc; color:#64748b; font-size:14px; font-weight:600;">
+                                No selected parts yet.
+                            </div>
+                        `;
+                        return;
+                    }
+
+                    const rows = estimateSelectedLines.map((line, index) => `
+                        <div style="display:grid; grid-template-columns:56px 1.5fr 62px 90px 90px 80px 80px; align-items:center; gap:8px; padding:10px 12px; border:1px solid #e2e8f0; border-radius:10px; background:#f8fafc; font-size:12px; color:#111827;">
+                            <div style="font-weight:800; color:#334155;">${index + 1}</div>
+                            <div style="font-weight:700; text-transform:capitalize; color:#111827;">${line.description}</div>
+                            <div style="text-align:center; color:#475569; font-weight:600;">${line.qty}</div>
+                            <div style="text-align:center; color:#475569; font-weight:600;">${line.partNumber || line.part}</div>
+                            <div style="text-align:right; font-weight:800; color:#b22222;">$${Number(line.price || 0).toFixed(2)}</div>
+                            <div style="text-align:right; color:#475569; font-weight:600;">${Number(line.body || 0).toFixed(2)}</div>
+                            <div style="text-align:right; color:#475569; font-weight:600;">${Number(line.paint || 0).toFixed(2)}</div>
+                        </div>
+                    `).join('');
+
+                    estimateLineList.innerHTML = `
+                        <div style="display:flex; flex-direction:column; gap:8px; min-width:650px;">
+                            <div style="display:grid; grid-template-columns:56px 1.5fr 62px 90px 90px 80px 80px; align-items:center; gap:8px; padding:8px 12px; border-bottom:1px solid #e2e8f0; font-size:11px; letter-spacing:0.08em; text-transform:uppercase; color:#475569; font-weight:800;">
+                                <div>Line #</div>
+                                <div>Description</div>
+                                <div style="text-align:center;">Qty</div>
+                                <div style="text-align:center;">Part #</div>
+                                <div style="text-align:right;">Price</div>
+                                <div style="text-align:right;">Body</div>
+                                <div style="text-align:right;">Paint</div>
+                            </div>
+                            ${rows}
+                        </div>
+                    `;
+                };
+
                 const buildSchematicSvg = (partName, bodyType, make = '', model = '') => {
                     const part = normalizePartName(partName || 'front bumper');
                     const profile = getVehicleProfile(make, model) || bodyType || 'car';
                     const selectedPart = part;
                     const vehicleImage = getVehicleImageAsset(make, model);
+                    const openComponentName = categoryList?.dataset.actionMenuFor || '';
                     const hotspots = getHotspotConfiguration(profile).map((item) => {
                         const isSelected = normalizePartName(item.part) === selectedPart;
                         const color = getHotspotColor(item.part);
@@ -671,6 +714,26 @@ def get_estimates_screen_html():
                         return `
                             <button type="button" data-part-hotspot="${item.part}" aria-label="${item.label}" title="${item.label}" style="position:absolute; left:${item.left}; top:${item.top}; width:${item.width}; height:${item.height}; border:2px solid ${border}; background:${fill}; border-radius:12px; box-shadow:${isSelected ? `0 0 0 3px ${color}33` : 'inset 0 0 0 1px rgba(15,23,42,0.10)'}; cursor:pointer; z-index:2; padding:0; opacity:0.95;">
                             </button>
+                        `;
+                    }).join('');
+
+                    const supportMarkup = getSupportComponents(selectedPart).map((item) => {
+                        const isMenuOpen = normalizePartName(item) === normalizePartName(openComponentName);
+                        return `
+                            <div style="position:relative;">
+                                <button type="button" data-component-chip="${item}" data-part-name="${selectedPart}" style="display:inline-flex; align-items:center; justify-content:center; padding:6px 10px; border-radius:999px; border:1px solid ${isMenuOpen ? '#b22222' : '#e2e8f0'}; background:${isMenuOpen ? '#fff1f2' : '#f8fafc'}; color:#111827; font-size:12px; font-weight:700; cursor:pointer;">
+                                    ${item}
+                                </button>
+                                ${isMenuOpen ? `
+                                    <div style="position:absolute; left:0; top:calc(100% + 8px); z-index:20; display:flex; flex-direction:column; gap:4px; background:#fff; border:1px solid #e2e8f0; border-radius:12px; box-shadow:0 12px 24px rgba(15,23,42,0.12); padding:8px; min-width:150px;">
+                                        ${estimateActionChoices.map((action) => `
+                                            <button type="button" data-component-action="${action}" data-component-name="${item}" data-part-name="${selectedPart}" style="padding:8px 10px; border:none; background:#f8fafc; color:#111827; text-align:left; border-radius:8px; font-size:12px; font-weight:700; cursor:pointer;">
+                                                ${action}
+                                            </button>
+                                        `).join('')}
+                                    </div>
+                                ` : ''}
+                            </div>
                         `;
                     }).join('');
 
@@ -687,9 +750,7 @@ def get_estimates_screen_html():
                                     <div style="font-size:12px; color:#475569; font-weight:700;">${make || 'Vehicle'} ${model || ''}</div>
                                 </div>
                                 <div style="display:flex; flex-wrap:wrap; gap:8px;">
-                                    ${getSupportComponents(selectedPart).map((item) => `
-                                        <span style="display:inline-flex; align-items:center; padding:6px 10px; border-radius:999px; background:#f8fafc; border:1px solid #e2e8f0; font-size:12px; color:#111827; font-weight:600;">${item}</span>
-                                    `).join('')}
+                                    ${supportMarkup}
                                 </div>
                             </div>
                         </div>
@@ -709,24 +770,47 @@ def get_estimates_screen_html():
                                 const chosenPart = hotspot.getAttribute('data-part-hotspot');
                                 if (!chosenPart) return;
                                 categoryList.dataset.selectedPart = normalizePartName(chosenPart);
+                                categoryList.dataset.actionMenuFor = '';
                                 renderCategories();
                             });
                         });
-                    }
 
-                    const estimateLines = getVehicleSpecificEstimateLines(selectedPart);
-                    if (estimateLineList) {
-                        estimateLineList.innerHTML = `
-                            <div style="display:flex; flex-direction:column; gap:8px; margin-top:12px;">
-                                ${estimateLines.map((line) => `
-                                    <div style="display:grid; grid-template-columns:1.6fr 0.7fr 0.8fr; gap:8px; padding:9px 10px; border:1px solid #e2e8f0; border-radius:10px; background:#f8fafc; font-size:13px; color:#111827;">
-                                        <div style="font-weight:600; text-transform:capitalize;">${line.label}</div>
-                                        <div style="text-align:center; color:#475569;">${line.qty} ${line.unit}</div>
-                                        <div style="text-align:right; font-weight:700; color:#b22222;">$${line.price}</div>
-                                    </div>
-                                `).join('')}
-                            </div>
-                        `;
+                        illustrationArea.querySelectorAll('[data-component-chip]').forEach((chip) => {
+                            chip.addEventListener('click', (event) => {
+                                event.stopPropagation();
+                                const componentName = chip.getAttribute('data-component-chip');
+                                const currentValue = categoryList?.dataset.actionMenuFor || '';
+                                categoryList.dataset.actionMenuFor = normalizePartName(currentValue) === normalizePartName(componentName) ? '' : componentName;
+                                renderIllustration();
+                            });
+                        });
+
+                        illustrationArea.querySelectorAll('[data-component-action]').forEach((optionButton) => {
+                            optionButton.addEventListener('click', (event) => {
+                                event.stopPropagation();
+                                const componentName = optionButton.getAttribute('data-component-name');
+                                const action = optionButton.getAttribute('data-component-action');
+                                const partName = optionButton.getAttribute('data-part-name');
+                                if (!componentName || !action || !partName) return;
+
+                                const defaultLine = getVehicleSpecificEstimateLines(partName)[0] || { price: 0, qty: 1 };
+                                estimateSelectedLines.push({
+                                    part: partName,
+                                    partNumber: partName,
+                                    component: componentName,
+                                    action,
+                                    description: `${componentName} (${action})`,
+                                    qty: defaultLine.qty || 1,
+                                    price: Number(defaultLine.price || 0),
+                                    body: 0,
+                                    paint: 0
+                                });
+
+                                categoryList.dataset.actionMenuFor = '';
+                                renderEstimateLines();
+                                renderIllustration();
+                            });
+                        });
                     }
                 };
 
@@ -806,9 +890,13 @@ def get_estimates_screen_html():
                 };
 
                 const clearEstimateWorkContent = () => {
-                    if (categoryList) categoryList.innerHTML = '';
+                    if (categoryList) {
+                        categoryList.innerHTML = '';
+                        categoryList.dataset.actionMenuFor = '';
+                    }
                     if (illustrationArea) illustrationArea.innerHTML = '';
                     if (estimateLineList) estimateLineList.innerHTML = '';
+                    estimateSelectedLines.length = 0;
                 };
 
                 const setEstimateView = (viewName) => {
