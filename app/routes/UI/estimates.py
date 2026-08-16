@@ -227,6 +227,10 @@ def get_estimates_screen_html():
                                     <span aria-hidden="true" style="font-size:22px; line-height:1;">👤</span>
                                     <span>Customer / Vehicle</span>
                                 </button>
+                                <button type="button" class="estimate-nav-button" data-estimate-view="estimate" style="display:flex; flex-direction:column; align-items:center; justify-content:center; gap:8px; width:100%; min-height:74px; border:1px solid #e5e7eb; border-radius:12px; background:#fff; color:#374151; font-size:11px; font-weight:700; cursor:pointer;">
+                                    <span aria-hidden="true" style="font-size:20px; line-height:1;">🧩</span>
+                                    <span>Estimate</span>
+                                </button>
                                 <button type="button" class="estimate-nav-button" data-estimate-view="rates" style="display:flex; flex-direction:column; align-items:center; justify-content:center; gap:8px; width:100%; min-height:74px; border:1px solid #e5e7eb; border-radius:12px; background:#fff; color:#374151; font-size:11px; font-weight:700; cursor:pointer;">
                                     <span aria-hidden="true" style="font-size:20px; line-height:1;">📊</span>
                                     <span>Rates</span>
@@ -270,6 +274,27 @@ def get_estimates_screen_html():
                                                 <div class="estimate-field"><label>License Plate</label><input id="estimateLicensePlate" type="text" placeholder="License plate" /></div>
                                                 <div class="estimate-field"><label>State</label><select id="estimatePlateState">${['<option value="">Select</option>', ...usStates.map((state) => `<option value="${state}">${state}</option>`)].join('')}</select></div>
                                             </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div id="estimateWorkPanel" style="display:none; flex:1 1 auto; min-width:0; gap:24px; align-items:stretch; overflow:visible; box-sizing:border-box;">
+                                    <aside id="estimateCategoriesPane" style="flex:0 0 230px; min-width:230px; background:#fff; border:1px solid #e5e7eb; border-radius:14px; box-shadow:0 8px 20px rgba(15,23,42,.06); padding:0; overflow:visible; display:flex; flex-direction:column; transition:all 0.35s ease; box-sizing:border-box;">
+                                        <div style="background:linear-gradient(180deg, #111827 0%, #1f2937 100%); color:#fff; padding:16px 18px; font-weight:800; letter-spacing:0.06em; font-size:13px; text-transform:uppercase;">Part Categories</div>
+                                        <div id="estimateCategoryList" style="padding:16px 14px; display:flex; flex-direction:column; gap:8px; overflow:auto; flex:1; min-height:0;"></div>
+                                    </aside>
+
+                                    <div id="estimateRightPane" style="flex:1 1 auto; min-width:420px; display:flex; flex-direction:column; gap:18px; overflow:visible; box-sizing:border-box; margin-left:0; margin-right:0; padding-right:10px;">
+                                        <div id="estimateSchematicPane" style="flex:1.4; background:#fff; border:1px solid #e5e7eb; border-radius:14px; box-shadow:0 8px 20px rgba(15,23,42,.06); padding:0; overflow:visible; display:flex; flex-direction:column; box-sizing:border-box;">
+                                            <div style="background:linear-gradient(180deg, #1f2937 0%, #374151 100%); color:#fff; padding:16px 18px; font-weight:800; letter-spacing:0.06em; font-size:13px; text-transform:uppercase;">Schematic</div>
+                                            <div style="padding:14px; display:flex; flex-direction:column; gap:12px; background:#f8fafc; min-height:0; flex:1; overflow:visible; box-sizing:border-box;">
+                                                <div id="estimateIllustrationArea" style="min-height:220px; overflow:visible; width:100%;"></div>
+                                            </div>
+                                        </div>
+
+                                        <div id="estimateLinesPane" style="flex:0.8; background:#fff; border:1px solid #e5e7eb; border-radius:14px; box-shadow:0 8px 20px rgba(15,23,42,.06); padding:0; overflow:visible; display:flex; flex-direction:column; box-sizing:border-box;">
+                                            <div style="background:linear-gradient(180deg, #374151 0%, #4b5563 100%); color:#fff; padding:16px 18px; font-weight:800; letter-spacing:0.06em; font-size:13px; text-transform:uppercase;">Estimate Lines</div>
+                                            <div id="estimateLineList" style="padding:14px; display:flex; flex-direction:column; gap:8px; overflow:auto; flex:1; min-height:0; width:100%; box-sizing:border-box;"></div>
                                         </div>
                                     </div>
                                 </div>
@@ -701,10 +726,12 @@ def get_estimates_screen_html():
                     });
 
                     const customerVehiclePanel = win.document.getElementById('estimateCustomerVehiclePanel');
+                    const estimateWorkPanel = win.document.getElementById('estimateWorkPanel');
                     const ratesPanel = win.document.getElementById('estimateRatesPanel');
                     const notesPanel = win.document.getElementById('estimateNotesPanel');
 
                     if (customerVehiclePanel) customerVehiclePanel.style.display = viewName === 'customerVehicle' ? 'flex' : 'none';
+                    if (estimateWorkPanel) estimateWorkPanel.style.display = viewName === 'estimate' ? 'flex' : 'none';
                     if (ratesPanel) ratesPanel.style.display = viewName === 'rates' ? 'block' : 'none';
                     if (notesPanel) notesPanel.style.display = viewName === 'notes' ? 'block' : 'none';
                 };
