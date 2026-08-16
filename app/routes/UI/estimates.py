@@ -549,48 +549,89 @@ def get_estimates_screen_html():
                     return components;
                 };
 
-                const buildSchematicSvg = (partName, bodyType) => {
+                const getVehicleProfile = (make = '', model = '') => {
+                    const normalized = `${make || ''} ${model || ''}`.toLowerCase();
+                    if (/(pickup|truck|silverado|sierra|tacoma|tundra|ram|frontier|canyon|colorado|ridgeline|sequoia|yukon|f-150|f-250|f-350)/i.test(normalized)) return 'truck';
+                    if (/(transit|sprinter|promaster|express|voyager|caravan|pacifica|minivan|van)/i.test(normalized)) return 'van';
+                    if (/(cr-v|rav4|explorer|escape|equinox|sportage|forester|outback|pilot|atlas|rogue|pathfinder|murano|xc60|xc90|x5|x3|g80|g90|palisade|telluride|suv|crosstrek|ascent|mdx|rdx|range rover|defender)/i.test(normalized)) return 'suv';
+                    if (/(mustang|camaro|challenger|corvette|miata|supra|911|z4|carrera|coupe)/i.test(normalized)) return 'coupe';
+                    return 'car';
+                };
+
+                const buildSchematicSvg = (partName, bodyType, make = '', model = '') => {
                     const part = normalizePartName(partName);
+                    const profile = getVehicleProfile(make, model) || bodyType || 'car';
                     const isFront = ['front bumper', 'grille', 'headlight', 'hood', 'fender', 'radiator support', 'radiator', 'condenser', 'frame', 'windshield'].includes(part);
                     const isRear = ['rear body', 'floor', 'tail light', 'rear bumper', 'quarter panel', 'tailgate', 'liftgate', 'trunk', 'bedside', 'roof'].includes(part);
-
-                    const vehicleColor = bodyType === 'truck' ? '#6b7280' : bodyType === 'suv' ? '#3b82f6' : bodyType === 'van' ? '#8b5cf6' : '#e11d48';
+                    const vehicleColor = profile === 'truck' ? '#6b7280' : profile === 'suv' ? '#3b82f6' : profile === 'van' ? '#8b5cf6' : profile === 'coupe' ? '#f59e0b' : '#e11d48';
                     const accentColor = '#f2f2f2';
                     const partLabel = part.split(' ').map((word) => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
 
-                    const genericBody = `
+                    const baseBody = {
+                        car: 'M88 164 L88 118 Q88 90 118 76 L286 76 Q312 76 320 104 L332 164 L332 172 Q332 182 326 188 L318 196 L100 196 L92 188 Q88 182 88 172 Z',
+                        coupe: 'M86 164 L86 118 Q86 88 116 74 L280 74 Q312 70 322 108 L336 164 L336 174 Q336 182 330 188 L320 196 L96 196 L90 188 Q86 182 86 174 Z',
+                        suv: 'M76 166 L76 130 Q76 100 104 82 L314 82 Q336 86 346 116 L356 152 L356 170 Q356 182 350 190 L338 196 L98 196 L82 190 Q76 182 76 170 Z',
+                        truck: 'M80 168 L80 122 Q80 92 108 78 L286 78 Q318 80 334 104 L354 150 L358 168 Q358 182 346 190 L328 196 L100 196 L84 188 Q80 182 80 168 Z',
+                        van: 'M64 166 L64 112 Q64 90 92 80 L314 80 Q342 82 348 110 L354 166 L354 176 Q354 184 348 192 L334 196 L94 196 L70 192 Q64 184 64 176 Z'
+                    }[profile] || 'M88 164 L88 118 Q88 90 118 76 L286 76 Q312 76 320 104 L332 164 L332 172 Q332 182 326 188 L318 196 L100 196 L92 188 Q88 182 88 172 Z';
+
+                    const roofShape = {
+                        car: 'M118 76 L228 76 L276 56 L306 56 L314 92 L192 92 L118 92 Z',
+                        coupe: 'M112 76 L230 64 L286 62 L312 98 L196 100 L112 100 Z',
+                        suv: 'M102 80 L230 70 L308 76 L344 116 L218 118 L102 118 Z',
+                        truck: 'M108 80 L230 72 L286 72 L318 92 L328 118 L208 118 L108 118 Z',
+                        van: 'M92 80 L240 76 L314 78 L336 110 L222 112 L92 112 Z'
+                    }[profile] || 'M118 76 L228 76 L276 56 L306 56 L314 92 L192 92 L118 92 Z';
+
+                    const highlightMap = {
+                        'front bumper': '<rect x="58" y="126" width="82" height="36" rx="10" fill="#dbeafe" stroke="#111827" stroke-width="2"/>',
+                        grille: '<rect x="118" y="98" width="152" height="28" rx="8" fill="#dbeafe" stroke="#111827" stroke-width="2"/>',
+                        headlight: '<rect x="82" y="104" width="48" height="30" rx="8" fill="#dbeafe" stroke="#111827" stroke-width="2"/>',
+                        hood: '<path d="M104 100 L288 100 L312 142 L90 142 Z" fill="#dbeafe" stroke="#111827" stroke-width="2"/>',
+                        fender: '<path d="M74 116 L110 94 L128 156 L74 170 Z" fill="#dbeafe" stroke="#111827" stroke-width="2"/>',
+                        'radiator support': '<rect x="122" y="96" width="164" height="18" rx="6" fill="#dbeafe" stroke="#111827" stroke-width="2"/>',
+                        radiator: '<rect x="134" y="104" width="142" height="26" rx="8" fill="#dbeafe" stroke="#111827" stroke-width="2"/>',
+                        condenser: '<rect x="146" y="106" width="118" height="22" rx="8" fill="#dbeafe" stroke="#111827" stroke-width="2"/>',
+                        frame: '<path d="M98 94 L126 94 L144 182 L104 192 L92 142 Z M294 94 L324 94 L322 192 L284 182 L276 144 Z" fill="#dbeafe" stroke="#111827" stroke-width="2"/>',
+                        windshield: '<path d="M134 76 L264 76 L288 132 L120 132 Z" fill="#dbeafe" stroke="#111827" stroke-width="2"/>',
+                        'front door': '<rect x="120" y="92" width="72" height="96" rx="8" fill="#dbeafe" stroke="#111827" stroke-width="2"/>',
+                        'rear door': '<rect x="228" y="92" width="72" height="96" rx="8" fill="#dbeafe" stroke="#111827" stroke-width="2"/>',
+                        'quarter panel': '<path d="M276 96 L330 112 L330 174 L274 176 L256 134 Z" fill="#dbeafe" stroke="#111827" stroke-width="2"/>',
+                        bedside: '<rect x="246" y="90" width="72" height="104" rx="8" fill="#dbeafe" stroke="#111827" stroke-width="2"/>',
+                        roof: '<path d="M124 68 L260 68 L298 92 L112 92 Z" fill="#dbeafe" stroke="#111827" stroke-width="2"/>',
+                        trunk: '<path d="M148 90 L268 90 L294 156 L124 156 Z" fill="#dbeafe" stroke="#111827" stroke-width="2"/>',
+                        liftgate: '<path d="M128 88 L282 88 L298 154 L112 154 Z" fill="#dbeafe" stroke="#111827" stroke-width="2"/>',
+                        'tailgate': '<rect x="118" y="100" width="190" height="62" rx="10" fill="#dbeafe" stroke="#111827" stroke-width="2"/>',
+                        'rear body': '<path d="M120 104 L292 104 L308 170 L104 170 Z" fill="#dbeafe" stroke="#111827" stroke-width="2"/>',
+                        floor: '<rect x="128" y="112" width="166" height="60" rx="10" fill="#dbeafe" stroke="#111827" stroke-width="2"/>',
+                        'tail light': '<rect x="314" y="120" width="30" height="34" rx="8" fill="#dbeafe" stroke="#111827" stroke-width="2"/>',
+                        'rear bumper': '<rect x="284" y="126" width="56" height="30" rx="10" fill="#dbeafe" stroke="#111827" stroke-width="2"/>'
+                    }[part] || '<rect x="120" y="104" width="162" height="54" rx="12" fill="#dbeafe" stroke="#111827" stroke-width="2"/>';
+
+                    const wheels = [
+                        '<circle cx="118" cy="196" r="16" fill="#1f2937" stroke="#e5e7eb" stroke-width="4"/>',
+                        '<circle cx="298" cy="196" r="16" fill="#1f2937" stroke="#e5e7eb" stroke-width="4"/>'
+                    ].join('');
+
+                    return `
                         <svg viewBox="0 0 420 260" width="100%" height="220" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="${partLabel} schematic">
-                            <rect x="48" y="28" width="324" height="194" rx="28" fill="${vehicleColor}" opacity="0.18" stroke="${vehicleColor}" stroke-width="3"/>
-                            <rect x="110" y="54" width="200" height="118" rx="18" fill="#ffffff" opacity="0.65" stroke="#111827" stroke-width="2"/>
-                            <path d="M80 90 L120 60 L300 60 L340 90" stroke="#111827" stroke-width="2.5" fill="none" opacity="0.8"/>
-                            ${isFront ? `<rect x="58" y="92" width="80" height="68" rx="12" fill="${accentColor}" stroke="#111827" stroke-width="2"/>` : ''}
-                            ${isRear ? `<rect x="282" y="92" width="80" height="68" rx="12" fill="${accentColor}" stroke="#111827" stroke-width="2"/>` : ''}
-                            ${part === 'front bumper' ? `<rect x="66" y="108" width="62" height="36" rx="10" fill="#dbeafe" stroke="#111827" stroke-width="2"/>` : ''}
-                            ${part === 'grille' ? `<rect x="120" y="88" width="180" height="36" rx="8" fill="#dbeafe" stroke="#111827" stroke-width="2"/>` : ''}
-                            ${part === 'headlight' ? `<rect x="78" y="85" width="60" height="52" rx="10" fill="#dbeafe" stroke="#111827" stroke-width="2"/>` : ''}
-                            ${part === 'hood' ? `<path d="M110 92 L310 92 L323 150 L97 150 Z" fill="#dbeafe" stroke="#111827" stroke-width="2"/>` : ''}
-                            ${part === 'fender' ? `<path d="M70 98 L112 74 L136 128 L84 160 Z" fill="#dbeafe" stroke="#111827" stroke-width="2"/>` : ''}
-                            ${part === 'radiator support' ? `<rect x="120" y="88" width="180" height="20" rx="6" fill="#e0f2fe" stroke="#111827" stroke-width="2"/>` : ''}
-                            ${part === 'radiator' ? `<rect x="136" y="92" width="148" height="38" rx="8" fill="#dbeafe" stroke="#111827" stroke-width="2"/>` : ''}
-                            ${part === 'condenser' ? `<rect x="150" y="94" width="120" height="30" rx="8" fill="#e0f2fe" stroke="#111827" stroke-width="2"/>` : ''}
-                            ${part === 'frame' ? `<path d="M96 74 L132 74 L150 170 L100 190 L90 136 Z M288 74 L324 74 L320 190 L270 170 L270 136 Z" fill="#dbeafe" stroke="#111827" stroke-width="2"/>` : ''}
-                            ${part === 'windshield' ? `<path d="M120 70 L300 70 L292 150 L128 150 Z" fill="#dbeafe" stroke="#111827" stroke-width="2"/>` : ''}
-                            ${part === 'front door' ? `<rect x="110" y="78" width="70" height="118" rx="8" fill="#dbeafe" stroke="#111827" stroke-width="2"/>` : ''}
-                            ${part === 'rear door' ? `<rect x="240" y="78" width="70" height="118" rx="8" fill="#dbeafe" stroke="#111827" stroke-width="2"/>` : ''}
-                            ${part === 'quarter panel' ? `<path d="M290 76 L328 90 L332 170 L270 174 L250 110 Z" fill="#dbeafe" stroke="#111827" stroke-width="2"/>` : ''}
-                            ${part === 'bedside' ? `<rect x="262" y="70" width="74" height="116" rx="8" fill="#dbeafe" stroke="#111827" stroke-width="2"/>` : ''}
-                            ${part === 'roof' ? `<path d="M132 52 L288 52 L305 84 L115 84 Z" fill="#dbeafe" stroke="#111827" stroke-width="2"/>` : ''}
-                            ${part === 'trunk' ? `<path d="M140 80 L280 80 L296 152 L124 152 Z" fill="#dbeafe" stroke="#111827" stroke-width="2"/>` : ''}
-                            ${part === 'liftgate' ? `<path d="M130 76 L290 76 L302 154 L118 154 Z" fill="#dbeafe" stroke="#111827" stroke-width="2"/>` : ''}
-                            ${part === 'tailgate' ? `<rect x="118" y="88" width="184" height="80" rx="10" fill="#dbeafe" stroke="#111827" stroke-width="2"/>` : ''}
-                            ${part === 'rear body' ? `<path d="M100 110 L320 110 L304 170 L116 170 Z" fill="#dbeafe" stroke="#111827" stroke-width="2"/>` : ''}
-                            ${part === 'floor' ? `<rect x="126" y="98" width="168" height="86" rx="10" fill="#dbeafe" stroke="#111827" stroke-width="2"/>` : ''}
-                            ${part === 'tail light' ? `<rect x="300" y="106" width="36" height="44" rx="8" fill="#dbeafe" stroke="#111827" stroke-width="2"/>` : ''}
-                            ${part === 'rear bumper' ? `<rect x="286" y="112" width="62" height="34" rx="10" fill="#dbeafe" stroke="#111827" stroke-width="2"/>` : ''}
-                            <text x="210" y="210" text-anchor="middle" font-size="15" font-weight="700" fill="#111827" font-family="Segoe UI, Arial, sans-serif">${partLabel}</text>
+                            <defs>
+                                <linearGradient id="vehicleShade" x1="0" x2="1">
+                                    <stop offset="0%" stop-color="${vehicleColor}" stop-opacity="0.22"/>
+                                    <stop offset="100%" stop-color="${vehicleColor}" stop-opacity="0.42"/>
+                                </linearGradient>
+                            </defs>
+                            <path d="${baseBody}" fill="url(#vehicleShade)" stroke="${vehicleColor}" stroke-width="3"/>
+                            <path d="${roofShape}" fill="#ffffff" opacity="0.68" stroke="#111827" stroke-width="2"/>
+                            ${isFront ? '<rect x="58" y="98" width="64" height="62" rx="12" fill="rgba(255,255,255,0.65)" stroke="#111827" stroke-width="2"/>' : ''}
+                            ${isRear ? '<rect x="298" y="98" width="64" height="62" rx="12" fill="rgba(255,255,255,0.65)" stroke="#111827" stroke-width="2"/>' : ''}
+                            ${highlightMap}
+                            ${wheels}
+                            <path d="M90 152 L330 152" stroke="#111827" stroke-width="2" opacity="0.35"/>
+                            <text x="210" y="220" text-anchor="middle" font-size="15" font-weight="700" fill="#111827" font-family="Segoe UI, Arial, sans-serif">${partLabel}</text>
+                            <text x="210" y="34" text-anchor="middle" font-size="11" font-weight="700" fill="#475569" font-family="Segoe UI, Arial, sans-serif">${make || 'Vehicle'} ${model || ''}</text>
                         </svg>
                     `;
-                    return genericBody;
                 };
 
                 const renderIllustration = () => {
@@ -598,7 +639,7 @@ def get_estimates_screen_html():
                     const model = modelSelect?.value || '';
                     const selectedPart = categoryList?.dataset.selectedPart || 'front bumper';
                     const bodyType = getVehicleBodyType(make, model);
-                    const svgMarkup = buildSchematicSvg(selectedPart, bodyType);
+                    const svgMarkup = buildSchematicSvg(selectedPart, bodyType, make, model);
                     if (illustrationArea) {
                         illustrationArea.innerHTML = `
                             <div style="padding:14px; background:linear-gradient(180deg, #f8fafc 0%, #eef2ff 100%); border:1px solid #e2e8f0; border-radius:12px; margin-bottom:14px; min-height:220px; display:flex; align-items:center; justify-content:center;">
