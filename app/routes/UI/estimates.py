@@ -130,12 +130,12 @@ def get_estimates_screen_html():
 
                         return `
                             <tr class="estimate-row">
-                                <td class="estimate-number">${{estimateNumber}}</td>
-                                <td>${{vehicle}}</td>
-                                <td>${{customer}}</td>
-                                <td>${{insurance}}</td>
-                                <td>${{claimNumber}}</td>
-                                <td style="text-align:right; font-weight:600; color:#111;">${{formatCurrency(total)}}</td>
+                                <td class="estimate-number">${estimateNumber}</td>
+                                <td>${vehicle}</td>
+                                <td>${customer}</td>
+                                <td>${insurance}</td>
+                                <td>${claimNumber}</td>
+                                <td style="text-align:right; font-weight:600; color:#111;">${formatCurrency(total)}</td>
                             </tr>
                         `;
                     }).join('');
