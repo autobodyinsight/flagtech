@@ -214,13 +214,13 @@ def get_estimates_screen_html():
                 `;
 
                 const formHtml = `
-                    <div id="estimateWindowContent" style="padding:20px 20px 24px; min-height:180px; background:#f5f7fb; color:#23272a; overflow:hidden;">
-                        <div id="estimateContentLayout" style="display:flex; gap:18px; min-height:560px; max-width:1400px; margin:0 auto; height:100%; overflow:hidden;">
-                            <div id="estimateLeftPane" style="flex:1.2; min-width:0; display:flex; gap:18px; align-items:stretch; overflow:hidden;">
-                                <div id="estimateInfoPane" style="flex:1.4; min-width:0; display:flex; flex-direction:column; gap:20px; transition:all 0.35s ease; overflow:hidden;">
-                                    <div class="estimate-card" style="background:#fff; border:1px solid #e5e7eb; border-radius:14px; box-shadow:0 8px 20px rgba(15,23,42,.06); padding:20px;">
+                    <div id="estimateWindowContent" style="padding:20px 10px 24px 20px; min-height:180px; background:#f5f7fb; color:#23272a; overflow:hidden; box-sizing:border-box;">
+                        <div id="estimateContentLayout" style="display:flex; gap:18px; min-height:560px; width:calc(100% - 10px); max-width:100%; margin:0 10px 0 0; height:100%; overflow:hidden; box-sizing:border-box;">
+                            <div id="estimateLeftPane" style="flex:0 0 46%; min-width:0; display:flex; gap:18px; align-items:stretch; overflow:hidden; box-sizing:border-box;">
+                                <div id="estimateInfoPane" style="flex:1 1 auto; min-width:0; display:flex; flex-direction:column; gap:20px; transition:all 0.35s ease; overflow:hidden; box-sizing:border-box;">
+                                    <div class="estimate-card" style="background:#fff; border:1px solid #e5e7eb; border-radius:14px; box-shadow:0 8px 20px rgba(15,23,42,.06); padding:20px; width:100%; min-width:0; box-sizing:border-box;">
                                         <div class="estimate-section-header" style="font-weight:800; font-size:18px; color:#111827; margin:0 0 16px;">Customer</div>
-                                        <div style="display:grid; grid-template-columns:repeat(2, minmax(220px, 1fr)); gap:16px;">
+                                        <div style="display:grid; grid-template-columns:repeat(2, minmax(150px, 1fr)); gap:16px; width:100%; box-sizing:border-box;">
                                             <div class="estimate-field"><label>First Name</label><input id="estimateFirstName" type="text" placeholder="First name" /></div>
                                             <div class="estimate-field"><label>Last Name</label><input id="estimateLastName" type="text" placeholder="Last name" /></div>
                                             <div class="estimate-field" style="grid-column:1 / -1;"><label>Address</label><input id="estimateAddress" type="text" placeholder="Street address" /></div>
@@ -234,9 +234,9 @@ def get_estimates_screen_html():
                                         </div>
                                     </div>
 
-                                    <div class="estimate-card" style="background:#fff; border:1px solid #e5e7eb; border-radius:14px; box-shadow:0 8px 20px rgba(15,23,42,.06); padding:20px;">
+                                    <div class="estimate-card" style="background:#fff; border:1px solid #e5e7eb; border-radius:14px; box-shadow:0 8px 20px rgba(15,23,42,.06); padding:20px; width:100%; min-width:0; box-sizing:border-box;">
                                         <div class="estimate-section-header" style="font-weight:800; font-size:18px; color:#111827; margin:0 0 16px;">Vehicle Info</div>
-                                        <div style="display:grid; grid-template-columns:repeat(2, minmax(220px, 1fr)); gap:16px;">
+                                        <div style="display:grid; grid-template-columns:repeat(2, minmax(150px, 1fr)); gap:16px; width:100%; box-sizing:border-box;">
                                             <div class="estimate-field" style="grid-column:1 / -1;"><label>VIN</label><input id="estimateVin" type="text" maxlength="17" placeholder="VIN" style="letter-spacing:0.12em; text-transform:uppercase;" /></div>
                                             <div class="estimate-field"><label>Year</label><select id="estimateYear">${years.map((year) => `<option value="${year}">${year}</option>`).join('')}</select></div>
                                             <div class="estimate-field"><label>Make</label><select id="estimateMake">${createMakeOptions()}</select></div>
@@ -251,23 +251,23 @@ def get_estimates_screen_html():
                                     </div>
                                 </div>
 
-                                <aside id="estimateCategoriesPane" style="flex:0 0 220px; min-width:220px; background:#fff; border:1px solid #e5e7eb; border-radius:14px; box-shadow:0 8px 20px rgba(15,23,42,.06); padding:0; overflow:hidden; display:flex; flex-direction:column; transition:all 0.35s ease;">
+                                <aside id="estimateCategoriesPane" style="flex:0 0 200px; min-width:200px; background:#fff; border:1px solid #e5e7eb; border-radius:14px; box-shadow:0 8px 20px rgba(15,23,42,.06); padding:0; overflow:hidden; display:flex; flex-direction:column; transition:all 0.35s ease; box-sizing:border-box;">
                                     <div style="background:linear-gradient(180deg, #111827 0%, #1f2937 100%); color:#fff; padding:16px 18px; font-weight:800; letter-spacing:0.06em; font-size:13px; text-transform:uppercase;">Part Categories</div>
                                     <div id="estimateCategoryList" style="padding:16px 14px; display:flex; flex-direction:column; gap:8px; overflow:auto; flex:1; min-height:0;"></div>
                                 </aside>
                             </div>
 
-                            <div id="estimateRightPane" style="flex:1.4; min-width:360px; display:flex; flex-direction:column; gap:18px; overflow:hidden;">
-                                <div id="estimateSchematicPane" style="flex:1.4; background:#fff; border:1px solid #e5e7eb; border-radius:14px; box-shadow:0 8px 20px rgba(15,23,42,.06); padding:0; overflow:hidden; display:flex; flex-direction:column;">
+                            <div id="estimateRightPane" style="flex:1 1 54%; min-width:360px; display:flex; flex-direction:column; gap:18px; overflow:hidden; box-sizing:border-box; margin-right:10px;">
+                                <div id="estimateSchematicPane" style="flex:1.4; background:#fff; border:1px solid #e5e7eb; border-radius:14px; box-shadow:0 8px 20px rgba(15,23,42,.06); padding:0; overflow:hidden; display:flex; flex-direction:column; box-sizing:border-box;">
                                     <div style="background:linear-gradient(180deg, #1f2937 0%, #374151 100%); color:#fff; padding:16px 18px; font-weight:800; letter-spacing:0.06em; font-size:13px; text-transform:uppercase;">Schematic</div>
-                                    <div style="padding:14px; display:flex; flex-direction:column; gap:12px; background:#f8fafc; min-height:0; flex:1; overflow:hidden;">
-                                        <div id="estimateIllustrationArea" style="min-height:220px; overflow:hidden;"></div>
+                                    <div style="padding:14px; display:flex; flex-direction:column; gap:12px; background:#f8fafc; min-height:0; flex:1; overflow:hidden; box-sizing:border-box;">
+                                        <div id="estimateIllustrationArea" style="min-height:220px; overflow:hidden; width:100%;"></div>
                                     </div>
                                 </div>
 
-                                <div id="estimateLinesPane" style="flex:0.8; background:#fff; border:1px solid #e5e7eb; border-radius:14px; box-shadow:0 8px 20px rgba(15,23,42,.06); padding:0; overflow:hidden; display:flex; flex-direction:column;">
+                                <div id="estimateLinesPane" style="flex:0.8; background:#fff; border:1px solid #e5e7eb; border-radius:14px; box-shadow:0 8px 20px rgba(15,23,42,.06); padding:0; overflow:hidden; display:flex; flex-direction:column; box-sizing:border-box;">
                                     <div style="background:linear-gradient(180deg, #374151 0%, #4b5563 100%); color:#fff; padding:16px 18px; font-weight:800; letter-spacing:0.06em; font-size:13px; text-transform:uppercase;">Estimate Lines</div>
-                                    <div id="estimateLineList" style="padding:14px; display:flex; flex-direction:column; gap:8px; overflow:auto; flex:1; min-height:0;"></div>
+                                    <div id="estimateLineList" style="padding:14px; display:flex; flex-direction:column; gap:8px; overflow:auto; flex:1; min-height:0; width:100%; box-sizing:border-box;"></div>
                                 </div>
                             </div>
                         </div>
