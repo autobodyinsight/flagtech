@@ -554,83 +554,126 @@ def get_estimates_screen_html():
                     if (/(pickup|truck|silverado|sierra|tacoma|tundra|ram|frontier|canyon|colorado|ridgeline|sequoia|yukon|f-150|f-250|f-350)/i.test(normalized)) return 'truck';
                     if (/(transit|sprinter|promaster|express|voyager|caravan|pacifica|minivan|van)/i.test(normalized)) return 'van';
                     if (/(cr-v|rav4|explorer|escape|equinox|sportage|forester|outback|pilot|atlas|rogue|pathfinder|murano|xc60|xc90|x5|x3|g80|g90|palisade|telluride|suv|crosstrek|ascent|mdx|rdx|range rover|defender)/i.test(normalized)) return 'suv';
-                    if (/(mustang|camaro|challenger|corvette|miata|supra|911|z4|carrera|coupe)/i.test(normalized)) return 'coupe';
+                    if (/(mustang|camaro|challenger|corvette|miata|supra|911|z4|carrera|coupe|2 door|2-door|2dr)/i.test(normalized)) return 'coupe';
                     return 'car';
                 };
 
+                const getVehicleDoorCount = (make = '', model = '') => {
+                    const normalized = `${make || ''} ${model || ''}`.toLowerCase();
+                    if (/(coupe|convertible|roadster|2 door|2-door|2dr|2 door coupe)/i.test(normalized) || getVehicleProfile(make, model) === 'coupe') return 2;
+                    if (/(sedan|4 door|4-door|4dr|family sedan)/i.test(normalized)) return 4;
+                    return 4;
+                };
+
+                const getVehicleImageAsset = (make = '', model = '') => {
+                    const profile = getVehicleProfile(make, model);
+                    if (profile === 'truck') return '/static/truck.jpg';
+                    if (profile === 'suv') return '/static/suv.jpg';
+                    if (profile === 'coupe' || getVehicleDoorCount(make, model) === 2) return '/static/car%202%20door.jpg';
+                    return '/static/car%204%20door.jpg';
+                };
+
+                const getHotspotConfiguration = (profile = 'car') => {
+                    const common = [
+                        { part: 'front bumper', label: 'Front Bumper', left: '7%', top: '70%', width: '24%', height: '14%' },
+                        { part: 'grille', label: 'Grille', left: '23%', top: '56%', width: '18%', height: '12%' },
+                        { part: 'headlight', label: 'Headlights', left: '21%', top: '42%', width: '12%', height: '11%' },
+                        { part: 'fender', label: 'Fender', left: '4%', top: '45%', width: '12%', height: '22%' },
+                        { part: 'hood', label: 'Hood', left: '18%', top: '30%', width: '48%', height: '21%' },
+                        { part: 'windshield', label: 'Windshield', left: '42%', top: '24%', width: '24%', height: '14%' },
+                        { part: 'front door', label: 'Front Door', left: '26%', top: '48%', width: '16%', height: '28%' },
+                        { part: 'rear door', label: 'Rear Door', left: '52%', top: '48%', width: '17%', height: '28%' },
+                        { part: 'quarter panel', label: 'Quarter Panel', left: '68%', top: '52%', width: '14%', height: '20%' },
+                        { part: 'bedside', label: 'Bedside', left: '67%', top: '45%', width: '17%', height: '24%' }
+                    ];
+
+                    if (profile === 'truck') {
+                        return common.map((item) => {
+                            if (item.part === 'front bumper') return { ...item, left: '7%', top: '72%', width: '26%', height: '12%' };
+                            if (item.part === 'grille') return { ...item, left: '28%', top: '58%', width: '20%', height: '11%' };
+                            if (item.part === 'headlight') return { ...item, left: '22%', top: '45%', width: '12%', height: '10%' };
+                            if (item.part === 'hood') return { ...item, left: '20%', top: '33%', width: '44%', height: '19%' };
+                            if (item.part === 'windshield') return { ...item, left: '42%', top: '21%', width: '22%', height: '15%' };
+                            if (item.part === 'rear door') return { ...item, left: '52%', top: '45%', width: '18%', height: '29%' };
+                            if (item.part === 'bedside') return { ...item, left: '67%', top: '42%', width: '18%', height: '27%' };
+                            return item;
+                        });
+                    }
+
+                    if (profile === 'suv') {
+                        return common.map((item) => {
+                            if (item.part === 'front bumper') return { ...item, left: '9%', top: '68%', width: '20%', height: '14%' };
+                            if (item.part === 'grille') return { ...item, left: '25%', top: '56%', width: '18%', height: '12%' };
+                            if (item.part === 'headlight') return { ...item, left: '23%', top: '42%', width: '12%', height: '10%' };
+                            if (item.part === 'hood') return { ...item, left: '20%', top: '32%', width: '48%', height: '20%' };
+                            if (item.part === 'windshield') return { ...item, left: '42%', top: '23%', width: '24%', height: '14%' };
+                            if (item.part === 'bedside') return { ...item, left: '69%', top: '44%', width: '18%', height: '24%' };
+                            return item;
+                        });
+                    }
+
+                    return common;
+                };
+
+                const getSupportComponents = (partName) => {
+                    const part = normalizePartName(partName || 'front bumper');
+                    const supportParts = {
+                        'front bumper': ['Front Bumper', 'Lower Bumper', 'RT Fog Lamp Cover', 'LT Fog Lamp Cover', 'Lower Grille', 'Lower Valance', 'Tow Hook Cover'],
+                        grille: ['Upper Grille', 'Lower Grille', 'Grille Insert', 'Grille Mounting Tabs', 'Grille Emblem'],
+                        headlight: ['Headlight Housing', 'Headlight Lens', 'RT Headlamp', 'LT Headlamp', 'Lamp Adjuster', 'Harness'],
+                        hood: ['Hood Skin', 'Hood Hinge', 'Hood Latch', 'Hood Insulation', 'Hood Support'],
+                        fender: ['Front Fender', 'Fender Liner', 'Fender Molding', 'Wheelhouse', 'Fender Bracket'],
+                        windshield: ['Windshield Glass', 'Windshield Molding', 'Weatherstrip', 'Sealant', 'Adhesive'],
+                        'front door': ['Front Door Shell', 'Door Inner Panel', 'Door Glass', 'Window Regulator', 'Door Hinges'],
+                        'rear door': ['Rear Door Shell', 'Door Inner Panel', 'Door Glass', 'Window Regulator', 'Door Hinges'],
+                        'quarter panel': ['Quarter Panel Outer', 'Quarter Panel Inner', 'Wheelhouse', 'Molding', 'Quarter Panel Brace'],
+                        bedside: ['Bedside Outer', 'Bedside Inner', 'Bedside Bracket', 'Bedside Molding', 'Support Brace'],
+                        'rear bumper': ['Rear Bumper Cover', 'Rear Bumper Reinforcement', 'Energy Absorber', 'Bracket Set'],
+                        'tail light': ['Tail Lamp Housing', 'Tail Lamp Lens', 'Gasket', 'Mounting Clips'],
+                        'tailgate': ['Tailgate Shell', 'Tailgate Hinges', 'Tailgate Latch', 'Support Cables'],
+                        liftgate: ['Liftgate Shell', 'Liftgate Hinges', 'Liftgate Striker', 'Glass'],
+                        roof: ['Roof Skin', 'Roof Bow', 'Weatherstrip', 'Trim'],
+                        'radiator support': ['Core Support', 'Support Braces', 'Mounting Tabs', 'Fascia Support'],
+                        radiator: ['Radiator Core', 'Fan Shroud', 'Upper Hose', 'Lower Hose'],
+                        condenser: ['Condenser Core', 'Line Set', 'Mounting Bracket', 'Seal'],
+                        frame: ['Left Rail', 'Right Rail', 'Crossmember', 'Mounting Tabs']
+                    };
+
+                    return supportParts[part] || supportParts['front bumper'];
+                };
+
                 const buildSchematicSvg = (partName, bodyType, make = '', model = '') => {
-                    const part = normalizePartName(partName);
+                    const part = normalizePartName(partName || 'front bumper');
                     const profile = getVehicleProfile(make, model) || bodyType || 'car';
-                    const isFront = ['front bumper', 'grille', 'headlight', 'hood', 'fender', 'radiator support', 'radiator', 'condenser', 'frame', 'windshield'].includes(part);
-                    const isRear = ['rear body', 'floor', 'tail light', 'rear bumper', 'quarter panel', 'tailgate', 'liftgate', 'trunk', 'bedside', 'roof'].includes(part);
-                    const vehicleColor = profile === 'truck' ? '#6b7280' : profile === 'suv' ? '#3b82f6' : profile === 'van' ? '#8b5cf6' : profile === 'coupe' ? '#f59e0b' : '#e11d48';
-                    const accentColor = '#f2f2f2';
-                    const partLabel = part.split(' ').map((word) => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
-
-                    const baseBody = {
-                        car: 'M88 164 L88 118 Q88 90 118 76 L286 76 Q312 76 320 104 L332 164 L332 172 Q332 182 326 188 L318 196 L100 196 L92 188 Q88 182 88 172 Z',
-                        coupe: 'M86 164 L86 118 Q86 88 116 74 L280 74 Q312 70 322 108 L336 164 L336 174 Q336 182 330 188 L320 196 L96 196 L90 188 Q86 182 86 174 Z',
-                        suv: 'M76 166 L76 130 Q76 100 104 82 L314 82 Q336 86 346 116 L356 152 L356 170 Q356 182 350 190 L338 196 L98 196 L82 190 Q76 182 76 170 Z',
-                        truck: 'M80 168 L80 122 Q80 92 108 78 L286 78 Q318 80 334 104 L354 150 L358 168 Q358 182 346 190 L328 196 L100 196 L84 188 Q80 182 80 168 Z',
-                        van: 'M64 166 L64 112 Q64 90 92 80 L314 80 Q342 82 348 110 L354 166 L354 176 Q354 184 348 192 L334 196 L94 196 L70 192 Q64 184 64 176 Z'
-                    }[profile] || 'M88 164 L88 118 Q88 90 118 76 L286 76 Q312 76 320 104 L332 164 L332 172 Q332 182 326 188 L318 196 L100 196 L92 188 Q88 182 88 172 Z';
-
-                    const roofShape = {
-                        car: 'M118 76 L228 76 L276 56 L306 56 L314 92 L192 92 L118 92 Z',
-                        coupe: 'M112 76 L230 64 L286 62 L312 98 L196 100 L112 100 Z',
-                        suv: 'M102 80 L230 70 L308 76 L344 116 L218 118 L102 118 Z',
-                        truck: 'M108 80 L230 72 L286 72 L318 92 L328 118 L208 118 L108 118 Z',
-                        van: 'M92 80 L240 76 L314 78 L336 110 L222 112 L92 112 Z'
-                    }[profile] || 'M118 76 L228 76 L276 56 L306 56 L314 92 L192 92 L118 92 Z';
-
-                    const highlightMap = {
-                        'front bumper': '<rect x="58" y="126" width="82" height="36" rx="10" fill="#dbeafe" stroke="#111827" stroke-width="2"/>',
-                        grille: '<rect x="118" y="98" width="152" height="28" rx="8" fill="#dbeafe" stroke="#111827" stroke-width="2"/>',
-                        headlight: '<rect x="82" y="104" width="48" height="30" rx="8" fill="#dbeafe" stroke="#111827" stroke-width="2"/>',
-                        hood: '<path d="M104 100 L288 100 L312 142 L90 142 Z" fill="#dbeafe" stroke="#111827" stroke-width="2"/>',
-                        fender: '<path d="M74 116 L110 94 L128 156 L74 170 Z" fill="#dbeafe" stroke="#111827" stroke-width="2"/>',
-                        'radiator support': '<rect x="122" y="96" width="164" height="18" rx="6" fill="#dbeafe" stroke="#111827" stroke-width="2"/>',
-                        radiator: '<rect x="134" y="104" width="142" height="26" rx="8" fill="#dbeafe" stroke="#111827" stroke-width="2"/>',
-                        condenser: '<rect x="146" y="106" width="118" height="22" rx="8" fill="#dbeafe" stroke="#111827" stroke-width="2"/>',
-                        frame: '<path d="M98 94 L126 94 L144 182 L104 192 L92 142 Z M294 94 L324 94 L322 192 L284 182 L276 144 Z" fill="#dbeafe" stroke="#111827" stroke-width="2"/>',
-                        windshield: '<path d="M134 76 L264 76 L288 132 L120 132 Z" fill="#dbeafe" stroke="#111827" stroke-width="2"/>',
-                        'front door': '<rect x="120" y="92" width="72" height="96" rx="8" fill="#dbeafe" stroke="#111827" stroke-width="2"/>',
-                        'rear door': '<rect x="228" y="92" width="72" height="96" rx="8" fill="#dbeafe" stroke="#111827" stroke-width="2"/>',
-                        'quarter panel': '<path d="M276 96 L330 112 L330 174 L274 176 L256 134 Z" fill="#dbeafe" stroke="#111827" stroke-width="2"/>',
-                        bedside: '<rect x="246" y="90" width="72" height="104" rx="8" fill="#dbeafe" stroke="#111827" stroke-width="2"/>',
-                        roof: '<path d="M124 68 L260 68 L298 92 L112 92 Z" fill="#dbeafe" stroke="#111827" stroke-width="2"/>',
-                        trunk: '<path d="M148 90 L268 90 L294 156 L124 156 Z" fill="#dbeafe" stroke="#111827" stroke-width="2"/>',
-                        liftgate: '<path d="M128 88 L282 88 L298 154 L112 154 Z" fill="#dbeafe" stroke="#111827" stroke-width="2"/>',
-                        'tailgate': '<rect x="118" y="100" width="190" height="62" rx="10" fill="#dbeafe" stroke="#111827" stroke-width="2"/>',
-                        'rear body': '<path d="M120 104 L292 104 L308 170 L104 170 Z" fill="#dbeafe" stroke="#111827" stroke-width="2"/>',
-                        floor: '<rect x="128" y="112" width="166" height="60" rx="10" fill="#dbeafe" stroke="#111827" stroke-width="2"/>',
-                        'tail light': '<rect x="314" y="120" width="30" height="34" rx="8" fill="#dbeafe" stroke="#111827" stroke-width="2"/>',
-                        'rear bumper': '<rect x="284" y="126" width="56" height="30" rx="10" fill="#dbeafe" stroke="#111827" stroke-width="2"/>'
-                    }[part] || '<rect x="120" y="104" width="162" height="54" rx="12" fill="#dbeafe" stroke="#111827" stroke-width="2"/>';
-
-                    const wheels = [
-                        '<circle cx="118" cy="196" r="16" fill="#1f2937" stroke="#e5e7eb" stroke-width="4"/>',
-                        '<circle cx="298" cy="196" r="16" fill="#1f2937" stroke="#e5e7eb" stroke-width="4"/>'
-                    ].join('');
+                    const selectedPart = part;
+                    const vehicleImage = getVehicleImageAsset(make, model);
+                    const hotspots = getHotspotConfiguration(profile).map((item) => {
+                        const isSelected = normalizePartName(item.part) === selectedPart;
+                        return `
+                            <button type="button" data-part-hotspot="${item.part}" aria-label="${item.label}" title="${item.label}" style="position:absolute; left:${item.left}; top:${item.top}; width:${item.width}; height:${item.height}; border:${isSelected ? '2px solid rgba(178,34,34,0.95)' : '1px solid rgba(255,255,255,0.82)'}; background:${isSelected ? 'rgba(178,34,34,0.18)' : 'rgba(255,255,255,0.08)'}; border-radius:12px; box-shadow:${isSelected ? '0 0 0 3px rgba(178,34,34,0.18)' : 'inset 0 0 0 1px rgba(15,23,42,0.10)'}; cursor:pointer; z-index:2; padding:0;">
+                            </button>
+                        `;
+                    }).join('');
 
                     return `
-                        <svg viewBox="0 0 420 260" width="100%" height="220" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="${partLabel} schematic">
-                            <defs>
-                                <linearGradient id="vehicleShade" x1="0" x2="1">
-                                    <stop offset="0%" stop-color="${vehicleColor}" stop-opacity="0.22"/>
-                                    <stop offset="100%" stop-color="${vehicleColor}" stop-opacity="0.42"/>
-                                </linearGradient>
-                            </defs>
-                            <path d="${baseBody}" fill="url(#vehicleShade)" stroke="${vehicleColor}" stroke-width="3"/>
-                            <path d="${roofShape}" fill="#ffffff" opacity="0.68" stroke="#111827" stroke-width="2"/>
-                            ${isFront ? '<rect x="58" y="98" width="64" height="62" rx="12" fill="rgba(255,255,255,0.65)" stroke="#111827" stroke-width="2"/>' : ''}
-                            ${isRear ? '<rect x="298" y="98" width="64" height="62" rx="12" fill="rgba(255,255,255,0.65)" stroke="#111827" stroke-width="2"/>' : ''}
-                            ${highlightMap}
-                            ${wheels}
-                            <path d="M90 152 L330 152" stroke="#111827" stroke-width="2" opacity="0.35"/>
-                            <text x="210" y="220" text-anchor="middle" font-size="15" font-weight="700" fill="#111827" font-family="Segoe UI, Arial, sans-serif">${partLabel}</text>
-                            <text x="210" y="34" text-anchor="middle" font-size="11" font-weight="700" fill="#475569" font-family="Segoe UI, Arial, sans-serif">${make || 'Vehicle'} ${model || ''}</text>
-                        </svg>
+                        <div style="width:100%; max-width:980px; margin:0 auto;">
+                            <div style="position:relative; width:100%; border:1px solid #dfe6ee; border-radius:14px; overflow:hidden; background:linear-gradient(180deg,#f8fafc 0%, #eef2ff 100%); box-shadow:inset 0 0 0 1px rgba(148,163,184,0.12);">
+                                <img src="${vehicleImage}" alt="${profile} vehicle schematic" style="display:block; width:100%; height:auto; max-height:360px; object-fit:contain; background:#fff;" />
+                                ${hotspots}
+                            </div>
+                            <div style="margin-top:14px; border:1px solid #e2e8f0; border-radius:12px; background:#fff; padding:14px; box-sizing:border-box;">
+                                <div style="font-size:11px; font-weight:800; letter-spacing:0.08em; text-transform:uppercase; color:#475569; margin-bottom:10px;">Component Group</div>
+                                <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:10px; flex-wrap:wrap;">
+                                    <div style="font-size:16px; font-weight:800; color:#111827; text-transform:capitalize;">${selectedPart}</div>
+                                    <div style="font-size:12px; color:#475569; font-weight:700;">${make || 'Vehicle'} ${model || ''}</div>
+                                </div>
+                                <div style="display:flex; flex-wrap:wrap; gap:8px;">
+                                    ${getSupportComponents(selectedPart).map((item) => `
+                                        <span style="display:inline-flex; align-items:center; padding:6px 10px; border-radius:999px; background:#f8fafc; border:1px solid #e2e8f0; font-size:12px; color:#111827; font-weight:600;">${item}</span>
+                                    `).join('')}
+                                </div>
+                            </div>
+                        </div>
                     `;
                 };
 
@@ -641,15 +684,15 @@ def get_estimates_screen_html():
                     const bodyType = getVehicleBodyType(make, model);
                     const svgMarkup = buildSchematicSvg(selectedPart, bodyType, make, model);
                     if (illustrationArea) {
-                        illustrationArea.innerHTML = `
-                            <div style="padding:14px; background:linear-gradient(180deg, #f8fafc 0%, #eef2ff 100%); border:1px solid #e2e8f0; border-radius:12px; margin-bottom:14px; min-height:220px; display:flex; align-items:center; justify-content:center;">
-                                ${svgMarkup}
-                            </div>
-                            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
-                                <div style="font-size:12px; text-transform:uppercase; letter-spacing:0.08em; color:#475569; font-weight:700;">Selected Part</div>
-                                <div style="font-size:13px; color:#111827; font-weight:700; text-transform:capitalize;">${selectedPart}</div>
-                            </div>
-                        `;
+                        illustrationArea.innerHTML = svgMarkup;
+                        illustrationArea.querySelectorAll('[data-part-hotspot]').forEach((hotspot) => {
+                            hotspot.addEventListener('click', () => {
+                                const chosenPart = hotspot.getAttribute('data-part-hotspot');
+                                if (!chosenPart) return;
+                                categoryList.dataset.selectedPart = normalizePartName(chosenPart);
+                                renderCategories();
+                            });
+                        });
                     }
 
                     const estimateLines = getVehicleSpecificEstimateLines(selectedPart);
