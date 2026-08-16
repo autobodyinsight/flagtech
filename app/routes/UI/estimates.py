@@ -615,6 +615,22 @@ def get_estimates_screen_html():
                     return common;
                 };
 
+                const getHotspotColor = (partName) => {
+                    const normalized = normalizePartName(partName);
+                    const colorMap = {
+                        'front bumper': '#d32f2f',
+                        grille: '#f472b6',
+                        headlight: '#7c3aed',
+                        fender: '#facc15',
+                        hood: '#14b8a6',
+                        'front door': '#22c55e',
+                        'rear door': '#67e8f9',
+                        'quarter panel': '#8b5e34',
+                        bedside: '#8b5e34'
+                    };
+                    return colorMap[normalized] || '#cbd5e1';
+                };
+
                 const getSupportComponents = (partName) => {
                     const part = normalizePartName(partName || 'front bumper');
                     const supportParts = {
@@ -647,11 +663,22 @@ def get_estimates_screen_html():
                     const profile = getVehicleProfile(make, model) || bodyType || 'car';
                     const selectedPart = part;
                     const vehicleImage = getVehicleImageAsset(make, model);
+                    const hotspots = getHotspotConfiguration(profile).map((item) => {
+                        const isSelected = normalizePartName(item.part) === selectedPart;
+                        const color = getHotspotColor(item.part);
+                        const fill = isSelected ? `${color}dd` : `${color}66`;
+                        const border = isSelected ? color : 'rgba(255,255,255,0.7)';
+                        return `
+                            <button type="button" data-part-hotspot="${item.part}" aria-label="${item.label}" title="${item.label}" style="position:absolute; left:${item.left}; top:${item.top}; width:${item.width}; height:${item.height}; border:2px solid ${border}; background:${fill}; border-radius:12px; box-shadow:${isSelected ? `0 0 0 3px ${color}33` : 'inset 0 0 0 1px rgba(15,23,42,0.10)'}; cursor:pointer; z-index:2; padding:0; opacity:0.95;">
+                            </button>
+                        `;
+                    }).join('');
 
                     return `
                         <div style="width:100%; max-width:980px; margin:0 auto;">
                             <div style="position:relative; width:100%; border:1px solid #dfe6ee; border-radius:14px; overflow:hidden; background:linear-gradient(180deg,#f8fafc 0%, #eef2ff 100%); box-shadow:inset 0 0 0 1px rgba(148,163,184,0.12);">
                                 <img src="${vehicleImage}" alt="${profile} vehicle schematic" style="display:block; width:100%; height:auto; max-height:360px; object-fit:contain; background:#fff;" />
+                                ${hotspots}
                             </div>
                             <div style="margin-top:14px; border:1px solid #e2e8f0; border-radius:12px; background:#fff; padding:14px; box-sizing:border-box;">
                                 <div style="font-size:11px; font-weight:800; letter-spacing:0.08em; text-transform:uppercase; color:#475569; margin-bottom:10px;">Component Group</div>
@@ -677,6 +704,14 @@ def get_estimates_screen_html():
                     const svgMarkup = buildSchematicSvg(selectedPart, bodyType, make, model);
                     if (illustrationArea) {
                         illustrationArea.innerHTML = svgMarkup;
+                        illustrationArea.querySelectorAll('[data-part-hotspot]').forEach((hotspot) => {
+                            hotspot.addEventListener('click', () => {
+                                const chosenPart = hotspot.getAttribute('data-part-hotspot');
+                                if (!chosenPart) return;
+                                categoryList.dataset.selectedPart = normalizePartName(chosenPart);
+                                renderCategories();
+                            });
+                        });
                     }
 
                     const estimateLines = getVehicleSpecificEstimateLines(selectedPart);
