@@ -136,7 +136,7 @@ def get_estimates_screen_html():
 
                 const manufacturerModels = {
                     Acura: ['CL', 'CSX', 'EL', 'ILX', 'Integra', 'MDX', 'NSX', 'RDX', 'RL', 'RSX', 'TL', 'TLX', 'TSX', 'ZDX'],
-                    Alfa Romeo: ['4C', 'Giulia', 'MiTo', 'Stelvio'],
+                    'Alfa Romeo': ['4C', 'Giulia', 'MiTo', 'Stelvio'],
                     Audi: ['A3', 'A4', 'A5', 'A6', 'A7', 'A8', 'Q3', 'Q4', 'Q5', 'Q7', 'Q8', 'R8', 'RS3', 'RS5', 'RS7', 'S3', 'S4', 'S5', 'S6', 'S7', 'S8', 'SQ5', 'SQ7', 'TT'],
                     BMW: ['1 Series', '2 Series', '3 Series', '4 Series', '5 Series', '6 Series', '7 Series', '8 Series', 'i3', 'i4', 'i8', 'M2', 'M3', 'M4', 'M5', 'M8', 'X1', 'X3', 'X4', 'X5', 'X6', 'X7', 'Z4'],
                     Buick: ['Cascada', 'Enclave', 'Encore', 'Encore GX', 'Envision', 'Envista', 'LaCrosse', 'Lucerne', 'Regal', 'Verano'],
@@ -156,12 +156,12 @@ def get_estimates_screen_html():
                     Jeep: ['Cherokee', 'Commander', 'Compass', 'Gladiator', 'Grand Cherokee', 'Liberty', 'Patriot', 'Renegade', 'Wrangler'],
                     Kia: ['Carens', 'EV6', 'Forte', 'K5', 'Niro', 'Optima', 'Rio', 'Seltos', 'Sorento', 'Soul', 'Sportage', 'Stinger', 'Telluride'],
                     Lamborghini: ['Aventador', 'Huracan', 'Urus'],
-                    Land Rover: ['Defender', 'Discovery', 'Discovery Sport', 'Range Rover', 'Range Rover Evoque', 'Range Rover Sport', 'Range Rover Velar'],
+                    'Land Rover': ['Defender', 'Discovery', 'Discovery Sport', 'Range Rover', 'Range Rover Evoque', 'Range Rover Sport', 'Range Rover Velar'],
                     Lexus: ['CT', 'ES', 'GX', 'IS', 'LS', 'LX', 'NX', 'RC', 'RX', 'TX', 'UX'],
                     Lincoln: ['Aviator', 'Continental', 'Corsair', 'MKC', 'MKS', 'MKZ', 'Navigator', 'Nautilus', 'Town Car'],
                     Maserati: ['Ghibli', 'GranTurismo', 'Levante', 'Quattroporte'],
                     Mazda: ['3', '5', '6', 'CX-3', 'CX-30', 'CX-5', 'CX-9', 'MX-5 Miata', 'Mazda2', 'Mazda3', 'Mazda6', 'MX-5'],
-                    Mercedes-Benz: ['A-Class', 'C-Class', 'CLA', 'CLS', 'E-Class', 'G-Class', 'GLA', 'GLB', 'GLC', 'GLE', 'GLS', 'M-Class', 'R-Class', 'S-Class', 'SL', 'SLK', 'Sprinter', 'V-Class'],
+                    'Mercedes-Benz': ['A-Class', 'C-Class', 'CLA', 'CLS', 'E-Class', 'G-Class', 'GLA', 'GLB', 'GLC', 'GLE', 'GLS', 'M-Class', 'R-Class', 'S-Class', 'SL', 'SLK', 'Sprinter', 'V-Class'],
                     Mini: ['Clubman', 'Cooper', 'Countryman', 'Convertible', 'John Cooper Works', 'One'],
                     Mitsubishi: ['Eclipse', 'Eclipse Cross', 'Galant', 'Lancer', 'Mirage', 'Montero', 'Outlander', 'Pajero', 'Raider'],
                     Nissan: ['350Z', '370Z', 'Altima', 'Armada', 'Frontier', 'GT-R', 'Juke', 'Leaf', 'Maxima', 'Murano', 'NV200', 'Pathfinder', 'Quest', 'Rogue', 'Sentra', 'Skyline', 'Titan', 'Versa', 'Xterra'],
