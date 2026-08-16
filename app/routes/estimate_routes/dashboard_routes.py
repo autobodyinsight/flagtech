@@ -143,6 +143,7 @@ def _build_estimate_list_rows(rows):
             "vehicle": vehicle_display,
             "customer": customer_name or "-",
             "insurance": str(row.get("insurance_company") or "-").strip() or "-",
+            "claim_number": str(row.get("claim_number") or "-").strip() or "-",
             "in_date": in_date_value.isoformat() if in_date_value else "-",
             "total": total_value,
             "sort_key": _estimate_sort_key(saved_value),
@@ -241,7 +242,7 @@ async def get_estimate_list(request: Request):
 
         cur.execute(
             """
-            SELECT id, vehicle, year, make, model, owner_info, insurance_company, in_date, grand_total, saved_at
+            SELECT id, vehicle, year, make, model, owner_info, insurance_company, claim_number, in_date, grand_total, saved_at
             FROM saved_estimates
             WHERE (
                     shop_uuid = %s::uuid

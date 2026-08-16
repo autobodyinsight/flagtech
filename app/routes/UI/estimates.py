@@ -16,6 +16,22 @@ def get_estimates_screen_html():
                     border-radius: 8px 8px 0 0;
                     box-shadow: 0 2px 8px rgba(0,0,0,0.08);
                     margin-bottom: -1px;
+                    gap: 10px;
+                }
+                #estimate .estimate-tab-add {
+                    display: inline-flex;
+                    align-items: center;
+                    justify-content: center;
+                    padding: 7px 12px;
+                    border-radius: 8px;
+                    background: #2e9d53;
+                    color: #fff;
+                    font-size: 12px;
+                    font-weight: 700;
+                    letter-spacing: 0.2px;
+                    box-shadow: none;
+                    border: none;
+                    line-height: 1;
                 }
                 #estimate .dashboard-ro-table-wrap {
                     background: #ffffff;
@@ -60,7 +76,10 @@ def get_estimates_screen_html():
 
             <div style="margin-top:8px;">
                 <div style="display:flex; align-items:flex-end; justify-content:space-between; margin-bottom:0; position:relative;">
-                    <h3 class="dashboard-ro-title-tab" style="margin:0; color:#333;">Estimate List</h3>
+                    <div style="display:flex; align-items:center; gap:10px;">
+                        <h3 class="dashboard-ro-title-tab" style="margin:0; color:#333;">Estimate List</h3>
+                        <button type="button" class="estimate-tab-add" aria-label="Add Estimate">+ Estimate</button>
+                    </div>
                 </div>
                 <div class="dashboard-ro-table-wrap" style="overflow-x:auto;">
                     <table id="estimateListTable" style="width:100%; border-collapse:collapse;">
@@ -70,7 +89,7 @@ def get_estimates_screen_html():
                                 <th class="dashboard-header-cell" style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold;">Vehicle</th>
                                 <th class="dashboard-header-cell" style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold;">Customer</th>
                                 <th class="dashboard-header-cell" style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold;">Insurance</th>
-                                <th class="dashboard-header-cell" style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold;">In</th>
+                                <th class="dashboard-header-cell" style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold;">Claim Number</th>
                                 <th class="dashboard-header-cell" style="padding:12px; border-bottom:2px solid #ddd; font-weight:bold; text-align:right;">Total</th>
                             </tr>
                         </thead>
@@ -97,7 +116,7 @@ def get_estimates_screen_html():
 
                     const rows = Array.isArray(data.estimateList) ? data.estimateList : [];
                     if (!rows.length) {
-                        body.innerHTML = '<tr><td colspan="6" style="padding:20px; text-align:center; color:#666;">No estimates found.</td></tr>';
+                        body.innerHTML = '<tr><td colspan="6" style="padding:20px; text-align:center; color:#666;">NO CURRENT ESTIMATES</td></tr>';
                         return;
                     }
 
@@ -106,7 +125,7 @@ def get_estimates_screen_html():
                         const vehicle = row.vehicle || '-';
                         const customer = row.customer || '-';
                         const insurance = row.insurance || '-';
-                        const inDate = row.in_date || '-';
+                        const claimNumber = row.claim_number || '-';
                         const total = Number(row.total || 0);
 
                         return `
@@ -115,7 +134,7 @@ def get_estimates_screen_html():
                                 <td>${{vehicle}}</td>
                                 <td>${{customer}}</td>
                                 <td>${{insurance}}</td>
-                                <td>${{inDate}}</td>
+                                <td>${{claimNumber}}</td>
                                 <td style="text-align:right; font-weight:600; color:#111;">${{formatCurrency(total)}}</td>
                             </tr>
                         `;
