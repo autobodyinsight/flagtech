@@ -661,6 +661,18 @@ def get_estimates_screen_html():
                 const estimateActionChoices = ['R&I', 'REPAIR', 'REPLACE', 'REFINISH'];
                 const estimateSelectedLines = [];
 
+                const getEstimateSummary = () => {
+                    const rates = collectEstimateRateValues();
+                    const partTotal = estimateSelectedLines.reduce((sum, line) => sum + (Number(line.price || 0) || 0), 0);
+                    const bodyHours = estimateSelectedLines.reduce((sum, line) => sum + (Number(line.body || 0) || 0), 0);
+                    const paintHours = estimateSelectedLines.reduce((sum, line) => sum + (Number(line.paint || 0) || 0), 0);
+                    const bodyCost = bodyHours * (Number(rates.body || 0) || 0);
+                    const paintCost = paintHours * (Number(rates.paint || 0) || 0);
+                    const tax = partTotal * ((Number(rates.taxRate || 0) || 0) / 100);
+                    const overallTotal = partTotal + bodyCost + paintCost + tax;
+                    return { partTotal, bodyHours, paintHours, bodyCost, paintCost, tax, overallTotal };
+                };
+
                 const renderEstimateLines = () => {
                     if (!estimateLineList) return;
                     if (!estimateSelectedLines.length) {
@@ -672,21 +684,40 @@ def get_estimates_screen_html():
                         return;
                     }
 
+                    const summary = getEstimateSummary();
                     const rows = estimateSelectedLines.map((line, index) => `
-                        <div style="display:grid; grid-template-columns:56px 1.5fr 62px 90px 90px 80px 80px; align-items:center; gap:8px; padding:10px 12px; border:1px solid #e2e8f0; border-radius:10px; background:#f8fafc; font-size:12px; color:#111827;">
+                        <div data-row-index="${index}" style="display:grid; grid-template-columns:68px 1.3fr 80px 120px 100px 100px 100px; align-items:center; gap:8px; padding:10px 12px; border:1px solid #e2e8f0; border-radius:10px; background:#f8fafc; font-size:12px; color:#111827;">
                             <div style="font-weight:800; color:#334155;">${index + 1}</div>
-                            <div style="font-weight:700; text-transform:capitalize; color:#111827;">${line.description}</div>
-                            <div style="text-align:center; color:#475569; font-weight:600;">${line.qty}</div>
-                            <div style="text-align:center; color:#475569; font-weight:600;">${line.partNumber || line.part}</div>
-                            <div style="text-align:right; font-weight:800; color:#b22222;">$${Number(line.price || 0).toFixed(2)}</div>
-                            <div style="text-align:right; color:#475569; font-weight:600;">${Number(line.body || 0).toFixed(2)}</div>
-                            <div style="text-align:right; color:#475569; font-weight:600;">${Number(line.paint || 0).toFixed(2)}</div>
+                            <input data-field="description" data-row-index="${index}" value="${(line.description || line.part || '').replace(/"/g, '&quot;')}" style="width:100%; border:1px solid #dfe6ee; border-radius:8px; background:#fff; padding:6px 8px; font-size:12px; color:#111827; box-sizing:border-box;" />
+                            <input data-field="qty" data-row-index="${index}" type="number" min="0" step="1" value="${Number(line.qty || 1)}" style="width:100%; border:1px solid #dfe6ee; border-radius:8px; background:#fff; padding:6px 8px; font-size:12px; color:#111827; box-sizing:border-box; text-align:center;" />
+                            <input data-field="partNumber" data-row-index="${index}" value="${line.partNumber ?? ''}" placeholder="" style="width:100%; border:1px solid #dfe6ee; border-radius:8px; background:#fff; padding:6px 8px; font-size:12px; color:#111827; box-sizing:border-box;" />
+                            <input data-field="price" data-row-index="${index}" type="number" min="0" step="0.01" value="${line.price === '' || line.price == null ? '' : Number(line.price || 0).toFixed(2)}" style="width:100%; border:1px solid #dfe6ee; border-radius:8px; background:#fff; padding:6px 8px; font-size:12px; color:#111827; box-sizing:border-box; text-align:right;" />
+                            <input data-field="body" data-row-index="${index}" type="number" min="0" step="0.01" value="${Number(line.body || 0).toFixed(2)}" style="width:100%; border:1px solid #dfe6ee; border-radius:8px; background:#fff; padding:6px 8px; font-size:12px; color:#111827; box-sizing:border-box; text-align:right;" />
+                            <input data-field="paint" data-row-index="${index}" type="number" min="0" step="0.01" value="${Number(line.paint || 0).toFixed(2)}" style="width:100%; border:1px solid #dfe6ee; border-radius:8px; background:#fff; padding:6px 8px; font-size:12px; color:#111827; box-sizing:border-box; text-align:right;" />
                         </div>
                     `).join('');
 
                     estimateLineList.innerHTML = `
-                        <div style="display:flex; flex-direction:column; gap:8px; min-width:650px;">
-                            <div style="display:grid; grid-template-columns:56px 1.5fr 62px 90px 90px 80px 80px; align-items:center; gap:8px; padding:8px 12px; border-bottom:1px solid #e2e8f0; font-size:11px; letter-spacing:0.08em; text-transform:uppercase; color:#475569; font-weight:800;">
+                        <div style="display:flex; flex-direction:column; gap:10px; min-width:760px;">
+                            <div style="display:grid; grid-template-columns:repeat(4, minmax(140px, 1fr)); gap:10px; padding:8px 6px; border:1px solid #e2e8f0; border-radius:12px; background:#f8fafc;">
+                                <div style="padding:10px 12px; border-radius:10px; background:#fff; border:1px solid #e2e8f0;">
+                                    <div style="font-size:10px; letter-spacing:0.08em; text-transform:uppercase; color:#64748b; font-weight:800;">Parts Price</div>
+                                    <div style="margin-top:6px; font-size:16px; font-weight:800; color:#111827;">$${summary.partTotal.toFixed(2)}</div>
+                                </div>
+                                <div style="padding:10px 12px; border-radius:10px; background:#fff; border:1px solid #e2e8f0;">
+                                    <div style="font-size:10px; letter-spacing:0.08em; text-transform:uppercase; color:#64748b; font-weight:800;">Body Hrs</div>
+                                    <div style="margin-top:6px; font-size:16px; font-weight:800; color:#111827;">${summary.bodyHours.toFixed(2)}</div>
+                                </div>
+                                <div style="padding:10px 12px; border-radius:10px; background:#fff; border:1px solid #e2e8f0;">
+                                    <div style="font-size:10px; letter-spacing:0.08em; text-transform:uppercase; color:#64748b; font-weight:800;">Paint Hrs</div>
+                                    <div style="margin-top:6px; font-size:16px; font-weight:800; color:#111827;">${summary.paintHours.toFixed(2)}</div>
+                                </div>
+                                <div style="padding:10px 12px; border-radius:10px; background:#fff; border:1px solid #e2e8f0;">
+                                    <div style="font-size:10px; letter-spacing:0.08em; text-transform:uppercase; color:#64748b; font-weight:800;">Overall Total</div>
+                                    <div style="margin-top:6px; font-size:16px; font-weight:800; color:#b22222;">$${summary.overallTotal.toFixed(2)}</div>
+                                </div>
+                            </div>
+                            <div style="display:grid; grid-template-columns:68px 1.3fr 80px 120px 100px 100px 100px; align-items:center; gap:8px; padding:8px 12px; border-bottom:1px solid #e2e8f0; font-size:11px; letter-spacing:0.08em; text-transform:uppercase; color:#475569; font-weight:800;">
                                 <div>Line #</div>
                                 <div>Description</div>
                                 <div style="text-align:center;">Qty</div>
@@ -698,6 +729,26 @@ def get_estimates_screen_html():
                             ${rows}
                         </div>
                     `;
+
+                    estimateLineList.querySelectorAll('input').forEach((input) => {
+                        input.addEventListener('keydown', (event) => {
+                            if (event.key === 'Enter') {
+                                event.preventDefault();
+                                const rowIndex = Number(input.getAttribute('data-row-index') || 0);
+                                const row = estimateSelectedLines[rowIndex];
+                                if (!row) return;
+                                const field = input.getAttribute('data-field');
+                                const value = input.value;
+                                if (field === 'description') row.description = value.trim() || row.part || '';
+                                if (field === 'qty') row.qty = Number(value || 1) || 1;
+                                if (field === 'partNumber') row.partNumber = value;
+                                if (field === 'price') row.price = value === '' ? '' : Number(value || 0) || 0;
+                                if (field === 'body') row.body = Number(value || 0) || 0;
+                                if (field === 'paint') row.paint = Number(value || 0) || 0;
+                                renderEstimateLines();
+                            }
+                        });
+                    });
                 };
 
                 const buildSchematicSvg = (partName, bodyType, make = '', model = '') => {
@@ -776,12 +827,12 @@ def get_estimates_screen_html():
                                 const defaultLine = getVehicleSpecificEstimateLines(partName)[0] || { price: 0, qty: 1 };
                                 estimateSelectedLines.push({
                                     part: partName,
-                                    partNumber: partName,
+                                    partNumber: '',
                                     component: componentName,
                                     action,
                                     description: `${componentName} (${action})`,
                                     qty: defaultLine.qty || 1,
-                                    price: Number(defaultLine.price || 0),
+                                    price: '',
                                     body: 0,
                                     paint: 0
                                 });
