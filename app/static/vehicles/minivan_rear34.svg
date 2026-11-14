@@ -1,0 +1,67 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 720" width="1280" height="720" class="flagtech-hotspots" data-image="minivan_rear34.jpg" data-view="rear34">
+<style>.zone polygon{fill:#b22222;fill-opacity:0;stroke:#b22222;stroke-opacity:0;stroke-width:2;cursor:pointer;transition:fill-opacity .12s}.zone:hover polygon{fill-opacity:.28;stroke-opacity:.9}.zone.active polygon{fill-opacity:.45;stroke-opacity:1}</style>
+<g class="zone" id="rear34-wheel_rr" data-part="wheel_rr" data-area="wheels" data-view="rear34"><title>RR wheel</title>
+<polygon points="652,398 638,401 622,408 609,417 595,432 587,444 577,467 572,494 572,514 574,528 582,554 590,569 600,582 613,594 630,604 652,610 668,610 685,606 701,598 713,589 728,572 738,554 743,540 748,514 748,494 745,475 738,454 733,444 718,424 707,414 685,402 668,398"/>
+</g>
+<g class="zone" id="rear34-wheel_fr" data-part="wheel_fr" data-area="wheels" data-view="rear34"><title>RF wheel</title>
+<polygon points="1104,360 1089,364 1077,371 1066,381 1058,392 1047,419 1045,450 1048,467 1053,481 1067,502 1077,511 1089,518 1104,522 1117,522 1131,518 1145,510 1164,487 1173,463 1175,432 1173,419 1168,404 1154,381 1145,372 1131,364 1117,360"/>
+</g>
+<g class="zone" id="rear34-wheel_rl" data-part="wheel_rl" data-area="wheels" data-view="rear34"><title>LR wheel</title>
+<polygon points="206,531 208,541 217,548 238,556 264,560 292,560 318,556 339,548 348,541 350,536 348,527 331,516 314,511 292,508 264,508 238,512 212,523"/>
+</g>
+<g class="zone" id="rear34-mirror_r" data-part="mirror_r" data-area="mirrors" data-view="rear34"><title>R mirror</title>
+<polygon points="1072,229 1038,232 1044,275 1075,269 1081,249 1081,242"/>
+</g>
+<g class="zone" id="rear34-taillamp_r" data-part="taillamp_r" data-area="tail_lamps" data-view="rear34"><title>R tail lamp</title>
+<polygon points="351,300 351,303 369,338 435,348 506,340 540,306 538,290 374,290"/>
+</g>
+<g class="zone" id="rear34-taillamp_l" data-part="taillamp_l" data-area="tail_lamps" data-view="rear34"><title>L tail lamp</title>
+<polygon points="128,278 120,290 120,335 138,335 160,298 156,281"/>
+</g>
+<g class="zone" id="rear34-headlamp_r" data-part="headlamp_r" data-area="headlamps" data-view="rear34"><title>R headlamp</title>
+<polygon points="1166,311 1175,346 1185,344 1178,315"/>
+</g>
+<g class="zone" id="rear34-back_glass" data-part="back_glass" data-area="glass" data-view="rear34"><title>Back glass</title>
+<polygon points="487,148 206,156 149,254 272,256 444,254 486,154"/>
+</g>
+<g class="zone" id="rear34-quarter_glass_r" data-part="quarter_glass_r" data-area="glass" data-view="rear34"><title>R quarter glass</title>
+<polygon points="700,134 592,145 556,169 537,230 536,239 550,250 722,254"/>
+</g>
+<g class="zone" id="rear34-sliding_door_glass_r" data-part="sliding_door_glass_r" data-area="glass" data-view="rear34"><title>R sliding door glass</title>
+<polygon points="726,138 756,260 900,265 869,140"/>
+</g>
+<g class="zone" id="rear34-b_pillar_r" data-part="b_pillar_r" data-area="roof" data-view="rear34"><title>R B-pillar</title>
+<polygon points="870,140 901,265 918,266 917,257 885,140"/>
+</g>
+<g class="zone" id="rear34-front_door_glass_r" data-part="front_door_glass_r" data-area="glass" data-view="rear34"><title>R front door glass</title>
+<polygon points="888,145 916,248 919,266 1037,275 1011,226 950,162"/>
+</g>
+<g class="zone" id="rear34-c_pillar_r" data-part="c_pillar_r" data-area="roof" data-view="rear34"><title>R C-pillar</title>
+<polygon points="695,122 697,133 700,133 702,137 723,252 723,254 720,255 720,258 755,261 725,140 726,137 733,137 732,130"/>
+</g>
+<g class="zone" id="rear34-liftgate" data-part="liftgate" data-area="trunk" data-view="rear34"><title>Liftgate</title>
+<polygon points="482,170 479,172 444,255 315,257 147,255 136,275 136,278 156,280 161,298 138,336 122,336 122,365 131,431 400,450 431,363 432,349 369,339 350,303 350,300 373,289 442,289 450,249"/>
+<polygon points="511,124 500,110 210,120 206,155 487,147 487,155 489,155 510,128"/>
+</g>
+<g class="zone" id="rear34-roof" data-part="roof" data-area="roof" data-view="rear34"><title>Roof</title>
+<polygon points="504,112 513,126 548,149 554,149 587,138 695,133 695,121 729,128 734,132 851,139 885,139 887,144 950,161 1013,227 1019,238 1038,238 1037,234 1027,221 962,162 876,120 706,106 557,106"/>
+</g>
+<g class="zone" id="rear34-front_door_r" data-part="front_door_r" data-area="front_door_r" data-view="rear34"><title>R front door</title>
+<polygon points="919,267 928,369 935,481 1046,467 1044,452 1046,418 1058,390 1064,382 1079,369 1078,299 1069,278"/>
+</g>
+<g class="zone" id="rear34-sliding_door_r" data-part="sliding_door_r" data-area="rear_door_r" data-view="rear34"><title>R sliding door</title>
+<polygon points="725,260 725,264 739,304 751,379 765,490 932,482 928,378 918,267"/>
+</g>
+<g class="zone" id="rear34-quarter_panel_r" data-part="quarter_panel_r" data-area="quarter_r" data-view="rear34"><title>R quarter panel</title>
+<polygon points="511,127 486,160 483,171 451,248 443,289 538,289 541,306 506,341 433,349 432,364 429,371 412,460 412,525 569,525 571,521 571,492 575,470 587,442 593,433 610,415 628,404 650,397 706,398 738,425 750,491 763,489 751,383 739,308 724,265 724,259 720,259 719,255 550,251 535,239 550,150"/>
+</g>
+<g class="zone" id="rear34-rocker_r" data-part="rocker_r" data-area="quarter_r" data-view="rear34"><title>R rocker panel</title>
+<polygon points="1055,485 1051,479 1048,469 921,484 880,485 751,494 751,499 756,515 1046,489 1055,488"/>
+</g>
+<g class="zone" id="rear34-fender_r" data-part="fender_r" data-area="fender_r" data-view="rear34"><title>R fender</title>
+<polygon points="1071,279 1079,298 1080,367 1103,359 1118,359 1129,362 1144,370 1156,382 1167,400 1174,418 1176,439 1173,468 1194,462 1194,374 1186,346 1183,345 1175,347 1173,344 1165,310 1122,287"/>
+</g>
+<g class="zone" id="rear34-rear_bumper" data-part="rear_bumper" data-area="rear_bumper" data-view="rear34"><title>Rear bumper</title>
+<polygon points="119,368 106,399 102,440 112,481 191,501 242,510 261,507 295,507 310,509 329,514 347,525 349,528 412,538 411,461 401,451 131,432 129,427 122,369"/>
+</g>
+</svg>

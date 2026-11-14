@@ -11,6 +11,8 @@ import urllib.error
 import urllib.request
 from typing import Callable
 
+from app.services.illustration_variant import select_variant
+
 VIN_LENGTH = 17
 VIN_TRANSLITERATION = {
     **{str(digit): digit for digit in range(10)},
@@ -144,16 +146,29 @@ def decode_vin(value: str | None, *, fetcher: Callable[[str], dict] | None = Non
             )
             if part
         )
+    vpic_fields = {
+        "BodyClass": str(row.get("BodyClass") or "").strip(),
+        "Doors": doors_raw,
+        "BodyCabType": str(row.get("BodyCabType") or "").strip(),
+        "Wheels": str(row.get("Wheels") or "").strip(),
+        "Series": str(row.get("Series") or "").strip(),
+        "Trim": str(row.get("Trim") or "").strip(),
+        "Model": model,
+        "Series2": str(row.get("Series2") or "").strip(),
+        "Trim2": str(row.get("Trim2") or "").strip(),
+    }
     vehicle = {
         "year": str(row.get("ModelYear") or "").strip(),
         "make": make.title() if make.isupper() else make,
         "model": model,
         "trim": str(row.get("Trim") or row.get("Series") or "").strip(),
-        "body_class": str(row.get("BodyClass") or "").strip(),
+        "body_class": vpic_fields["BodyClass"],
         "doors": doors_raw,
         "drive": str(row.get("DriveType") or "").strip(),
         "engine": engine.strip(),
         "body_style": body_style_from_vpic(row.get("BodyClass"), doors_raw),
+        "cab_type": vpic_fields["BodyCabType"],
+        "illustration_variant": select_variant(vpic_fields),
     }
     result["vehicle"] = vehicle
     result["decoded"] = True

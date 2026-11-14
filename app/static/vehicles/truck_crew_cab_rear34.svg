@@ -1,0 +1,67 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 720" width="1280" height="720" class="flagtech-hotspots" data-image="truck_crew_cab_rear34.jpg" data-view="rear34">
+<style>.zone polygon{fill:#b22222;fill-opacity:0;stroke:#b22222;stroke-opacity:0;stroke-width:2;cursor:pointer;transition:fill-opacity .12s}.zone:hover polygon{fill-opacity:.28;stroke-opacity:.9}.zone.active polygon{fill-opacity:.45;stroke-opacity:1}</style>
+<g class="zone" id="rear34-wheel_rr" data-part="wheel_rr" data-area="wheels" data-view="rear34"><title>RR wheel</title>
+<polygon points="594,402 579,405 560,414 550,421 535,437 524,456 518,472 514,494 514,514 516,528 524,552 535,571 550,587 560,594 579,603 594,606 610,606 625,603 642,595 655,586 669,571 675,562 685,539 690,514 690,494 686,472 680,456 669,437 655,422 642,413 625,405 610,402"/>
+</g>
+<g class="zone" id="rear34-wheel_fr" data-part="wheel_fr" data-area="wheels" data-view="rear34"><title>RF wheel</title>
+<polygon points="1087,373 1071,377 1058,384 1040,402 1028,428 1025,443 1025,461 1028,476 1036,496 1054,517 1077,529 1101,531 1117,527 1130,520 1144,507 1152,496 1162,468 1163,443 1157,419 1150,405 1134,387 1111,375"/>
+</g>
+<g class="zone" id="rear34-wheel_rl" data-part="wheel_rl" data-area="wheels" data-view="rear34"><title>LR wheel</title>
+<polygon points="214,531 214,537 218,544 232,553 252,559 280,563 319,562 344,557 360,551 369,545 374,537 372,527 360,517 332,508 308,505 270,506 240,512 223,520"/>
+</g>
+<g class="zone" id="rear34-mirror_r" data-part="mirror_r" data-area="mirrors" data-view="rear34"><title>R mirror</title>
+<polygon points="1057,236 1043,235 1019,239 1025,281 1056,278 1062,252"/>
+</g>
+<g class="zone" id="rear34-taillamp_r" data-part="taillamp_r" data-area="tail_lamps" data-view="rear34"><title>R tail lamp</title>
+<polygon points="398,300 402,390 465,388 456,300 411,294"/>
+</g>
+<g class="zone" id="rear34-taillamp_l" data-part="taillamp_l" data-area="tail_lamps" data-view="rear34"><title>L tail lamp</title>
+<polygon points="110,286 100,289 98,296 100,375 112,372"/>
+</g>
+<g class="zone" id="rear34-headlamp_r" data-part="headlamp_r" data-area="headlamps" data-view="rear34"><title>R headlamp</title>
+<polygon points="1162,328 1165,375 1177,375 1175,331"/>
+</g>
+<g class="zone" id="rear34-back_glass" data-part="back_glass" data-area="glass" data-view="rear34"><title>Back glass</title>
+<polygon points="722,165 490,169 472,235 470,248 728,260"/>
+</g>
+<g class="zone" id="rear34-rear_door_glass_r" data-part="rear_door_glass_r" data-area="glass" data-view="rear34"><title>R rear door glass</title>
+<polygon points="775,165 790,265 885,265 862,165"/>
+</g>
+<g class="zone" id="rear34-b_pillar_r" data-part="b_pillar_r" data-area="roof" data-view="rear34"><title>R B-pillar</title>
+<polygon points="863,165 886,266 902,269 881,165"/>
+</g>
+<g class="zone" id="rear34-front_door_glass_r" data-part="front_door_glass_r" data-area="glass" data-view="rear34"><title>R front door glass</title>
+<polygon points="883,170 903,269 1018,278 989,226 943,185 935,180"/>
+</g>
+<g class="zone" id="rear34-c_pillar_r" data-part="c_pillar_r" data-area="roof" data-view="rear34"><title>R C-pillar</title>
+<polygon points="722,156 731,260 758,262 790,269 774,168 775,162 756,150"/>
+</g>
+<g class="zone" id="rear34-tailgate" data-part="tailgate" data-area="trunk" data-view="rear34"><title>Tailgate</title>
+<polygon points="110,258 108,285 111,286 113,372 103,375 103,378 115,406 400,412 402,391 397,311 400,260 112,256"/>
+</g>
+<g class="zone" id="rear34-roof" data-part="roof" data-area="roof" data-view="rear34"><title>Roof</title>
+<polygon points="952,190 956,196 991,227 999,243 1003,243 1011,239 1008,234 967,198"/>
+<polygon points="492,165 492,168 519,168 721,159 721,156 725,154 756,149 773,160 875,160 897,172 921,176 921,174 880,154 815,147 717,142 575,145 505,153 498,156"/>
+</g>
+<g class="zone" id="rear34-rear_door_r" data-part="rear_door_r" data-area="rear_door_r" data-view="rear34"><title>R rear door</title>
+<polygon points="756,263 772,465 915,456 902,270 885,266 791,266 791,269 788,270"/>
+</g>
+<g class="zone" id="rear34-front_door_r" data-part="front_door_r" data-area="front_door_r" data-view="rear34"><title>R front door</title>
+<polygon points="903,270 910,377 919,458 1024,448 1027,427 1039,402 1058,383 1056,310 1050,281 1041,280 1025,282 1024,278 1012,279"/>
+</g>
+<g class="zone" id="rear34-bed_side_r" data-part="bed_side_r" data-area="quarter_r" data-view="rear34"><title>R bed side</title>
+<polygon points="403,260 405,264 457,300 466,384 465,433 469,494 513,498 516,475 521,460 533,438 541,430 544,418 561,383 566,379 611,362 662,369 700,412 737,487 740,487 771,466 762,346 752,265 469,254"/>
+</g>
+<g class="zone" id="rear34-rocker_r" data-part="rocker_r" data-area="quarter_r" data-view="rear34"><title>R rocker panel</title>
+<polygon points="1024,451 967,454 924,459 909,458 772,468 741,487 740,491 744,500 1021,470 1025,469"/>
+</g>
+<g class="zone" id="rear34-front_bumper" data-part="front_bumper" data-area="front_bumper" data-view="rear34"><title>Front bumper</title>
+<polygon points="1162,375 1165,459 1169,459 1180,455 1183,451 1183,438 1187,418 1187,393 1178,376"/>
+</g>
+<g class="zone" id="rear34-fender_r" data-part="fender_r" data-area="fender_r" data-view="rear34"><title>R fender</title>
+<polygon points="1051,281 1057,308 1059,381 1079,373 1100,360 1131,362 1156,381 1160,404 1162,404 1161,375 1164,374 1161,328 1167,328 1167,326 1158,316 1144,304 1101,288"/>
+</g>
+<g class="zone" id="rear34-rear_bumper" data-part="rear_bumper" data-area="rear_bumper" data-view="rear34"><title>Rear bumper</title>
+<polygon points="85,411 87,446 91,454 96,458 186,475 315,481 409,494 468,494 464,425 407,413 115,407 102,379 99,381 102,400 99,402 89,403"/>
+</g>
+</svg>

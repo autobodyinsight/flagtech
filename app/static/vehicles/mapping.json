@@ -1,0 +1,399 @@
+{
+  "version": 2,
+  "description": "Maps NHTSA vPIC DecodeVinValues fields (BodyClass, Doors, BodyCabType, plus Wheels/Series/Trim for dually detection) to a FlagTech pencil illustration pair (front-left 3/4 + rear-right 3/4, each with a clickable SVG overlay). Rules are evaluated top to bottom; first match wins. String matches are case-insensitive substring matches against the vPIC value.",
+  "inputs": [
+    "BodyClass",
+    "Doors",
+    "BodyCabType",
+    "Wheels",
+    "Series",
+    "Trim",
+    "Model"
+  ],
+  "variants": {
+    "sedan_4dr": {
+      "label": "Car - 4-door sedan",
+      "images": {
+        "front34": "sedan_4dr_front34.jpg",
+        "rear34": "sedan_4dr_rear34.jpg"
+      },
+      "overlays": {
+        "front34": "sedan_4dr_front34.svg",
+        "rear34": "sedan_4dr_rear34.svg"
+      }
+    },
+    "hatch_4dr": {
+      "label": "Car - 4-door hatchback",
+      "images": {
+        "front34": "hatch_4dr_front34.jpg",
+        "rear34": "hatch_4dr_rear34.jpg"
+      },
+      "overlays": {
+        "front34": "hatch_4dr_front34.svg",
+        "rear34": "hatch_4dr_rear34.svg"
+      }
+    },
+    "coupe_2dr": {
+      "label": "Car - 2-door coupe",
+      "images": {
+        "front34": "coupe_2dr_front34.jpg",
+        "rear34": "coupe_2dr_rear34.jpg"
+      },
+      "overlays": {
+        "front34": "coupe_2dr_front34.svg",
+        "rear34": "coupe_2dr_rear34.svg"
+      }
+    },
+    "suv_4dr_liftgate": {
+      "label": "SUV - 4-door, liftgate",
+      "images": {
+        "front34": "suv_4dr_liftgate_front34.jpg",
+        "rear34": "suv_4dr_liftgate_rear34.jpg"
+      },
+      "overlays": {
+        "front34": "suv_4dr_liftgate_front34.svg",
+        "rear34": "suv_4dr_liftgate_rear34.svg"
+      }
+    },
+    "suv_2dr_liftgate": {
+      "label": "SUV - 2-door, liftgate",
+      "images": {
+        "front34": "suv_2dr_liftgate_front34.jpg",
+        "rear34": "suv_2dr_liftgate_rear34.jpg"
+      },
+      "overlays": {
+        "front34": "suv_2dr_liftgate_front34.svg",
+        "rear34": "suv_2dr_liftgate_rear34.svg"
+      }
+    },
+    "suv_2dr_tailgate": {
+      "label": "SUV - 2-door, liftglass + drop tailgate",
+      "manual_only": true,
+      "images": {
+        "front34": "suv_2dr_tailgate_front34.jpg",
+        "rear34": "suv_2dr_tailgate_rear34.jpg"
+      },
+      "overlays": {
+        "front34": "suv_2dr_tailgate_front34.svg",
+        "rear34": "suv_2dr_tailgate_rear34.svg"
+      }
+    },
+    "suv_4dr_swing": {
+      "label": "SUV - 4-door, swing-out rear doors",
+      "manual_only": true,
+      "images": {
+        "front34": "suv_4dr_swing_front34.jpg",
+        "rear34": "suv_4dr_swing_rear34.jpg"
+      },
+      "overlays": {
+        "front34": "suv_4dr_swing_front34.svg",
+        "rear34": "suv_4dr_swing_rear34.svg"
+      }
+    },
+    "minivan": {
+      "label": "Van - minivan, sliding doors + liftgate",
+      "images": {
+        "front34": "minivan_front34.jpg",
+        "rear34": "minivan_rear34.jpg"
+      },
+      "overlays": {
+        "front34": "minivan_front34.svg",
+        "rear34": "minivan_rear34.svg"
+      }
+    },
+    "truck_regular_cab": {
+      "label": "Truck - regular cab",
+      "images": {
+        "front34": "truck_regular_cab_front34.jpg",
+        "rear34": "truck_regular_cab_rear34.jpg"
+      },
+      "overlays": {
+        "front34": "truck_regular_cab_front34.svg",
+        "rear34": "truck_regular_cab_rear34.svg"
+      }
+    },
+    "truck_extended_cab": {
+      "label": "Truck - extended cab",
+      "images": {
+        "front34": "truck_extended_cab_front34.jpg",
+        "rear34": "truck_extended_cab_rear34.jpg"
+      },
+      "overlays": {
+        "front34": "truck_extended_cab_front34.svg",
+        "rear34": "truck_extended_cab_rear34.svg"
+      }
+    },
+    "truck_crew_cab": {
+      "label": "Truck - crew cab",
+      "images": {
+        "front34": "truck_crew_cab_front34.jpg",
+        "rear34": "truck_crew_cab_rear34.jpg"
+      },
+      "overlays": {
+        "front34": "truck_crew_cab_front34.svg",
+        "rear34": "truck_crew_cab_rear34.svg"
+      }
+    },
+    "truck_crew_dually": {
+      "label": "Truck - crew cab dually (DRW)",
+      "images": {
+        "front34": "truck_crew_dually_front34.jpg",
+        "rear34": "truck_crew_dually_rear34.jpg"
+      },
+      "overlays": {
+        "front34": "truck_crew_dually_front34.svg",
+        "rear34": "truck_crew_dually_rear34.svg"
+      }
+    }
+  },
+  "dually_signals": {
+    "Wheels_at_least": 6,
+    "text_contains_any": [
+      "DRW",
+      "DUALLY",
+      "DUAL REAR"
+    ],
+    "text_fields": [
+      "Series",
+      "Trim",
+      "Model",
+      "Series2",
+      "Trim2"
+    ]
+  },
+  "rules": [
+    {
+      "when": {
+        "BodyClass": [
+          "Pickup",
+          "Sport Utility Truck",
+          "Chassis Cab",
+          "Truck"
+        ],
+        "dually": true
+      },
+      "variant": "truck_crew_dually"
+    },
+    {
+      "when": {
+        "BodyClass": [
+          "Pickup",
+          "Sport Utility Truck",
+          "Chassis Cab",
+          "Truck"
+        ],
+        "BodyCabType": [
+          "Crew"
+        ]
+      },
+      "variant": "truck_crew_cab"
+    },
+    {
+      "when": {
+        "BodyClass": [
+          "Pickup",
+          "Sport Utility Truck",
+          "Chassis Cab",
+          "Truck"
+        ],
+        "BodyCabType": [
+          "Extra",
+          "Super",
+          "Quad",
+          "Double",
+          "King",
+          "Extended"
+        ]
+      },
+      "variant": "truck_extended_cab"
+    },
+    {
+      "when": {
+        "BodyClass": [
+          "Pickup",
+          "Sport Utility Truck",
+          "Chassis Cab",
+          "Truck"
+        ],
+        "BodyCabType": [
+          "Regular"
+        ]
+      },
+      "variant": "truck_regular_cab"
+    },
+    {
+      "when": {
+        "BodyClass": [
+          "Chassis Cab (Single Cab)"
+        ]
+      },
+      "variant": "truck_regular_cab"
+    },
+    {
+      "when": {
+        "BodyClass": [
+          "Chassis Cab (Double Cab)"
+        ]
+      },
+      "variant": "truck_crew_cab"
+    },
+    {
+      "when": {
+        "BodyClass": [
+          "Pickup",
+          "Sport Utility Truck",
+          "Chassis Cab",
+          "Truck"
+        ],
+        "Doors": [
+          2,
+          3
+        ]
+      },
+      "variant": "truck_regular_cab"
+    },
+    {
+      "when": {
+        "BodyClass": [
+          "Pickup",
+          "Sport Utility Truck",
+          "Chassis Cab",
+          "Truck"
+        ]
+      },
+      "variant": "truck_crew_cab"
+    },
+    {
+      "when": {
+        "BodyClass": [
+          "Minivan",
+          "Cargo Van",
+          "Van"
+        ]
+      },
+      "variant": "minivan"
+    },
+    {
+      "when": {
+        "BodyClass": [
+          "Sport Utility Vehicle",
+          "Crossover Utility Vehicle",
+          "Multipurpose Vehicle"
+        ],
+        "Doors": [
+          2,
+          3
+        ]
+      },
+      "variant": "suv_2dr_liftgate"
+    },
+    {
+      "when": {
+        "BodyClass": [
+          "Sport Utility Vehicle",
+          "Crossover Utility Vehicle",
+          "Multipurpose Vehicle"
+        ]
+      },
+      "variant": "suv_4dr_liftgate"
+    },
+    {
+      "when": {
+        "BodyClass": [
+          "Wagon"
+        ]
+      },
+      "variant": "hatch_4dr"
+    },
+    {
+      "when": {
+        "BodyClass": [
+          "Hatchback",
+          "Liftback",
+          "Notchback"
+        ],
+        "Doors": [
+          2,
+          3
+        ]
+      },
+      "variant": "coupe_2dr"
+    },
+    {
+      "when": {
+        "BodyClass": [
+          "Hatchback",
+          "Liftback",
+          "Notchback"
+        ]
+      },
+      "variant": "hatch_4dr"
+    },
+    {
+      "when": {
+        "BodyClass": [
+          "Coupe",
+          "Convertible",
+          "Cabriolet",
+          "Roadster"
+        ],
+        "Doors": [
+          4,
+          5
+        ]
+      },
+      "variant": "sedan_4dr"
+    },
+    {
+      "when": {
+        "BodyClass": [
+          "Coupe",
+          "Convertible",
+          "Cabriolet",
+          "Roadster"
+        ]
+      },
+      "variant": "coupe_2dr"
+    },
+    {
+      "when": {
+        "BodyClass": [
+          "Sedan",
+          "Saloon",
+          "Limousine"
+        ],
+        "Doors": [
+          2,
+          3
+        ]
+      },
+      "variant": "coupe_2dr"
+    },
+    {
+      "when": {
+        "BodyClass": [
+          "Sedan",
+          "Saloon",
+          "Limousine"
+        ]
+      },
+      "variant": "sedan_4dr"
+    }
+  ],
+  "fallback": {
+    "by_doors": {
+      "2": "coupe_2dr",
+      "3": "coupe_2dr"
+    },
+    "default": "sedan_4dr"
+  },
+  "manual_override_note": "vPIC cannot tell a liftgate from a liftglass + drop tailgate or from swing-out rear doors. Offer the estimator a body-style picker that defaults to the matched variant and lists suv_2dr_tailgate and suv_4dr_swing as manual choices.",
+  "image_size": [
+    1280,
+    720
+  ],
+  "views": {
+    "front34": "front three-quarter from the driver (left) front corner: front end + left side",
+    "rear34": "rear three-quarter from the passenger (right) rear corner: rear end + right side"
+  }
+}

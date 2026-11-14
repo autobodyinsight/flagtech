@@ -21,8 +21,8 @@ The app is multi-shop. Each shop is a `domain`. An organization can own more tha
 - A new estimate page at `/ui/native-estimate`, opened from Estimates → + Estimate.
 - VIN length, character, and check-digit checks. A bad check digit warns and still lets you continue.
 - NHTSA vPIC decode for year, make, model, trim, body class, doors, drive, and engine. Every field stays editable. If the decoder is down, you type the vehicle in.
-- Original SVG diagrams for sedan/coupe, SUV/hatch, pickup, and van. Two-door cars have no rear doors. Pickups label the bedside and tailgate. These drawings are not CCC, Mitchell, Audatex, or MOTOR art.
-- Area list plus diagram. Choosing an area opens a generic sub-part breakdown and a line editor: operation, part name, part type, part number, quantity, price, body hours, refinish hours, mechanical hours, frame hours, and notes.
+- Pencil-sketch front and rear views for 12 body styles, under `app/static/vehicles`. VIN decode picks the drawing. The body-style menu can override it, because a VIN cannot tell a swing-door SUV from a liftgate or a liftglass from a drop tailgate. The chosen variant is stored on the estimate. The older geometric SVG is used only if those images fail to load.
+- Choosing a panel highlights that part in both views and opens a generic sub-part breakdown plus a line editor: operation, part name, part type, part number, quantity, price, body hours, refinish hours, mechanical hours, frame hours, and notes.
 - Shop labor rates (body, refinish, mechanical, frame) and paint materials per refinish hour, stored in cents.
 - Live totals. Money math for new estimates uses integer cents.
 - Save, supplement/version, and convert to a repair order. Conversion writes the same `saved_estimates` shape an imported CCC estimate uses, so parts, hours, payments, the roadmap, and GP reports pick it up.
@@ -116,7 +116,7 @@ Health check: `GET /health`.
 ## API additions
 
 - `POST /api/native-estimates/decode-vin`
-- `GET /api/catalog/areas`, `/api/catalog/diagram`, `/api/catalog/area-diagram`, `/api/catalog/parts`
+- `GET /api/catalog/illustrations`, `/api/catalog/illustrations/{variant}`, `/api/catalog/areas`, `/api/catalog/diagram`, `/api/catalog/area-diagram`, `/api/catalog/parts`
 - `GET` and `POST /api/shop/labor-rates`
 - `GET` and `POST /api/native-estimates`, `POST /api/native-estimates/{id}/convert`, `POST /api/native-estimates/{id}/supplement`
 - `POST /api/tech-assignment/quick`

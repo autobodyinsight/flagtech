@@ -24,6 +24,7 @@ from app.services.middleware import get_authenticated_user
 from app.services.parts_catalog import get_parts_catalog
 from app.services.pdf_export import render_text_pdf
 from app.services.permissions import snapshot_can_view_financials
+from app.services.illustration_variant import known_variant, list_variants, profile_for_variant, variant_assets
 from app.services.vehicle_diagram import area_catalog, normalize_body_style, render_area_svg, render_vehicle_svg
 from app.services.vin import decode_vin
 
@@ -152,14 +153,34 @@ async def native_decode_vin(request: Request):
     return JSONResponse(status_code=status, content=decoded)
 
 
+@router.get("/catalog/illustrations")
+async def catalog_illustrations():
+    return {"variants": list_variants()}
+
+
+@router.get("/catalog/illustrations/{variant}")
+async def catalog_illustration(variant: str):
+    return variant_assets(variant)
+
+
 @router.get("/catalog/areas")
-async def catalog_areas(body_style: str = "sedan", doors: int = 4):
-    style = normalize_body_style(body_style, doors)
-    return {"body_style": style, "doors": 2 if style == "coupe" else doors, "areas": area_catalog(style, doors)}
+async def catalog_areas(body_style: str = "sedan", doors: int = 4, variant: str = ""):
+    if variant:
+        style, door_count = profile_for_variant(variant)
+    else:
+        style = normalize_body_style(body_style, doors)
+        door_count = doors
+    return {
+        "body_style": style,
+        "doors": 2 if style == "coupe" else door_count,
+        "areas": area_catalog(style, door_count),
+    }
 
 
 @router.get("/catalog/diagram")
-async def catalog_diagram(body_style: str = "sedan", doors: int = 4, side: str = "left", selected: str = ""):
+async def catalog_diagram(body_style: str = "sedan", doors: int = 4, side: str = "left", selected: str = "", variant: str = ""):
+    if variant:
+        body_style, doors = profile_for_variant(variant)
     svg = render_vehicle_svg(body_style, doors, side, selected)
     return Response(content=svg, media_type="image/svg+xml")
 
@@ -284,6 +305,8 @@ def _payload_from_body(data: dict, rates: dict) -> tuple[dict | None, str | None
         "body_class": str(vehicle.get("body_class") or "")[:80],
         "body_style": normalize_body_style(vehicle.get("body_style") or vehicle.get("body_class"), vehicle.get("doors")),
         "doors": str(vehicle.get("doors") or "")[:8],
+        "illustration_variant": known_variant(vehicle.get("illustration_variant")),
+        "cab_type": str(vehicle.get("cab_type") or "")[:80],
         "drive": str(vehicle.get("drive") or "")[:40],
         "engine": str(vehicle.get("engine") or "")[:120],
     }
@@ -404,6 +427,7 @@ async def save_native_estimate(request: Request):
                 SET customer = %s::jsonb,
                     vehicle = %s::jsonb,
                     vin = %s,
+                    illustration_variant = %s,
                     lines = %s::jsonb,
                     totals = %s::jsonb,
                     rates = %s::jsonb,
@@ -415,6 +439,7 @@ async def save_native_estimate(request: Request):
                     json.dumps(payload["customer"]),
                     json.dumps(payload["vehicle"]),
                     payload["vin"],
+                    payload["vehicle"].get("illustration_variant"),
                     json.dumps(payload["lines"]),
                     json.dumps(payload["totals"]),
                     json.dumps(payload["rates"]),
@@ -431,9 +456,9 @@ async def save_native_estimate(request: Request):
                 """
                 INSERT INTO native_estimates (
                     public_id, domain, shop_id, shop_uuid, estimate_number, version,
-                    supplement_number, status, customer, vehicle, vin, lines, totals, rates, notes, created_by
+                    supplement_number, status, customer, vehicle, vin, illustration_variant, lines, totals, rates, notes, created_by
                 )
-                VALUES (%s::uuid, %s, %s, %s::uuid, %s, 1, 0, 'draft', %s::jsonb, %s::jsonb, %s, %s::jsonb, %s::jsonb, %s::jsonb, %s::jsonb, %s)
+                VALUES (%s::uuid, %s, %s, %s::uuid, %s, 1, 0, 'draft', %s::jsonb, %s::jsonb, %s, %s, %s::jsonb, %s::jsonb, %s::jsonb, %s::jsonb, %s)
                 """,
                 (
                     public_id,
@@ -444,6 +469,7 @@ async def save_native_estimate(request: Request):
                     json.dumps(payload["customer"]),
                     json.dumps(payload["vehicle"]),
                     payload["vin"],
+                    payload["vehicle"].get("illustration_variant"),
                     json.dumps(payload["lines"]),
                     json.dumps(payload["totals"]),
                     json.dumps(payload["rates"]),
@@ -503,11 +529,11 @@ async def supplement_native_estimate(public_id: str, request: Request):
             """
             INSERT INTO native_estimates (
                 public_id, domain, shop_id, shop_uuid, estimate_number, version, supplement_number,
-                parent_public_id, status, ro, customer, vehicle, vin, lines, totals, rates, notes, created_by
+                parent_public_id, status, ro, customer, vehicle, vin, illustration_variant, lines, totals, rates, notes, created_by
             )
             VALUES (
                 %s::uuid, %s, %s, %s::uuid, %s, %s, %s, %s::uuid, 'draft', %s,
-                %s::jsonb, %s::jsonb, %s, %s::jsonb, %s::jsonb, %s::jsonb, %s::jsonb, %s
+                %s::jsonb, %s::jsonb, %s, %s, %s::jsonb, %s::jsonb, %s::jsonb, %s::jsonb, %s
             )
             """,
             (
@@ -523,6 +549,7 @@ async def supplement_native_estimate(public_id: str, request: Request):
                 json.dumps(existing.get("customer") if isinstance(existing.get("customer"), (dict, list)) else json.loads(existing.get("customer") or "{}")),
                 json.dumps(existing.get("vehicle") if isinstance(existing.get("vehicle"), (dict, list)) else json.loads(existing.get("vehicle") or "{}")),
                 existing.get("vin"),
+                existing.get("illustration_variant"),
                 json.dumps(existing.get("lines") if isinstance(existing.get("lines"), list) else json.loads(existing.get("lines") or "[]")),
                 json.dumps(existing.get("totals") if isinstance(existing.get("totals"), dict) else json.loads(existing.get("totals") or "{}")),
                 json.dumps(existing.get("rates") if isinstance(existing.get("rates"), dict) else json.loads(existing.get("rates") or "{}")),

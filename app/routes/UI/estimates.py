@@ -1170,6 +1170,23 @@ def get_estimates_screen_html():
                     if (!response.ok || data.error) throw new Error(data.error || 'Unable to load estimates');
 
                     const rows = Array.isArray(data.estimateList) ? data.estimateList : [];
+                    try {
+                        const nativeResp = await fetch('/api/native-estimates', { credentials: 'include' });
+                        const nativeData = await nativeResp.json();
+                        (nativeData.estimates || []).forEach((estimate) => {
+                            rows.push({
+                                estimate_number: estimate.estimate_number,
+                                vehicle: estimate.vehicle,
+                                customer: estimate.customer,
+                                insurance: estimate.status || '',
+                                claim_number: estimate.ro || '',
+                                total: estimate.total,
+                                native_id: estimate.id,
+                            });
+                        });
+                    } catch (nativeError) {
+                        console.error('Native estimates unavailable', nativeError);
+                    }
                     window.currentEstimateRows = rows;
 
                     if (!rows.length) {
@@ -1185,8 +1202,9 @@ def get_estimates_screen_html():
                         const claimNumber = row.claim_number || '-';
                         const total = Number(row.total || 0);
 
+                        const nativeId = row.native_id ? ` data-native-id="${row.native_id}"` : '';
                         return `
-                            <tr class="estimate-row">
+                            <tr class="estimate-row"${nativeId}>
                                 <td class="estimate-number">${estimateNumber}</td>
                                 <td>${vehicle}</td>
                                 <td>${customer}</td>
@@ -1196,6 +1214,13 @@ def get_estimates_screen_html():
                             </tr>
                         `;
                     }).join('');
+                    body.querySelectorAll('tr[data-native-id]').forEach((rowEl) => {
+                        rowEl.style.cursor = 'pointer';
+                        rowEl.addEventListener('click', () => {
+                            const id = rowEl.getAttribute('data-native-id');
+                            window.open('/ui/native-estimate?id=' + encodeURIComponent(id), 'Estimate_Window_' + id, 'width=1280,height=900,scrollbars=yes,resizable=yes');
+                        });
+                    });
                 } catch (error) {
                     console.error('Error loading estimate list:', error);
                     body.innerHTML = '<tr><td colspan="6" style="padding:20px; text-align:center; color:#b22222;">Unable to load estimates.</td></tr>';

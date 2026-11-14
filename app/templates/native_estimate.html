@@ -35,6 +35,16 @@
     .areas button.active { border-color:var(--red); background:#fff1f2; color:var(--red); }
     .diagram { background:#fff; border-radius:12px; padding:8px; overflow:auto; }
     .diagram svg { width:100%; height:auto; }
+    .view-tabs { display:none; gap:6px; margin-bottom:8px; }
+    .view-tabs button.active { background:#fff; color:#b22222; }
+    .view-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+    .stage { position:relative; background:#faf9f7; border:1px solid #e4dfdc; border-radius:12px; overflow:hidden; }
+    .stage picture, .stage img { display:block; width:100%; height:auto; }
+    .stage .overlay { position:absolute; inset:0; }
+    .stage .overlay svg { width:100%; height:100%; }
+    .flagtech-hotspots .zone.hl polygon,
+    .flagtech-hotspots .zone.active polygon { fill:#b22222; fill-opacity:.34; stroke:#b22222; stroke-opacity:1; }
+    .hotspot-tip { position:absolute; z-index:3; pointer-events:none; background:#111; color:#fff; font-size:12px; font-weight:700; padding:4px 8px; border-radius:6px; transform:translate(8px, 8px); }
     table { width:100%; border-collapse:collapse; font-size:13px; }
     th, td { padding:6px; border-bottom:1px solid #e5e0de; text-align:left; }
     .totals { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:8px; margin-bottom:10px; }
@@ -43,8 +53,11 @@
     .hidden { display:none; }
     .status-line { font-size:13px; color:#555; }
     @media (max-width: 900px) {
-      main, .work, .grid, .totals { grid-template-columns:1fr; }
+      main, .work, .grid, .totals, .view-grid { grid-template-columns:1fr; }
       nav { flex-direction:row; overflow:auto; }
+      .view-tabs { display:flex; }
+      .stage { display:none; }
+      .stage.tab-on { display:block; }
     }
   </style>
 </head>
@@ -88,13 +101,7 @@
           <label>Drive <input id="drive" /></label>
           <label>Engine <input id="engine" /></label>
           <label>Body style
-            <select id="bodyStyle">
-              <option value="sedan">Sedan</option>
-              <option value="coupe">Coupe</option>
-              <option value="suv">SUV / hatch</option>
-              <option value="pickup">Pickup</option>
-              <option value="van">Van</option>
-            </select>
+            <select id="illustrationVariant"></select>
           </label>
           <label>Deductible (cents) <input id="deductible" type="number" min="0" step="1" value="0" /></label>
         </div>
@@ -102,14 +109,15 @@
       <div id="view-estimate" class="card hidden">
         <div class="work">
           <div>
-            <div style="display:flex; gap:6px; margin-bottom:8px;">
-              <button type="button" class="secondary" id="sideLeft">Left</button>
-              <button type="button" class="secondary" id="sideRight">Right</button>
-            </div>
             <div id="areaList" class="areas"></div>
           </div>
           <div>
+            <div class="view-tabs" id="viewTabs">
+              <button type="button" class="secondary active" data-viewtab="front34">Front</button>
+              <button type="button" class="secondary" data-viewtab="rear34">Rear</button>
+            </div>
             <div id="diagram" class="diagram">Loading diagram…</div>
+            <div id="diagramFallback" class="diagram hidden"></div>
             <div id="areaDiagram" class="diagram" style="margin-top:8px;"></div>
             <div id="partSuggestions" class="status-line"></div>
             <div class="grid" style="margin-top:10px;">
@@ -154,7 +162,7 @@
     </section>
   </main>
   <script>
-    const state = { id: null, lines: [], side: "left", area: "front_bumper", rates: {}, number: new URLSearchParams(location.search).get("number") || "" };
+    const state = { id: null, lines: [], area: "front_bumper", part: "", rates: {}, variant: "sedan_4dr", pencil: true, number: new URLSearchParams(location.search).get("number") || "" };
     const $ = (id) => document.getElementById(id);
     const status = (text, kind="") => { const el = $("status"); el.textContent = text || ""; el.className = "banner " + kind; };
     async function api(url, options={}) {
@@ -174,7 +182,7 @@
       return { first_name: $("firstName").value.trim(), last_name: $("lastName").value.trim(), phone: $("phone").value.trim(), email: $("email").value.trim(), insurance_company: $("insurance").value.trim(), claim_number: $("claim").value.trim() };
     }
     function vehicle() {
-      return { year: $("year").value.trim(), make: $("make").value.trim(), model: $("model").value.trim(), trim: $("trim").value.trim(), body_class: $("bodyClass").value.trim(), body_style: $("bodyStyle").value, doors: $("doors").value.trim(), drive: $("drive").value.trim(), engine: $("engine").value.trim() };
+      return { year: $("year").value.trim(), make: $("make").value.trim(), model: $("model").value.trim(), trim: $("trim").value.trim(), body_class: $("bodyClass").value.trim(), doors: $("doors").value.trim(), drive: $("drive").value.trim(), engine: $("engine").value.trim(), illustration_variant: $("illustrationVariant").value || state.variant };
     }
     function payload() {
       return { id: state.id, vin: $("vin").value.trim().toUpperCase(), customer: customer(), vehicle: vehicle(), lines: state.lines, notes: $("notes").value.trim() ? [$("notes").value.trim()] : [], deductible_cents: Number($("deductible").value || 0) };
@@ -193,8 +201,8 @@
           $("doors").value = data.vehicle.doors || $("doors").value;
           $("drive").value = data.vehicle.drive || "";
           $("engine").value = data.vehicle.engine || "";
-          if (data.vehicle.body_style) $("bodyStyle").value = data.vehicle.body_style;
-          status(warnings.join(" ") || "VIN decoded. You can edit any field.", warnings.length ? "warn" : "ok");
+          if (data.vehicle.illustration_variant) setVariant(data.vehicle.illustration_variant, false);
+          status(warnings.join(" ") || "VIN decoded. You can change the body style if the drawing is wrong.", warnings.length ? "warn" : "ok");
         } else {
           status(data.error || warnings.join(" ") || "Enter the vehicle manually.", "bad");
         }
@@ -203,31 +211,124 @@
         status(error.message, "bad");
       }
     }
+    function setVariant(id, redraw = true) {
+      state.variant = id || "sedan_4dr";
+      const select = $("illustrationVariant");
+      if (select && [...select.options].some((option) => option.value === state.variant)) select.value = state.variant;
+      if (redraw) refreshAreas();
+    }
     async function refreshAreas() {
-      const doors = Number($("doors").value || 4);
-      const data = await api(`/api/catalog/areas?body_style=${encodeURIComponent($("bodyStyle").value)}&doors=${doors}`);
+      const data = await api(`/api/catalog/areas?variant=${encodeURIComponent(state.variant)}`);
       const list = $("areaList");
       list.innerHTML = "";
       data.areas.forEach((area) => {
         const button = document.createElement("button");
         button.type = "button";
         button.textContent = area.label;
+        button.setAttribute("data-area", area.id);
         button.className = area.id === state.area ? "active" : "";
-        button.onclick = () => selectArea(area.id, area.label);
+        button.onclick = () => selectArea(area.id, area.label, "");
         list.appendChild(button);
       });
-      if (!data.areas.some((area) => area.id === state.area)) state.area = data.areas[0].id;
+      if (!data.areas.some((area) => area.id === state.area) && data.areas[0]) state.area = data.areas[0].id;
       await loadDiagram();
+      await loadAreaDetails();
+    }
+    function highlightZones() {
+      document.querySelectorAll("#diagram .zone").forEach((zone) => {
+        const samePart = state.part && zone.dataset.part === state.part;
+        const sameArea = !state.part && zone.dataset.area === state.area;
+        zone.classList.toggle("active", Boolean(samePart || sameArea));
+      });
+      document.querySelectorAll("#areaList button").forEach((button) => {
+        button.classList.toggle("active", button.textContent && button.dataset && false);
+      });
+      document.querySelectorAll("#areaList button").forEach((button) => {
+        button.classList.toggle("active", button.getAttribute("data-area") === state.area);
+      });
+    }
+    async function loadPencil(meta) {
+      const labels = { front34: "Front", rear34: "Rear" };
+      const grid = document.createElement("div");
+      grid.className = "view-grid";
+      grid.dataset.variant = meta.id;
+      for (const view of ["front34", "rear34"]) {
+        const files = meta.views[view];
+        const figure = document.createElement("figure");
+        figure.className = "stage" + (view === "front34" ? " tab-on" : "");
+        figure.dataset.view = view;
+        figure.innerHTML = `<picture><source srcset="${files.webp}" type="image/webp"><img alt="${meta.label} ${labels[view]}" src="${files.jpg}"></picture><div class="overlay"></div><div class="hotspot-tip" hidden></div>`;
+        const overlay = figure.querySelector(".overlay");
+        const svgText = await fetch(files.overlay, { credentials: "same-origin" }).then((response) => {
+          if (!response.ok) throw new Error("overlay");
+          return response.text();
+        });
+        if (!svgText.includes("data-area")) throw new Error("overlay");
+        overlay.innerHTML = svgText;
+        const img = figure.querySelector("img");
+        await new Promise((resolve, reject) => {
+          if (img.complete && img.naturalWidth) resolve();
+          img.onload = () => resolve();
+          img.onerror = () => reject(new Error("image"));
+        });
+        grid.appendChild(figure);
+      }
+      $("diagram").classList.remove("hidden");
+      $("diagramFallback").classList.add("hidden");
+      $("diagram").innerHTML = "";
+      $("diagram").appendChild(grid);
+      wireZones();
+      state.pencil = true;
+    }
+    async function loadFallback() {
+      state.pencil = false;
+      $("diagram").classList.add("hidden");
+      const fallback = $("diagramFallback");
+      fallback.classList.remove("hidden");
+      const response = await fetch(`/api/catalog/diagram?variant=${encodeURIComponent(state.variant)}&selected=${encodeURIComponent(state.area)}`, { credentials: "include" });
+      fallback.innerHTML = await response.text();
+      fallback.querySelectorAll("[data-area]").forEach((node) => node.addEventListener("click", () => selectArea(node.getAttribute("data-area"), "", "")));
     }
     async function loadDiagram() {
-      const doors = Number($("doors").value || 4);
-      const url = `/api/catalog/diagram?body_style=${encodeURIComponent($("bodyStyle").value)}&doors=${doors}&side=${state.side}&selected=${encodeURIComponent(state.area)}`;
-      const response = await fetch(url, { credentials: "include" });
-      $("diagram").innerHTML = await response.text();
-      $("diagram").querySelectorAll("[data-area]").forEach((node) => node.addEventListener("click", () => selectArea(node.getAttribute("data-area"))));
+      try {
+        const meta = await api(`/api/catalog/illustrations/${encodeURIComponent(state.variant)}`);
+        await loadPencil(meta);
+        highlightZones();
+      } catch (error) {
+        await loadFallback();
+      }
+    }
+    function wireZones() {
+      const tipFor = (zone) => zone.closest(".stage").querySelector(".hotspot-tip");
+      $("diagram").querySelectorAll(".zone").forEach((zone) => {
+        zone.addEventListener("mouseenter", (event) => {
+          const part = zone.dataset.part;
+          $("diagram").querySelectorAll(`.zone[data-part="${CSS.escape(part)}"]`).forEach((item) => item.classList.add("hl"));
+          const tip = tipFor(zone);
+          const title = zone.querySelector("title");
+          if (tip && title) {
+            tip.hidden = false;
+            tip.textContent = title.textContent;
+            const rect = zone.closest(".stage").getBoundingClientRect();
+            tip.style.left = `${event.clientX - rect.left}px`;
+            tip.style.top = `${event.clientY - rect.top}px`;
+          }
+        });
+        zone.addEventListener("mouseleave", () => {
+          $("diagram").querySelectorAll(".zone.hl").forEach((item) => item.classList.remove("hl"));
+          const tip = tipFor(zone);
+          if (tip) tip.hidden = true;
+        });
+        zone.addEventListener("click", () => {
+          const title = zone.querySelector("title");
+          selectArea(zone.dataset.area, title ? title.textContent : "", zone.dataset.part);
+        });
+      });
+    }
+    async function loadAreaDetails() {
       const areaResponse = await fetch(`/api/catalog/area-diagram?area=${encodeURIComponent(state.area)}`, { credentials: "include" });
       $("areaDiagram").innerHTML = await areaResponse.text();
-      const parts = await api(`/api/catalog/parts?area=${encodeURIComponent(state.area)}&body_style=${encodeURIComponent($("bodyStyle").value)}`);
+      const parts = await api(`/api/catalog/parts?area=${encodeURIComponent(state.area)}`);
       const wrap = $("partSuggestions");
       wrap.innerHTML = "";
       const note = document.createElement("div");
@@ -250,11 +351,16 @@
         wrap.appendChild(button);
       });
     }
-    function selectArea(id, label) {
-      state.area = id;
+    async function selectArea(id, label, part) {
+      state.area = id || state.area;
+      state.part = part || "";
       if (label) $("partName").value = label;
-      else $("partName").value = id.replaceAll("_", " ");
-      refreshAreas();
+      else if (!part) $("partName").value = String(state.area).replaceAll("_", " ");
+      document.querySelectorAll("#areaList button").forEach((button) => {
+        button.classList.toggle("active", button.getAttribute("data-area") === state.area);
+      });
+      highlightZones();
+      await loadAreaDetails();
     }
     function renderLines(totals) {
       const box = $("totals");
@@ -300,10 +406,15 @@
     });
     $("decodeBtn").onclick = decodeVin;
     $("vin").addEventListener("change", decodeVin);
-    $("bodyStyle").addEventListener("change", refreshAreas);
+    $("illustrationVariant").addEventListener("change", () => setVariant($("illustrationVariant").value, true));
     $("doors").addEventListener("change", refreshAreas);
-    $("sideLeft").onclick = () => { state.side = "left"; loadDiagram(); };
-    $("sideRight").onclick = () => { state.side = "right"; loadDiagram(); };
+    document.querySelectorAll("#viewTabs button").forEach((button) => {
+      button.onclick = () => {
+        document.querySelectorAll("#viewTabs button").forEach((item) => item.classList.toggle("active", item === button));
+        const view = button.getAttribute("data-viewtab");
+        document.querySelectorAll("#diagram .stage").forEach((stage) => stage.classList.toggle("tab-on", stage.dataset.view === view));
+      };
+    });
     $("addLine").onclick = async () => {
       state.lines.push({
         area: state.area, operation: $("operation").value, part_name: $("partName").value || "Part",
@@ -349,9 +460,37 @@
         status("Supplement version created. Save changes, then convert to update the same repair order.", "ok");
       } catch (error) { status(error.message, "bad"); }
     };
+    function applyEstimate(estimate) {
+      state.id = estimate.id;
+      state.lines = estimate.lines || [];
+      const customer = estimate.customer || {};
+      const vehicle = estimate.vehicle || {};
+      $("firstName").value = customer.first_name || "";
+      $("lastName").value = customer.last_name || "";
+      $("phone").value = customer.phone || "";
+      $("email").value = customer.email || "";
+      $("insurance").value = customer.insurance_company || "";
+      $("claim").value = customer.claim_number || "";
+      $("vin").value = estimate.vin || "";
+      $("year").value = vehicle.year || "";
+      $("make").value = vehicle.make || "";
+      $("model").value = vehicle.model || "";
+      $("trim").value = vehicle.trim || "";
+      $("bodyClass").value = vehicle.body_class || "";
+      $("doors").value = vehicle.doors || "";
+      $("drive").value = vehicle.drive || "";
+      $("engine").value = vehicle.engine || "";
+      $("deductible").value = (estimate.totals || {}).deductible_cents || 0;
+      setVariant(vehicle.illustration_variant || "sedan_4dr", false);
+      $("title").textContent = `Estimate ${estimate.estimate_number} · v${estimate.version}`;
+      renderLines(estimate.totals);
+    }
     (async function init() {
       status("Loading shop rates…");
       try {
+        const catalog = await api("/api/catalog/illustrations");
+        const select = $("illustrationVariant");
+        select.innerHTML = (catalog.variants || []).map((item) => `<option value="${item.id}">${item.label}</option>`).join("");
         const rates = await api("/api/shop/labor-rates");
         const values = rates.rates || {};
         $("rateBody").value = values.body_rate_cents || 0;
@@ -359,7 +498,14 @@
         $("rateMech").value = values.mechanical_rate_cents || 0;
         $("rateFrame").value = values.frame_rate_cents || 0;
         $("rateMaterials").value = values.paint_materials_per_hour_cents || 0;
-        status(state.number ? `Draft number hint ${state.number}. Decode a VIN or enter the vehicle.` : "Decode a VIN or enter the vehicle.");
+        const existingId = new URLSearchParams(location.search).get("id");
+        if (existingId) {
+          const loaded = await api(`/api/native-estimates/${existingId}`);
+          applyEstimate(loaded.estimate);
+          status("Opened the saved estimate with its body-style drawing.");
+        } else {
+          status(state.number ? `Draft number hint ${state.number}. Decode a VIN or enter the vehicle.` : "Decode a VIN or enter the vehicle.");
+        }
       } catch (error) {
         status(error.message || "Unable to load rates.", "bad");
       }

@@ -102,6 +102,7 @@ def ensure_enterprise_schema(cur) -> None:
     cur.execute("CREATE INDEX IF NOT EXISTS idx_native_estimates_domain_vin ON native_estimates(domain, vin)")
     cur.execute("CREATE INDEX IF NOT EXISTS idx_native_estimates_shop_status ON native_estimates(shop_uuid, status)")
     cur.execute("CREATE INDEX IF NOT EXISTS idx_native_estimates_ro ON native_estimates(domain, ro)")
+    cur.execute("ALTER TABLE native_estimates ADD COLUMN IF NOT EXISTS illustration_variant VARCHAR(64)")
 
     cur.execute(
         """
