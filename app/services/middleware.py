@@ -324,16 +324,14 @@ def get_authenticated_user(request: Request) -> dict | None:
         normalized_shop_id = int(row.get("shop_id") or 0) or None
         normalized_shop_uuid = str(row.get("shop_uuid") or "").strip() or None
         normalized_user_uuid = str(row.get("user_id") or "").strip() or None
-        permission_snapshot = _normalize_permission_snapshot(row.get("permission_snapshot"))
-        if not permission_snapshot:
-            permission_snapshot = build_permission_snapshot(
-                role=str(row.get("role") or "").strip(),
-                domain=normalized_domain,
-                shop_id=normalized_shop_id,
-                shop_uuid=normalized_shop_uuid,
-                user_uuid=normalized_user_uuid,
-                is_architect=is_architect,
-            )
+        permission_snapshot = build_permission_snapshot(
+            role=str(row.get("role") or "").strip(),
+            domain=normalized_domain,
+            shop_id=normalized_shop_id,
+            shop_uuid=normalized_shop_uuid,
+            user_uuid=normalized_user_uuid,
+            is_architect=is_architect,
+        )
 
         user_payload = {
             "id": int(row.get("id") or 0),

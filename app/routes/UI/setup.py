@@ -140,6 +140,11 @@ def get_setup_screen_html():
                             <option value="Receptionist">Receptionist</option>
                             <option value="HR">HR</option>
                             <option value="Support">Support</option>
+                            <option value="Owner">Owner</option>
+                            <option value="Admin">Admin</option>
+                            <option value="Accounting">Accounting</option>
+                            <option value="Front Office">Front Office</option>
+                            <option value="Technician">Technician</option>
                         </select>
                     </div>
                     <div>
@@ -383,7 +388,7 @@ def get_setup_script():
                 const roleLocked = !!user.role_locked;
                 const rowWeight = roleLocked ? '800' : '400';
                 const roleText = setupEscape(user.role || '');
-                const roleOptions = ['Manager', 'Estimator', 'Tech', 'Receptionist', 'HR', 'Support']
+                const roleOptions = ['Manager', 'Estimator', 'Tech', 'Technician', 'Receptionist', 'HR', 'Support', 'Owner', 'Admin', 'Accounting', 'Front Office']
                     .map((role) => `<option value="${role}" ${String(user.role || '') === role ? 'selected' : ''}>${role}</option>`)
                     .join('');
                 const firstText = setupEscape(user.first_name || '');

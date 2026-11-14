@@ -1,0 +1,23 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt -r requirements-dev.txt
+      - name: Lint new modules
+        run: |
+          ruff check app/services/money.py app/services/vin.py app/services/estimate_math.py app/services/duplicates.py app/services/parts_catalog.py app/services/vehicle_diagram.py app/services/permissions.py app/services/totp.py tests
+      - name: Unit tests
+        run: pytest -q tests

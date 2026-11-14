@@ -106,6 +106,12 @@ async def auth_login(request: Request):
     if not email or not password:
         return JSONResponse(status_code=400, content={"error": "email and password are required"})
 
+    from app.services.rate_limit import allow
+
+    client_host = request.client.host if request.client else "unknown"
+    if not allow(f"login:{client_host}", limit=20, window_seconds=60):
+        return JSONResponse(status_code=429, content={"error": "Too many login attempts. Try again shortly."})
+
     conn = get_conn()
     cur = conn.cursor()
     try:
@@ -141,12 +147,31 @@ async def auth_login(request: Request):
         if not password_valid:
             return JSONResponse(status_code=401, content={"error": "Invalid credentials"})
 
-        if should_upgrade_hash:
+        if should_upgrade_hash and not _is_architect_email(str(row.get("email") or "")):
             cur.execute(
                 "UPDATE shop_users SET password_hash = %s WHERE id = %s",
                 (hash_password(password), int(row.get("id") or 0)),
             )
             conn.commit()
+
+        if not _is_architect_email(str(row.get("email") or "")):
+            try:
+                from app.services.totp import verify_code
+
+                cur.execute(
+                    "SELECT enabled, totp_secret FROM user_mfa WHERE user_id = %s",
+                    (int(row.get("id") or 0),),
+                )
+                mfa_row = cur.fetchone() or {}
+                if mfa_row.get("enabled"):
+                    mfa_code = str(data.get("mfa_code") or "").strip()
+                    if not mfa_code:
+                        return JSONResponse(status_code=401, content={"error": "MFA code required", "mfa_required": True})
+                    if not verify_code(str(mfa_row.get("totp_secret") or ""), mfa_code):
+                        return JSONResponse(status_code=401, content={"error": "Invalid MFA code"})
+            except Exception:
+                # MFA is optional. A missing table must not block existing logins.
+                pass
 
         if not bool(row.get("shop_active", True)):
             return JSONResponse(status_code=403, content={"error": "LOG IN NOT AUTHORIZED, CONTACT SUPPORT"})

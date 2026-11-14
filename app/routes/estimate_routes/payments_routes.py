@@ -1294,6 +1294,29 @@ async def save_ro_payments(request: Request):
                 ),
             )
 
+        try:
+            from app.services.audit import write_audit
+            from app.services.middleware import get_authenticated_user
+
+            actor = get_authenticated_user(request) or {}
+            write_audit(
+                cur,
+                domain=domain,
+                shop_id=current_shop_id,
+                actor_user_id=actor.get("id"),
+                actor_email=actor.get("email"),
+                action="payment_save",
+                entity_type="payment",
+                entity_id=ro_value,
+                after={
+                    "insurance_paid": insurance_paid,
+                    "customer_paid": customer_paid,
+                    "insurance_entry": insurance_entry_amount,
+                    "customer_entry": customer_entry_amount,
+                },
+            )
+        except Exception:
+            pass
         conn.commit()
 
         balance = max(0.0, grand_total - insurance_paid - customer_paid)

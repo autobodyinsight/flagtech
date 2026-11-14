@@ -537,6 +537,14 @@ async def get_dashboard_data(request: Request):
         ]
         ros_per_tech.sort(key=lambda item: item["ros"], reverse=True)
 
+        from app.services.permissions import snapshot_can_view_financials
+
+        visible = snapshot_can_view_financials((get_authenticated_user(request) or {}).get("permissions"))
+        if not visible:
+            for item in ro_list:
+                item["total"] = None
+            total_sales = None
+            average_ro = None
         return {
             "totalSales": total_sales,
             "totalROs": ro_count,
@@ -545,6 +553,7 @@ async def get_dashboard_data(request: Request):
             "hoursPerTech": hours_per_tech,
             "rosPerTech": ros_per_tech,
             "roList": ro_list,
+            "financialsVisible": visible,
         }
     finally:
         cur.close()

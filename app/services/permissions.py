@@ -86,6 +86,15 @@ def build_permission_snapshot(
         action: access_level in ACTION_RULES.get(action, ALL_ACCESS_LEVELS)
         for action in ACTION_RULES
     }
+    # Existing roles keep every screen they have today. Technician/Tech is the
+    # one role that cannot see GP, payments, or other shop financials.
+    # ARCHITECT is forced above via is_architect and is never reduced.
+    role_key = str(role or "").strip().lower().replace("_", " ")
+    view_financials = True
+    if not is_architect and role_key in {"tech", "technician"}:
+        features["reports"] = False
+        features["payments"] = False
+        view_financials = False
     return {
         "access_level": access_level,
         "shop_domain": str(domain or "").strip().lower(),
@@ -94,7 +103,17 @@ def build_permission_snapshot(
         "user_uuid": str(user_uuid or "").strip() or None,
         "features": features,
         "actions": actions,
+        "view_financials": view_financials,
     }
+
+
+def snapshot_can_view_financials(snapshot: dict | None) -> bool:
+    normalized = snapshot or {}
+    if str(normalized.get("access_level") or "").strip().upper() == ACCESS_ARCHITECT:
+        return True
+    if "view_financials" in normalized:
+        return bool(normalized.get("view_financials"))
+    return True
 
 
 def has_feature_access(snapshot: dict | None, feature: str | None) -> bool:
@@ -177,6 +196,18 @@ def resolve_feature_for_path(path: str, method: str = "GET") -> str | None:
 
     if normalized_path == "/api/reports_data" or normalized_path.startswith("/api/records/"):
         return "reports"
+
+    if normalized_path.startswith("/api/payments/") or normalized_path.startswith("/api/exports/reports"):
+        return "payments" if normalized_path.startswith("/api/payments/") else "reports"
+
+    if normalized_path.startswith("/api/native-estimates") or normalized_path.startswith("/api/catalog/") or normalized_path.startswith("/api/shop/labor-rates"):
+        return "estimate"
+
+    if normalized_path.startswith("/api/exports/"):
+        return "estimate"
+
+    if normalized_path.startswith("/api/tech-assignment/"):
+        return "tech"
 
     if normalized_path.startswith("/api/payments/"):
         return "payments"

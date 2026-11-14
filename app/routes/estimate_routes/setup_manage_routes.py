@@ -594,7 +594,7 @@ async def update_manage_user(request: Request):
     email = str(data.get("email") or "").strip().lower()
     role = str(data.get("role") or "").strip()
 
-    allowed_roles = {"Manager", "Estimator", "Tech", "Receptionist", "HR", "Support"}
+    allowed_roles = {"Manager", "Estimator", "Tech", "Technician", "Receptionist", "HR", "Support", "Owner", "Admin", "Accounting", "Front Office"}
     if not selected_domain or not first_name or not last_name or not email or role not in allowed_roles:
         return JSONResponse(status_code=400, content={"error": "shop_domain, first_name, last_name, email, and valid role are required"})
     if _is_architect_email(email):
@@ -666,7 +666,7 @@ async def create_manage_user(request: Request):
     email = str(data.get("email") or "").strip().lower()
     role = str(data.get("role") or "").strip()
     password = str(data.get("password") or "").strip()
-    allowed_roles = {"Manager", "Estimator", "Tech", "Receptionist", "HR", "Support"}
+    allowed_roles = {"Manager", "Estimator", "Tech", "Technician", "Receptionist", "HR", "Support", "Owner", "Admin", "Accounting", "Front Office"}
 
     if not selected_domain or not first_name or not last_name or not email or not role or not password:
         return JSONResponse(status_code=400, content={"error": "shop_domain, first_name, last_name, email, role, and password are required"})
@@ -896,7 +896,7 @@ async def update_setup_user(request: Request):
     email = str(data.get("email") or "").strip().lower()
     role = str(data.get("role") or "").strip()
 
-    allowed_roles = {"Manager", "Estimator", "Tech", "Receptionist", "HR", "Support"}
+    allowed_roles = {"Manager", "Estimator", "Tech", "Technician", "Receptionist", "HR", "Support", "Owner", "Admin", "Accounting", "Front Office"}
     if not first_name or not last_name or not email or not role:
         return JSONResponse(status_code=400, content={"error": "first_name, last_name, email, and role are required"})
     if role not in allowed_roles:
@@ -1115,7 +1115,7 @@ async def create_setup_user(request: Request):
     role = str(data.get("role") or "").strip()
     password = str(data.get("password") or "")
 
-    allowed_roles = {"Manager", "Estimator", "Tech", "Receptionist", "HR", "Support"}
+    allowed_roles = {"Manager", "Estimator", "Tech", "Technician", "Receptionist", "HR", "Support", "Owner", "Admin", "Accounting", "Front Office"}
     if not first_name or not last_name or not email or not role or not password:
         return JSONResponse(status_code=400, content={"error": "first_name, last_name, email, role, and password are required"})
     if role not in allowed_roles:
