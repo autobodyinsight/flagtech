@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>New estimate</title>
+  <style>
+    :root { --red:#b22222; --sidebar:#971d1d; --bg:#d3d3d3; --card:#f4f1ef; --ink:#23272a; }
+    * { box-sizing: border-box; }
+    body { margin:0; font-family:"Segoe UI", Tahoma, sans-serif; background:var(--bg); color:var(--ink); }
+    header { display:flex; justify-content:space-between; gap:12px; align-items:center; padding:14px 18px; background:linear-gradient(90deg,#111,#971d1d); color:#fff; }
+    header h1 { margin:0; font-size:20px; }
+    header p { margin:4px 0 0; opacity:.85; font-size:13px; }
+    .actions { display:flex; gap:8px; flex-wrap:wrap; }
+    button, select, input, textarea { font:inherit; }
+    button { background:var(--red); color:#fff; border:0; border-radius:8px; padding:9px 12px; font-weight:700; cursor:pointer; }
+    button.secondary { background:#3c4142; }
+    button.green { background:#2e9d53; }
+    button:disabled { opacity:.6; cursor:default; }
+    main { display:grid; grid-template-columns:180px 1fr; gap:14px; padding:14px; }
+    nav { background:var(--sidebar); border-radius:12px; padding:10px; display:flex; flex-direction:column; gap:8px; }
+    nav button { background:transparent; border:1px solid rgba(255,255,255,.25); }
+    nav button.active { background:#fff; color:var(--red); }
+    .card { background:var(--card); border-radius:12px; padding:14px; box-shadow:0 8px 18px rgba(0,0,0,.06); }
+    .grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; }
+    label { display:flex; flex-direction:column; gap:4px; font-size:12px; font-weight:700; letter-spacing:.04em; text-transform:uppercase; color:#475569; }
+    input, select, textarea { border:1px solid #d5d0ce; border-radius:8px; padding:8px 10px; background:#fff; color:#111; }
+    .banner { min-height:22px; margin:8px 0; font-weight:700; }
+    .banner.warn { color:#8a5a00; }
+    .banner.bad { color:#8d1d1d; }
+    .banner.ok { color:#1c7c4d; }
+    .work { display:grid; grid-template-columns:220px 1fr; gap:12px; }
+    .areas { display:flex; flex-direction:column; gap:6px; max-height:640px; overflow:auto; }
+    .areas button { background:#fff; color:#111; border:1px solid #ddd; text-align:left; }
+    .areas button.active { border-color:var(--red); background:#fff1f2; color:var(--red); }
+    .diagram { background:#fff; border-radius:12px; padding:8px; overflow:auto; }
+    .diagram svg { width:100%; height:auto; }
+    table { width:100%; border-collapse:collapse; font-size:13px; }
+    th, td { padding:6px; border-bottom:1px solid #e5e0de; text-align:left; }
+    .totals { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:8px; margin-bottom:10px; }
+    .totals div { background:#fff; border-radius:8px; padding:8px; }
+    .totals strong { display:block; font-size:16px; }
+    .hidden { display:none; }
+    .status-line { font-size:13px; color:#555; }
+    @media (max-width: 900px) {
+      main, .work, .grid, .totals { grid-template-columns:1fr; }
+      nav { flex-direction:row; overflow:auto; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div>
+      <h1 id="title">New estimate</h1>
+      <p>Same shop flow as an imported estimate. Save it, then convert it to a repair order.</p>
+    </div>
+    <div class="actions">
+      <button class="secondary" id="supplementBtn" type="button">Supplement</button>
+      <button class="green" id="saveBtn" type="button">Save</button>
+      <button id="convertBtn" type="button">Convert to RO</button>
+    </div>
+  </header>
+  <main>
+    <nav>
+      <button type="button" class="active" data-view="customer">Customer / Vehicle</button>
+      <button type="button" data-view="estimate">Estimate</button>
+      <button type="button" data-view="rates">Rates</button>
+      <button type="button" data-view="notes">Notes</button>
+    </nav>
+    <section>
+      <div id="status" class="banner"></div>
+      <div id="view-customer" class="card">
+        <div class="grid">
+          <label>First name <input id="firstName" /></label>
+          <label>Last name <input id="lastName" /></label>
+          <label>Phone <input id="phone" /></label>
+          <label>Email <input id="email" /></label>
+          <label>Insurance <input id="insurance" /></label>
+          <label>Claim # <input id="claim" /></label>
+          <label>VIN <input id="vin" maxlength="17" style="text-transform:uppercase" placeholder="Paste 17-character VIN" /></label>
+          <label>Decoder <button type="button" id="decodeBtn">Decode VIN</button></label>
+          <label>Year <input id="year" /></label>
+          <label>Make <input id="make" /></label>
+          <label>Model <input id="model" /></label>
+          <label>Trim <input id="trim" /></label>
+          <label>Body class <input id="bodyClass" /></label>
+          <label>Doors <input id="doors" value="4" /></label>
+          <label>Drive <input id="drive" /></label>
+          <label>Engine <input id="engine" /></label>
+          <label>Body style
+            <select id="bodyStyle">
+              <option value="sedan">Sedan</option>
+              <option value="coupe">Coupe</option>
+              <option value="suv">SUV / hatch</option>
+              <option value="pickup">Pickup</option>
+              <option value="van">Van</option>
+            </select>
+          </label>
+          <label>Deductible (cents) <input id="deductible" type="number" min="0" step="1" value="0" /></label>
+        </div>
+      </div>
+      <div id="view-estimate" class="card hidden">
+        <div class="work">
+          <div>
+            <div style="display:flex; gap:6px; margin-bottom:8px;">
+              <button type="button" class="secondary" id="sideLeft">Left</button>
+              <button type="button" class="secondary" id="sideRight">Right</button>
+            </div>
+            <div id="areaList" class="areas"></div>
+          </div>
+          <div>
+            <div id="diagram" class="diagram">Loading diagram…</div>
+            <div id="areaDiagram" class="diagram" style="margin-top:8px;"></div>
+            <div id="partSuggestions" class="status-line"></div>
+            <div class="grid" style="margin-top:10px;">
+              <label>Operation
+                <select id="operation">
+                  <option>Repair</option><option>Replace</option><option>R&amp;I</option><option>Refinish</option><option>Blend</option><option>Sublet</option>
+                </select>
+              </label>
+              <label>Part name <input id="partName" /></label>
+              <label>Part type
+                <select id="partType"><option>OEM</option><option>Aftermarket</option><option>Used</option><option>Reman</option></select>
+              </label>
+              <label>Part number <input id="partNumber" /></label>
+              <label>Qty <input id="qty" type="number" min="0.01" step="0.01" value="1" /></label>
+              <label>Price (cents) <input id="priceCents" type="number" min="0" step="1" value="0" /></label>
+              <label>Body hrs <input id="bodyHours" type="number" min="0" step="0.1" value="0" /></label>
+              <label>Refinish hrs <input id="refinishHours" type="number" min="0" step="0.1" value="0" /></label>
+              <label>Mech hrs <input id="mechHours" type="number" min="0" step="0.1" value="0" /></label>
+              <label>Frame hrs <input id="frameHours" type="number" min="0" step="0.1" value="0" /></label>
+              <label>Notes <input id="lineNotes" /></label>
+            </div>
+            <div style="margin-top:8px;"><button type="button" id="addLine">Add line</button></div>
+            <div id="totals" class="totals" style="margin-top:12px;"></div>
+            <div id="lines"></div>
+          </div>
+        </div>
+      </div>
+      <div id="view-rates" class="card hidden">
+        <p class="status-line">Rates are stored per shop in cents per hour. Paint materials are cents per refinish hour.</p>
+        <div class="grid">
+          <label>Body <input id="rateBody" type="number" min="0" step="1" /></label>
+          <label>Refinish <input id="rateRefinish" type="number" min="0" step="1" /></label>
+          <label>Mechanical <input id="rateMech" type="number" min="0" step="1" /></label>
+          <label>Frame <input id="rateFrame" type="number" min="0" step="1" /></label>
+          <label>Materials / refinish hr <input id="rateMaterials" type="number" min="0" step="1" /></label>
+        </div>
+        <div style="margin-top:8px;"><button type="button" id="saveRates">Save shop rates</button></div>
+      </div>
+      <div id="view-notes" class="card hidden">
+        <label>Estimate notes <textarea id="notes" rows="6"></textarea></label>
+      </div>
+    </section>
+  </main>
+  <script>
+    const state = { id: null, lines: [], side: "left", area: "front_bumper", rates: {}, number: new URLSearchParams(location.search).get("number") || "" };
+    const $ = (id) => document.getElementById(id);
+    const status = (text, kind="") => { const el = $("status"); el.textContent = text || ""; el.className = "banner " + kind; };
+    async function api(url, options={}) {
+      const response = await fetch(url, { credentials: "include", headers: { "Content-Type": "application/json" }, ...options });
+      const text = await response.text();
+      let data = {};
+      try { data = text ? JSON.parse(text) : {}; } catch { data = { error: text }; }
+      if (!response.ok) {
+        const error = new Error(data.error || "Request failed");
+        error.payload = data;
+        error.status = response.status;
+        throw error;
+      }
+      return data;
+    }
+    function customer() {
+      return { first_name: $("firstName").value.trim(), last_name: $("lastName").value.trim(), phone: $("phone").value.trim(), email: $("email").value.trim(), insurance_company: $("insurance").value.trim(), claim_number: $("claim").value.trim() };
+    }
+    function vehicle() {
+      return { year: $("year").value.trim(), make: $("make").value.trim(), model: $("model").value.trim(), trim: $("trim").value.trim(), body_class: $("bodyClass").value.trim(), body_style: $("bodyStyle").value, doors: $("doors").value.trim(), drive: $("drive").value.trim(), engine: $("engine").value.trim() };
+    }
+    function payload() {
+      return { id: state.id, vin: $("vin").value.trim().toUpperCase(), customer: customer(), vehicle: vehicle(), lines: state.lines, notes: $("notes").value.trim() ? [$("notes").value.trim()] : [], deductible_cents: Number($("deductible").value || 0) };
+    }
+    async function decodeVin() {
+      status("Decoding VIN…");
+      try {
+        const data = await api("/api/native-estimates/decode-vin", { method: "POST", body: JSON.stringify({ vin: $("vin").value }) });
+        const warnings = (data.validation && data.validation.warnings) || [];
+        if (data.vehicle) {
+          $("year").value = data.vehicle.year || "";
+          $("make").value = data.vehicle.make || "";
+          $("model").value = data.vehicle.model || "";
+          $("trim").value = data.vehicle.trim || "";
+          $("bodyClass").value = data.vehicle.body_class || "";
+          $("doors").value = data.vehicle.doors || $("doors").value;
+          $("drive").value = data.vehicle.drive || "";
+          $("engine").value = data.vehicle.engine || "";
+          if (data.vehicle.body_style) $("bodyStyle").value = data.vehicle.body_style;
+          status(warnings.join(" ") || "VIN decoded. You can edit any field.", warnings.length ? "warn" : "ok");
+        } else {
+          status(data.error || warnings.join(" ") || "Enter the vehicle manually.", "bad");
+        }
+        await refreshAreas();
+      } catch (error) {
+        status(error.message, "bad");
+      }
+    }
+    async function refreshAreas() {
+      const doors = Number($("doors").value || 4);
+      const data = await api(`/api/catalog/areas?body_style=${encodeURIComponent($("bodyStyle").value)}&doors=${doors}`);
+      const list = $("areaList");
+      list.innerHTML = "";
+      data.areas.forEach((area) => {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.textContent = area.label;
+        button.className = area.id === state.area ? "active" : "";
+        button.onclick = () => selectArea(area.id, area.label);
+        list.appendChild(button);
+      });
+      if (!data.areas.some((area) => area.id === state.area)) state.area = data.areas[0].id;
+      await loadDiagram();
+    }
+    async function loadDiagram() {
+      const doors = Number($("doors").value || 4);
+      const url = `/api/catalog/diagram?body_style=${encodeURIComponent($("bodyStyle").value)}&doors=${doors}&side=${state.side}&selected=${encodeURIComponent(state.area)}`;
+      const response = await fetch(url, { credentials: "include" });
+      $("diagram").innerHTML = await response.text();
+      $("diagram").querySelectorAll("[data-area]").forEach((node) => node.addEventListener("click", () => selectArea(node.getAttribute("data-area"))));
+      const areaResponse = await fetch(`/api/catalog/area-diagram?area=${encodeURIComponent(state.area)}`, { credentials: "include" });
+      $("areaDiagram").innerHTML = await areaResponse.text();
+      const parts = await api(`/api/catalog/parts?area=${encodeURIComponent(state.area)}&body_style=${encodeURIComponent($("bodyStyle").value)}`);
+      const wrap = $("partSuggestions");
+      wrap.innerHTML = "";
+      const note = document.createElement("div");
+      note.textContent = parts.notice;
+      wrap.appendChild(note);
+      (parts.parts || []).forEach((part) => {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "secondary";
+        button.style.margin = "4px";
+        button.textContent = part.name;
+        button.onclick = () => {
+          $("partName").value = part.name;
+          $("partNumber").value = part.part_number;
+          $("partType").value = part.part_type;
+          $("bodyHours").value = part.body_hours;
+          $("refinishHours").value = part.refinish_hours;
+          $("lineNotes").value = part.notes;
+        };
+        wrap.appendChild(button);
+      });
+    }
+    function selectArea(id, label) {
+      state.area = id;
+      if (label) $("partName").value = label;
+      else $("partName").value = id.replaceAll("_", " ");
+      refreshAreas();
+    }
+    function renderLines(totals) {
+      const box = $("totals");
+      const money = (cents) => "$" + (Number(cents || 0) / 100).toFixed(2);
+      const source = totals || {};
+      box.innerHTML = `
+        <div>Parts<strong>${source.parts_total || "$0.00"}</strong></div>
+        <div>Body labor<strong>${source.body_labor || "$0.00"}</strong></div>
+        <div>Refinish + materials<strong>${source.paint_labor || "$0.00"}</strong></div>
+        <div>Grand<strong>${source.grand_total || "$0.00"}</strong></div>`;
+      const rows = state.lines.map((line, index) => `<tr>
+        <td>${index + 1}</td><td>${line.operation}</td><td>${line.part_name}</td><td>${line.part_type}</td>
+        <td>${line.part_number || ""}</td><td>${line.quantity}</td><td>${money(line.price_cents)}</td>
+        <td>${line.body_hours}</td><td>${line.refinish_hours}</td><td>${line.notes || ""}</td>
+        <td><button type="button" data-remove="${index}" class="secondary">Remove</button></td></tr>`).join("");
+      $("lines").innerHTML = state.lines.length ? `<table><thead><tr><th>#</th><th>Op</th><th>Part</th><th>Type</th><th>Part #</th><th>Qty</th><th>Price</th><th>Body</th><th>Refinish</th><th>Notes</th><th></th></tr></thead><tbody>${rows}</tbody></table>` : `<div class="status-line">No lines yet. Choose an area and add a line.</div>`;
+      $("lines").querySelectorAll("[data-remove]").forEach((button) => button.onclick = async () => { state.lines.splice(Number(button.dataset.remove), 1); await preview(); });
+    }
+    async function preview() {
+      try {
+        const data = await api("/api/native-estimates/preview", { method: "POST", body: JSON.stringify(payload()) });
+        state.lines = data.lines || state.lines;
+        renderLines(data.totals);
+      } catch (error) {
+        status(error.message, "bad");
+      }
+    }
+    async function saveEstimate() {
+      status("Saving…");
+      const data = await api("/api/native-estimates", { method: "POST", body: JSON.stringify(payload()) });
+      state.id = data.estimate.id;
+      state.lines = data.estimate.lines || [];
+      $("title").textContent = `Estimate ${data.estimate.estimate_number} · v${data.estimate.version}`;
+      renderLines(data.estimate.totals);
+      status("Estimate saved.", "ok");
+      return data.estimate;
+    }
+    document.querySelectorAll("nav button").forEach((button) => button.onclick = () => {
+      document.querySelectorAll("nav button").forEach((item) => item.classList.remove("active"));
+      button.classList.add("active");
+      ["customer", "estimate", "rates", "notes"].forEach((name) => $("view-" + name).classList.toggle("hidden", button.dataset.view !== name));
+      if (button.dataset.view === "estimate") refreshAreas();
+    });
+    $("decodeBtn").onclick = decodeVin;
+    $("vin").addEventListener("change", decodeVin);
+    $("bodyStyle").addEventListener("change", refreshAreas);
+    $("doors").addEventListener("change", refreshAreas);
+    $("sideLeft").onclick = () => { state.side = "left"; loadDiagram(); };
+    $("sideRight").onclick = () => { state.side = "right"; loadDiagram(); };
+    $("addLine").onclick = async () => {
+      state.lines.push({
+        area: state.area, operation: $("operation").value, part_name: $("partName").value || "Part",
+        part_type: $("partType").value, part_number: $("partNumber").value, quantity: $("qty").value,
+        price_cents: Number($("priceCents").value || 0), body_hours: $("bodyHours").value,
+        refinish_hours: $("refinishHours").value, mechanical_hours: $("mechHours").value,
+        frame_hours: $("frameHours").value, notes: $("lineNotes").value
+      });
+      await preview();
+    };
+    $("saveBtn").onclick = () => saveEstimate().catch((error) => status(error.message, "bad"));
+    $("saveRates").onclick = async () => {
+      const body = { body_rate_cents: Number($("rateBody").value || 0), refinish_rate_cents: Number($("rateRefinish").value || 0), mechanical_rate_cents: Number($("rateMech").value || 0), frame_rate_cents: Number($("rateFrame").value || 0), paint_materials_per_hour_cents: Number($("rateMaterials").value || 0) };
+      await api("/api/shop/labor-rates", { method: "POST", body: JSON.stringify(body) });
+      status("Shop labor rates saved.", "ok");
+      await preview();
+    };
+    $("convertBtn").onclick = async () => {
+      try {
+        const estimate = state.id ? { id: state.id } : await saveEstimate();
+        const id = state.id || estimate.id;
+        let data;
+        try {
+          data = await api(`/api/native-estimates/${id}/convert`, { method: "POST", body: JSON.stringify({ acknowledge_duplicate: false }) });
+        } catch (error) {
+          if (error.status === 409 && error.payload && error.payload.code === "duplicate_warning") {
+            const list = (error.payload.duplicates || []).map((item) => `${item.ro} (${item.reason})`).join(", ");
+            if (!confirm(`Possible duplicate of ${list}. Create or update the repair order anyway? Existing ROs are not deleted.`)) return;
+            data = await api(`/api/native-estimates/${id}/convert`, { method: "POST", body: JSON.stringify({ acknowledge_duplicate: true }) });
+          } else throw error;
+        }
+        status(`Repair order ${data.ro} is on the dashboard, roadmap, parts, hours, payments, and GP reports.`, "ok");
+      } catch (error) { status(error.message, "bad"); }
+    };
+    $("supplementBtn").onclick = async () => {
+      try {
+        if (!state.id) await saveEstimate();
+        const data = await api(`/api/native-estimates/${state.id}/supplement`, { method: "POST", body: "{}" });
+        state.id = data.estimate.id;
+        state.lines = data.estimate.lines || [];
+        $("title").textContent = `Estimate ${data.estimate.estimate_number} · supplement ${data.estimate.supplement_number}`;
+        renderLines(data.estimate.totals);
+        status("Supplement version created. Save changes, then convert to update the same repair order.", "ok");
+      } catch (error) { status(error.message, "bad"); }
+    };
+    (async function init() {
+      status("Loading shop rates…");
+      try {
+        const rates = await api("/api/shop/labor-rates");
+        const values = rates.rates || {};
+        $("rateBody").value = values.body_rate_cents || 0;
+        $("rateRefinish").value = values.refinish_rate_cents || 0;
+        $("rateMech").value = values.mechanical_rate_cents || 0;
+        $("rateFrame").value = values.frame_rate_cents || 0;
+        $("rateMaterials").value = values.paint_materials_per_hour_cents || 0;
+        status(state.number ? `Draft number hint ${state.number}. Decode a VIN or enter the vehicle.` : "Decode a VIN or enter the vehicle.");
+      } catch (error) {
+        status(error.message || "Unable to load rates.", "bad");
+      }
+      renderLines();
+    })();
+  </script>
+</body>
+</html>

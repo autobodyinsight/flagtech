@@ -126,6 +126,14 @@ def get_estimates_screen_html():
 
             function openEstimateWindowFromEstimateList(event) {
                 if (event) event.stopPropagation();
+                const nextEstimateNumber = getNextEstimateNumber();
+                const url = '/ui/native-estimate?number=' + encodeURIComponent(nextEstimateNumber);
+                const estimateWindow = window.open(url, 'Estimate_Window_' + nextEstimateNumber, 'width=1280,height=900,scrollbars=yes,resizable=yes');
+                if (!estimateWindow) window.location.assign(url);
+            }
+
+            function legacyEstimateBuilderUnused(event) {
+                if (event) event.stopPropagation();
 
                 const nextEstimateNumber = getNextEstimateNumber();
                 const win = window.open('', `Estimate_Window_${nextEstimateNumber}`, 'width=1100,height=760,scrollbars=yes,resizable=yes');

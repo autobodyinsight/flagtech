@@ -25,6 +25,7 @@ from app.routes.estimate_modules.shop_scope import (
     _ensure_shop_id_columns_for_domain_tables,
     _ensure_shop_id_sync_triggers,
 )
+from app.routes.estimate_modules.enterprise_schema import ensure_enterprise_schema
 from app.services.db import get_conn
 from app.services.schema_state import is_schema_bootstrapped, set_schema_bootstrapped
 
@@ -91,6 +92,7 @@ def initialize_application_schema() -> None:
             _sync_shop_id_bindings(cur)
             _ensure_shop_id_columns_for_domain_tables(cur)
             _ensure_shop_id_sync_triggers(cur)
+            ensure_enterprise_schema(cur)
 
             set_schema_bootstrapped(True)
         finally:

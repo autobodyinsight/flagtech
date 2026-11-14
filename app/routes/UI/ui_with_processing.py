@@ -1199,6 +1199,35 @@ async def save_estimate(request: Request):
     ecd_date_value = _add_weekdays(in_date_value, _weekday_days_from_hours(_estimate_hours_for_ecd(data)))
 
     try:
+        from app.services.duplicates import query_duplicate_matches
+        from app.routes.estimate_modules.shop_scope import resolve_request_scope
+
+        if not data.get("acknowledge_duplicate"):
+            scope = resolve_request_scope(request, cur, domain=domain)
+            if scope.get("shop_id") and scope.get("shop_uuid"):
+                matches = query_duplicate_matches(
+                    cur,
+                    domain=domain,
+                    shop_id=scope["shop_id"],
+                    shop_uuid=scope["shop_uuid"],
+                    incoming={
+                        "ro": ro_value,
+                        "vin": data.get("vin"),
+                        "year": data.get("year"),
+                        "make": data.get("make"),
+                        "model": data.get("model"),
+                        "customer": data.get("owner_info"),
+                    },
+                )
+                if matches:
+                    return JSONResponse(
+                        status_code=409,
+                        content={
+                            "error": "Possible duplicate repair order",
+                            "code": "duplicate_warning",
+                            "duplicates": matches,
+                        },
+                    )
         cur.execute(
             """
             SELECT id
@@ -1306,6 +1335,24 @@ async def save_estimate(request: Request):
         inserted_rows = _sync_ro_line_assignments_for_estimate_update(cur, domain, ro_value, labor_repairs, paint_repairs)
         _refresh_role_assignments_from_lines(cur, domain, ro_value, inserted_rows)
         _recalculate_ro_assignment_hours(cur, domain, ro_value, labor_repairs, paint_repairs)
+        try:
+            from app.services.audit import write_audit
+            from app.services.middleware import get_authenticated_user
+
+            actor = get_authenticated_user(request) or {}
+            write_audit(
+                cur,
+                domain=domain,
+                shop_id=actor.get("shop_id"),
+                actor_user_id=actor.get("id"),
+                actor_email=actor.get("email"),
+                action="import_save",
+                entity_type="repair_order",
+                entity_id=ro_value,
+                after={"vin": data.get("vin"), "grand_total": (estimate_totals or {}).get("grand_total")},
+            )
+        except Exception:
+            pass
         conn.commit()
     finally:
         cur.close()

@@ -450,7 +450,7 @@ def get_dashboard_screen_html():
                         <button id="roSidebarBtn-estimate" class="ro-sidebar-btn" data-view="estimate" title="Estimate" style="background:none; border:none; padding:0; cursor:pointer;">${icons.estimate}</button>
                         <button id="roSidebarBtn-tech" class="ro-sidebar-btn" data-view="tech" title="Tech" style="background:none; border:none; padding:0; cursor:pointer;">${icons.tech}</button>
                         <button id="roSidebarBtn-parts" class="ro-sidebar-btn" data-view="parts" title="Parts" style="background:none; border:none; padding:0; cursor:pointer;">${icons.cart}</button>
-                        <button id="roSidebarBtn-payments" class="ro-sidebar-btn" data-view="payments" title="Payments" style="background:none; border:none; padding:0; cursor:pointer;">${icons.credit}</button>
+                        ${window.__flagtechHideFinancials ? '' : `<button id="roSidebarBtn-payments" class="ro-sidebar-btn" data-view="payments" title="Payments" style="background:none; border:none; padding:0; cursor:pointer;">${icons.credit}</button>`}
                         <div style="position:relative; display:flex; justify-content:center; width:100%;">
                             <button id="roPrintTrigger" class="ro-sidebar-btn ro-sidebar-action mini-popup-trigger" type="button" aria-label="Print" title="Print" style="background:none; border:none; padding:0; cursor:pointer;">${icons.print}</button>
                             <div id="roPrintOptionsModal" class="mini-popup-panel" style="display:none; left:calc(100% + 10px); right:auto; top:0;">
@@ -2218,7 +2218,17 @@ def get_dashboard_screen_html():
                     <div>
                         <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; margin-bottom:10px;">
                             <div style="font-weight:700; font-size:18px; color:#333;">Tech Hours Assignment</div>
-                            <button id="roPopupTechUnassignBtn" type="button" style="padding:8px 12px; background:#d32f2f; color:#fff; border:none; border-radius:6px; cursor:pointer; font-weight:700;" disabled>Unassign</button>
+                            <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+                                <select id="roPopupQuickTech" style="padding:8px; border:1px solid #ccc; border-radius:6px; min-width:160px;"><option value="">Assign all unassigned…</option></select>
+                                <select id="roPopupQuickType" style="padding:8px; border:1px solid #ccc; border-radius:6px;">
+                                    <option value="body">body</option>
+                                    <option value="paint">paint</option>
+                                    <option value="mech">mech</option>
+                                    <option value="frame">frame</option>
+                                </select>
+                                <button id="roPopupQuickAssignBtn" type="button" style="padding:8px 12px; background:#b22222; color:#fff; border:none; border-radius:6px; cursor:pointer; font-weight:700;">Assign</button>
+                                <button id="roPopupTechUnassignBtn" type="button" style="padding:8px 12px; background:#d32f2f; color:#fff; border:none; border-radius:6px; cursor:pointer; font-weight:700;" disabled>Unassign</button>
+                            </div>
                         </div>
                         <div id="roPopupTechList"><div style="color:#777;">Loading...</div></div>
                     </div>
@@ -2253,6 +2263,41 @@ def get_dashboard_screen_html():
                 `;
 
                 bindTechModalActions();
+                const quickTech = roWindowDoc.getElementById('roPopupQuickTech');
+                const quickBtn = roWindowDoc.getElementById('roPopupQuickAssignBtn');
+                if (quickTech) {
+                    popupFetchJson('/api/techs/list').then((res) => {
+                        (res.techs || []).forEach((tech) => {
+                            const option = roWindowDoc.createElement('option');
+                            option.value = String(tech.id);
+                            option.textContent = `${tech.first_name || ''} ${tech.last_name || ''}`.trim();
+                            quickTech.appendChild(option);
+                        });
+                    }).catch((error) => console.error('Unable to load techs', error));
+                }
+                if (quickBtn) {
+                    quickBtn.onclick = async () => {
+                        const techId = Number(quickTech?.value || 0);
+                        const repairType = roWindowDoc.getElementById('roPopupQuickType')?.value || 'body';
+                        if (!techId) {
+                            alert('Choose a technician.');
+                            return;
+                        }
+                        try {
+                            const result = await popupFetchJson('/api/tech-assignment/quick', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ ro: ro.ro, tech_id: techId, repair_type: repairType }),
+                            });
+                            alert(result.updated ? `Assigned ${result.updated} unassigned ${repairType} line(s) to ${result.tech_name}.` : 'No unassigned lines of that type.');
+                            await renderTechView();
+                            loadDashboardData();
+                        } catch (error) {
+                            console.error(error);
+                            alert('Unable to assign hours.');
+                        }
+                    };
+                }
                 const listEl = roWindowDoc.getElementById('roPopupTechList');
                 const unassignBtn = roWindowDoc.getElementById('roPopupTechUnassignBtn');
 
@@ -2943,6 +2988,7 @@ def get_dashboard_screen_html():
                     const data = await response.json();
                     if (data && !data.error) {
                         dashboardData = data;
+                        window.__flagtechHideFinancials = data.financialsVisible === false;
                         updateDashboard(data);
                         return;
                     }
@@ -3062,12 +3108,13 @@ def get_dashboard_screen_html():
             // Update all dashboard elements
             function updateDashboard(data) {
                 const openMetrics = computeOpenOnlyDashboardMetrics(data?.roList || []);
+                const hideMoney = data?.financialsVisible === false;
 
                 // Update Total Sales bar and value
                 const maxSales = Math.max(openMetrics.totalSales, 10000); // minimum scale
-                const salesPercent = (openMetrics.totalSales / maxSales) * 100;
+                const salesPercent = hideMoney ? 0 : (openMetrics.totalSales / maxSales) * 100;
                 document.getElementById('totalSalesBar').style.height = salesPercent + '%';
-                document.getElementById('totalSalesValue').innerText = '$' + openMetrics.totalSales.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+                document.getElementById('totalSalesValue').innerText = hideMoney ? '—' : ('$' + openMetrics.totalSales.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2}));
 
                 const maxRos = Math.max(openMetrics.totalROs, 1);
                 const rosPercent = (openMetrics.totalROs / maxRos) * 100;
@@ -3078,7 +3125,7 @@ def get_dashboard_screen_html():
                 document.getElementById('averageHrs').innerText = openMetrics.averageHrs.toFixed(1);
                 
                 // Update Average RO
-                document.getElementById('averageRO').innerText = '$' + openMetrics.averageRO.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+                document.getElementById('averageRO').innerText = hideMoney ? '—' : ('$' + openMetrics.averageRO.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2}));
                 
                 // Update Total Hrs per Tech - Pie Chart
                 updateHoursPerTechChart(openMetrics.hoursPerTech);
@@ -4810,7 +4857,7 @@ def get_dashboard_screen_html():
                                     ${ro.hours.toFixed(1)}
                                 </button>
                             </td>
-                            <td style="padding:12px; border-bottom:1px solid #eee; color:#333; text-align:right; font-weight:bold;">$${ro.total.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                            <td style="padding:12px; border-bottom:1px solid #eee; color:#333; text-align:right; font-weight:bold;">${window.__flagtechHideFinancials ? '—' : ('$' + Number(ro.total || 0).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2}))}</td>
                         </tr>
                         <tr id="hrs-assignment-row-${rowId}" style="display:none; background:${rowBg};">
                             <td colspan="10" style="padding:0 16px 10px 16px; border-bottom:1px solid #eee;">

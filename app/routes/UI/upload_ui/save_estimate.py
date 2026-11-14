@@ -758,7 +758,7 @@ function confirmMissingRoYes() {{
     }});
 }}
 
-function executeSaveEstimateInternal() {{
+function executeSaveEstimateInternal(acknowledgeDuplicate) {{
   const saveBtn = document.getElementById('executeSaveBtn');
   const statusDiv = document.getElementById('saveEstimateStatus');
 
@@ -871,7 +871,8 @@ function executeSaveEstimateInternal() {{
       estimate_snapshot: estimateSnapshot,
       estimate_totals: totalsData,
       local_upload_date: localUploadDate,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
+      acknowledge_duplicate: !!acknowledgeDuplicate
     }};
 
     fetch('/ui/save-estimate', {{
@@ -895,6 +896,18 @@ function executeSaveEstimateInternal() {{
     .then((resultPayload) => {{
       const ok = !!(resultPayload && resultPayload.ok);
       const data = (resultPayload && resultPayload.data) || {{}};
+      if (!ok && data.code === 'duplicate_warning' && !acknowledgeDuplicate) {{
+        const list = (data.duplicates || []).map((item) => (item.ro || 'RO') + ' (' + (item.reason || 'match') + ')').join(', ');
+        const proceed = window.confirm('This looks like a duplicate of ' + list + '. Save anyway? Nothing already saved will be deleted.');
+        if (proceed) {{
+          executeSaveEstimateInternal(true);
+          return;
+        }}
+        statusDiv.textContent = 'Save cancelled. Review the existing repair order.';
+        statusDiv.style.color = '#8a5a00';
+        saveBtn.disabled = false;
+        return;
+      }}
       if (ok && data.status === 'success') {{
         statusDiv.textContent = 'Saved successfully!';
         statusDiv.style.color = 'green';

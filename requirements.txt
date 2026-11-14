@@ -3,7 +3,7 @@ uvicorn[standard]
 gunicorn
 PyMuPDF 
 pillow
-psycopg2
+psycopg2-binary
 SQLAlchemy
 pytesseract
 

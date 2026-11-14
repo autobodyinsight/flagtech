@@ -206,8 +206,20 @@ async def login_screen(request: Request):
                     credentials: 'include',
                     body: JSON.stringify(payload),
                 });
-                const data = await resp.json();
-                if (!resp.ok || data.error) {
+                let data = await resp.json();
+                if (data && data.mfa_required) {
+                    const code = window.prompt('Enter your authentication code:');
+                    if (!code) throw new Error('MFA code required');
+                    payload.mfa_code = code;
+                    const retry = await fetch('/api/auth/login', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        credentials: 'include',
+                        body: JSON.stringify(payload),
+                    });
+                    data = await retry.json();
+                    if (!retry.ok || data.error) throw new Error(data.error || 'Login failed');
+                } else if (!resp.ok || data.error) {
                     throw new Error(data.error || 'Login failed');
                 }
 
@@ -1668,7 +1680,12 @@ async def home_screen(request: Request):
                 const sideManageBtn = document.getElementById('sideManageBtn');
                 if (sideManageBtn) sideManageBtn.style.display = canAccessManage ? 'flex' : 'none';
                 const sideSetupBtn = document.getElementById('sideSetupBtn');
-                if (sideSetupBtn) sideSetupBtn.style.display = 'flex';
+                if (sideSetupBtn) sideSetupBtn.style.display = canAccessScreen('setup') ? 'flex' : 'none';
+                document.querySelectorAll('.side-menu-item[data-screen]').forEach((item) => {{
+                    const screen = item.getAttribute('data-screen');
+                    if (screen === 'manage') return;
+                    item.style.display = canAccessScreen(screen) ? 'flex' : 'none';
+                }});
                 const resetPasswordBtn = document.getElementById('profileResetPasswordBtn');
                 if (resetPasswordBtn) resetPasswordBtn.style.display = canPerformAction('reset_profile_password') ? 'inline-flex' : 'none';
 
@@ -1790,6 +1807,10 @@ async def home_screen(request: Request):
 
             if (screenName === 'setup' && typeof setupLoadData === 'function') {{
                 setupLoadData();
+            }}
+
+            if (screenName === 'estimate' && typeof loadEstimateList === 'function') {{
+                loadEstimateList();
             }}
 
             if (screenName === 'manage') {{

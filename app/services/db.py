@@ -93,10 +93,23 @@ class ConnectionAdapter:
         self._autocommit = bool(value)
 
 
+def _prefer_psycopg2(dsn: str) -> str:
+    """Keep the historical psycopg2 driver when the URL does not name one."""
+    if dsn.startswith("postgres://"):
+        dsn = "postgresql://" + dsn[len("postgres://") :]
+    if dsn.startswith("postgresql://"):
+        dsn = "postgresql+psycopg2://" + dsn[len("postgresql://") :]
+    return dsn
+
+
 def _ensure_sslmode(dsn: str) -> str:
+    dsn = _prefer_psycopg2(dsn)
     parsed = urlsplit(dsn)
     query = dict(parse_qsl(parsed.query, keep_blank_values=True))
-    if "sslmode" not in query:
+    override = str(os.getenv("DATABASE_SSLMODE") or "").strip()
+    if override:
+        query["sslmode"] = override
+    elif "sslmode" not in query:
         query["sslmode"] = "require"
     return urlunsplit((parsed.scheme, parsed.netloc, parsed.path, urlencode(query), parsed.fragment))
 

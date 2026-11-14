@@ -10,6 +10,8 @@ from .dashboard_routes import router as dashboard_router
 from .payments_routes import router as payments_router
 from .ro_routes import router as ro_router
 from .misc_routes import router as misc_router
+from .native_estimate_routes import router as native_estimate_router
+from .enterprise_auth_routes import router as enterprise_auth_router
 
 
 router = APIRouter()
@@ -23,3 +25,5 @@ router.include_router(dashboard_router)
 router.include_router(payments_router)
 router.include_router(ro_router)
 router.include_router(misc_router)
+router.include_router(native_estimate_router)
+router.include_router(enterprise_auth_router)
